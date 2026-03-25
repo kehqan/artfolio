@@ -296,3 +296,35 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 CREATE OR REPLACE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
+
+-- ============================================================
+-- STORAGE BUCKET FOR ARTWORK IMAGES
+-- ============================================================
+-- Run this separately in SQL Editor after the main schema
+
+-- Create the artworks storage bucket
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('artworks', 'artworks', true)
+ON CONFLICT (id) DO NOTHING;
+
+-- Allow authenticated users to upload to their own folder
+CREATE POLICY "Users can upload artwork images"
+  ON storage.objects FOR INSERT
+  WITH CHECK (
+    bucket_id = 'artworks' AND
+    auth.uid()::text = (string_to_array(name, '/'))[1]
+  );
+
+-- Allow anyone to view artwork images (public portfolio)
+CREATE POLICY "Artwork images are publicly viewable"
+  ON storage.objects FOR SELECT
+  USING (bucket_id = 'artworks');
+
+-- Allow users to delete their own images
+CREATE POLICY "Users can delete own artwork images"
+  ON storage.objects FOR DELETE
+  USING (
+    bucket_id = 'artworks' AND
+    auth.uid()::text = (string_to_array(name, '/'))[1]
+  );

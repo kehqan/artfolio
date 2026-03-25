@@ -1,0 +1,75 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-canvas-950 text-canvas-200 font-body antialiased;
+  }
+
+  ::selection {
+    @apply bg-accent-500/30 text-white;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 px-7 py-3.5 
+           bg-accent-500 text-canvas-950 font-semibold text-sm tracking-wide uppercase
+           rounded-none hover:bg-accent-400 transition-all duration-300
+           hover:shadow-[0_0_24px_rgba(220,140,36,0.25)];
+  }
+
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 px-7 py-3.5 
+           border border-canvas-600 text-canvas-200 font-medium text-sm tracking-wide uppercase
+           rounded-none hover:border-accent-500 hover:text-accent-400 transition-all duration-300;
+  }
+
+  .section-label {
+    @apply text-[11px] font-semibold uppercase tracking-[0.25em] text-accent-500;
+  }
+
+  .heading-xl {
+    @apply font-display text-5xl md:text-6xl lg:text-7xl text-canvas-50 leading-[1.05] tracking-tight;
+  }
+
+  .heading-lg {
+    @apply font-display text-3xl md:text-4xl lg:text-5xl text-canvas-50 leading-[1.1];
+  }
+
+  .heading-md {
+    @apply font-display text-2xl md:text-3xl text-canvas-50 leading-[1.15];
+  }
+
+  .body-lg {
+    @apply text-lg md:text-xl text-canvas-400 leading-relaxed;
+  }
+}
+
+@layer utilities {
+  .stagger-1 { animation-delay: 0.1s; }
+  .stagger-2 { animation-delay: 0.2s; }
+  .stagger-3 { animation-delay: 0.3s; }
+  .stagger-4 { animation-delay: 0.4s; }
+  .stagger-5 { animation-delay: 0.5s; }
+  .stagger-6 { animation-delay: 0.6s; }
+}
+
+/* Grain overlay for texture */
+.grain::after {
+  content: "";
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  opacity: 0.03;
+  z-index: 100;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='1'/%3E%3C/svg%3E");
+}

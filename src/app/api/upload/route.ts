@@ -1,16 +1,43 @@
-import { createClient } from "@/lib/supabase/server";
-import { NextResponse } from "next/server";
+import { createServerClient } from "@supabase/ssr";
+import { cookies } from "next/headers";
+import { NextRequest, NextResponse } from "next/server";
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
-    const supabase = createClient();
+    const cookieStore = cookies();
+
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          getAll() {
+            return cookieStore.getAll();
+          },
+          setAll(cookiesToSet) {
+            try {
+              cookiesToSet.forEach(({ name, value, options }) =>
+                cookieStore.set(name, value, options)
+              );
+            } catch {
+              // Ignore in route handlers
+            }
+          },
+        },
+      }
+    );
 
     const {
       data: { user },
+      error: userError,
     } = await supabase.auth.getUser();
 
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (userError || !user) {
+      console.error("Auth error:", userError?.message || "No user");
+      return NextResponse.json(
+        { error: "Unauthorized. Please log in again." },
+        { status: 401 }
+      );
     }
 
     const formData = await request.formData();
@@ -21,7 +48,12 @@ export async function POST(request: Request) {
     }
 
     // Validate file type
-    const allowedTypes = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+    const allowedTypes = [
+      "image/jpeg",
+      "image/png",
+      "image/webp",
+      "image/gif",
+    ];
     if (!allowedTypes.includes(file.type)) {
       return NextResponse.json(
         { error: "Invalid file type. Use JPG, PNG, WebP, or GIF." },
@@ -37,22 +69,27 @@ export async function POST(request: Request) {
       );
     }
 
-    // Create unique filename
+    // Convert File to ArrayBuffer for upload
+    const arrayBuffer = await file.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+
+    // Create unique filename inside user's folder
     const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
     const fileName = `${user.id}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
 
     // Upload to Supabase Storage
     const { data, error } = await supabase.storage
       .from("artworks")
-      .upload(fileName, file, {
+      .upload(fileName, buffer, {
+        contentType: file.type,
         cacheControl: "3600",
         upsert: false,
       });
 
     if (error) {
-      console.error("Upload error:", error);
+      console.error("Storage upload error:", error.message, JSON.stringify(error));
       return NextResponse.json(
-        { error: "Failed to upload image." },
+        { error: `Upload failed: ${error.message}` },
         { status: 500 }
       );
     }
@@ -63,8 +100,8 @@ export async function POST(request: Request) {
     } = supabase.storage.from("artworks").getPublicUrl(data.path);
 
     return NextResponse.json({ url: publicUrl, path: data.path });
-  } catch (err) {
-    console.error("Upload error:", err);
+  } catch (err: any) {
+    console.error("Upload route error:", err?.message || err);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

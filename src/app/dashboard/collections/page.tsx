@@ -38,7 +38,7 @@ export default async function CollectionsPage() {
         <div>
           <span className="section-label">Organize</span>
           <h1 className="heading-md mt-2">My Collections</h1>
-          <p className="text-sm text-canvas-500 mt-1">
+          <p className="text-sm text-slate-9000 mt-1">
             {items.length} collection{items.length !== 1 ? "s" : ""}
           </p>
         </div>
@@ -49,10 +49,10 @@ export default async function CollectionsPage() {
       </div>
 
       {enriched.length === 0 ? (
-        <div className="border border-canvas-800/40 bg-canvas-900/20 p-16 text-center">
-          <FolderOpen size={40} className="text-canvas-700 mx-auto mb-4" strokeWidth={1} />
-          <h2 className="font-display text-xl text-canvas-300">No collections yet</h2>
-          <p className="text-sm text-canvas-500 mt-2 max-w-sm mx-auto">
+        <div className="border border-slate-150 bg-slate-50 p-16 text-center">
+          <FolderOpen size={40} className="text-slate-300 mx-auto mb-4" strokeWidth={1} />
+          <h2 className="font-display text-xl text-slate-600">No collections yet</h2>
+          <p className="text-sm text-slate-9000 mt-2 max-w-sm mx-auto">
             Create collections to group your artworks for exhibitions, series, or portfolios.
           </p>
           <Link href="/dashboard/collections/new" className="btn-primary mt-6 inline-flex">
@@ -66,36 +66,36 @@ export default async function CollectionsPage() {
             <Link
               key={col.id}
               href={`/dashboard/collections/${col.id}`}
-              className="group border border-canvas-800/40 bg-canvas-900/20 hover:bg-canvas-900/40 transition-all duration-300"
+              className="group border border-slate-150 bg-slate-50 hover:bg-slate-50 transition-all duration-300"
             >
-              <div className="aspect-[3/2] bg-canvas-900 overflow-hidden">
+              <div className="aspect-[3/2] bg-slate-50 overflow-hidden">
                 {col.previews.length > 0 ? (
-                  <div className="grid grid-cols-2 h-full gap-px bg-canvas-800/30">
+                  <div className="grid grid-cols-2 h-full gap-px bg-slate-100">
                     {col.previews.slice(0, 4).map((img: string, i: number) => (
-                      <div key={i} className="bg-canvas-900 overflow-hidden">
+                      <div key={i} className="bg-slate-50 overflow-hidden">
                         <img src={img} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                       </div>
                     ))}
                     {col.previews.length < 4 &&
                       [...Array(4 - col.previews.length)].map((_, i) => (
-                        <div key={`empty-${i}`} className="bg-canvas-900 flex items-center justify-center">
-                          <ImageIcon size={16} className="text-canvas-800" />
+                        <div key={`empty-${i}`} className="bg-slate-50 flex items-center justify-center">
+                          <ImageIcon size={16} className="text-slate-200" />
                         </div>
                       ))}
                   </div>
                 ) : (
                   <div className="w-full h-full flex items-center justify-center">
-                    <FolderOpen size={32} className="text-canvas-700" strokeWidth={1} />
+                    <FolderOpen size={32} className="text-slate-300" strokeWidth={1} />
                   </div>
                 )}
               </div>
               <div className="p-4">
-                <h3 className="font-display text-base text-canvas-100 group-hover:text-accent-400 transition-colors">
+                <h3 className="font-display text-base text-slate-800 group-hover:text-brand-600 transition-colors">
                   {col.title}
                 </h3>
-                <div className="flex items-center gap-3 mt-1.5 text-xs text-canvas-500">
+                <div className="flex items-center gap-3 mt-1.5 text-xs text-slate-9000">
                   <span>{col.artworkCount} artwork{col.artworkCount !== 1 ? "s" : ""}</span>
-                  {!col.is_public && <span className="text-canvas-600">· Private</span>}
+                  {!col.is_public && <span className="text-slate-400">· Private</span>}
                 </div>
               </div>
             </Link>

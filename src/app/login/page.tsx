@@ -47,19 +47,19 @@ function LoginForm() {
       {/* Mobile logo */}
       <div className="lg:hidden mb-10">
         <Link href="/" className="flex items-center gap-2.5">
-          <div className="w-8 h-8 bg-accent-500 flex items-center justify-center">
-            <span className="font-display text-canvas-950 text-lg leading-none">
+          <div className="w-8 h-8 bg-slate-900 flex items-center justify-center">
+            <span className="font-display text-white text-lg leading-none">
               A
             </span>
           </div>
-          <span className="font-display text-xl text-canvas-50">
+          <span className="font-display text-xl text-slate-900">
             Artfolio
           </span>
         </Link>
       </div>
 
-      <h1 className="font-display text-2xl text-canvas-50">Log In</h1>
-      <p className="text-sm text-canvas-500 mt-2">
+      <h1 className="font-display text-2xl text-slate-900">Log In</h1>
+      <p className="text-sm text-slate-9000 mt-2">
         Enter your credentials to access your account.
       </p>
 
@@ -86,7 +86,7 @@ function LoginForm() {
       <form className="mt-8 flex flex-col gap-5" onSubmit={handleLogin}>
         {/* Email */}
         <div>
-          <label className="block text-xs font-medium uppercase tracking-[0.15em] text-canvas-400 mb-2">
+          <label className="block text-xs font-medium uppercase tracking-[0.15em] text-slate-400 mb-2">
             Email
           </label>
           <input
@@ -95,13 +95,13 @@ function LoginForm() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="your@email.com"
-            className="w-full px-4 py-3 bg-canvas-900/50 border border-canvas-800/60 text-canvas-100 placeholder:text-canvas-600 text-sm focus:outline-none focus:border-accent-500/50 focus:bg-canvas-900/80 transition-all"
+            className="w-full px-4 py-3 bg-white border border-slate-200 text-slate-800 placeholder:text-slate-500 text-sm focus:outline-none focus:border-brand-500/50 focus:bg-slate-50 transition-all"
           />
         </div>
 
         {/* Password */}
         <div>
-          <label className="block text-xs font-medium uppercase tracking-[0.15em] text-canvas-400 mb-2">
+          <label className="block text-xs font-medium uppercase tracking-[0.15em] text-slate-400 mb-2">
             Password
           </label>
           <div className="relative">
@@ -111,12 +111,12 @@ function LoginForm() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
-              className="w-full px-4 py-3 bg-canvas-900/50 border border-canvas-800/60 text-canvas-100 placeholder:text-canvas-600 text-sm focus:outline-none focus:border-accent-500/50 focus:bg-canvas-900/80 transition-all pr-11"
+              className="w-full px-4 py-3 bg-white border border-slate-200 text-slate-800 placeholder:text-slate-500 text-sm focus:outline-none focus:border-brand-500/50 focus:bg-slate-50 transition-all pr-11"
             />
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-canvas-600 hover:text-canvas-400 transition-colors"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-400 transition-colors"
             >
               {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
             </button>
@@ -143,11 +143,11 @@ function LoginForm() {
         </button>
       </form>
 
-      <p className="text-sm text-canvas-500 mt-8 text-center">
+      <p className="text-sm text-slate-9000 mt-8 text-center">
         Don&apos;t have an account?{" "}
         <Link
           href="/register"
-          className="text-accent-500 hover:text-accent-400 transition-colors"
+          className="text-brand-600 hover:text-brand-600 transition-colors"
         >
           Create one free
         </Link>
@@ -155,7 +155,7 @@ function LoginForm() {
 
       <Link
         href="/"
-        className="block text-center text-xs text-canvas-600 hover:text-canvas-400 transition-colors mt-6"
+        className="block text-center text-xs text-slate-500 hover:text-slate-400 transition-colors mt-6"
       >
         &larr; Back to homepage
       </Link>
@@ -167,10 +167,10 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex">
       {/* Left Side — Branding */}
-      <div className="hidden lg:flex lg:w-1/2 relative bg-canvas-900/30 items-center justify-center overflow-hidden">
+      <div className="hidden lg:flex lg:w-1/2 relative bg-slate-50 items-center justify-center overflow-hidden">
         <div className="absolute inset-0 pointer-events-none">
-          <div className="absolute top-1/3 left-1/4 w-[400px] h-[400px] bg-accent-500/[0.04] rounded-full blur-3xl" />
-          <div className="absolute bottom-1/4 right-1/4 w-[300px] h-[300px] bg-accent-500/[0.03] rounded-full blur-3xl" />
+          <div className="absolute top-1/3 left-1/4 w-[400px] h-[400px] bg-slate-900/[0.04] rounded-full blur-3xl" />
+          <div className="absolute bottom-1/4 right-1/4 w-[300px] h-[300px] bg-slate-900/[0.03] rounded-full blur-3xl" />
           <div
             className="absolute inset-0 opacity-[0.03]"
             style={{
@@ -182,21 +182,21 @@ export default function LoginPage() {
         </div>
         <div className="relative z-10 max-w-md px-12">
           <Link href="/" className="flex items-center gap-2.5 mb-10">
-            <div className="w-9 h-9 bg-accent-500 flex items-center justify-center">
-              <span className="font-display text-canvas-950 text-xl leading-none">
+            <div className="w-9 h-9 bg-slate-900 flex items-center justify-center">
+              <span className="font-display text-white text-xl leading-none">
                 A
               </span>
             </div>
-            <span className="font-display text-2xl text-canvas-50">
+            <span className="font-display text-2xl text-slate-900">
               Artfolio
             </span>
           </Link>
-          <h2 className="font-display text-3xl text-canvas-50 leading-tight">
+          <h2 className="font-display text-3xl text-slate-900 leading-tight">
             Welcome back to
             <br />
-            <span className="text-accent-400">your studio.</span>
+            <span className="text-brand-600">your studio.</span>
           </h2>
-          <p className="text-canvas-500 mt-4 leading-relaxed">
+          <p className="text-slate-9000 mt-4 leading-relaxed">
             Pick up where you left off. Your artworks, collections, and
             portfolio are waiting for you.
           </p>
@@ -208,7 +208,7 @@ export default function LoginPage() {
         <Suspense
           fallback={
             <div className="flex items-center justify-center">
-              <Loader2 size={24} className="animate-spin text-canvas-500" />
+              <Loader2 size={24} className="animate-spin text-slate-9000" />
             </div>
           }
         >

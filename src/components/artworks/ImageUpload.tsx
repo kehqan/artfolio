@@ -97,19 +97,19 @@ export default function ImageUpload({
           {images.map((url, index) => (
             <div
               key={url}
-              className="relative group aspect-square bg-canvas-900 border border-canvas-800/40 overflow-hidden"
+              className="relative group aspect-square bg-slate-50 border border-slate-150 overflow-hidden"
             >
               <img
                 src={url}
                 alt={`Artwork image ${index + 1}`}
                 className="w-full h-full object-cover"
               />
-              <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
                 {index > 0 && (
                   <button
                     type="button"
                     onClick={() => moveImage(index, index - 1)}
-                    className="w-8 h-8 bg-canvas-800 text-canvas-200 flex items-center justify-center text-xs hover:bg-canvas-700 transition-colors"
+                    className="w-8 h-8 bg-slate-200 text-slate-700 flex items-center justify-center text-xs hover:bg-slate-300 transition-colors"
                   >
                     ←
                   </button>
@@ -125,14 +125,14 @@ export default function ImageUpload({
                   <button
                     type="button"
                     onClick={() => moveImage(index, index + 1)}
-                    className="w-8 h-8 bg-canvas-800 text-canvas-200 flex items-center justify-center text-xs hover:bg-canvas-700 transition-colors"
+                    className="w-8 h-8 bg-slate-200 text-slate-700 flex items-center justify-center text-xs hover:bg-slate-300 transition-colors"
                   >
                     →
                   </button>
                 )}
               </div>
               {index === 0 && (
-                <span className="absolute top-2 left-2 text-[9px] font-semibold uppercase tracking-wider bg-accent-500 text-canvas-950 px-2 py-0.5">
+                <span className="absolute top-2 left-2 text-[9px] font-semibold uppercase tracking-wider bg-slate-900 text-white px-2 py-0.5">
                   Cover
                 </span>
               )}
@@ -151,8 +151,8 @@ export default function ImageUpload({
           onDrop={handleDrop}
           className={`relative border-2 border-dashed transition-all duration-300 p-8 text-center cursor-pointer ${
             dragOver
-              ? "border-accent-500 bg-accent-500/5"
-              : "border-canvas-800/60 hover:border-canvas-600"
+              ? "border-brand-500 bg-brand-50"
+              : "border-slate-200 hover:border-slate-300"
           }`}
           onClick={() => document.getElementById("file-input")?.click()}
         >
@@ -170,17 +170,17 @@ export default function ImageUpload({
 
           {uploading ? (
             <div className="flex flex-col items-center gap-3">
-              <Loader2 size={24} className="animate-spin text-accent-500" />
-              <p className="text-sm text-canvas-400">Uploading...</p>
+              <Loader2 size={24} className="animate-spin text-brand-600" />
+              <p className="text-sm text-slate-500">Uploading...</p>
             </div>
           ) : (
             <div className="flex flex-col items-center gap-3">
-              <Upload size={24} className="text-canvas-500" strokeWidth={1.5} />
+              <Upload size={24} className="text-slate-9000" strokeWidth={1.5} />
               <div>
-                <p className="text-sm text-canvas-300">
+                <p className="text-sm text-slate-600">
                   Drop images here or click to browse
                 </p>
-                <p className="text-xs text-canvas-600 mt-1">
+                <p className="text-xs text-slate-400 mt-1">
                   JPG, PNG, WebP, GIF · Max 10MB each · Up to {maxImages} images
                 </p>
               </div>
@@ -189,10 +189,10 @@ export default function ImageUpload({
         </div>
       )}
 
-      {error && <p className="text-sm text-red-400 mt-2">{error}</p>}
+      {error && <p className="text-sm text-red-600 mt-2">{error}</p>}
 
       {images.length > 0 && (
-        <p className="text-xs text-canvas-600 mt-2">
+        <p className="text-xs text-slate-400 mt-2">
           {images.length}/{maxImages} images · First image is the cover · Hover to reorder or remove
         </p>
       )}

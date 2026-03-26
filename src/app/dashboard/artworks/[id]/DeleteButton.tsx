@@ -35,7 +35,7 @@ export default function DeleteArtworkButton({
   if (confirming) {
     return (
       <div className="flex items-center gap-2">
-        <span className="text-xs text-red-400">Delete?</span>
+        <span className="text-xs text-red-600">Delete?</span>
         <button
           onClick={handleDelete}
           disabled={deleting}
@@ -49,7 +49,7 @@ export default function DeleteArtworkButton({
         </button>
         <button
           onClick={() => setConfirming(false)}
-          className="px-3 py-1.5 border border-canvas-700 text-canvas-400 text-xs hover:text-canvas-200 transition-colors"
+          className="px-3 py-1.5 border border-slate-200 text-slate-500 text-xs hover:text-slate-700 transition-colors"
         >
           No
         </button>
@@ -60,7 +60,7 @@ export default function DeleteArtworkButton({
   return (
     <button
       onClick={() => setConfirming(true)}
-      className="inline-flex items-center gap-1.5 px-4 py-2 border border-canvas-800/60 text-canvas-500 text-xs uppercase tracking-wide hover:border-red-500/50 hover:text-red-400 transition-all"
+      className="inline-flex items-center gap-1.5 px-4 py-2 border border-slate-200 text-slate-9000 text-xs uppercase tracking-wide hover:border-red-500/50 hover:text-red-600 transition-all"
     >
       <Trash2 size={14} />
       Delete

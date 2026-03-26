@@ -14,7 +14,7 @@ export default function AboutPage() {
           <h1 className="heading-xl mt-4">
             Built for the
             <br />
-            <span className="text-accent-400">Art World</span>
+            <span className="text-brand-600">Art World</span>
           </h1>
         </div>
 
@@ -23,7 +23,7 @@ export default function AboutPage() {
           <div className="grid md:grid-cols-2 gap-16">
             <div>
               <h2 className="heading-md">Our Story</h2>
-              <div className="mt-6 flex flex-col gap-5 text-canvas-400 leading-relaxed">
+              <div className="mt-6 flex flex-col gap-5 text-slate-400 leading-relaxed">
                 <p>
                   Artists and galleries have been underserved by technology for
                   too long. Most end up juggling spreadsheets for inventory,
@@ -67,10 +67,10 @@ export default function AboutPage() {
                   },
                 ].map((value) => (
                   <div key={value.title}>
-                    <h3 className="font-display text-lg text-canvas-50">
+                    <h3 className="font-display text-lg text-slate-900">
                       {value.title}
                     </h3>
-                    <p className="text-sm text-canvas-500 mt-1 leading-relaxed">
+                    <p className="text-sm text-slate-9000 mt-1 leading-relaxed">
                       {value.text}
                     </p>
                   </div>
@@ -82,10 +82,10 @@ export default function AboutPage() {
 
         {/* Mission */}
         <div className="max-w-7xl mx-auto px-6 mt-24">
-          <div className="bg-canvas-900/30 border border-canvas-800/40 p-10 md:p-16 text-center">
+          <div className="bg-slate-50 border border-slate-150 p-10 md:p-16 text-center">
             <Heart
               size={28}
-              className="text-accent-500 mx-auto mb-6"
+              className="text-brand-600 mx-auto mb-6"
               strokeWidth={1.5}
             />
             <h2 className="heading-md max-w-lg mx-auto">

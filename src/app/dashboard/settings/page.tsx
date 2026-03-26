@@ -101,7 +101,7 @@ export default function SettingsPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
-        <Loader2 size={24} className="animate-spin text-canvas-500" />
+        <Loader2 size={24} className="animate-spin text-slate-9000" />
       </div>
     );
   }
@@ -111,20 +111,20 @@ export default function SettingsPage() {
       <div className="mb-8">
         <span className="section-label">Settings</span>
         <h1 className="heading-md mt-2">Profile Settings</h1>
-        <p className="text-canvas-500 mt-1 text-sm">
+        <p className="text-slate-9000 mt-1 text-sm">
           Update your profile information. This will appear on your public
           portfolio.
         </p>
       </div>
 
       {error && (
-        <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
+        <div className="mb-6 p-4 bg-red-50 border border-red-200 text-red-600 text-sm">
           {error}
         </div>
       )}
 
       {saved && (
-        <div className="mb-6 p-4 bg-green-500/10 border border-green-500/20 text-green-400 text-sm flex items-center gap-2">
+        <div className="mb-6 p-4 bg-emerald-50 border border-emerald-200 text-emerald-600 text-sm flex items-center gap-2">
           <CheckCircle2 size={16} />
           Profile saved successfully!
         </div>
@@ -133,37 +133,37 @@ export default function SettingsPage() {
       <form onSubmit={handleSave} className="flex flex-col gap-6">
         {/* Role Display */}
         <div>
-          <label className="block text-xs font-medium uppercase tracking-[0.15em] text-canvas-400 mb-2">
+          <label className="block text-xs font-medium uppercase tracking-[0.15em] text-slate-500 mb-2">
             Account Type
           </label>
-          <div className="px-4 py-3 bg-canvas-900/30 border border-canvas-800/40 text-canvas-400 text-sm capitalize">
+          <div className="px-4 py-3 bg-slate-50 border border-slate-150 text-slate-500 text-sm capitalize">
             {role}
           </div>
-          <p className="text-xs text-canvas-600 mt-1">
+          <p className="text-xs text-slate-400 mt-1">
             Account type cannot be changed.
           </p>
         </div>
 
         {/* Full Name */}
         <div>
-          <label className="block text-xs font-medium uppercase tracking-[0.15em] text-canvas-400 mb-2">
+          <label className="block text-xs font-medium uppercase tracking-[0.15em] text-slate-500 mb-2">
             {role === "gallery" ? "Gallery Name" : "Full Name"}
           </label>
           <input
             type="text"
             value={fullName}
             onChange={(e) => setFullName(e.target.value)}
-            className="w-full px-4 py-3 bg-canvas-900/50 border border-canvas-800/60 text-canvas-100 placeholder:text-canvas-600 text-sm focus:outline-none focus:border-accent-500/50 focus:bg-canvas-900/80 transition-all"
+            className="w-full px-4 py-3 bg-white border border-slate-200 text-slate-800 placeholder:text-slate-400 text-sm focus:outline-none focus:border-brand-500/50 focus:bg-slate-50 transition-all"
           />
         </div>
 
         {/* Username */}
         <div>
-          <label className="block text-xs font-medium uppercase tracking-[0.15em] text-canvas-400 mb-2">
+          <label className="block text-xs font-medium uppercase tracking-[0.15em] text-slate-500 mb-2">
             Username
           </label>
           <div className="flex items-center gap-0">
-            <span className="px-3 py-3 bg-canvas-800/50 border border-r-0 border-canvas-800/60 text-canvas-500 text-sm">
+            <span className="px-3 py-3 bg-slate-100 border border-r-0 border-slate-200 text-slate-9000 text-sm">
               artfolio.com/portfolio/
             </span>
             <input
@@ -175,17 +175,17 @@ export default function SettingsPage() {
                 )
               }
               placeholder="yourname"
-              className="flex-1 px-4 py-3 bg-canvas-900/50 border border-canvas-800/60 text-canvas-100 placeholder:text-canvas-600 text-sm focus:outline-none focus:border-accent-500/50 focus:bg-canvas-900/80 transition-all"
+              className="flex-1 px-4 py-3 bg-white border border-slate-200 text-slate-800 placeholder:text-slate-400 text-sm focus:outline-none focus:border-brand-500/50 focus:bg-slate-50 transition-all"
             />
           </div>
-          <p className="text-xs text-canvas-600 mt-1">
+          <p className="text-xs text-slate-400 mt-1">
             Only letters, numbers, hyphens, and underscores.
           </p>
         </div>
 
         {/* Bio */}
         <div>
-          <label className="block text-xs font-medium uppercase tracking-[0.15em] text-canvas-400 mb-2">
+          <label className="block text-xs font-medium uppercase tracking-[0.15em] text-slate-500 mb-2">
             Bio
           </label>
           <textarea
@@ -194,16 +194,16 @@ export default function SettingsPage() {
             rows={4}
             maxLength={500}
             placeholder="Tell the world about yourself or your gallery..."
-            className="w-full px-4 py-3 bg-canvas-900/50 border border-canvas-800/60 text-canvas-100 placeholder:text-canvas-600 text-sm focus:outline-none focus:border-accent-500/50 focus:bg-canvas-900/80 transition-all resize-none"
+            className="w-full px-4 py-3 bg-white border border-slate-200 text-slate-800 placeholder:text-slate-400 text-sm focus:outline-none focus:border-brand-500/50 focus:bg-slate-50 transition-all resize-none"
           />
-          <p className="text-xs text-canvas-600 mt-1">
+          <p className="text-xs text-slate-400 mt-1">
             {bio.length}/500 characters
           </p>
         </div>
 
         {/* Website */}
         <div>
-          <label className="block text-xs font-medium uppercase tracking-[0.15em] text-canvas-400 mb-2">
+          <label className="block text-xs font-medium uppercase tracking-[0.15em] text-slate-500 mb-2">
             Website
           </label>
           <input
@@ -211,13 +211,13 @@ export default function SettingsPage() {
             value={website}
             onChange={(e) => setWebsite(e.target.value)}
             placeholder="https://yourwebsite.com"
-            className="w-full px-4 py-3 bg-canvas-900/50 border border-canvas-800/60 text-canvas-100 placeholder:text-canvas-600 text-sm focus:outline-none focus:border-accent-500/50 focus:bg-canvas-900/80 transition-all"
+            className="w-full px-4 py-3 bg-white border border-slate-200 text-slate-800 placeholder:text-slate-400 text-sm focus:outline-none focus:border-brand-500/50 focus:bg-slate-50 transition-all"
           />
         </div>
 
         {/* Location */}
         <div>
-          <label className="block text-xs font-medium uppercase tracking-[0.15em] text-canvas-400 mb-2">
+          <label className="block text-xs font-medium uppercase tracking-[0.15em] text-slate-500 mb-2">
             Location
           </label>
           <input
@@ -225,12 +225,12 @@ export default function SettingsPage() {
             value={location}
             onChange={(e) => setLocation(e.target.value)}
             placeholder="City, Country"
-            className="w-full px-4 py-3 bg-canvas-900/50 border border-canvas-800/60 text-canvas-100 placeholder:text-canvas-600 text-sm focus:outline-none focus:border-accent-500/50 focus:bg-canvas-900/80 transition-all"
+            className="w-full px-4 py-3 bg-white border border-slate-200 text-slate-800 placeholder:text-slate-400 text-sm focus:outline-none focus:border-brand-500/50 focus:bg-slate-50 transition-all"
           />
         </div>
 
         {/* Save Button */}
-        <div className="pt-4 border-t border-canvas-800/40">
+        <div className="pt-4 border-t border-slate-150">
           <button
             type="submit"
             disabled={saving}

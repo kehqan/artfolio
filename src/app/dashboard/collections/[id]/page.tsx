@@ -33,7 +33,7 @@ export default async function CollectionDetailPage({ params }: Props) {
 
   return (
     <div>
-      <Link href="/dashboard/collections" className="inline-flex items-center gap-2 text-sm text-canvas-500 hover:text-canvas-300 transition-colors mb-6">
+      <Link href="/dashboard/collections" className="inline-flex items-center gap-2 text-sm text-slate-9000 hover:text-slate-600 transition-colors mb-6">
         <ArrowLeft size={14} /> Back to Collections
       </Link>
 
@@ -42,11 +42,11 @@ export default async function CollectionDetailPage({ params }: Props) {
           <div className="flex items-center gap-3 mb-1">
             <h1 className="heading-md">{collection.title}</h1>
             {!collection.is_public && (
-              <span className="text-[10px] font-semibold uppercase tracking-[0.15em] px-2.5 py-1 border border-canvas-700/30 text-canvas-500">Private</span>
+              <span className="text-[10px] font-semibold uppercase tracking-[0.15em] px-2.5 py-1 border border-slate-200 text-slate-9000">Private</span>
             )}
           </div>
-          {collection.description && <p className="text-sm text-canvas-400 mt-1">{collection.description}</p>}
-          <p className="text-xs text-canvas-600 mt-2">{artworks.length} artwork{artworks.length !== 1 ? "s" : ""}</p>
+          {collection.description && <p className="text-sm text-slate-500 mt-1">{collection.description}</p>}
+          <p className="text-xs text-slate-400 mt-2">{artworks.length} artwork{artworks.length !== 1 ? "s" : ""}</p>
         </div>
         <div className="flex items-center gap-3">
           <Link href={`/dashboard/collections/${collection.id}/edit`} className="btn-secondary !py-2 !px-4 text-xs">
@@ -59,26 +59,26 @@ export default async function CollectionDetailPage({ params }: Props) {
 
       {/* Artwork Grid */}
       {artworks.length === 0 ? (
-        <div className="border border-canvas-800/40 bg-canvas-900/20 p-16 text-center mt-6">
-          <ImageIcon size={40} className="text-canvas-700 mx-auto mb-4" strokeWidth={1} />
-          <h2 className="font-display text-xl text-canvas-300">No artworks in this collection</h2>
-          <p className="text-sm text-canvas-500 mt-2">Use the dropdown above to add artworks.</p>
+        <div className="border border-slate-150 bg-slate-50 p-16 text-center mt-6">
+          <ImageIcon size={40} className="text-slate-300 mx-auto mb-4" strokeWidth={1} />
+          <h2 className="font-display text-xl text-slate-600">No artworks in this collection</h2>
+          <p className="text-sm text-slate-9000 mt-2">Use the dropdown above to add artworks.</p>
         </div>
       ) : (
         <div className="mt-6 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
           {artworks.map((artwork: any) => (
             <Link key={artwork.id} href={`/dashboard/artworks/${artwork.id}`}
-              className="group border border-canvas-800/40 bg-canvas-900/20 hover:bg-canvas-900/40 transition-all">
-              <div className="aspect-square bg-canvas-900 overflow-hidden">
+              className="group border border-slate-150 bg-slate-50 hover:bg-slate-50 transition-all">
+              <div className="aspect-square bg-slate-50 overflow-hidden">
                 {artwork.images?.[0] ? (
                   <img src={artwork.images[0]} alt={artwork.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                 ) : (
-                  <div className="w-full h-full flex items-center justify-center"><ImageIcon size={24} className="text-canvas-700" /></div>
+                  <div className="w-full h-full flex items-center justify-center"><ImageIcon size={24} className="text-slate-300" /></div>
                 )}
               </div>
               <div className="p-3">
-                <h3 className="text-sm text-canvas-200 truncate group-hover:text-accent-400 transition-colors">{artwork.title}</h3>
-                {artwork.medium && <p className="text-xs text-canvas-500 mt-0.5 truncate">{artwork.medium}</p>}
+                <h3 className="text-sm text-slate-700 truncate group-hover:text-brand-600 transition-colors">{artwork.title}</h3>
+                {artwork.medium && <p className="text-xs text-slate-9000 mt-0.5 truncate">{artwork.medium}</p>}
               </div>
             </Link>
           ))}

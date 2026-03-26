@@ -35,36 +35,36 @@ export default function NewCollectionPage() {
     router.refresh();
   }
 
-  const inputClass = "w-full px-4 py-3 bg-canvas-900/50 border border-canvas-800/60 text-canvas-100 placeholder:text-canvas-600 text-sm focus:outline-none focus:border-accent-500/50 focus:bg-canvas-900/80 transition-all";
+  const inputClass = "w-full px-4 py-3 bg-white border border-slate-200 text-slate-800 placeholder:text-slate-400 text-sm focus:outline-none focus:border-brand-500/50 focus:bg-slate-50 transition-all";
 
   return (
     <div className="max-w-2xl">
-      <Link href="/dashboard/collections" className="inline-flex items-center gap-2 text-sm text-canvas-500 hover:text-canvas-300 transition-colors mb-6">
+      <Link href="/dashboard/collections" className="inline-flex items-center gap-2 text-sm text-slate-9000 hover:text-slate-600 transition-colors mb-6">
         <ArrowLeft size={14} /> Back to Collections
       </Link>
       <div className="mb-8">
         <span className="section-label">New</span>
         <h1 className="heading-md mt-2">Create Collection</h1>
       </div>
-      {error && <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 text-red-400 text-sm">{error}</div>}
+      {error && <div className="mb-6 p-4 bg-red-50 border border-red-200 text-red-600 text-sm">{error}</div>}
       <form onSubmit={handleSubmit} className="space-y-6">
         <div>
-          <label className="block text-xs font-medium uppercase tracking-[0.15em] text-canvas-400 mb-2">Title <span className="text-red-400">*</span></label>
+          <label className="block text-xs font-medium uppercase tracking-[0.15em] text-slate-500 mb-2">Title <span className="text-red-600">*</span></label>
           <input type="text" required value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Collection name" className={inputClass} />
         </div>
         <div>
-          <label className="block text-xs font-medium uppercase tracking-[0.15em] text-canvas-400 mb-2">Description</label>
+          <label className="block text-xs font-medium uppercase tracking-[0.15em] text-slate-500 mb-2">Description</label>
           <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} placeholder="What is this collection about?" className={`${inputClass} resize-none`} />
         </div>
         <div>
-          <label className="block text-xs font-medium uppercase tracking-[0.15em] text-canvas-400 mb-3">Visibility</label>
+          <label className="block text-xs font-medium uppercase tracking-[0.15em] text-slate-500 mb-3">Visibility</label>
           <div className="flex gap-3">
-            <button type="button" onClick={() => setIsPublic(true)} className={`px-4 py-2.5 border text-sm transition-all ${isPublic ? "border-accent-500 bg-accent-500/10 text-accent-400" : "border-canvas-800/60 text-canvas-500 hover:border-canvas-600"}`}>Public</button>
-            <button type="button" onClick={() => setIsPublic(false)} className={`px-4 py-2.5 border text-sm transition-all ${!isPublic ? "border-accent-500 bg-accent-500/10 text-accent-400" : "border-canvas-800/60 text-canvas-500 hover:border-canvas-600"}`}>Private</button>
+            <button type="button" onClick={() => setIsPublic(true)} className={`px-4 py-2.5 border text-sm transition-all ${isPublic ? "border-brand-500 bg-brand-50 text-brand-600" : "border-slate-200 text-slate-9000 hover:border-slate-300"}`}>Public</button>
+            <button type="button" onClick={() => setIsPublic(false)} className={`px-4 py-2.5 border text-sm transition-all ${!isPublic ? "border-brand-500 bg-brand-50 text-brand-600" : "border-slate-200 text-slate-9000 hover:border-slate-300"}`}>Private</button>
           </div>
-          <p className="text-xs text-canvas-600 mt-1">Public collections appear on your portfolio page.</p>
+          <p className="text-xs text-slate-400 mt-1">Public collections appear on your portfolio page.</p>
         </div>
-        <div className="pt-4 border-t border-canvas-800/40">
+        <div className="pt-4 border-t border-slate-150">
           <button type="submit" disabled={saving} className="btn-primary disabled:opacity-50">
             {saving ? <><Loader2 size={16} className="animate-spin" /> Creating...</> : <><Save size={16} /> Create Collection</>}
           </button>

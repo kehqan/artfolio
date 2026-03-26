@@ -86,10 +86,10 @@ export default function RegisterPage() {
   return (
     <div className="min-h-screen flex">
       {/* Left Side — Branding */}
-      <div className="hidden lg:flex lg:w-1/2 relative bg-canvas-900/30 items-center justify-center overflow-hidden">
+      <div className="hidden lg:flex lg:w-1/2 relative bg-slate-50 items-center justify-center overflow-hidden">
         <div className="absolute inset-0 pointer-events-none">
-          <div className="absolute top-1/3 right-1/4 w-[400px] h-[400px] bg-accent-500/[0.04] rounded-full blur-3xl" />
-          <div className="absolute bottom-1/4 left-1/4 w-[300px] h-[300px] bg-accent-500/[0.03] rounded-full blur-3xl" />
+          <div className="absolute top-1/3 right-1/4 w-[400px] h-[400px] bg-slate-900/[0.04] rounded-full blur-3xl" />
+          <div className="absolute bottom-1/4 left-1/4 w-[300px] h-[300px] bg-slate-900/[0.03] rounded-full blur-3xl" />
           <div
             className="absolute inset-0 opacity-[0.03]"
             style={{
@@ -101,21 +101,21 @@ export default function RegisterPage() {
         </div>
         <div className="relative z-10 max-w-md px-12">
           <Link href="/" className="flex items-center gap-2.5 mb-10">
-            <div className="w-9 h-9 bg-accent-500 flex items-center justify-center">
-              <span className="font-display text-canvas-950 text-xl leading-none">
+            <div className="w-9 h-9 bg-slate-900 flex items-center justify-center">
+              <span className="font-display text-white text-xl leading-none">
                 A
               </span>
             </div>
-            <span className="font-display text-2xl text-canvas-50">
+            <span className="font-display text-2xl text-slate-900">
               Artfolio
             </span>
           </Link>
-          <h2 className="font-display text-3xl text-canvas-50 leading-tight">
+          <h2 className="font-display text-3xl text-slate-900 leading-tight">
             Start your
             <br />
-            <span className="text-accent-400">art journey.</span>
+            <span className="text-brand-600">art journey.</span>
           </h2>
-          <p className="text-canvas-500 mt-4 leading-relaxed">
+          <p className="text-slate-9000 mt-4 leading-relaxed">
             Join artists and galleries who are managing their work, building
             portfolios, and connecting with the art world.
           </p>
@@ -128,21 +128,21 @@ export default function RegisterPage() {
           {/* Mobile logo */}
           <div className="lg:hidden mb-10">
             <Link href="/" className="flex items-center gap-2.5">
-              <div className="w-8 h-8 bg-accent-500 flex items-center justify-center">
-                <span className="font-display text-canvas-950 text-lg leading-none">
+              <div className="w-8 h-8 bg-slate-900 flex items-center justify-center">
+                <span className="font-display text-white text-lg leading-none">
                   A
                 </span>
               </div>
-              <span className="font-display text-xl text-canvas-50">
+              <span className="font-display text-xl text-slate-900">
                 Artfolio
               </span>
             </Link>
           </div>
 
-          <h1 className="font-display text-2xl text-canvas-50">
+          <h1 className="font-display text-2xl text-slate-900">
             Create Account
           </h1>
-          <p className="text-sm text-canvas-500 mt-2">
+          <p className="text-sm text-slate-9000 mt-2">
             Choose your role and get started in minutes.
           </p>
 
@@ -155,7 +155,7 @@ export default function RegisterPage() {
           <form className="mt-8 flex flex-col gap-5" onSubmit={handleRegister}>
             {/* Role Selection */}
             <div>
-              <label className="block text-xs font-medium uppercase tracking-[0.15em] text-canvas-400 mb-3">
+              <label className="block text-xs font-medium uppercase tracking-[0.15em] text-slate-400 mb-3">
                 I am a...
               </label>
               <div className="grid grid-cols-2 gap-3">
@@ -164,8 +164,8 @@ export default function RegisterPage() {
                   onClick={() => setRole("artist")}
                   className={`flex flex-col items-center gap-2 p-4 border transition-all duration-300 ${
                     role === "artist"
-                      ? "border-accent-500 bg-accent-500/10 text-accent-400"
-                      : "border-canvas-800/60 bg-canvas-900/30 text-canvas-500 hover:border-canvas-600"
+                      ? "border-brand-500 bg-slate-900/10 text-brand-600"
+                      : "border-slate-200 bg-slate-50 text-slate-9000 hover:border-canvas-600"
                   }`}
                 >
                   <Palette size={22} />
@@ -176,8 +176,8 @@ export default function RegisterPage() {
                   onClick={() => setRole("gallery")}
                   className={`flex flex-col items-center gap-2 p-4 border transition-all duration-300 ${
                     role === "gallery"
-                      ? "border-accent-500 bg-accent-500/10 text-accent-400"
-                      : "border-canvas-800/60 bg-canvas-900/30 text-canvas-500 hover:border-canvas-600"
+                      ? "border-brand-500 bg-slate-900/10 text-brand-600"
+                      : "border-slate-200 bg-slate-50 text-slate-9000 hover:border-canvas-600"
                   }`}
                 >
                   <Building2 size={22} />
@@ -188,7 +188,7 @@ export default function RegisterPage() {
 
             {/* Name */}
             <div>
-              <label className="block text-xs font-medium uppercase tracking-[0.15em] text-canvas-400 mb-2">
+              <label className="block text-xs font-medium uppercase tracking-[0.15em] text-slate-400 mb-2">
                 {role === "gallery" ? "Gallery Name" : "Full Name"}
               </label>
               <input
@@ -199,13 +199,13 @@ export default function RegisterPage() {
                 placeholder={
                   role === "gallery" ? "Gallery name" : "Your full name"
                 }
-                className="w-full px-4 py-3 bg-canvas-900/50 border border-canvas-800/60 text-canvas-100 placeholder:text-canvas-600 text-sm focus:outline-none focus:border-accent-500/50 focus:bg-canvas-900/80 transition-all"
+                className="w-full px-4 py-3 bg-white border border-slate-200 text-slate-800 placeholder:text-slate-500 text-sm focus:outline-none focus:border-brand-500/50 focus:bg-slate-50 transition-all"
               />
             </div>
 
             {/* Email */}
             <div>
-              <label className="block text-xs font-medium uppercase tracking-[0.15em] text-canvas-400 mb-2">
+              <label className="block text-xs font-medium uppercase tracking-[0.15em] text-slate-400 mb-2">
                 Email
               </label>
               <input
@@ -214,13 +214,13 @@ export default function RegisterPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="your@email.com"
-                className="w-full px-4 py-3 bg-canvas-900/50 border border-canvas-800/60 text-canvas-100 placeholder:text-canvas-600 text-sm focus:outline-none focus:border-accent-500/50 focus:bg-canvas-900/80 transition-all"
+                className="w-full px-4 py-3 bg-white border border-slate-200 text-slate-800 placeholder:text-slate-500 text-sm focus:outline-none focus:border-brand-500/50 focus:bg-slate-50 transition-all"
               />
             </div>
 
             {/* Password */}
             <div>
-              <label className="block text-xs font-medium uppercase tracking-[0.15em] text-canvas-400 mb-2">
+              <label className="block text-xs font-medium uppercase tracking-[0.15em] text-slate-400 mb-2">
                 Password
               </label>
               <div className="relative">
@@ -231,12 +231,12 @@ export default function RegisterPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Min. 8 characters"
-                  className="w-full px-4 py-3 bg-canvas-900/50 border border-canvas-800/60 text-canvas-100 placeholder:text-canvas-600 text-sm focus:outline-none focus:border-accent-500/50 focus:bg-canvas-900/80 transition-all pr-11"
+                  className="w-full px-4 py-3 bg-white border border-slate-200 text-slate-800 placeholder:text-slate-500 text-sm focus:outline-none focus:border-brand-500/50 focus:bg-slate-50 transition-all pr-11"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-canvas-600 hover:text-canvas-400 transition-colors"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-400 transition-colors"
                 >
                   {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
@@ -263,16 +263,16 @@ export default function RegisterPage() {
             </button>
           </form>
 
-          <p className="text-xs text-canvas-600 text-center mt-5">
+          <p className="text-xs text-slate-500 text-center mt-5">
             By creating an account, you agree to our Terms of Service and
             Privacy Policy.
           </p>
 
-          <p className="text-sm text-canvas-500 mt-6 text-center">
+          <p className="text-sm text-slate-9000 mt-6 text-center">
             Already have an account?{" "}
             <Link
               href="/login"
-              className="text-accent-500 hover:text-accent-400 transition-colors"
+              className="text-brand-600 hover:text-brand-600 transition-colors"
             >
               Log in
             </Link>
@@ -280,7 +280,7 @@ export default function RegisterPage() {
 
           <Link
             href="/"
-            className="block text-center text-xs text-canvas-600 hover:text-canvas-400 transition-colors mt-6"
+            className="block text-center text-xs text-slate-500 hover:text-slate-400 transition-colors mt-6"
           >
             &larr; Back to homepage
           </Link>

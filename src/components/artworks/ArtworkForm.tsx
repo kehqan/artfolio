@@ -156,15 +156,15 @@ export default function ArtworkForm({ artwork, isEditing }: ArtworkFormProps) {
   }
 
   const inputClass =
-    "w-full px-4 py-3 bg-canvas-900/50 border border-canvas-800/60 text-canvas-100 placeholder:text-canvas-600 text-sm focus:outline-none focus:border-accent-500/50 focus:bg-canvas-900/80 transition-all";
+    "w-full px-4 py-3 bg-white border border-slate-200 text-slate-800 placeholder:text-slate-400 text-sm focus:outline-none focus:border-brand-500/50 focus:bg-slate-50 transition-all";
   const labelClass =
-    "block text-xs font-medium uppercase tracking-[0.15em] text-canvas-400 mb-2";
+    "block text-xs font-medium uppercase tracking-[0.15em] text-slate-500 mb-2";
 
   return (
     <div>
       <Link
         href="/dashboard/artworks"
-        className="inline-flex items-center gap-2 text-sm text-canvas-500 hover:text-canvas-300 transition-colors mb-6"
+        className="inline-flex items-center gap-2 text-sm text-slate-9000 hover:text-slate-600 transition-colors mb-6"
       >
         <ArrowLeft size={14} />
         Back to Artworks
@@ -175,7 +175,7 @@ export default function ArtworkForm({ artwork, isEditing }: ArtworkFormProps) {
         <h1 className="heading-md mt-2">
           {isEditing ? "Edit Artwork" : "Add Artwork"}
         </h1>
-        <p className="text-canvas-500 mt-1 text-sm">
+        <p className="text-slate-9000 mt-1 text-sm">
           {isEditing
             ? "Update the details of your artwork."
             : "Fill in the details to add a new artwork to your inventory."}
@@ -183,7 +183,7 @@ export default function ArtworkForm({ artwork, isEditing }: ArtworkFormProps) {
       </div>
 
       {error && (
-        <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
+        <div className="mb-6 p-4 bg-red-50 border border-red-200 text-red-600 text-sm">
           {error}
         </div>
       )}
@@ -191,7 +191,7 @@ export default function ArtworkForm({ artwork, isEditing }: ArtworkFormProps) {
       <form onSubmit={handleSubmit} className="space-y-8">
         {/* ── Images ── */}
         <section>
-          <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-canvas-400 mb-4 pb-2 border-b border-canvas-800/40">
+          <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 mb-4 pb-2 border-b border-slate-150">
             Images
           </h2>
           <ImageUpload
@@ -202,13 +202,13 @@ export default function ArtworkForm({ artwork, isEditing }: ArtworkFormProps) {
 
         {/* ── Basic Info ── */}
         <section>
-          <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-canvas-400 mb-4 pb-2 border-b border-canvas-800/40">
+          <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 mb-4 pb-2 border-b border-slate-150">
             Basic Information
           </h2>
           <div className="space-y-5">
             <div>
               <label className={labelClass}>
-                Title <span className="text-red-400">*</span>
+                Title <span className="text-red-600">*</span>
               </label>
               <input
                 type="text"
@@ -266,7 +266,7 @@ export default function ArtworkForm({ artwork, isEditing }: ArtworkFormProps) {
 
         {/* ── Dimensions ── */}
         <section>
-          <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-canvas-400 mb-4 pb-2 border-b border-canvas-800/40">
+          <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 mb-4 pb-2 border-b border-slate-150">
             Dimensions (cm)
           </h2>
           <div className="grid grid-cols-3 gap-4">
@@ -311,7 +311,7 @@ export default function ArtworkForm({ artwork, isEditing }: ArtworkFormProps) {
 
         {/* ── Pricing & Status ── */}
         <section>
-          <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-canvas-400 mb-4 pb-2 border-b border-canvas-800/40">
+          <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 mb-4 pb-2 border-b border-slate-150">
             Pricing & Status
           </h2>
           <div className="space-y-5">
@@ -322,7 +322,7 @@ export default function ArtworkForm({ artwork, isEditing }: ArtworkFormProps) {
                   <select
                     value={data.currency}
                     onChange={(e) => updateField("currency", e.target.value)}
-                    className="px-3 py-3 bg-canvas-800/50 border border-r-0 border-canvas-800/60 text-canvas-400 text-sm focus:outline-none"
+                    className="px-3 py-3 bg-slate-100 border border-r-0 border-slate-200 text-slate-500 text-sm focus:outline-none"
                   >
                     {currencies.map((c) => (
                       <option key={c} value={c}>
@@ -351,8 +351,8 @@ export default function ArtworkForm({ artwork, isEditing }: ArtworkFormProps) {
                       onClick={() => updateField("status", s.value)}
                       className={`px-3 py-2.5 border text-sm transition-all duration-200 ${
                         data.status === s.value
-                          ? "border-accent-500 bg-accent-500/10 text-accent-400"
-                          : "border-canvas-800/60 text-canvas-500 hover:border-canvas-600"
+                          ? "border-brand-500 bg-brand-50 text-brand-600"
+                          : "border-slate-200 text-slate-9000 hover:border-slate-300"
                       }`}
                     >
                       {s.label}
@@ -366,7 +366,7 @@ export default function ArtworkForm({ artwork, isEditing }: ArtworkFormProps) {
 
         {/* ── Location & Notes ── */}
         <section>
-          <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-canvas-400 mb-4 pb-2 border-b border-canvas-800/40">
+          <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 mb-4 pb-2 border-b border-slate-150">
             Location & Notes
           </h2>
           <div className="space-y-5">
@@ -389,7 +389,7 @@ export default function ArtworkForm({ artwork, isEditing }: ArtworkFormProps) {
                 placeholder="Personal notes (not visible to others)..."
                 className={`${inputClass} resize-none`}
               />
-              <p className="text-xs text-canvas-600 mt-1">
+              <p className="text-xs text-slate-400 mt-1">
                 Only visible to you. Use for reminders, history, or context.
               </p>
             </div>
@@ -397,7 +397,7 @@ export default function ArtworkForm({ artwork, isEditing }: ArtworkFormProps) {
         </section>
 
         {/* ── Submit ── */}
-        <div className="pt-6 border-t border-canvas-800/40 flex items-center gap-4">
+        <div className="pt-6 border-t border-slate-150 flex items-center gap-4">
           <button
             type="submit"
             disabled={saving}
@@ -417,7 +417,7 @@ export default function ArtworkForm({ artwork, isEditing }: ArtworkFormProps) {
           </button>
           <Link
             href="/dashboard/artworks"
-            className="text-sm text-canvas-500 hover:text-canvas-300 transition-colors"
+            className="text-sm text-slate-9000 hover:text-slate-600 transition-colors"
           >
             Cancel
           </Link>

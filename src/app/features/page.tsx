@@ -125,7 +125,7 @@ export default function FeaturesPage() {
           <h1 className="heading-xl mt-4">
             Everything You Need
             <br />
-            <span className="text-accent-400">to Thrive</span>
+            <span className="text-brand-600">to Thrive</span>
           </h1>
           <p className="body-lg mt-6 max-w-xl">
             A complete toolkit built specifically for artists and galleries.
@@ -135,30 +135,30 @@ export default function FeaturesPage() {
 
         {/* Feature List */}
         <div className="max-w-7xl mx-auto px-6">
-          <div className="flex flex-col gap-px bg-canvas-800/30">
+          <div className="flex flex-col gap-px bg-slate-100/30">
             {phases.map((feature, index) => (
               <div
                 key={feature.title}
-                className="bg-canvas-950 grid md:grid-cols-2 gap-8 md:gap-16 p-8 md:p-14 group hover:bg-canvas-900/20 transition-colors duration-500"
+                className="bg-white grid md:grid-cols-2 gap-8 md:gap-16 p-8 md:p-14 group hover:bg-slate-50 transition-colors duration-500"
               >
                 <div>
                   <div className="flex items-center gap-3 mb-5">
                     <feature.icon
                       size={22}
-                      className="text-accent-500"
+                      className="text-brand-600"
                       strokeWidth={1.5}
                     />
                     {feature.status === "coming" && (
-                      <span className="text-[10px] font-semibold uppercase tracking-[0.15em] text-canvas-600 border border-canvas-700 px-2.5 py-1">
+                      <span className="text-[10px] font-semibold uppercase tracking-[0.15em] text-slate-500 border border-slate-200 px-2.5 py-1">
                         Coming Soon
                       </span>
                     )}
                   </div>
                   <h2 className="heading-md">{feature.title}</h2>
-                  <p className="text-accent-500/70 text-sm mt-1">
+                  <p className="text-brand-600/70 text-sm mt-1">
                     {feature.tagline}
                   </p>
-                  <p className="text-canvas-400 mt-5 leading-relaxed">
+                  <p className="text-slate-400 mt-5 leading-relaxed">
                     {feature.description}
                   </p>
                 </div>
@@ -172,10 +172,10 @@ export default function FeaturesPage() {
                       >
                         <CheckCircle2
                           size={16}
-                          className="text-accent-500 shrink-0"
+                          className="text-brand-600 shrink-0"
                           strokeWidth={1.5}
                         />
-                        <span className="text-canvas-300">{h}</span>
+                        <span className="text-slate-600">{h}</span>
                       </div>
                     ))}
                   </div>

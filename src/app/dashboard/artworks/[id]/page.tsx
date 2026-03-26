@@ -20,9 +20,9 @@ interface Props {
 }
 
 const statusColors: Record<string, string> = {
-  available: "bg-green-500/10 text-green-400 border-green-500/20",
-  sold: "bg-red-500/10 text-red-400 border-red-500/20",
-  not_for_sale: "bg-canvas-700/20 text-canvas-400 border-canvas-700/30",
+  available: "bg-emerald-50 text-emerald-600 border-emerald-200",
+  sold: "bg-red-50 text-red-600 border-red-200",
+  not_for_sale: "bg-slate-300/20 text-slate-500 border-slate-200",
   reserved: "bg-amber-500/10 text-amber-400 border-amber-500/20",
 };
 
@@ -63,7 +63,7 @@ export default async function ArtworkDetailPage({ params }: Props) {
     <div>
       <Link
         href="/dashboard/artworks"
-        className="inline-flex items-center gap-2 text-sm text-canvas-500 hover:text-canvas-300 transition-colors mb-6"
+        className="inline-flex items-center gap-2 text-sm text-slate-9000 hover:text-slate-600 transition-colors mb-6"
       >
         <ArrowLeft size={14} />
         Back to Artworks
@@ -83,7 +83,7 @@ export default async function ArtworkDetailPage({ params }: Props) {
             </span>
           </div>
           {artwork.year && (
-            <p className="text-sm text-canvas-500">{artwork.year}</p>
+            <p className="text-sm text-slate-9000">{artwork.year}</p>
           )}
         </div>
         <div className="flex items-center gap-3">
@@ -104,11 +104,11 @@ export default async function ArtworkDetailPage({ params }: Props) {
           {artwork.images && artwork.images.length > 0 ? (
             <div className="space-y-3">
               {/* Main Image */}
-              <div className="aspect-[4/3] bg-canvas-900 border border-canvas-800/40 overflow-hidden">
+              <div className="aspect-[4/3] bg-slate-50 border border-slate-150 overflow-hidden">
                 <img
                   src={artwork.images[0]}
                   alt={artwork.title}
-                  className="w-full h-full object-contain bg-canvas-900"
+                  className="w-full h-full object-contain bg-slate-50"
                 />
               </div>
               {/* Thumbnails */}
@@ -117,10 +117,10 @@ export default async function ArtworkDetailPage({ params }: Props) {
                   {artwork.images.map((img: string, i: number) => (
                     <div
                       key={i}
-                      className={`aspect-square bg-canvas-900 border overflow-hidden ${
+                      className={`aspect-square bg-slate-50 border overflow-hidden ${
                         i === 0
-                          ? "border-accent-500"
-                          : "border-canvas-800/40"
+                          ? "border-brand-500"
+                          : "border-slate-150"
                       }`}
                     >
                       <img
@@ -134,17 +134,17 @@ export default async function ArtworkDetailPage({ params }: Props) {
               )}
             </div>
           ) : (
-            <div className="aspect-[4/3] bg-canvas-900/50 border border-canvas-800/40 flex items-center justify-center">
+            <div className="aspect-[4/3] bg-white border border-slate-150 flex items-center justify-center">
               <div className="text-center">
                 <ImageIcon
                   size={40}
-                  className="text-canvas-700 mx-auto mb-3"
+                  className="text-slate-300 mx-auto mb-3"
                   strokeWidth={1}
                 />
-                <p className="text-sm text-canvas-600">No images uploaded</p>
+                <p className="text-sm text-slate-400">No images uploaded</p>
                 <Link
                   href={`/dashboard/artworks/${artwork.id}/edit`}
-                  className="text-xs text-accent-500 hover:text-accent-400 mt-2 inline-block"
+                  className="text-xs text-brand-600 hover:text-brand-600 mt-2 inline-block"
                 >
                   Add images →
                 </Link>
@@ -155,10 +155,10 @@ export default async function ArtworkDetailPage({ params }: Props) {
           {/* Description */}
           {artwork.description && (
             <div className="mt-8">
-              <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-canvas-400 mb-3">
+              <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 mb-3">
                 Description
               </h2>
-              <p className="text-canvas-300 leading-relaxed whitespace-pre-wrap">
+              <p className="text-slate-600 leading-relaxed whitespace-pre-wrap">
                 {artwork.description}
               </p>
             </div>
@@ -168,19 +168,19 @@ export default async function ArtworkDetailPage({ params }: Props) {
         {/* Details Sidebar */}
         <div className="space-y-6">
           {/* Details Card */}
-          <div className="border border-canvas-800/40 bg-canvas-900/20">
-            <div className="p-5 border-b border-canvas-800/40">
-              <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-canvas-400">
+          <div className="border border-slate-150 bg-slate-50">
+            <div className="p-5 border-b border-slate-150">
+              <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
                 Details
               </h2>
             </div>
             <div className="p-5 space-y-4">
               {artwork.medium && (
                 <div className="flex items-start gap-3">
-                  <Tag size={15} className="text-canvas-600 mt-0.5 shrink-0" />
+                  <Tag size={15} className="text-slate-400 mt-0.5 shrink-0" />
                   <div>
-                    <p className="text-xs text-canvas-500">Medium</p>
-                    <p className="text-sm text-canvas-200">{artwork.medium}</p>
+                    <p className="text-xs text-slate-9000">Medium</p>
+                    <p className="text-sm text-slate-700">{artwork.medium}</p>
                   </div>
                 </div>
               )}
@@ -188,11 +188,11 @@ export default async function ArtworkDetailPage({ params }: Props) {
                 <div className="flex items-start gap-3">
                   <Calendar
                     size={15}
-                    className="text-canvas-600 mt-0.5 shrink-0"
+                    className="text-slate-400 mt-0.5 shrink-0"
                   />
                   <div>
-                    <p className="text-xs text-canvas-500">Year</p>
-                    <p className="text-sm text-canvas-200">{artwork.year}</p>
+                    <p className="text-xs text-slate-9000">Year</p>
+                    <p className="text-sm text-slate-700">{artwork.year}</p>
                   </div>
                 </div>
               )}
@@ -200,11 +200,11 @@ export default async function ArtworkDetailPage({ params }: Props) {
                 <div className="flex items-start gap-3">
                   <Ruler
                     size={15}
-                    className="text-canvas-600 mt-0.5 shrink-0"
+                    className="text-slate-400 mt-0.5 shrink-0"
                   />
                   <div>
-                    <p className="text-xs text-canvas-500">Dimensions</p>
-                    <p className="text-sm text-canvas-200">{dimensions} cm</p>
+                    <p className="text-xs text-slate-9000">Dimensions</p>
+                    <p className="text-sm text-slate-700">{dimensions} cm</p>
                   </div>
                 </div>
               )}
@@ -212,11 +212,11 @@ export default async function ArtworkDetailPage({ params }: Props) {
                 <div className="flex items-start gap-3">
                   <DollarSign
                     size={15}
-                    className="text-canvas-600 mt-0.5 shrink-0"
+                    className="text-slate-400 mt-0.5 shrink-0"
                   />
                   <div>
-                    <p className="text-xs text-canvas-500">Price</p>
-                    <p className="text-sm text-canvas-200">
+                    <p className="text-xs text-slate-9000">Price</p>
+                    <p className="text-sm text-slate-700">
                       {artwork.currency}{" "}
                       {parseFloat(artwork.price).toLocaleString()}
                     </p>
@@ -227,11 +227,11 @@ export default async function ArtworkDetailPage({ params }: Props) {
                 <div className="flex items-start gap-3">
                   <MapPin
                     size={15}
-                    className="text-canvas-600 mt-0.5 shrink-0"
+                    className="text-slate-400 mt-0.5 shrink-0"
                   />
                   <div>
-                    <p className="text-xs text-canvas-500">Location</p>
-                    <p className="text-sm text-canvas-200">
+                    <p className="text-xs text-slate-9000">Location</p>
+                    <p className="text-sm text-slate-700">
                       {artwork.location}
                     </p>
                   </div>
@@ -242,15 +242,15 @@ export default async function ArtworkDetailPage({ params }: Props) {
 
           {/* Notes */}
           {artwork.notes && (
-            <div className="border border-canvas-800/40 bg-canvas-900/20">
-              <div className="p-5 border-b border-canvas-800/40">
-                <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-canvas-400 flex items-center gap-2">
+            <div className="border border-slate-150 bg-slate-50">
+              <div className="p-5 border-b border-slate-150">
+                <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 flex items-center gap-2">
                   <FileText size={13} />
                   Private Notes
                 </h2>
               </div>
               <div className="p-5">
-                <p className="text-sm text-canvas-400 whitespace-pre-wrap">
+                <p className="text-sm text-slate-500 whitespace-pre-wrap">
                   {artwork.notes}
                 </p>
               </div>
@@ -258,7 +258,7 @@ export default async function ArtworkDetailPage({ params }: Props) {
           )}
 
           {/* Metadata */}
-          <div className="text-xs text-canvas-600 space-y-1">
+          <div className="text-xs text-slate-400 space-y-1">
             <p>
               Added{" "}
               {new Date(artwork.created_at).toLocaleDateString("en-US", {

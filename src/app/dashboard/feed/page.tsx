@@ -8,35 +8,16 @@ export default async function FeedPage() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  // Get all posts with profile info
-  const { data: posts } = await supabase
-    .from("posts")
-    .select("*, profiles(full_name, username, avatar_url, role)")
-    .order("created_at", { ascending: false })
-    .limit(50);
+  const { data: posts } = await supabase.from("posts").select("*, profiles(full_name, username, avatar_url, role)").order("created_at", { ascending: false }).limit(50);
 
   return (
     <div className="max-w-2xl">
-      <div className="mb-8">
-        <span className="section-label">Community</span>
-        <h1 className="heading-md mt-2">Feed</h1>
-        <p className="text-sm text-canvas-500 mt-1">Share updates and see what others are posting.</p>
-      </div>
-
-      {/* Create Post */}
+      <h1 className="heading-md mb-6">Feed</h1>
       <CreatePost userId={user.id} />
-
-      {/* Posts */}
-      <div className="mt-8 space-y-4">
+      <div className="mt-6 space-y-4">
         {(!posts || posts.length === 0) ? (
-          <div className="border border-canvas-800/40 bg-canvas-900/20 p-12 text-center">
-            <p className="text-canvas-500">No posts yet. Be the first to share something!</p>
-          </div>
-        ) : (
-          posts.map((post: any) => (
-            <PostCard key={post.id} post={post} currentUserId={user.id} />
-          ))
-        )}
+          <div className="card p-12 text-center"><p className="text-slate-400">No posts yet. Be the first to share something!</p></div>
+        ) : posts.map((post: any) => <PostCard key={post.id} post={post} currentUserId={user.id} />)}
       </div>
     </div>
   );

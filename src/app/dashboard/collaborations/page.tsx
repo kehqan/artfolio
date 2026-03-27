@@ -41,7 +41,7 @@ export default function CollaborationsPage() {
     const supabase = createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { setSaving(false); return; }
-    await supabase.from("collaborations").insert({ user_id: user.id, ...form });
+    await supabase.from("collaborations").insert({ user_id: user.id, ...form, deadline: form.deadline || null });
     setShowForm(false);
     setForm({ title: "", description: "", type: "Co-creation", partner_name: "", partner_email: "", deadline: "", status: "Open" });
     load();

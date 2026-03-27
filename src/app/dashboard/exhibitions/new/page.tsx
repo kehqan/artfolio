@@ -9,7 +9,7 @@ export default function NewExhibitionPage() {
   const router = useRouter();
   const [form, setForm] = useState({
     title: "", description: "", venue: "", start_date: "", end_date: "",
-    status: "Planning", is_public: true,h
+    status: "Planning", is_public: true,
   });
   const [saving, setSaving] = useState(false);
 

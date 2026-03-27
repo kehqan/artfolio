@@ -9,7 +9,7 @@ export default function NewExhibitionPage() {
   const router = useRouter();
   const [form, setForm] = useState({
     title: "", description: "", venue: "", start_date: "", end_date: "",
-    status: "Planning", is_public: true,
+    status: "Planning", is_public: true,h
   });
   const [saving, setSaving] = useState(false);
 
@@ -22,7 +22,7 @@ export default function NewExhibitionPage() {
     const supabase = createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { setSaving(false); return; }
-    await supabase.from("exhibitions").insert({ user_id: user.id, ...form });
+    await supabase.from("exhibitions").insert({ user_id: user.id, ...form, start_date: form.start_date || null, end_date: form.end_date || null });
     router.push("/dashboard/exhibitions");
   }
 

@@ -160,7 +160,7 @@ export default function ExplorePage() {
         ) : (
           <>
             {/* Available Artworks */}
-       2    {artworks.length > 0 && (
+            {artworks.length > 0 && (
               <section>
                 <SectionHeader title="Available Artworks" href="/discover" />
                 <HScroll>
@@ -174,7 +174,7 @@ export default function ExplorePage() {
                             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                           />
                         ) : (
-               2          <div className="w-full h-full flex items-center justify-center">
+                          <div className="w-full h-full flex items-center justify-center">
                             <Palette className="w-10 h-10 text-gray-300" />
                           </div>
                         )}
@@ -196,7 +196,7 @@ export default function ExplorePage() {
                     </div>
                   ))}
                 </HScroll>
-       2      </section>
+              </section>
             )}
 
             {/* Artists to Follow */}
@@ -223,7 +223,7 @@ export default function ExplorePage() {
                       <p className="text-xs text-gray-400 truncate">{artist.city}, {artist.country}</p>
                       {artist.medium && (
                         <p className="text-xs text-gray-300 truncate mt-0.5">{artist.medium}</p>
-              2       )}
+                      )}
                     </Link>
                   ))}
                 </HScroll>
@@ -236,7 +236,7 @@ export default function ExplorePage() {
                 <SectionHeader title="Venues & Spaces" href="/discover" />
                 <HScroll>
                   {venues.map(venue => (
-                 2  <Link
+                    <Link
                       key={venue.id}
                       href={`/venues/${venue.id}`}
                       className="flex-none w-72 group"
@@ -244,7 +244,7 @@ export default function ExplorePage() {
                       <div className="relative h-44 rounded-2xl overflow-hidden bg-gray-100 mb-3">
                         {venue.cover_image_url ? (
                           <img
-                    2       src={venue.cover_image_url}
+                            src={venue.cover_image_url}
                             alt={venue.name}
                             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                           />
@@ -255,7 +255,7 @@ export default function ExplorePage() {
                         )}
                         <span className="absolute top-3 left-3 bg-white/90 backdrop-blur text-xs px-2.5 py-1 rounded-full font-medium shadow-sm">
                           {venue.type}
-     (                  </span>
+                        </span>
                       </div>
                       <h3 className="font-semibold">{venue.name}</h3>
                       <p className="text-xs text-gray-400 flex items-center gap-1 mt-1">
@@ -286,7 +286,12 @@ export default function ExplorePage() {
                             <span className="text-white/20 text-5xl font-bold">{ex.title[0]}</span>
                           </div>
                         )}
-                     (: "short", day: "numeric", year: "numeric" })}
+                      </div>
+                      <h3 className="font-semibold text-sm">{ex.title}</h3>
+                      {ex.venue && <p className="text-xs text-gray-400 mt-0.5">{ex.venue}</p>}
+                      {ex.start_date && (
+                        <p className="text-xs text-gray-400 mt-0.5">
+                          {new Date(ex.start_date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
                           {ex.end_date && ` – ${new Date(ex.end_date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`}
                         </p>
                       )}
@@ -296,19 +301,13 @@ export default function ExplorePage() {
               </section>
             )}
 
-2           {/* CTA */}
+            {/* CTA */}
             <section className="bg-gray-50 rounded-3xl px-8 py-16 text-center">
               <h2 className="text-3xl font-bold mb-3">Ready to be part of this?</h2>
               <p className="text-gray-500 mb-10 max-w-md mx-auto text-lg">
                 Whether you create, collect, or curate — Artfolio has a place for you.
               </p>
-   2          <div className="flex gap-4 justify-center flex-wrap">
-                <Link href="/register?type=artist"
-                  className="btn-primary px-7 py-3 flex items-center gap-2 text-base">
-                  <Palette className="w-4 h-4" /> I&apos;m an Artist
-                </Link>
-                <Link href="/register?type=venue"
-                  className="b          <div className="flex gap-4 justify-center flex-wrap">
+   (          <div className="flex gap-4 justify-center flex-wrap">
                 <Link href="/register?type=artist"
                   className="btn-primary px-7 py-3 flex items-center gap-2 text-base">
                   <Palette className="w-4 h-4" /> I&apos;m an Artist

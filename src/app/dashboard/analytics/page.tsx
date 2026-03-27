@@ -63,7 +63,7 @@ export default function AnalyticsPage() {
       months[key] = { amount: 0, count: 0 };
     }
     sales.forEach(s => {
-      const d = new Date(s.sale_date || s.created_at);
+      const d = new Date(s.sale_date);
       const key = d.toLocaleString("default", { month: "short", year: "2-digit" });
       if (months[key]) { months[key].amount += Number(s.amount) || 0; months[key].count++; }
     });

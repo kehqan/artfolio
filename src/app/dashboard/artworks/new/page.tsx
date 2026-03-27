@@ -15,6 +15,7 @@ export default function NewArtworkPage() {
   const [form, setForm] = useState({
     title: "", year: "", medium: "", dimensions: "", price: "",
     status: "Available", description: "", location: "", notes: "", collection_id: "",
+    is_one_of_a_kind: false,
   });
 
   useEffect(() => {
@@ -77,6 +78,7 @@ export default function NewArtworkPage() {
       location: form.location || null,
       notes: form.notes || null,
       collection_id: form.collection_id || null,
+      is_one_of_a_kind: form.is_one_of_a_kind,
       images: uploadedUrls,
     }).select().single();
 
@@ -202,6 +204,15 @@ export default function NewArtworkPage() {
 
             <div className="flex gap-3 justify-end">
               <Link href="/dashboard/artworks" className="btn-secondary">Cancel</Link>
+                            <label className="flex items-center gap-3 cursor-pointer py-2">
+                <input
+                  type="checkbox"
+                  checked={form.is_one_of_a_kind}
+                  onChange={(e) => setForm(f => ({ ...f, is_one_of_a_kind: e.target.checked }))}
+                  className="w-4 h-4 accent-black"
+                />
+                <span className="text-sm font-medium">One of a Kind (unique work)</span>
+              </label>
               <button type="submit" disabled={saving} className="btn-primary">
                 {saving ? "Saving..." : "Save Artwork"}
               </button>

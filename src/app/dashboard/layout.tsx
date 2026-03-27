@@ -7,6 +7,8 @@ import {
   LayoutDashboard, Image, FolderOpen, Globe, MessageSquare,
   Compass, LayoutGrid, BarChart3, Users, Settings, LogOut,
   ChevronRight, Palette, Handshake, ShieldCheck, Menu, X,
+  BarChart2,
+  Users2,
 } from "lucide-react";
 
 const navGroups = [
@@ -42,13 +44,14 @@ const navGroups = [
     label: "Business",
     items: [
       { href: "/dashboard/sales", label: "Sales Tracking", icon: BarChart3 },
+      { href: "/dashboard/analytics", label: "Analytics", icon: BarChart2 },
+      { href: "/dashboard/clients", label: "Clients", icon: Users2 },
     ],
   },
   {
     label: "Account",
     items: [
       { href: "/dashboard/profile", label: "Profile Settings", icon: Settings },
-      { href: "/dashboard/admin", label: "Admin Panel", icon: ShieldCheck },
     ],
   },
 ];

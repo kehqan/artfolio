@@ -49,7 +49,8 @@ const navGroups = [
   {
     label: "Discover",
     items: [
-      { href: "/dashboard/explore", label: "Explore", icon: Compass },
+      { href: "/explore", label: "Explore Art", icon: Compass },
+      { href: "/dashboard/pool", label: "Discovery Pool", icon: Handshake },
     ],
   },
   {

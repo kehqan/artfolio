@@ -7,12 +7,10 @@ import { Search, Image as ImageIcon } from "lucide-react";
 type Artwork = {
   id: string; title: string; medium?: string; year?: number;
   price?: number; status: string; images?: string[];
-  artists?: { name: string; username: string; city?: string } | null;
+  artist_name?: string; artist_username?: string;
 };
-
 type Artist = { id: string; name: string; username: string; city?: string; avatar_url?: string; medium?: string };
 type Venue = { id: string; name: string; type: string; city?: string; logo_url?: string };
-
 type Tab = "artworks" | "artists" | "venues";
 
 export default function ExplorePage() {
@@ -27,28 +25,29 @@ export default function ExplorePage() {
 
   async function load() {
     const supabase = createClient();
-    const [{ data: aw }, { data: ar }, { data: ve }] = await Promise.all([
-      supabase.from("artworks").select("id, title, medium, year, price, status, images, artists(name, username, city)").eq("status", "Available").limit(50),
+    const [{ data: rawArtworks }, { data: rawArtists }, { data: rawVenues }] = await Promise.all([
+      supabase.from("artworks").select("id, title, medium, year, price, status, images, artist_id").eq("status", "Available").limit(50),
       supabase.from("artists").select("id, name, username, city, avatar_url, medium").limit(50),
       supabase.from("venues").select("id, name, type, city, logo_url").limit(50),
     ]);
-    setArtworks((aw as Artwork[]) || []);
-    setArtists(ar || []);
-    setVenues(ve || []);
+
+    const artistMap: Record<string, { name: string; username: string }> = {};
+    for (const a of rawArtists || []) artistMap[a.id] = { name: a.name, username: a.username };
+
+    setArtworks((rawArtworks || []).map((a) => ({
+      id: a.id, title: a.title, medium: a.medium, year: a.year,
+      price: a.price, status: a.status, images: a.images,
+      artist_name: a.artist_id ? artistMap[a.artist_id]?.name : undefined,
+      artist_username: a.artist_id ? artistMap[a.artist_id]?.username : undefined,
+    })));
+    setArtists((rawArtists || []).map((a) => ({ id: a.id, name: a.name, username: a.username, city: a.city, avatar_url: a.avatar_url, medium: a.medium })));
+    setVenues((rawVenues || []).map((v) => ({ id: v.id, name: v.name, type: v.type, city: v.city, logo_url: v.logo_url })));
     setLoading(false);
   }
 
-  const filteredArtworks = artworks.filter((a) =>
-    !search || a.title?.toLowerCase().includes(search.toLowerCase()) ||
-    a.medium?.toLowerCase().includes(search.toLowerCase()) ||
-    (a.artists as any)?.name?.toLowerCase().includes(search.toLowerCase())
-  );
-  const filteredArtists = artists.filter((a) =>
-    !search || a.name?.toLowerCase().includes(search.toLowerCase()) || a.city?.toLowerCase().includes(search.toLowerCase())
-  );
-  const filteredVenues = venues.filter((v) =>
-    !search || v.name?.toLowerCase().includes(search.toLowerCase()) || v.city?.toLowerCase().includes(search.toLowerCase())
-  );
+  const filteredArtworks = artworks.filter((a) => !search || a.title?.toLowerCase().includes(search.toLowerCase()) || a.artist_name?.toLowerCase().includes(search.toLowerCase()));
+  const filteredArtists = artists.filter((a) => !search || a.name?.toLowerCase().includes(search.toLowerCase()) || a.city?.toLowerCase().includes(search.toLowerCase()));
+  const filteredVenues = venues.filter((v) => !search || v.name?.toLowerCase().includes(search.toLowerCase()) || v.city?.toLowerCase().includes(search.toLowerCase()));
 
   return (
     <div>
@@ -56,14 +55,10 @@ export default function ExplorePage() {
         <h1 className="page-title">Explore</h1>
         <p className="page-subtitle">Discover artworks, artists, and venues</p>
       </div>
-
-      {/* Search */}
       <div className="relative max-w-md mb-6">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
-        <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search artworks, artists, venues..." className="input pl-9" />
+        <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search..." className="input pl-9" />
       </div>
-
-      {/* Tabs */}
       <div className="flex rounded-xl border border-stone-200 overflow-hidden w-fit mb-6">
         {(["artworks", "artists", "venues"] as Tab[]).map((t) => (
           <button key={t} onClick={() => setTab(t)}
@@ -77,19 +72,18 @@ export default function ExplorePage() {
         <div className="card p-12 text-center text-stone-400">Loading...</div>
       ) : tab === "artworks" ? (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-          {filteredArtworks.map((a) => (
+          {filteredArtworks.length === 0 ? (
+            <div className="col-span-full card p-12 text-center text-stone-400">No artworks found</div>
+          ) : filteredArtworks.map((a) => (
             <div key={a.id} className="card-hover overflow-hidden group">
               <div className="aspect-square bg-stone-100">
-                {a.images?.[0]
-                  ? <img src={a.images[0]} alt={a.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                {a.images?.[0] ? <img src={a.images[0]} alt={a.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
                   : <div className="w-full h-full flex items-center justify-center"><ImageIcon className="w-8 h-8 text-stone-300" /></div>}
               </div>
               <div className="p-3">
                 <p className="text-sm font-medium text-stone-900 truncate">{a.title}</p>
-                {(a.artists as any)?.name && (
-                  <Link href={`/artist/${(a.artists as any).username}`} className="text-xs text-emerald-600 hover:underline">
-                    {(a.artists as any).name}
-                  </Link>
+                {a.artist_name && a.artist_username && (
+                  <Link href={`/artist/${a.artist_username}`} className="text-xs text-emerald-600 hover:underline">{a.artist_name}</Link>
                 )}
                 <div className="flex items-center justify-between mt-1.5">
                   <span className="badge badge-available text-[10px]">{a.status}</span>
@@ -98,14 +92,14 @@ export default function ExplorePage() {
               </div>
             </div>
           ))}
-          {filteredArtworks.length === 0 && <div className="col-span-full card p-12 text-center text-stone-400">No artworks found</div>}
         </div>
       ) : tab === "artists" ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {filteredArtists.map((a) => (
+          {filteredArtists.length === 0 ? (
+            <div className="col-span-full card p-12 text-center text-stone-400">No artists found</div>
+          ) : filteredArtists.map((a) => (
             <Link key={a.id} href={`/artist/${a.username}`} className="card-hover p-5 flex items-center gap-4">
-              {a.avatar_url
-                ? <img src={a.avatar_url} alt="" className="w-12 h-12 rounded-full object-cover shrink-0" />
+              {a.avatar_url ? <img src={a.avatar_url} alt="" className="w-12 h-12 rounded-full object-cover shrink-0" />
                 : <div className="w-12 h-12 rounded-full bg-stone-200 flex items-center justify-center text-stone-600 font-semibold text-lg shrink-0">{a.name?.[0]}</div>}
               <div className="min-w-0">
                 <p className="font-semibold text-stone-900 truncate">{a.name}</p>
@@ -114,14 +108,14 @@ export default function ExplorePage() {
               </div>
             </Link>
           ))}
-          {filteredArtists.length === 0 && <div className="col-span-full card p-12 text-center text-stone-400">No artists found</div>}
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredVenues.map((v) => (
+          {filteredVenues.length === 0 ? (
+            <div className="col-span-full card p-12 text-center text-stone-400">No venues found</div>
+          ) : filteredVenues.map((v) => (
             <Link key={v.id} href={`/venue/${v.id}`} className="card-hover p-5 flex items-center gap-4">
-              {v.logo_url
-                ? <img src={v.logo_url} alt="" className="w-12 h-12 rounded-xl object-cover shrink-0" />
+              {v.logo_url ? <img src={v.logo_url} alt="" className="w-12 h-12 rounded-xl object-cover shrink-0" />
                 : <div className="w-12 h-12 rounded-xl bg-stone-200 flex items-center justify-center text-stone-600 font-semibold text-lg shrink-0">{v.name?.[0]}</div>}
               <div className="min-w-0">
                 <p className="font-semibold text-stone-900 truncate">{v.name}</p>
@@ -130,7 +124,6 @@ export default function ExplorePage() {
               </div>
             </Link>
           ))}
-          {filteredVenues.length === 0 && <div className="col-span-full card p-12 text-center text-stone-400">No venues found</div>}
         </div>
       )}
     </div>

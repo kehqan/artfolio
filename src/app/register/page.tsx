@@ -162,7 +162,7 @@ function RegisterForm() {
           <div className="flex gap-2 mb-10">
             <div className="h-1 rounded-full flex-1 bg-black" />
             <div className={`h-1 rounded-full flex-1 transition-all duration-300 ${step === 2 ? "bg-black" : "bg-gray-200"}`} />
-          </div>
+      2   </div>
 
           {/* ── ARTIST STEP 1 ── */}
           {isArtist && step === 1 && (
@@ -286,7 +286,7 @@ function RegisterForm() {
                 <div>
                   <label className="block text-sm font-medium mb-2">Type of venue <span className="text-red-400">*</span></label>
                   <div className="flex flex-wrap gap-2">
-                    {VENUE_TYPES.map(t => (
+      2             {VENUE_TYPES.map(t => (
                       <button key={t} type="button" onClick={() => setVenueData(d => ({ ...d, type: t }))}
                         className={`px-3 py-1.5 rounded-full text-sm border transition-all ${venueData.type === t ? "bg-black text-white border-black" : "border-gray-200 text-gray-600 hover:border-gray-400"}`}>
                         {t}

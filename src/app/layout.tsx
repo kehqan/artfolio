@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
-import { Fraunces, Plus_Jakarta_Sans, JetBrains_Mono } from "next/font/google";
+import { Syne, Plus_Jakarta_Sans, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 
-const fraunces = Fraunces({
+// Syne — ultra-bold display, matches the reference image perfectly
+const syne = Syne({
   subsets: ["latin"],
-  variable: "--font-fraunces",
-  axes: ["opsz"],
+  variable: "--font-syne",
+  weight: ["700", "800"],
 });
 
 const plusJakarta = Plus_Jakarta_Sans({
@@ -19,14 +20,14 @@ const jetbrains = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Artfolio — For Artists & Galleries",
-  description: "The professional platform for artists and galleries to manage, share, and sell artwork.",
+  title: "Artfolio — Art · Community · Discovery",
+  description: "A platform for artists and venues to connect, showcase work, and grow in the Iranian art scene.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${fraunces.variable} ${plusJakarta.variable} ${jetbrains.variable}`}>
-      <body className="font-sans bg-stone-50 text-stone-900 antialiased">{children}</body>
+    <html lang="en" className={`${syne.variable} ${plusJakarta.variable} ${jetbrains.variable}`}>
+      <body className="font-sans bg-paper text-stone-900 antialiased">{children}</body>
     </html>
   );
 }

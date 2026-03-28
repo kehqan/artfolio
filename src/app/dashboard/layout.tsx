@@ -87,20 +87,20 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     href === "/dashboard" ? pathname === href : pathname.startsWith(href);
 
   const Sidebar = () => (
-    <aside className="flex flex-col h-full bg-white border-r border-stone-200 w-64 shrink-0">
+    <aside className="flex flex-col h-full bg-white border-r-2 border-stone-900 w-64 shrink-0">
       {/* Logo */}
-      <div className="px-6 py-5 border-b border-stone-100">
+      <div className="px-5 py-5 border-b-2 border-stone-900 bg-yellow-400">
         <Link href="/dashboard" className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-stone-900 rounded-lg flex items-center justify-center">
-            <Palette className="w-4 h-4 text-white" />
+          <div className="w-8 h-8 bg-stone-900 flex items-center justify-center border border-stone-900">
+            <Palette className="w-4 h-4 text-yellow-400" />
           </div>
-          <span className="font-display font-semibold text-stone-900 text-lg">Artfolio</span>
+          <span className="font-display font-black text-stone-900 text-lg tracking-tight">Artfolio</span>
         </Link>
       </div>
 
       {/* Profile snippet */}
       {profile && (
-        <div className="px-4 py-4 border-b border-stone-100">
+        <div className="px-4 py-4 border-b border-stone-200">
           <div className="flex items-center gap-3">
             {profile.avatar_url ? (
               <img src={profile.avatar_url} alt="" className="w-9 h-9 rounded-full object-cover border border-stone-200" />
@@ -121,7 +121,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <nav className="flex-1 px-3 py-4 overflow-y-auto space-y-6">
         {navGroups.map((group) => (
           <div key={group.label}>
-            <p className="px-3 mb-1.5 text-[10px] font-bold tracking-widest uppercase text-stone-400">
+            <p className="px-3 mb-1.5 text-[10px] font-black tracking-[0.18em] uppercase text-stone-400">
               {group.label}
             </p>
             <div className="space-y-0.5">
@@ -147,7 +147,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
       {/* Logout */}
       <div className="px-3 pb-4 border-t border-stone-100 pt-3">
-        <button onClick={handleLogout} className="nav-item text-rose-500 hover:text-rose-700 hover:bg-rose-50 w-full">
+        <button onClick={handleLogout} className="nav-item text-rose-500 hover:bg-rose-50 w-full">
           <LogOut className="w-4 h-4" />
           Sign Out
         </button>

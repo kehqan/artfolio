@@ -3,12 +3,11 @@ import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import {
-  ChevronLeft, ChevronRight, Square, MapPin, MessageSquare,
-  Calendar, Users, ArrowRight, Palette, LayoutDashboard,
-  LogOut, User
+  ChevronLeft, ChevronRight, ArrowRight, ArrowUpRight,
+  MapPin, MessageSquare, Calendar, Users, LayoutDashboard,
+  LogOut, User, Zap, Star
 } from "lucide-react";
 
-// ── Types ─────────────────────────────────────────────────────────
 type Artwork = { id: string; title: string; images?: string[]; price?: number; status: string; artist_name?: string };
 type Venue   = { id: string; name: string; type: string; city?: string; logo_url?: string; cover_image_url?: string };
 type Post    = { id: string; content?: string; images?: string[]; profile_name?: string; profile_avatar?: string };
@@ -16,149 +15,202 @@ type Exhibition = { id: string; title: string; venue?: string; start_date?: stri
 type Collab  = { id: string; title: string; type?: string; partner_name?: string; status: string };
 type Profile = { full_name: string; avatar_url?: string } | null;
 
-const TABS = ["Artworks", "Artists", "Venues", "Exhibitions", "Collaborations"];
+const TABS = [
+  { id: "all",            label: "ALL"           },
+  { id: "artworks",       label: "ARTWORKS"      },
+  { id: "venues",         label: "VENUES"        },
+  { id: "exhibitions",    label: "EXHIBITIONS"   },
+  { id: "collaborations", label: "COLLABS"       },
+];
 
-// ── Carousel wrapper ──────────────────────────────────────────────
-function Carousel({ title, icon: Icon, accentColor, children }: {
-  title: string; icon: React.ElementType; accentColor: string; children: React.ReactNode;
-}) {
+// ── Scrollable row ────────────────────────────────────────────────
+function Row({ label, accent, children }: { label: string; accent: string; children: React.ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
-  const scroll = (dir: "l" | "r") => ref.current?.scrollBy({ left: dir === "l" ? -320 : 320, behavior: "smooth" });
+  const scroll = (d: number) => ref.current?.scrollBy({ left: d, behavior: "smooth" });
   return (
-    <div className="space-y-4">
-      {/* Section header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className={`${accentColor} border-4 border-black w-10 h-10 flex items-center justify-center`}>
-            <Icon className="w-5 h-5 text-black" strokeWidth={2.5} />
+    <div className="mb-16">
+      {/* Section bar */}
+      <div className="flex items-center justify-between mb-0 border-t-4 border-b-4 border-black py-2 px-0">
+        <div className="flex items-center gap-0">
+          <div className={`${accent} border-r-4 border-black px-4 py-1`}>
+            <span className="text-[11px] font-black tracking-[0.2em] text-black">{label}</span>
           </div>
-          <span className="text-sm font-black uppercase tracking-widest text-black">{title}</span>
         </div>
-        <div className="flex gap-2">
-          <button onClick={() => scroll("l")}
-            className="w-9 h-9 border-4 border-black bg-white flex items-center justify-center hover:translate-x-[2px] hover:translate-y-[2px] transition-all">
-            <ChevronLeft className="w-4 h-4" strokeWidth={3} />
+        <div className="flex gap-0">
+          <button onClick={() => scroll(-340)}
+            className="w-10 h-10 border-l-4 border-black bg-white flex items-center justify-center hover:bg-[#FFD400] transition-colors active:bg-black active:text-white">
+            <ChevronLeft className="w-5 h-5" strokeWidth={3} />
           </button>
-          <button onClick={() => scroll("r")}
-            className="w-9 h-9 border-4 border-black bg-white flex items-center justify-center hover:translate-x-[2px] hover:translate-y-[2px] transition-all">
-            <ChevronRight className="w-4 h-4" strokeWidth={3} />
+          <button onClick={() => scroll(340)}
+            className="w-10 h-10 border-l-4 border-black bg-white flex items-center justify-center hover:bg-[#FFD400] transition-colors active:bg-black active:text-white">
+            <ChevronRight className="w-5 h-5" strokeWidth={3} />
           </button>
         </div>
       </div>
-      {/* Scrollable row */}
-      <div ref={ref} className="flex gap-5 overflow-x-auto pb-2" style={{ scrollbarWidth: "none" }}>
+      <div ref={ref} className="flex gap-0 overflow-x-auto border-b-4 border-black" style={{ scrollbarWidth: "none" }}>
         {children}
       </div>
     </div>
   );
 }
 
-// ── Cards ─────────────────────────────────────────────────────────
-function ArtworkCard({ a }: { a: Artwork }) {
+// ── Artwork card ──────────────────────────────────────────────────
+function ArtCard({ a, idx }: { a: Artwork; idx: number }) {
+  const bg = idx % 4 === 0 ? "bg-white" : idx % 4 === 1 ? "bg-[#FFD400]" : idx % 4 === 2 ? "bg-white" : "bg-black";
+  const textColor = idx % 4 === 3 ? "text-white" : "text-black";
+  const badgeStyle = a.status?.toLowerCase() === "available"
+    ? "bg-[#FFD400] text-black border-2 border-black"
+    : "bg-black text-white border-2 border-black";
+
   return (
-    <div className="shrink-0 w-52 bg-white border-4 border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] hover:shadow-[10px_10px_0px_0px_rgba(0,0,0,1)] hover:-translate-y-1 transition-all duration-200 group">
-      <div className="w-full h-52 bg-stone-100 overflow-hidden border-b-4 border-black">
+    <div className={`shrink-0 w-56 border-r-4 border-black ${bg} group cursor-pointer hover:z-10 relative`}
+      style={{ transition: "transform 0.15s" }}
+      onMouseEnter={e => (e.currentTarget.style.transform = "translateY(-4px)")}
+      onMouseLeave={e => (e.currentTarget.style.transform = "translateY(0)")}>
+      {/* Image */}
+      <div className="w-full h-56 overflow-hidden border-b-4 border-black relative bg-stone-200">
         {a.images?.[0]
-          ? <img src={a.images[0]} alt={a.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
-          : <div className="w-full h-full flex items-center justify-center"><Square className="w-10 h-10 text-stone-300" /></div>}
-      </div>
-      <div className="p-3">
-        <p className="font-black text-black text-sm truncate leading-tight">{a.title}</p>
-        {a.artist_name && <p className="text-xs text-black/60 font-medium truncate mt-0.5">{a.artist_name}</p>}
-        <div className="flex items-center justify-between mt-2">
-          {a.status?.toLowerCase() === "available"
-            ? <span className="px-2 py-0.5 bg-[#FFD400] border-2 border-black text-[10px] font-black uppercase">Available</span>
-            : <span className="px-2 py-0.5 bg-black text-[#FFD400] border-2 border-black text-[10px] font-black uppercase">Sold</span>}
-          {a.price && <span className="text-xs font-black font-mono">${a.price.toLocaleString()}</span>}
+          ? <img src={a.images[0]} alt={a.title} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+          : <div className="w-full h-full flex items-center justify-center"><Star className="w-12 h-12 text-stone-400" /></div>}
+        <div className={`absolute top-0 right-0 px-2 py-1 text-[10px] font-black border-b-2 border-l-2 border-black ${badgeStyle}`}>
+          {a.status?.toUpperCase() || "—"}
         </div>
+      </div>
+      {/* Info */}
+      <div className="p-4">
+        <p className={`font-black text-base leading-tight truncate ${textColor}`}>{a.title}</p>
+        {a.artist_name && <p className={`text-xs font-bold mt-1 truncate opacity-60 ${textColor}`}>{a.artist_name}</p>}
+        {a.price && <p className={`text-sm font-black mt-3 font-mono ${textColor}`}>${a.price.toLocaleString()}</p>}
       </div>
     </div>
   );
 }
 
-function VenueCard({ v }: { v: Venue }) {
+// ── Venue card ────────────────────────────────────────────────────
+function VenueCard({ v, idx }: { v: Venue; idx: number }) {
+  const accents = ["bg-[#FF6B6B]", "bg-[#4ECDC4]", "bg-[#95E1D3]", "bg-[#FFD400]"];
+  const ac = accents[idx % accents.length];
   return (
-    <Link href={`/venue/${v.id}`} className="shrink-0 w-64 bg-white border-4 border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] hover:shadow-[10px_10px_0px_0px_rgba(0,0,0,1)] hover:-translate-y-1 transition-all duration-200 block group">
-      <div className="w-full h-36 bg-stone-100 overflow-hidden border-b-4 border-black relative">
+    <Link href={`/venue/${v.id}`}
+      className="shrink-0 w-72 border-r-4 border-black bg-white group cursor-pointer block"
+      style={{ transition: "transform 0.15s" }}
+      onMouseEnter={e => (e.currentTarget.style.transform = "translateY(-4px)")}
+      onMouseLeave={e => (e.currentTarget.style.transform = "translateY(0)")}>
+      {/* Cover */}
+      <div className="w-full h-40 overflow-hidden border-b-4 border-black relative bg-stone-200">
         {v.cover_image_url
-          ? <img src={v.cover_image_url} alt={v.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
-          : <div className="w-full h-full flex items-center justify-center"><MapPin className="w-10 h-10 text-stone-300" /></div>}
+          ? <img src={v.cover_image_url} alt={v.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+          : <div className={`w-full h-full ${ac} flex items-center justify-center`}><MapPin className="w-12 h-12 text-black opacity-30" /></div>}
+        {/* Logo */}
         {v.logo_url && (
-          <img src={v.logo_url} alt="" className="absolute bottom-2 left-3 w-10 h-10 border-2 border-black object-cover bg-white" />
+          <div className="absolute bottom-0 left-0 w-12 h-12 border-r-2 border-t-2 border-black bg-white overflow-hidden">
+            <img src={v.logo_url} alt="" className="w-full h-full object-cover" />
+          </div>
         )}
-      </div>
-      <div className="p-3">
-        <p className="font-black text-black text-sm truncate">{v.name}</p>
-        <div className="flex items-center gap-1.5 mt-1">
-          <span className="text-[10px] font-black uppercase text-black/50 tracking-wider capitalize">{v.type}</span>
-          {v.city && <><span className="text-black/30">·</span><span className="text-[10px] font-bold text-black/50 flex items-center gap-0.5"><MapPin className="w-2.5 h-2.5" />{v.city}</span></>}
+        {/* Type tag */}
+        <div className={`absolute top-0 left-0 ${ac} border-b-2 border-r-2 border-black px-3 py-1`}>
+          <span className="text-[10px] font-black uppercase text-black">{v.type}</span>
         </div>
+      </div>
+      <div className="p-4 flex items-end justify-between">
+        <div className="min-w-0">
+          <p className="font-black text-base text-black truncate">{v.name}</p>
+          {v.city && <p className="text-xs font-bold text-black/50 mt-1 flex items-center gap-1"><MapPin className="w-3 h-3" />{v.city}</p>}
+        </div>
+        <ArrowUpRight className="w-5 h-5 text-black shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" strokeWidth={3} />
       </div>
     </Link>
   );
 }
 
-function PostCard({ p }: { p: Post }) {
+// ── Post card ─────────────────────────────────────────────────────
+function PostCard({ p, idx }: { p: Post; idx: number }) {
+  const isWide = idx % 3 === 0;
   return (
-    <div className="shrink-0 w-60 bg-white border-4 border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] hover:shadow-[10px_10px_0px_0px_rgba(0,0,0,1)] hover:-translate-y-1 transition-all duration-200 group">
-      <div className="w-full h-40 bg-stone-100 overflow-hidden border-b-4 border-black">
+    <div className={`shrink-0 ${isWide ? "w-80" : "w-60"} border-r-4 border-black bg-white group`}
+      style={{ transition: "transform 0.15s" }}
+      onMouseEnter={e => (e.currentTarget.style.transform = "translateY(-4px)")}
+      onMouseLeave={e => (e.currentTarget.style.transform = "translateY(0)")}>
+      <div className={`w-full overflow-hidden border-b-4 border-black bg-stone-100 relative ${isWide ? "h-52" : "h-40"}`}>
         {p.images?.[0]
-          ? <img src={p.images[0]} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
-          : <div className="w-full h-full flex items-center justify-center bg-stone-50 p-4">
-              <p className="text-xs text-black/60 font-medium line-clamp-5 leading-relaxed">{p.content}</p>
+          ? <img src={p.images[0]} alt="" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+          : <div className="w-full h-full flex items-center justify-center p-5 bg-[#FFD400]">
+              <p className="text-sm font-bold text-black leading-relaxed line-clamp-5">{p.content}</p>
             </div>}
       </div>
       {p.profile_name && (
-        <div className="p-3 flex items-center gap-2">
+        <div className="p-3 flex items-center gap-2.5 border-t-0">
           {p.profile_avatar
-            ? <img src={p.profile_avatar} alt="" className="w-7 h-7 border-2 border-black object-cover" />
-            : <div className="w-7 h-7 border-2 border-black bg-[#FFD400] flex items-center justify-center text-xs font-black">{p.profile_name[0]}</div>}
-          <span className="text-xs font-bold text-black truncate">{p.profile_name}</span>
+            ? <img src={p.profile_avatar} alt="" className="w-8 h-8 border-2 border-black object-cover" />
+            : <div className="w-8 h-8 border-2 border-black bg-[#FFD400] flex items-center justify-center text-xs font-black text-black">{p.profile_name[0]}</div>}
+          <span className="text-xs font-black text-black">{p.profile_name}</span>
         </div>
       )}
     </div>
   );
 }
 
-function ExhibitionCard({ e }: { e: Exhibition }) {
+// ── Exhibition card ───────────────────────────────────────────────
+function ExhibCard({ e }: { e: Exhibition }) {
   const isCurrent = e.status?.toLowerCase() === "current";
   return (
-    <div className="shrink-0 w-56 bg-white border-4 border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] hover:shadow-[10px_10px_0px_0px_rgba(0,0,0,1)] hover:-translate-y-1 transition-all duration-200 group">
-      <div className="w-full h-36 bg-stone-100 overflow-hidden border-b-4 border-black relative">
+    <div className="shrink-0 w-64 border-r-4 border-black bg-white group"
+      style={{ transition: "transform 0.15s" }}
+      onMouseEnter={el => (el.currentTarget.style.transform = "translateY(-4px)")}
+      onMouseLeave={el => (el.currentTarget.style.transform = "translateY(0)")}>
+      <div className="w-full h-44 overflow-hidden border-b-4 border-black relative bg-stone-200">
         {e.cover_image
-          ? <img src={e.cover_image} alt={e.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
-          : <div className="w-full h-full flex items-center justify-center"><Calendar className="w-10 h-10 text-stone-300" /></div>}
-        <span className={`absolute top-2 right-2 px-2 py-0.5 text-[10px] font-black uppercase border-2 border-black ${isCurrent ? "bg-[#FFD400] text-black" : "bg-[#4ECDC4] text-black"}`}>
-          {e.status}
-        </span>
+          ? <img src={e.cover_image} alt={e.title} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+          : <div className="w-full h-full flex items-center justify-center bg-stone-100"><Calendar className="w-12 h-12 text-stone-300" /></div>}
+        <div className={`absolute top-0 left-0 border-b-4 border-r-4 border-black px-3 py-1.5 ${isCurrent ? "bg-[#FFD400]" : "bg-[#4ECDC4]"}`}>
+          <span className="text-[10px] font-black uppercase text-black tracking-widest">{e.status}</span>
+        </div>
       </div>
-      <div className="p-3">
-        <p className="font-black text-black text-sm truncate leading-tight">{e.title}</p>
-        {e.venue && <p className="text-xs text-black/60 font-medium truncate mt-0.5">{e.venue}</p>}
-        {e.start_date && <p className="text-[10px] text-black/40 font-bold mt-1">{new Date(e.start_date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</p>}
+      <div className="p-4">
+        <p className="font-black text-sm text-black leading-tight line-clamp-2">{e.title}</p>
+        {e.venue && <p className="text-xs font-bold text-black/50 mt-1.5">{e.venue}</p>}
+        {e.start_date && (
+          <p className="text-[10px] font-black text-black/40 mt-2 uppercase tracking-wider">
+            {new Date(e.start_date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+          </p>
+        )}
       </div>
     </div>
   );
 }
 
-function CollabCard({ c }: { c: Collab }) {
+// ── Collab card ───────────────────────────────────────────────────
+function CollabCard({ c, idx }: { c: Collab; idx: number }) {
+  const bgs = ["bg-black", "bg-[#FF6B6B]", "bg-black", "bg-[#4ECDC4]"];
+  const texts = ["text-[#FFD400]", "text-black", "text-[#FFD400]", "text-black"];
+  const bg = bgs[idx % bgs.length];
+  const tx = texts[idx % texts.length];
   return (
-    <div className="shrink-0 w-56 bg-black border-4 border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] hover:shadow-[10px_10px_0px_0px_rgba(0,0,0,1)] hover:-translate-y-1 transition-all duration-200 p-5 flex flex-col justify-between min-h-[140px]">
+    <div className={`shrink-0 w-56 border-r-4 border-black ${bg} group p-5 flex flex-col justify-between min-h-[180px]`}
+      style={{ transition: "transform 0.15s" }}
+      onMouseEnter={e => (e.currentTarget.style.transform = "translateY(-4px)")}
+      onMouseLeave={e => (e.currentTarget.style.transform = "translateY(0)")}>
       <div>
-        {c.type && <span className="px-2 py-0.5 bg-[#FFD400] text-black text-[10px] font-black uppercase border border-[#FFD400] inline-block mb-3">{c.type}</span>}
-        <p className="font-black text-white text-sm leading-snug line-clamp-2">{c.title}</p>
+        {c.type && (
+          <div className="inline-block bg-[#FFD400] border-2 border-black px-2 py-0.5 mb-4">
+            <span className="text-[10px] font-black uppercase text-black tracking-wider">{c.type}</span>
+          </div>
+        )}
+        <p className={`font-black text-sm leading-snug ${tx}`}>{c.title}</p>
       </div>
-      <div className="mt-3 flex items-center justify-between">
-        {c.partner_name && <p className="text-[10px] text-white/50 font-bold truncate">With: {c.partner_name}</p>}
-        <span className="px-2 py-0.5 bg-[#FFD400] text-black text-[10px] font-black uppercase ml-auto">{c.status}</span>
+      <div className="mt-4 flex items-end justify-between">
+        {c.partner_name && <p className={`text-[10px] font-bold uppercase opacity-60 ${tx} truncate`}>{c.partner_name}</p>}
+        <div className="bg-[#FFD400] border-2 border-black px-2 py-0.5 shrink-0 ml-2">
+          <span className="text-[10px] font-black text-black uppercase">{c.status}</span>
+        </div>
       </div>
     </div>
   );
 }
 
-// ── Main page ─────────────────────────────────────────────────────
+// ── Main ──────────────────────────────────────────────────────────
 export default function ExplorePage() {
-  const [activeTab, setActiveTab] = useState("Artworks");
+  const [activeTab, setActiveTab] = useState("all");
   const [profile, setProfile] = useState<Profile>(null);
   const [userLoaded, setUserLoaded] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -173,8 +225,6 @@ export default function ExplorePage() {
   useEffect(() => {
     async function load() {
       const supabase = createClient();
-
-      // Auth check
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         const { data: p } = await supabase.from("profiles").select("full_name, avatar_url").eq("id", user.id).single();
@@ -182,31 +232,30 @@ export default function ExplorePage() {
       }
       setUserLoaded(true);
 
-      // Content
       const [
-        { data: rawArtworks }, { data: rawArtists },
-        { data: rawVenues }, { data: rawPosts },
-        { data: rawProfiles }, { data: rawExhibitions }, { data: rawCollabs }
+        { data: rawAw }, { data: rawAr },
+        { data: rawVe }, { data: rawPo },
+        { data: rawPr }, { data: rawEx }, { data: rawCo }
       ] = await Promise.all([
-        supabase.from("artworks").select("id, title, images, price, status, artist_id").eq("status", "Available").limit(20),
-        supabase.from("artists").select("id, name").limit(200),
-        supabase.from("venues").select("id, name, type, city, logo_url, cover_image_url").limit(12),
-        supabase.from("posts").select("id, content, images, user_id").order("created_at", { ascending: false }).limit(12),
-        supabase.from("profiles").select("id, full_name, avatar_url").limit(300),
-        supabase.from("exhibitions").select("id, title, venue, start_date, cover_image, status").in("status", ["Current", "Upcoming", "current", "upcoming"]).limit(12),
-        supabase.from("collaborations").select("id, title, type, partner_name, status").eq("status", "Open").limit(12),
+        supabase.from("artworks").select("id,title,images,price,status,artist_id").eq("status","Available").limit(20),
+        supabase.from("artists").select("id,name").limit(200),
+        supabase.from("venues").select("id,name,type,city,logo_url,cover_image_url").limit(12),
+        supabase.from("posts").select("id,content,images,user_id").order("created_at",{ascending:false}).limit(12),
+        supabase.from("profiles").select("id,full_name,avatar_url").limit(300),
+        supabase.from("exhibitions").select("id,title,venue,start_date,cover_image,status").in("status",["Current","Upcoming","current","upcoming"]).limit(12),
+        supabase.from("collaborations").select("id,title,type,partner_name,status").eq("status","Open").limit(12),
       ]);
 
-      const artistMap: Record<string, string> = {};
-      for (const a of rawArtists || []) artistMap[a.id] = a.name;
-      const profileMap: Record<string, { name: string; avatar?: string }> = {};
-      for (const p of rawProfiles || []) profileMap[p.id] = { name: p.full_name, avatar: p.avatar_url };
+      const am: Record<string,string> = {};
+      for (const a of rawAr||[]) am[a.id]=a.name;
+      const pm: Record<string,{name:string;avatar?:string}> = {};
+      for (const p of rawPr||[]) pm[p.id]={name:p.full_name,avatar:p.avatar_url};
 
-      setArtworks((rawArtworks || []).map((a) => ({ id: a.id, title: a.title, images: a.images, price: a.price, status: a.status, artist_name: a.artist_id ? artistMap[a.artist_id] : undefined })));
-      setVenues((rawVenues || []).map((v) => ({ id: v.id, name: v.name, type: v.type, city: v.city, logo_url: v.logo_url, cover_image_url: v.cover_image_url })));
-      setPosts((rawPosts || []).map((p) => ({ id: p.id, content: p.content, images: p.images, profile_name: profileMap[p.user_id]?.name, profile_avatar: profileMap[p.user_id]?.avatar })));
-      setExhibitions((rawExhibitions || []).map((e) => ({ id: e.id, title: e.title, venue: e.venue, start_date: e.start_date, cover_image: e.cover_image, status: e.status })));
-      setCollabs((rawCollabs || []).map((c) => ({ id: c.id, title: c.title, type: c.type, partner_name: c.partner_name, status: c.status })));
+      setArtworks((rawAw||[]).map(a=>({id:a.id,title:a.title,images:a.images,price:a.price,status:a.status,artist_name:a.artist_id?am[a.artist_id]:undefined})));
+      setVenues((rawVe||[]).map(v=>({id:v.id,name:v.name,type:v.type,city:v.city,logo_url:v.logo_url,cover_image_url:v.cover_image_url})));
+      setPosts((rawPo||[]).map(p=>({id:p.id,content:p.content,images:p.images,profile_name:pm[p.user_id]?.name,profile_avatar:pm[p.user_id]?.avatar})));
+      setExhibitions((rawEx||[]).map(e=>({id:e.id,title:e.title,venue:e.venue,start_date:e.start_date,cover_image:e.cover_image,status:e.status})));
+      setCollabs((rawCo||[]).map(c=>({id:c.id,title:c.title,type:c.type,partner_name:c.partner_name,status:c.status})));
       setLoading(false);
     }
     load();
@@ -215,28 +264,34 @@ export default function ExplorePage() {
   async function handleLogout() {
     const supabase = createClient();
     await supabase.auth.signOut();
-    setProfile(null);
-    setMenuOpen(false);
+    setProfile(null); setMenuOpen(false);
   }
 
-  return (
-    <div className="min-h-screen bg-[#FFD400] relative">
+  const showArtworks     = activeTab === "all" || activeTab === "artworks";
+  const showVenues       = activeTab === "all" || activeTab === "venues";
+  const showExhibitions  = activeTab === "all" || activeTab === "exhibitions";
+  const showCollabs      = activeTab === "all" || activeTab === "collaborations";
 
-      {/* ── Sticky Header ──────────────────────────────────── */}
-      <header className="sticky top-0 z-50 bg-[#FFD400] border-b-4 border-black py-4">
-        <div className="max-w-[1400px] mx-auto px-6 flex items-center justify-between gap-4">
+  return (
+    <div className="min-h-screen bg-[#FFD400]">
+
+      {/* ── HEADER ──────────────────────────────────────────── */}
+      <header className="sticky top-0 z-50 bg-[#FFD400] border-b-4 border-black">
+        <div className="flex items-stretch justify-between h-14">
 
           {/* Logo */}
-          <Link href="/" className="text-2xl font-black tracking-tight text-black shrink-0">Artfolio</Link>
+          <Link href="/" className="flex items-center px-6 border-r-4 border-black font-black text-xl text-black tracking-tight hover:bg-black hover:text-[#FFD400] transition-colors">
+            Artfolio
+          </Link>
 
           {/* Tabs */}
-          <nav className="flex gap-2 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
+          <nav className="flex flex-1 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
             {TABS.map((tab) => (
-              <button key={tab} onClick={() => setActiveTab(tab)}
-                className={`px-5 py-2 text-sm font-black border-4 border-black whitespace-nowrap transition-all ${
-                  activeTab === tab ? "bg-black text-[#FFD400]" : "bg-white text-black hover:translate-x-[2px] hover:translate-y-[2px]"
+              <button key={tab.id} onClick={() => setActiveTab(tab.id)}
+                className={`h-full px-5 text-[11px] font-black tracking-[0.15em] border-r-4 border-black whitespace-nowrap transition-all ${
+                  activeTab === tab.id ? "bg-black text-[#FFD400]" : "text-black hover:bg-black/10"
                 }`}>
-                {tab}
+                {tab.label}
               </button>
             ))}
           </nav>
@@ -244,121 +299,178 @@ export default function ExplorePage() {
           {/* Auth */}
           {userLoaded && (
             profile ? (
-              <div className="flex items-center gap-3 relative shrink-0">
-                <Link href="/dashboard" className="text-sm font-bold text-black hover:opacity-70 hidden sm:block">Dashboard</Link>
-                <button onClick={() => setMenuOpen((p) => !p)} className="flex items-center gap-2">
+              <div className="flex items-stretch relative">
+                <Link href="/dashboard"
+                  className="flex items-center gap-2 px-5 border-l-4 border-black text-sm font-black text-black hover:bg-black hover:text-[#FFD400] transition-colors">
+                  <LayoutDashboard className="w-4 h-4" />
+                  <span className="hidden sm:block">DASHBOARD</span>
+                </Link>
+                <button onClick={() => setMenuOpen(p=>!p)}
+                  className="flex items-center px-4 border-l-4 border-black hover:bg-black/10 transition-colors">
                   {profile.avatar_url
-                    ? <img src={profile.avatar_url} alt="" className="w-10 h-10 border-4 border-black object-cover" />
-                    : <div className="w-10 h-10 border-4 border-black bg-black flex items-center justify-center text-[#FFD400] font-black text-sm">{profile.full_name?.[0]}</div>}
+                    ? <img src={profile.avatar_url} alt="" className="w-8 h-8 border-2 border-black object-cover" />
+                    : <div className="w-8 h-8 border-2 border-black bg-black flex items-center justify-center text-[#FFD400] text-xs font-black">{profile.full_name?.[0]}</div>}
                 </button>
                 {menuOpen && (
-                  <div className="absolute right-0 top-full mt-2 w-44 bg-white border-4 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] z-50">
-                    <Link href="/dashboard" onClick={() => setMenuOpen(false)} className="flex items-center gap-2 px-4 py-3 text-sm font-bold text-black hover:bg-[#FFD400] transition-colors"><LayoutDashboard className="w-4 h-4" /> Dashboard</Link>
-                    <Link href="/dashboard/profile" onClick={() => setMenuOpen(false)} className="flex items-center gap-2 px-4 py-3 text-sm font-bold text-black hover:bg-[#FFD400] transition-colors"><User className="w-4 h-4" /> Profile</Link>
-                    <button onClick={handleLogout} className="flex items-center gap-2 px-4 py-3 text-sm font-bold text-black hover:bg-red-100 w-full border-t-2 border-black"><LogOut className="w-4 h-4" /> Sign out</button>
+                  <div className="absolute right-0 top-full bg-white border-4 border-black z-50 w-44" style={{ boxShadow: "4px 4px 0 #000" }}>
+                    <Link href="/dashboard/profile" onClick={() => setMenuOpen(false)} className="flex items-center gap-2 px-4 py-3 text-sm font-bold text-black hover:bg-[#FFD400] border-b-2 border-black transition-colors"><User className="w-4 h-4" /> Profile</Link>
+                    <button onClick={handleLogout} className="flex items-center gap-2 px-4 py-3 text-sm font-bold text-black hover:bg-[#FF6B6B] w-full transition-colors"><LogOut className="w-4 h-4" /> Sign out</button>
                   </div>
                 )}
               </div>
             ) : (
-              <div className="flex items-center gap-3 shrink-0">
-                <Link href="/login" className="text-sm font-black underline text-black">Sign in</Link>
-                <Link href="/register" className="px-5 py-2 bg-black text-[#FFD400] border-4 border-black font-black text-sm hover:translate-x-[2px] hover:translate-y-[2px] transition-all">
-                  Join free
-                </Link>
+              <div className="flex items-stretch">
+                <Link href="/login" className="flex items-center px-5 border-l-4 border-black text-sm font-black text-black hover:bg-black/10 transition-colors">SIGN IN</Link>
+                <Link href="/register" className="flex items-center px-5 border-l-4 border-black bg-black text-[#FFD400] text-sm font-black hover:bg-stone-900 transition-colors">JOIN FREE</Link>
               </div>
             )
           )}
         </div>
       </header>
 
-      {/* ── Hero ───────────────────────────────────────────── */}
-      <section className="max-w-[1400px] mx-auto px-6 py-16">
-        <div className="bg-white border-4 border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] p-8 max-w-3xl mb-8 relative">
-          <h1 className="text-5xl font-black text-black mb-4 leading-tight">
-            Discover art.<br />Connect spaces.
-          </h1>
-          <p className="text-lg font-medium text-black/70">
-            Browse artworks from emerging artists, explore venues, and follow the community.
-          </p>
-          {/* Speech bubble tail */}
-          <div className="absolute -bottom-6 left-12 w-0 h-0 border-l-[20px] border-l-transparent border-r-[20px] border-r-transparent border-t-[24px] border-t-white" />
-          <div className="absolute -bottom-[34px] left-[50px] w-0 h-0 border-l-[18px] border-l-transparent border-r-[18px] border-r-transparent border-t-[24px] border-t-black" />
+      {/* ── HERO TICKER ─────────────────────────────────────── */}
+      <div className="border-b-4 border-black overflow-hidden bg-black">
+        <div className="flex items-center py-2 animate-marquee whitespace-nowrap">
+          {["DISCOVER ART", "CONNECT SPACES", "FIND YOUR VENUE", "MEET ARTISTS", "EXPLORE NOW", "ARTFOLIO"].map((t,i) => (
+            <span key={i} className="text-[#FFD400] text-xs font-black tracking-[0.3em] uppercase px-8 border-r border-[#FFD400]/30">{t}</span>
+          ))}
+          {["DISCOVER ART", "CONNECT SPACES", "FIND YOUR VENUE", "MEET ARTISTS", "EXPLORE NOW", "ARTFOLIO"].map((t,i) => (
+            <span key={`b${i}`} className="text-[#FFD400] text-xs font-black tracking-[0.3em] uppercase px-8 border-r border-[#FFD400]/30">{t}</span>
+          ))}
         </div>
+      </div>
 
-        {!profile && (
-          <div className="mt-10">
-            <Link href="/register"
-              className="inline-flex items-center gap-2 px-8 py-3 bg-black text-[#FFD400] border-4 border-black font-bold text-lg shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px] transition-all">
-              Join as Artist or Venue →
-            </Link>
-          </div>
-        )}
-        {profile && (
-          <div className="mt-10">
-            <Link href="/dashboard"
-              className="inline-flex items-center gap-2 px-8 py-3 bg-black text-[#FFD400] border-4 border-black font-bold text-lg shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px] transition-all">
-              <LayoutDashboard className="w-5 h-5" /> Go to your dashboard
-            </Link>
-          </div>
-        )}
-      </section>
+      {/* ── HERO BLOCK ──────────────────────────────────────── */}
+      <div className="border-b-4 border-black">
+        <div className="max-w-[1400px] mx-auto grid grid-cols-1 lg:grid-cols-3">
 
-      {/* ── Carousels ──────────────────────────────────────── */}
-      <section className="max-w-[1400px] mx-auto px-6 pb-16 space-y-16">
+          {/* Left — headline */}
+          <div className="lg:col-span-2 border-r-0 lg:border-r-4 border-black p-10 lg:p-16">
+            {/* Speech bubble */}
+            <div className="bg-white border-4 border-black inline-block px-8 py-6 mb-8 relative" style={{ boxShadow: "6px 6px 0 #000" }}>
+              <h1 className="text-5xl lg:text-6xl font-black text-black leading-[0.95] tracking-tight">
+                Discover art.<br />Connect spaces.
+              </h1>
+              <div className="absolute -bottom-5 left-10 w-0 h-0 border-l-[16px] border-l-transparent border-r-[16px] border-r-transparent border-t-[20px] border-t-white" />
+              <div className="absolute -bottom-[30px] left-[38px] w-0 h-0 border-l-[14px] border-l-transparent border-r-[14px] border-r-transparent border-t-[20px] border-t-black" />
+            </div>
+            <p className="text-black/70 text-lg font-semibold max-w-lg leading-relaxed mt-10">
+              Browse emerging artists, find local exhibitions, and connect with venues shaping the Iranian art scene.
+            </p>
+            {!profile && (
+              <div className="mt-8 flex flex-wrap gap-4">
+                <Link href="/register"
+                  className="inline-flex items-center gap-2 px-8 py-4 bg-black text-[#FFD400] border-4 border-black font-black text-base hover:bg-stone-900 transition-colors group"
+                  style={{ boxShadow: "4px 4px 0 #000" }}>
+                  Join as Artist or Venue
+                  <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                </Link>
+                <Link href="/login" className="inline-flex items-center gap-2 px-8 py-4 bg-white border-4 border-black font-black text-base text-black hover:bg-[#FFD400] transition-colors">
+                  Sign in
+                </Link>
+              </div>
+            )}
+            {profile && (
+              <Link href="/dashboard"
+                className="inline-flex items-center gap-2 px-8 py-4 bg-black text-[#FFD400] border-4 border-black font-black text-base mt-8 hover:bg-stone-900 transition-colors"
+                style={{ boxShadow: "4px 4px 0 #000" }}>
+                <LayoutDashboard className="w-5 h-5" /> Your Dashboard →
+              </Link>
+            )}
+          </div>
+
+          {/* Right — stat blocks */}
+          <div className="grid grid-cols-2 border-t-4 lg:border-t-0 lg:border-l-4 border-black">
+            {[
+              { n: artworks.length,    l: "ARTWORKS",     bg: "bg-white"         },
+              { n: venues.length,      l: "VENUES",       bg: "bg-[#FF6B6B]"     },
+              { n: exhibitions.length, l: "EXHIBITIONS",  bg: "bg-[#4ECDC4]"     },
+              { n: collabs.length,     l: "COLLABS OPEN", bg: "bg-black"         },
+            ].map((s, i) => (
+              <div key={i} className={`${s.bg} border-r-4 border-b-4 border-black p-6 flex flex-col justify-between`}>
+                <span className={`text-4xl font-black ${s.bg === "bg-black" ? "text-[#FFD400]" : "text-black"}`}>
+                  {loading ? "—" : s.n || "0"}
+                </span>
+                <span className={`text-[10px] font-black tracking-[0.2em] uppercase mt-2 ${s.bg === "bg-black" ? "text-[#FFD400]/60" : "text-black/50"}`}>
+                  {s.l}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* ── CONTENT ROWS ────────────────────────────────────── */}
+      <div className="max-w-[1400px] mx-auto">
         {loading ? (
-          <div className="flex items-center justify-center py-20">
-            <div className="bg-white border-4 border-black px-8 py-4 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
-              <p className="font-black text-black">Loading...</p>
+          <div className="flex items-center justify-center py-32">
+            <div className="bg-white border-4 border-black px-10 py-5" style={{ boxShadow: "4px 4px 0 #000" }}>
+              <div className="flex items-center gap-3">
+                <Zap className="w-5 h-5 text-black animate-pulse" />
+                <span className="font-black text-black tracking-widest uppercase text-sm">Loading...</span>
+              </div>
             </div>
           </div>
         ) : (
-          <>
-            {artworks.length > 0 && (
-              <Carousel title="TOP PICKS" icon={Square} accentColor="bg-[#FF6B6B]">
-                {artworks.map((a) => <ArtworkCard key={a.id} a={a} />)}
-              </Carousel>
+          <div className="pt-12 pb-0">
+            {showArtworks && artworks.length > 0 && (
+              <Row label="TOP PICKS" accent="bg-[#FF6B6B]">
+                {artworks.map((a,i) => <ArtCard key={a.id} a={a} idx={i} />)}
+              </Row>
             )}
-            {venues.length > 0 && (
-              <Carousel title="POPULAR VENUES" icon={MapPin} accentColor="bg-[#4ECDC4]">
-                {venues.map((v) => <VenueCard key={v.id} v={v} />)}
-              </Carousel>
+            {showVenues && venues.length > 0 && (
+              <Row label="POPULAR VENUES" accent="bg-[#4ECDC4]">
+                {venues.map((v,i) => <VenueCard key={v.id} v={v} idx={i} />)}
+              </Row>
             )}
-            {posts.length > 0 && (
-              <Carousel title="FROM THE COMMUNITY" icon={MessageSquare} accentColor="bg-[#95E1D3]">
-                {posts.map((p) => <PostCard key={p.id} p={p} />)}
-              </Carousel>
+            {activeTab === "all" && posts.length > 0 && (
+              <Row label="FROM THE COMMUNITY" accent="bg-[#95E1D3]">
+                {posts.map((p,i) => <PostCard key={p.id} p={p} idx={i} />)}
+              </Row>
             )}
-            {exhibitions.length > 0 && (
-              <Carousel title="UPCOMING & CURRENT EXHIBITIONS" icon={Calendar} accentColor="bg-[#4ECDC4]">
-                {exhibitions.map((e) => <ExhibitionCard key={e.id} e={e} />)}
-              </Carousel>
+            {showExhibitions && exhibitions.length > 0 && (
+              <Row label="EXHIBITIONS" accent="bg-[#FFD400] border-2 border-black">
+                {exhibitions.map(e => <ExhibCard key={e.id} e={e} />)}
+              </Row>
             )}
-            {collabs.length > 0 && (
-              <Carousel title="OPEN COLLABORATIONS" icon={Users} accentColor="bg-[#FFD400] border-4 border-black">
-                {collabs.map((c) => <CollabCard key={c.id} c={c} />)}
-              </Carousel>
+            {showCollabs && collabs.length > 0 && (
+              <Row label="OPEN COLLABORATIONS" accent="bg-black">
+                {collabs.map((c,i) => <CollabCard key={c.id} c={c} idx={i} />)}
+              </Row>
             )}
-          </>
+          </div>
         )}
-      </section>
+      </div>
 
-      {/* ── Bottom CTA ─────────────────────────────────────── */}
-      <section className="max-w-[1400px] mx-auto px-6 py-24">
-        <div className="bg-black border-4 border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] p-12 text-center">
-          <h2 className="text-4xl font-black text-[#FFD400] mb-4">Ready to showcase your work?</h2>
-          <p className="text-xl text-white mb-8 font-medium">Join artists and venues on Artfolio</p>
-          <Link href="/register"
-            className="inline-flex items-center gap-2 px-10 py-4 bg-[#FFD400] text-black border-4 border-white font-black text-lg hover:translate-x-[2px] hover:translate-y-[2px] transition-all">
-            Get started free <ArrowRight className="w-5 h-5" />
-          </Link>
+      {/* ── BOTTOM CTA ──────────────────────────────────────── */}
+      <div className="border-t-4 border-black bg-black mt-0">
+        <div className="max-w-[1400px] mx-auto flex flex-col lg:flex-row items-stretch">
+          <div className="flex-1 p-12 lg:p-16 border-b-4 lg:border-b-0 lg:border-r-4 border-[#FFD400]/30">
+            <h2 className="text-4xl lg:text-5xl font-black text-[#FFD400] leading-tight mb-4">
+              Ready to<br />showcase<br />your work?
+            </h2>
+            <p className="text-white/60 font-semibold mb-8 max-w-sm">Join artists and venues building the Iranian art community on Artfolio.</p>
+            <Link href="/register"
+              className="inline-flex items-center gap-3 px-8 py-4 bg-[#FFD400] text-black border-4 border-[#FFD400] font-black text-lg hover:bg-white transition-colors group"
+              style={{ boxShadow: "4px 4px 0 #FFD40066" }}>
+              Get started free
+              <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+            </Link>
+          </div>
+          {/* Decorative grid */}
+          <div className="grid grid-cols-3 w-full lg:w-64 shrink-0">
+            {["bg-[#FF6B6B]","bg-[#FFD400]","bg-black","bg-[#4ECDC4]","bg-black","bg-[#FFD400]","bg-black","bg-[#FF6B6B]","bg-[#4ECDC4]"].map((b,i) => (
+              <div key={i} className={`${b} border border-[#FFD400]/20 aspect-square`} />
+            ))}
+          </div>
         </div>
-      </section>
+      </div>
 
-      {/* Decorative */}
-      <div className="absolute top-20 right-20 text-6xl opacity-20 rotate-12 select-none pointer-events-none">★</div>
-      <div className="absolute bottom-32 left-16 text-5xl opacity-20 -rotate-12 select-none pointer-events-none">✦</div>
-      <div className="absolute top-1/3 left-10 w-32 h-32 border-4 border-black/10 rotate-45 pointer-events-none" />
-      <div className="absolute bottom-20 right-20 w-24 h-24 border-4 border-black/10 rounded-full pointer-events-none" />
+      {/* Marquee keyframe */}
+      <style>{`
+        @keyframes marquee { from { transform: translateX(0) } to { transform: translateX(-50%) } }
+        .animate-marquee { animation: marquee 20s linear infinite; }
+      `}</style>
     </div>
   );
 }

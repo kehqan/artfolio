@@ -1,281 +1,505 @@
-import { createClient } from "@/lib/supabase/server";
-import Link from "next/link";
-import {
-  ImageIcon, FolderOpen, LayoutGrid, Users,
-  Plus, ArrowRight, TrendingUp, BarChart3,
-  MessageSquare, Handshake, Eye, Zap, ArrowUpRight,
-} from "lucide-react";
+'use client'
 
-// Mini inline sparkline bars (pure CSS/SVG, no library needed)
-function Sparkline({ values, color }: { values: number[]; color: string }) {
-  const max = Math.max(...values, 1);
+import { useEffect, useState } from 'react'
+import { createClient } from '@/lib/supabase/client'
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+interface Profile {
+  id: string
+  full_name: string | null
+  username: string | null
+  role: string | null
+  avatar_url: string | null
+}
+
+interface StatData {
+  artworks: number
+  collections: number
+  exhibitions: number
+  followers: number
+}
+
+interface ArtworkItem {
+  id: string
+  title: string
+  status: string | null
+  created_at: string
+  image_url: string | null
+}
+
+interface ClientItem {
+  id: string
+  name: string
+  email: string | null
+  status?: string
+}
+
+// ─── Sparkline bars ───────────────────────────────────────────────────────────
+
+const BARS: Record<string, number[]> = {
+  artworks:    [16, 22, 14, 30, 36, 38],
+  collections: [18, 28, 20, 32, 24, 38],
+  exhibitions: [38, 30, 20, 28, 16, 22],
+  followers:   [8, 8, 8, 8, 8, 8],
+}
+
+function Sparkline({ type }: { type: keyof typeof BARS }) {
+  const bars = BARS[type]
   return (
-    <div className="flex items-end gap-0.5 h-10">
-      {values.map((v, i) => (
-        <div key={i} className={`w-1.5 rounded-none transition-all ${color}`}
-          style={{ height: `${Math.max(4, (v / max) * 40)}px`, opacity: i === values.length - 1 ? 1 : 0.4 + (i / values.length) * 0.5 }} />
+    <div style={{ display: 'flex', alignItems: 'flex-end', gap: 3, height: 38 }}>
+      {bars.map((h, i) => (
+        <div
+          key={i}
+          style={{
+            width: 6,
+            height: h,
+            borderRadius: 2,
+            background: h >= 28 ? '#FFE000' : '#E0D8CA',
+            border: h >= 28 ? '1px solid #0D0D0D' : undefined,
+            transition: 'height 0.3s',
+          }}
+        />
       ))}
     </div>
-  );
+  )
 }
 
-// Quick action card
-function QuickAction({ href, icon: Icon, label, sub, accent }: { href: string; icon: React.ElementType; label: string; sub: string; accent?: boolean }) {
-  return (
-    <Link href={href}
-      className={`flex items-center gap-4 px-4 py-3 border-b-2 border-black transition-all group hover:bg-[#FFD400] ${accent ? "bg-[#FFD400]" : "bg-white"}`}>
-      <div className={`w-9 h-9 border-2 border-black flex items-center justify-center shrink-0 ${accent ? "bg-black" : "bg-[#FFFBEA] group-hover:bg-black"} transition-colors`}>
-        <Icon className={`w-4 h-4 ${accent ? "text-[#FFD400]" : "text-black group-hover:text-[#FFD400]"} transition-colors`} />
-      </div>
-      <div className="min-w-0 flex-1">
-        <p className="text-sm font-black text-black">{label}</p>
-        <p className="text-[10px] font-bold text-black/50 uppercase tracking-wider">{sub}</p>
-      </div>
-      <ArrowRight className="w-4 h-4 text-black/30 group-hover:text-black shrink-0 group-hover:translate-x-0.5 transition-all" />
-    </Link>
-  );
+// ─── Quick Actions ─────────────────────────────────────────────────────────────
+
+const QUICK_ACTIONS = [
+  { icon: '＋', label: 'Add Artwork',      href: '/dashboard/artworks',       primary: true },
+  { icon: '📁', label: 'New Collection',   href: '/dashboard/collections' },
+  { icon: '💬', label: 'Post to Feed',     href: '/dashboard/feed' },
+  { icon: '🔍', label: 'Discover Artists', href: '/dashboard/discover' },
+  { icon: '🏛',  label: 'New Exhibition',   href: '/dashboard/exhibitions' },
+  { icon: '📊', label: 'Record Sale',      href: '/dashboard/sales' },
+]
+
+// ─── Status badge colours ─────────────────────────────────────────────────────
+
+function statusBadge(s: string | null) {
+  const v = (s || '').toLowerCase()
+  if (v === 'available') return { background: '#FFE000', color: '#0D0D0D' }
+  if (v === 'sold')      return { background: '#0D0D0D', color: '#FFFFFF' }
+  return { background: '#E0D8CA', color: '#5C5346' }
 }
 
-export default async function DashboardPage() {
-  const supabase = createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return null;
+// ─── Relative time ────────────────────────────────────────────────────────────
 
-  const [
-    { count: artworkCount },
-    { count: collectionCount },
-    { count: exhibitionCount },
-    { count: followerCount },
-    { count: saleCount },
-    { data: recentArtworks },
-    { data: recentSales },
-  ] = await Promise.all([
-    supabase.from("artworks").select("*", { count: "exact", head: true }).eq("user_id", user.id),
-    supabase.from("collections").select("*", { count: "exact", head: true }).eq("user_id", user.id),
-    supabase.from("exhibitions").select("*", { count: "exact", head: true }).eq("user_id", user.id),
-    supabase.from("follows").select("*", { count: "exact", head: true }).eq("following_id", user.id),
-    supabase.from("sales").select("*", { count: "exact", head: true }).eq("user_id", user.id),
-    supabase.from("artworks").select("id, title, images, status, price, medium").eq("user_id", user.id).order("created_at", { ascending: false }).limit(5),
-    supabase.from("sales").select("id, title, amount, status, created_at").eq("user_id", user.id).order("created_at", { ascending: false }).limit(5),
-  ]);
+function relTime(iso: string) {
+  const diff = Date.now() - new Date(iso).getTime()
+  const m = Math.floor(diff / 60000)
+  if (m < 60)  return `${m}m ago`
+  const h = Math.floor(m / 60)
+  if (h < 24)  return `${h}h ago`
+  return `${Math.floor(h / 24)}d ago`
+}
 
-  // Fake sparkline data (would come from real analytics in prod)
-  const stats = [
-    { label: "Artworks",     value: artworkCount    ?? 0, icon: ImageIcon,   href: "/dashboard/artworks",    spark: [3,5,4,6,5,8,7,9,8,artworkCount??0],    color: "bg-[#FFD400]" },
-    { label: "Collections",  value: collectionCount ?? 0, icon: FolderOpen,  href: "/dashboard/collections",  spark: [1,2,1,3,2,4,3,5,4,collectionCount??0],  color: "bg-[#FF6B6B]" },
-    { label: "Exhibitions",  value: exhibitionCount ?? 0, icon: LayoutGrid,  href: "/dashboard/exhibitions",  spark: [0,1,0,2,1,2,1,3,2,exhibitionCount??0],  color: "bg-[#4ECDC4]" },
-    { label: "Followers",    value: followerCount   ?? 0, icon: Users,       href: "/dashboard/discover",     spark: [2,4,3,5,6,5,7,8,9,followerCount??0],    color: "bg-black"     },
-  ];
+// ─── Main component ────────────────────────────────────────────────────────────
 
-  const statusStyle: Record<string, string> = {
-    available: "bg-[#FFD400] text-black border border-black",
-    sold:      "bg-black text-[#FFD400] border border-black",
-    reserved:  "bg-[#4ECDC4] text-black border border-black",
-    "not for sale": "bg-stone-200 text-black border border-black",
-  };
+export default function DashboardPage() {
+  const supabase = createClient()
+  const router   = useRouter()
 
-  const saleStatusStyle: Record<string, string> = {
-    completed: "bg-[#FFD400] text-black border border-black",
-    paid:      "bg-[#FFD400] text-black border border-black",
-    pending:   "bg-[#4ECDC4] text-black border border-black",
-    cancelled: "bg-[#FF6B6B] text-black border border-black",
-  };
+  const [profile,    setProfile]    = useState<Profile | null>(null)
+  const [stats,      setStats]      = useState<StatData>({ artworks: 0, collections: 0, exhibitions: 0, followers: 0 })
+  const [artworks,   setArtworks]   = useState<ArtworkItem[]>([])
+  const [clients,    setClients]    = useState<ClientItem[]>([])
+  const [loading,    setLoading]    = useState(true)
+
+  useEffect(() => {
+    async function load() {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) { router.push('/login'); return }
+
+      // Profile
+      const { data: prof } = await supabase
+        .from('profiles')
+        .select('id, full_name, username, role, avatar_url')
+        .eq('id', user.id)
+        .single()
+      setProfile(prof)
+
+      // Stats (parallel)
+      const [
+        { count: aCount },
+        { count: cCount },
+        { count: eCount },
+        { count: fCount },
+      ] = await Promise.all([
+        supabase.from('artworks').select('id', { count: 'exact', head: true }).eq('artist_id', user.id),
+        supabase.from('collections').select('id', { count: 'exact', head: true }).eq('artist_id', user.id),
+        supabase.from('exhibitions').select('id', { count: 'exact', head: true }).eq('artist_id', user.id),
+        supabase.from('followers').select('id', { count: 'exact', head: true }).eq('following_id', user.id),
+      ])
+      setStats({
+        artworks:    aCount ?? 0,
+        collections: cCount ?? 0,
+        exhibitions: eCount ?? 0,
+        followers:   fCount ?? 0,
+      })
+
+      // Recent artworks
+      const { data: aw } = await supabase
+        .from('artworks')
+        .select('id, title, status, created_at, image_url')
+        .eq('artist_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(3)
+      setArtworks(aw ?? [])
+
+      // Clients
+      const { data: cl } = await supabase
+        .from('clients')
+        .select('id, name, email')
+        .eq('artist_id', user.id)
+        .limit(6)
+      setClients(cl ?? [])
+
+      setLoading(false)
+    }
+    load()
+  }, [])
+
+  const initials = (name: string | null) =>
+    name ? name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2) : '?'
+
+  const displayName = profile?.full_name || profile?.username || 'Artist'
+
+  // ─── Stat cards data ─────────────────────────────────────────────────────────
+  const STAT_CARDS = [
+    { label: 'Total Artworks', value: stats.artworks,    delta: '+1 this month', neg: false, type: 'artworks'    as const },
+    { label: 'Collections',    value: stats.collections, delta: '+0.73%',        neg: false, type: 'collections' as const },
+    { label: 'Exhibitions',    value: stats.exhibitions, delta: 'Upcoming',      neg: true,  type: 'exhibitions' as const },
+    { label: 'Followers',      value: stats.followers,   delta: 'No change',     neg: false, neutral: true, type: 'followers' as const },
+  ]
+
+  if (loading) return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#F5F0E8', fontFamily: 'Inter, sans-serif', fontWeight: 700, fontSize: 14, color: '#9B8F7A' }}>
+      Loading dashboard…
+    </div>
+  )
 
   return (
-    <div>
-      {/* ── PAGE HEADER ──────────────────────────────────── */}
-      <div className="flex items-start justify-between mb-8">
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <Zap className="w-4 h-4 text-[#FFD400] fill-[#FFD400]" />
-            <span className="text-[10px] font-black tracking-[0.25em] uppercase text-black/40">Overview</span>
-          </div>
-          <h1 className="font-black text-3xl text-black tracking-tight">Dashboard</h1>
-        </div>
-        <div className="flex items-center gap-2">
-          <Link href="/dashboard/analytics"
-            className="flex items-center gap-2 px-4 py-2 bg-white border-2 border-black text-sm font-black hover:bg-[#FFD400] transition-colors">
-            <BarChart3 className="w-4 h-4" /> Analytics
-          </Link>
-          <Link href="/dashboard/artworks/new"
-            className="flex items-center gap-2 px-4 py-2 bg-black text-[#FFD400] border-2 border-black text-sm font-black hover:bg-stone-900 transition-colors">
-            <Plus className="w-4 h-4" /> Add Artwork
-          </Link>
-        </div>
-      </div>
+    <>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        :root {
+          --yellow:   #FFE000;
+          --black:    #0D0D0D;
+          --white:    #FFFFFF;
+          --cream:    #F5F0E8;
+          --gray-100: #F0EBE1;
+          --gray-200: #E0D8CA;
+          --gray-400: #9B8F7A;
+          --gray-600: #5C5346;
+          --border:   2px solid #0D0D0D;
+          --shadow:   3px 3px 0px #0D0D0D;
+          --shadow-lg:5px 5px 0px #0D0D0D;
+          --green:    #00C853;
+          --red:      #F50057;
+        }
+        body { font-family: 'Inter', sans-serif; }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #ccc; border-radius: 3px; }
 
-      {/* ── STAT CARDS ───────────────────────────────────── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-0 mb-8 border-2 border-black">
-        {stats.map((s, i) => (
-          <Link key={s.label} href={s.href}
-            className={`p-5 flex flex-col justify-between min-h-[120px] group hover:bg-[#FFD400] transition-colors ${i < 3 ? "border-r-2 border-black" : ""} ${i >= 2 ? "border-t-2 lg:border-t-0 border-black" : ""} bg-white`}>
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-[10px] font-black tracking-[0.2em] uppercase text-black/40 mb-1">{s.label}</p>
-                <p className="text-3xl font-black text-black">{s.value}</p>
-              </div>
-              <Sparkline values={s.spark} color={s.color} />
-            </div>
-            <div className="flex items-center gap-1 text-[10px] font-black text-black/40 group-hover:text-black transition-colors">
-              <TrendingUp className="w-3 h-3" />
-              <span>View all</span>
-              <ArrowUpRight className="w-3 h-3 ml-auto" />
-            </div>
-          </Link>
-        ))}
-      </div>
+        .topbar-btn:hover  { transform: translate(-1px,-1px); box-shadow: 4px 4px 0 #0D0D0D !important; }
+        .stat-card:hover   { transform: translate(-2px,-2px); box-shadow: var(--shadow-lg) !important; }
+        .card-header-link:hover { transform: translate(-1px,-1px); box-shadow: 3px 3px 0 #0D0D0D; }
+        .quick-action-item:hover { background: var(--gray-100); }
+        .primary-action:hover   { background: #222 !important; }
+        .nav-item:hover { background: #1e1e1e; color: #fff; }
+      `}</style>
 
-      {/* ── MAIN GRID ────────────────────────────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', fontFamily: 'Inter, sans-serif', background: '#F5F0E8', color: '#0D0D0D' }}>
 
-        {/* Left col: recent artworks + sales */}
-        <div className="lg:col-span-2 space-y-6">
+        {/* ── SIDEBAR ── */}
+        <aside style={{ width: 220, background: '#0D0D0D', color: '#fff', display: 'flex', flexDirection: 'column', flexShrink: 0, borderRight: 'var(--border)', overflowY: 'auto' }}>
 
-          {/* Recent Artworks */}
-          <div className="bg-white border-2 border-black">
-            <div className="flex items-center justify-between px-5 py-4 border-b-2 border-black">
-              <div>
-                <h2 className="font-black text-base text-black">Recent Artworks</h2>
-                <p className="text-[10px] font-bold text-black/40 uppercase tracking-wider mt-0.5">Latest additions to your inventory</p>
-              </div>
-              <Link href="/dashboard/artworks" className="flex items-center gap-1 text-xs font-black text-black border-2 border-black px-3 py-1.5 hover:bg-[#FFD400] transition-colors">
-                View all <ArrowRight className="w-3 h-3" />
-              </Link>
-            </div>
-
-            {recentArtworks && recentArtworks.length > 0 ? (
-              <div>
-                {recentArtworks.map((aw, i) => (
-                  <Link key={aw.id} href={`/dashboard/artworks/${aw.id}`}
-                    className={`flex items-center gap-4 px-5 py-3 hover:bg-[#FFFBEA] transition-colors group ${i < recentArtworks.length - 1 ? "border-b border-black/10" : ""}`}>
-                    {/* Thumbnail */}
-                    <div className="w-12 h-12 border-2 border-black overflow-hidden shrink-0 bg-stone-100">
-                      {aw.images?.[0]
-                        ? <img src={aw.images[0]} alt={aw.title} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300" />
-                        : <div className="w-full h-full flex items-center justify-center"><ImageIcon className="w-5 h-5 text-stone-300" /></div>}
-                    </div>
-                    {/* Info */}
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-black text-black truncate">{aw.title}</p>
-                      {aw.medium && <p className="text-[10px] font-bold text-black/40 uppercase tracking-wider truncate">{aw.medium}</p>}
-                    </div>
-                    {/* Right side */}
-                    <div className="flex items-center gap-3 shrink-0">
-                      {aw.price && <span className="text-sm font-black font-mono text-black">${aw.price.toLocaleString()}</span>}
-                      <span className={`px-2 py-0.5 text-[10px] font-black uppercase ${statusStyle[aw.status?.toLowerCase()] || "bg-stone-100 text-black border border-black"}`}>
-                        {aw.status}
-                      </span>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            ) : (
-              <div className="flex flex-col items-center justify-center py-12 text-center px-4">
-                <div className="w-16 h-16 border-4 border-black bg-[#FFD400] flex items-center justify-center mb-4">
-                  <ImageIcon className="w-8 h-8 text-black" />
-                </div>
-                <p className="font-black text-black mb-1">No artworks yet</p>
-                <p className="text-sm font-bold text-black/50 mb-4">Start building your portfolio</p>
-                <Link href="/dashboard/artworks/new" className="flex items-center gap-2 px-5 py-2.5 bg-black text-[#FFD400] border-2 border-black font-black text-sm hover:bg-stone-900 transition-colors">
-                  <Plus className="w-4 h-4" /> Add Artwork
-                </Link>
-              </div>
-            )}
+          {/* Logo */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '18px 16px 14px', borderBottom: '1px solid #2a2a2a' }}>
+            <div style={{ width: 32, height: 32, background: '#FFE000', border: 'var(--border)', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, fontWeight: 900, color: '#0D0D0D', flexShrink: 0 }}>A</div>
+            <span style={{ fontSize: 16, fontWeight: 800, letterSpacing: '-0.3px', color: '#fff' }}>
+              Artfolio<sup style={{ fontSize: 8, verticalAlign: 'super', opacity: 0.5 }}>✦</sup>
+            </span>
           </div>
 
-          {/* Recent Sales */}
-          {recentSales && recentSales.length > 0 && (
-            <div className="bg-white border-2 border-black">
-              <div className="flex items-center justify-between px-5 py-4 border-b-2 border-black">
-                <div>
-                  <h2 className="font-black text-base text-black">Latest Sales</h2>
-                  <p className="text-[10px] font-bold text-black/40 uppercase tracking-wider mt-0.5">{saleCount ?? 0} total transactions</p>
-                </div>
-                <Link href="/dashboard/sales" className="flex items-center gap-1 text-xs font-black text-black border-2 border-black px-3 py-1.5 hover:bg-[#FFD400] transition-colors">
-                  See all <ArrowRight className="w-3 h-3" />
-                </Link>
-              </div>
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b-2 border-black bg-[#FFFBEA]">
-                    <th className="text-left px-5 py-2.5 text-[10px] font-black uppercase tracking-widest text-black/50">Artwork</th>
-                    <th className="text-left px-3 py-2.5 text-[10px] font-black uppercase tracking-widest text-black/50">Date</th>
-                    <th className="text-right px-5 py-2.5 text-[10px] font-black uppercase tracking-widest text-black/50">Amount</th>
-                    <th className="text-center px-3 py-2.5 text-[10px] font-black uppercase tracking-widest text-black/50">Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {recentSales.map((sale, i) => (
-                    <tr key={sale.id} className={`hover:bg-[#FFFBEA] transition-colors ${i < recentSales.length - 1 ? "border-b border-black/10" : ""}`}>
-                      <td className="px-5 py-3 font-bold text-black truncate max-w-[160px]">{sale.title || "—"}</td>
-                      <td className="px-3 py-3 text-[11px] font-bold text-black/40">
-                        {sale.created_at ? new Date(sale.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "—"}
-                      </td>
-                      <td className="px-5 py-3 text-right font-black text-black font-mono">{sale.amount ? `$${Number(sale.amount).toLocaleString()}` : "—"}</td>
-                      <td className="px-3 py-3 text-center">
-                        <span className={`px-2 py-0.5 text-[9px] font-black uppercase ${saleStatusStyle[sale.status?.toLowerCase()] || "bg-stone-100 text-black border border-black"}`}>
-                          {sale.status || "—"}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-
-        {/* Right col: quick actions */}
-        <div className="space-y-6">
-
-          {/* Quick Actions */}
-          <div className="bg-white border-2 border-black">
-            <div className="px-5 py-4 border-b-2 border-black">
-              <h2 className="font-black text-base text-black">Quick Actions</h2>
-              <p className="text-[10px] font-bold text-black/40 uppercase tracking-wider mt-0.5">Jump to common tasks</p>
+          {/* User */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px 14px', borderBottom: '1px solid #2a2a2a' }}>
+            <div style={{ width: 34, height: 34, borderRadius: '50%', background: '#FFE000', border: '2px solid #444', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 700, color: '#0D0D0D', flexShrink: 0 }}>
+              {initials(profile?.full_name || null)}
             </div>
             <div>
-              <QuickAction href="/dashboard/artworks/new"  icon={Plus}         label="Add Artwork"       sub="Upload new work"         accent />
-              <QuickAction href="/dashboard/collections/new" icon={FolderOpen}  label="New Collection"    sub="Organise your portfolio" />
-              <QuickAction href="/dashboard/exhibitions/new" icon={LayoutGrid}  label="New Exhibition"    sub="Plan a show"             />
-              <QuickAction href="/dashboard/feed"           icon={MessageSquare} label="Post to Feed"     sub="Share with community"    />
-              <QuickAction href="/dashboard/pool"           icon={Handshake}    label="Discovery Pool"    sub="Find venues & artists"   />
-              <QuickAction href="/dashboard/sales"          icon={BarChart3}    label="Record a Sale"     sub="Track revenue"           />
-              <QuickAction href="/explore"                  icon={Eye}          label="Browse Explore"    sub="See what's happening"    />
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#fff' }}>{displayName}</div>
+              <div style={{ fontSize: 11, color: '#888', marginTop: 1 }}>{profile?.role || 'Artist'}</div>
             </div>
           </div>
 
-          {/* Community Snapshot */}
-          <div className="bg-black border-2 border-black">
-            <div className="px-5 py-4 border-b border-white/10">
-              <h2 className="font-black text-base text-[#FFD400]">Community</h2>
-              <p className="text-[10px] font-bold text-white/30 uppercase tracking-wider mt-0.5">Your reach &amp; connections</p>
+          {/* Nav sections */}
+          {[
+            { label: 'Overview', items: [{ icon: '▣', text: 'Dashboard', href: '/dashboard', active: true, badge: '3' }] },
+            { label: 'Inventory', items: [
+              { icon: '🖼', text: 'My Artworks', href: '/dashboard/artworks', badge: String(stats.artworks) },
+              { icon: '📁', text: 'Collections', href: '/dashboard/collections' },
+            ]},
+            { label: 'Presence', items: [
+              { icon: '🌐', text: 'My Portfolio', href: '/dashboard/portfolio' },
+              { icon: '🏛',  text: 'Exhibitions', href: '/dashboard/exhibitions' },
+            ]},
+            { label: 'Community', items: [
+              { icon: '💬', text: 'Feed', href: '/dashboard/feed' },
+              { icon: '🔍', text: 'Discover', href: '/dashboard/discover' },
+              { icon: '🤝', text: 'Collaborations', href: '/dashboard/collaborations' },
+            ]},
+            { label: 'Business', items: [
+              { icon: '📊', text: 'Sales Tracking', href: '/dashboard/sales' },
+              { icon: '👤', text: 'Clients', href: '/dashboard/clients' },
+              { icon: '📈', text: 'Analytics', href: '/dashboard/analytics' },
+            ]},
+          ].map(section => (
+            <div key={section.label}>
+              <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '1.2px', color: '#555', textTransform: 'uppercase', padding: '16px 16px 4px' }}>{section.label}</div>
+              <nav style={{ padding: '0 8px' }}>
+                {section.items.map(item => (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className="nav-item"
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 9,
+                      padding: '8px 10px', borderRadius: 6,
+                      fontSize: 13, fontWeight: item.active ? 700 : 500,
+                      color: item.active ? '#0D0D0D' : '#aaa',
+                      cursor: 'pointer', marginBottom: 2,
+                      textDecoration: 'none',
+                      background: item.active ? '#FFE000' : 'transparent',
+                      border: item.active ? '2px solid #0D0D0D' : '2px solid transparent',
+                      boxShadow: item.active ? '3px 3px 0px #0D0D0D' : 'none',
+                    }}
+                  >
+                    <span style={{ fontSize: 14, width: 16, textAlign: 'center', opacity: item.active ? 1 : 0.7 }}>{item.icon}</span>
+                    {item.text}
+                    {item.badge && (
+                      <span style={{ marginLeft: 'auto', background: item.active ? '#0D0D0D' : '#2a2a2a', color: item.active ? '#FFE000' : '#aaa', fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 20 }}>
+                        {item.badge}
+                      </span>
+                    )}
+                  </Link>
+                ))}
+              </nav>
             </div>
-            <div className="p-5 grid grid-cols-2 gap-4">
-              {[
-                { label: "Followers",      value: followerCount  ?? 0, icon: Users       },
-                { label: "Exhibitions",    value: exhibitionCount ?? 0, icon: LayoutGrid  },
-                { label: "Collaborations", value: 0,                    icon: Handshake   },
-                { label: "Sales Made",     value: saleCount      ?? 0, icon: BarChart3   },
-              ].map((s) => (
-                <div key={s.label} className="flex flex-col gap-1">
-                  <div className="w-8 h-8 bg-[#FFD400] border border-[#FFD400] flex items-center justify-center mb-1">
-                    <s.icon className="w-4 h-4 text-black" />
+          ))}
+
+          {/* Sign out */}
+          <div
+            onClick={async () => { await supabase.auth.signOut(); router.push('/') }}
+            style={{ marginTop: 'auto', padding: '14px 16px', borderTop: '1px solid #2a2a2a', display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, color: '#f44', fontWeight: 600 }}
+          >
+            <span>→</span> Sign Out
+          </div>
+        </aside>
+
+        {/* ── MAIN ── */}
+        <main style={{ flex: 1, overflowY: 'auto', background: '#F5F0E8' }}>
+
+          {/* Topbar */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 28px', borderBottom: '2px solid #0D0D0D', background: '#F5F0E8', position: 'sticky', top: 0, zIndex: 10 }}>
+            <div>
+              <div style={{ fontSize: 22, fontWeight: 900, letterSpacing: '-0.5px' }}>Dashboard</div>
+              <div style={{ fontSize: 13, color: '#9B8F7A', marginTop: 1 }}>Welcome back — here&apos;s what&apos;s happening with your work.</div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ width: 36, height: 36, border: '2px solid #0D0D0D', background: '#fff', boxShadow: '3px 3px 0 #0D0D0D', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, cursor: 'pointer' }}>🔍</div>
+              <div style={{ width: 36, height: 36, border: '2px solid #0D0D0D', background: '#fff', boxShadow: '3px 3px 0 #0D0D0D', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, cursor: 'pointer' }}>🔔</div>
+              <Link href="/dashboard/artworks" className="topbar-btn" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', border: '2px solid #0D0D0D', fontSize: 13, fontWeight: 700, background: '#FFE000', color: '#0D0D0D', cursor: 'pointer', boxShadow: '3px 3px 0 #0D0D0D', borderRadius: 6, textDecoration: 'none', transition: 'transform 0.1s, box-shadow 0.1s' }}>
+                ＋ Add Artwork →
+              </Link>
+            </div>
+          </div>
+
+          <div style={{ padding: '24px 28px' }}>
+
+            {/* ── STAT CARDS ── */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 14, marginBottom: 22 }}>
+              {STAT_CARDS.map(s => (
+                <div key={s.label} className="stat-card" style={{ background: '#fff', border: '2px solid #0D0D0D', boxShadow: '3px 3px 0 #0D0D0D', borderRadius: 8, padding: '16px 18px', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', cursor: 'pointer', transition: 'transform 0.1s, box-shadow 0.1s' }}>
+                  <div>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: '#9B8F7A', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 6 }}>{s.label}</div>
+                    <div style={{ fontSize: 28, fontWeight: 900, letterSpacing: '-1px', color: '#0D0D0D' }}>{s.value}</div>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: (s as any).neutral ? '#9B8F7A' : s.neg ? '#F50057' : '#00C853', marginTop: 4 }}>
+                      {(s as any).neutral ? '— ' : s.neg ? '↓ ' : '↑ '}{s.delta}
+                    </div>
                   </div>
-                  <span className="text-2xl font-black text-white">{s.value}</span>
-                  <span className="text-[9px] font-black uppercase tracking-widest text-white/30">{s.label}</span>
+                  <Sparkline type={s.type} />
                 </div>
               ))}
             </div>
-            <div className="px-5 pb-5">
-              <Link href="/dashboard/discover"
-                className="flex items-center justify-center gap-2 w-full py-2.5 bg-[#FFD400] border-2 border-[#FFD400] text-black font-black text-sm hover:bg-white transition-colors">
-                Discover Artists <ArrowRight className="w-4 h-4" />
-              </Link>
+
+            {/* ── MAIN GRID ── */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: 18 }}>
+
+              {/* LEFT: Recent Artworks Feed */}
+              <div>
+                <div style={{ background: '#fff', border: '2px solid #0D0D0D', boxShadow: '3px 3px 0 #0D0D0D', borderRadius: 8, overflow: 'hidden' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px', borderBottom: '2px solid #0D0D0D', fontSize: 14, fontWeight: 800 }}>
+                    Recent Artworks
+                    <Link href="/dashboard/artworks" className="card-header-link" style={{ fontSize: 12, fontWeight: 700, color: '#0D0D0D', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 4, padding: '4px 10px', border: '2px solid #0D0D0D', borderRadius: 20, background: '#FFE000', boxShadow: '2px 2px 0 #0D0D0D', transition: 'transform 0.1s, box-shadow 0.1s' }}>
+                      View all →
+                    </Link>
+                  </div>
+
+                  {artworks.length === 0 ? (
+                    <div style={{ padding: '40px 18px', textAlign: 'center', color: '#9B8F7A', fontSize: 13, fontWeight: 600 }}>
+                      No artworks yet.{' '}
+                      <Link href="/dashboard/artworks" style={{ color: '#0D0D0D', fontWeight: 800, textDecoration: 'underline' }}>Add your first →</Link>
+                    </div>
+                  ) : artworks.map(aw => (
+                    <div key={aw.id} style={{ padding: '16px 18px', borderBottom: '2px solid #0D0D0D' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+                          <div style={{ width: 32, height: 32, borderRadius: '50%', background: '#FFE000', border: '2px solid #0D0D0D', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 800, color: '#0D0D0D', flexShrink: 0 }}>
+                            {initials(displayName)}
+                          </div>
+                          <div>
+                            <div style={{ fontSize: 13, fontWeight: 700 }}>{displayName}</div>
+                            <div style={{ fontSize: 11, color: '#9B8F7A', marginTop: 1 }}>Added {relTime(aw.created_at)}</div>
+                          </div>
+                        </div>
+                        <button style={{ background: 'none', border: 'none', fontSize: 16, cursor: 'pointer', color: '#9B8F7A' }}>···</button>
+                      </div>
+
+                      <div style={{ fontSize: 13, color: '#5C5346', lineHeight: 1.5, marginBottom: 12 }}>{aw.title}</div>
+
+                      {aw.image_url ? (
+                        <div style={{ marginBottom: 12 }}>
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={aw.image_url}
+                            alt={aw.title}
+                            style={{ width: '100%', aspectRatio: '3/2', objectFit: 'cover', border: '2px solid #0D0D0D', borderRadius: 6 }}
+                          />
+                        </div>
+                      ) : (
+                        <div style={{ width: '100%', aspectRatio: '3/2', border: '2px solid #0D0D0D', borderRadius: 6, background: '#1a3a5c', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 36, color: '#fff', fontWeight: 900, marginBottom: 12 }}>?</div>
+                      )}
+
+                      <span style={{ display: 'inline-block', fontSize: 10, fontWeight: 800, textTransform: 'uppercase', padding: '3px 8px', border: '2px solid #0D0D0D', borderRadius: 4, letterSpacing: '0.5px', marginBottom: 10, ...statusBadge(aw.status) }}>
+                        {aw.status || 'Draft'}
+                      </span>
+
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 16, fontSize: 12, fontWeight: 600, color: '#5C5346' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer' }}>💬 <span>0</span></div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer' }}>♡ <span>0</span></div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer', marginLeft: 'auto' }}>↗ Share</div>
+                      </div>
+                    </div>
+                  ))}
+
+                  {/* Comment input */}
+                  <div style={{ padding: '12px 18px', borderTop: '2px solid #0D0D0D', display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <div style={{ width: 28, height: 28, borderRadius: '50%', background: '#FFE000', border: '2px solid #0D0D0D', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 800, color: '#0D0D0D', flexShrink: 0 }}>
+                      {initials(displayName)}
+                    </div>
+                    <input
+                      type="text"
+                      placeholder="Type to add your comment…"
+                      style={{ flex: 1, padding: '8px 12px', border: '2px solid #0D0D0D', borderRadius: 6, fontSize: 13, fontFamily: 'Inter, sans-serif', background: '#F0EBE1', outline: 'none' }}
+                    />
+                    <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                      <span style={{ fontSize: 18, cursor: 'pointer', opacity: 0.5 }}>😊</span>
+                      <span style={{ fontSize: 18, cursor: 'pointer', opacity: 0.5 }}>＋</span>
+                      <div style={{ width: 34, height: 34, background: '#FFE000', border: '2px solid #0D0D0D', boxShadow: '3px 3px 0 #0D0D0D', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 14 }}>→</div>
+                    </div>
+                  </div>
+
+                </div>
+              </div>
+
+              {/* RIGHT COLUMN */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+                {/* Quick Actions */}
+                <div style={{ background: '#fff', border: '2px solid #0D0D0D', boxShadow: '3px 3px 0 #0D0D0D', borderRadius: 8, overflow: 'hidden' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px', borderBottom: '2px solid #0D0D0D', fontSize: 14, fontWeight: 800 }}>Quick Actions</div>
+                  <div style={{ padding: '8px 0' }}>
+                    {QUICK_ACTIONS.map(a => (
+                      <Link
+                        key={a.label}
+                        href={a.href}
+                        className={a.primary ? 'primary-action' : 'quick-action-item'}
+                        style={{
+                          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                          padding: a.primary ? '12px 16px' : '11px 18px',
+                          margin: a.primary ? '8px 12px' : undefined,
+                          borderBottom: a.primary ? undefined : '1px solid #E0D8CA',
+                          fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                          transition: 'background 0.1s',
+                          textDecoration: 'none',
+                          color: a.primary ? '#fff' : '#0D0D0D',
+                          background: a.primary ? '#0D0D0D' : 'transparent',
+                          borderRadius: a.primary ? 6 : undefined,
+                          border: a.primary ? '2px solid #0D0D0D' : undefined,
+                          boxShadow: a.primary ? '3px 3px 0 #0D0D0D' : undefined,
+                        }}
+                      >
+                        <span><span style={{ fontSize: 14, marginRight: 10, opacity: 0.7 }}>{a.icon}</span>{a.label}</span>
+                        <span style={{ fontSize: 14, color: a.primary ? '#FFE000' : '#9B8F7A' }}>→</span>
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Collectors & Clients */}
+                <div style={{ background: '#fff', border: '2px solid #0D0D0D', boxShadow: '3px 3px 0 #0D0D0D', borderRadius: 8, overflow: 'hidden' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px', borderBottom: '2px solid #0D0D0D', fontSize: 14, fontWeight: 800 }}>Collectors &amp; Clients</div>
+                  <div style={{ padding: '4px 0' }}>
+                    {clients.length === 0 ? (
+                      <div style={{ padding: '20px 18px', fontSize: 13, color: '#9B8F7A', fontWeight: 600 }}>
+                        No clients yet.{' '}
+                        <Link href="/dashboard/clients" style={{ color: '#0D0D0D', fontWeight: 800, textDecoration: 'underline' }}>Add one →</Link>
+                      </div>
+                    ) : clients.map((c, i) => {
+                      const statusColors = [
+                        { bg: '#CFFDE1', color: '#00874A', label: 'Online' },
+                        { bg: '#FFF3CD', color: '#856404', label: 'Away'   },
+                        { bg: '#E0D8CA', color: '#5C5346', label: 'Offline'},
+                      ]
+                      const sc = statusColors[i % 3]
+                      return (
+                        <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 18px', borderBottom: '1px solid #E0D8CA' }}>
+                          <div style={{ width: 30, height: 30, borderRadius: '50%', border: '2px solid #0D0D0D', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, background: '#F0EBE1' }}>
+                            {initials(c.name)}
+                          </div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.name}</div>
+                            <div style={{ fontSize: 11, color: '#9B8F7A' }}>{c.email || '—'}</div>
+                          </div>
+                          <span style={{ fontSize: 10, fontWeight: 700, padding: '3px 8px', border: '2px solid #0D0D0D', borderRadius: 20, flexShrink: 0, background: sc.bg, color: sc.color }}>
+                            {sc.label}
+                          </span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+
+              </div>
             </div>
           </div>
-        </div>
+
+          {/* Footer */}
+          <div style={{ padding: '14px 28px', borderTop: '2px solid #0D0D0D', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 11, color: '#9B8F7A', fontWeight: 500 }}>
+            <span>Artfolio ✦ Artist Dashboard</span>
+            <span>© {new Date().getFullYear()}</span>
+          </div>
+
+        </main>
       </div>
-    </div>
-  );
+    </>
+  )
 }

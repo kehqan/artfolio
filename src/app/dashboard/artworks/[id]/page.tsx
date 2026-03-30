@@ -4,9 +4,8 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import {
-  ArrowLeft, Edit2, Trash2, Image as ImageIcon,
-  X, Upload, TrendingUp, TrendingDown, ExternalLink,
-  Heart, Share2, MoreHorizontal,
+  ArrowLeft, Edit2, Trash2, ImageIcon,
+  X, Upload, Share2, ExternalLink, MoreHorizontal,
 } from "lucide-react";
 
 type Artwork = {
@@ -14,9 +13,10 @@ type Artwork = {
   dimensions?: string; price?: number; status: string;
   description?: string; location?: string; notes?: string;
   images?: string[]; created_at: string; user_id: string;
+  sale_method?: string;
 };
 
-const STATUS_CONFIG: Record<string, { label: string; bg: string; color: string }> = {
+const STATUS_CFG: Record<string, { label: string; bg: string; color: string }> = {
   available:      { label: "Available",    bg: "#DCFCE7", color: "#166534" },
   Available:      { label: "Available",    bg: "#DCFCE7", color: "#166534" },
   sold:           { label: "Sold",         bg: "#111110", color: "#FFD400" },
@@ -29,25 +29,34 @@ const STATUS_CONFIG: Record<string, { label: string; bg: string; color: string }
   "In Storage":   { label: "In Storage",   bg: "#E0F2FE", color: "#0C4A6E" },
 };
 
+const SALE_METHODS = [
+  { value: "",                  label: "— Not specified —",  icon: "" },
+  { value: "direct",           label: "Direct Purchase",    icon: "🛒" },
+  { value: "inquiry",          label: "Inquiry Only",       icon: "✉️" },
+  { value: "price_on_request", label: "Price on Request",   icon: "💬" },
+  { value: "auction",          label: "Auction",            icon: "🔨" },
+  { value: "not_for_sale",     label: "Not for Sale",       icon: "🚫" },
+];
+
 const TABS = ["General Information", "Provenance", "Exhibition History", "Notes"];
 
 export default function ArtworkDetailPage() {
-  const params  = useParams();
-  const router  = useRouter();
-  const id      = params.id as string;
+  const params = useParams();
+  const router = useRouter();
+  const id = params.id as string;
 
-  const [artwork, setArtwork]     = useState<Artwork | null>(null);
-  const [loading, setLoading]     = useState(true);
+  const [artwork, setArtwork]   = useState<Artwork | null>(null);
+  const [loading, setLoading]   = useState(true);
   const [activeTab, setActiveTab] = useState("General Information");
   const [activeImg, setActiveImg] = useState(0);
-  const [editing, setEditing]     = useState(false);
+  const [editing, setEditing]   = useState(false);
 
-  // Edit form state
   const [form, setForm] = useState({
     title: "", year: "", medium: "", dimensions: "", price: "",
     status: "Available", description: "", location: "", notes: "",
+    sale_method: "",
   });
-  const [saving, setSaving] = useState(false);
+  const [saving, setSaving]         = useState(false);
   const [newFiles, setNewFiles]     = useState<File[]>([]);
   const [newPreviews, setNewPreviews] = useState<string[]>([]);
   const [existingImages, setExistingImages] = useState<string[]>([]);
@@ -56,7 +65,7 @@ export default function ArtworkDetailPage() {
     const supabase = createClient();
     supabase.from("artworks").select("*").eq("id", id).single().then(({ data }) => {
       if (data) {
-        setArtwork(data);
+        setArtwork(data as Artwork);
         setForm({
           title: data.title || "",
           year: data.year ? String(data.year) : "",
@@ -67,6 +76,7 @@ export default function ArtworkDetailPage() {
           description: data.description || "",
           location: data.location || "",
           notes: data.notes || "",
+          sale_method: data.sale_method || "",
         });
         setExistingImages(data.images || []);
       }
@@ -114,10 +124,12 @@ export default function ArtworkDetailPage() {
       description: form.description || null,
       location: form.location || null,
       notes: form.notes || null,
+      sale_method: form.sale_method || null,
       images: [...existingImages, ...uploadedUrls],
     };
+
     const { data } = await supabase.from("artworks").update(updated).eq("id", id).select().single();
-    if (data) { setArtwork(data); setExistingImages(data.images || []); }
+    if (data) { setArtwork(data as Artwork); setExistingImages(data.images || []); }
     setNewFiles([]); setNewPreviews([]);
     setSaving(false); setEditing(false);
   }
@@ -133,109 +145,78 @@ export default function ArtworkDetailPage() {
     });
   }
 
-  if (loading) return (
-    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: 80, color: "#9B8F7A", fontSize: 14 }}>
-      Loading…
-    </div>
-  );
+  if (loading) return <div style={{ padding: 80, textAlign: "center", color: "#9B8F7A", fontSize: 14 }}>Loading…</div>;
+  if (!artwork) return <div style={{ padding: 40, textAlign: "center", color: "#9B8F7A" }}>Artwork not found</div>;
 
-  if (!artwork) return (
-    <div style={{ padding: 40, textAlign: "center", color: "#9B8F7A" }}>Artwork not found</div>
-  );
-
-  const statusCfg = STATUS_CONFIG[artwork.status] ?? { label: artwork.status, bg: "#F3F4F6", color: "#374151" };
-  const coverImg  = artwork.images?.[activeImg] ?? null;
-  const set       = (k: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
+  const statusCfg = STATUS_CFG[artwork.status] ?? { label: artwork.status, bg: "#F5F0E8", color: "#5C5346" };
+  const currentSaleMethod = SALE_METHODS.find(m => m.value === (artwork.sale_method || ""));
+  const set = (k: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
     setForm(p => ({ ...p, [k]: e.target.value }));
+
+  const inputStyle = {
+    width: "100%", padding: "10px 12px", border: "2px solid #111110", borderRadius: 6,
+    fontSize: 14, fontFamily: "inherit", outline: "none", boxSizing: "border-box" as const,
+    transition: "border-color 0.1s, box-shadow 0.1s",
+  };
+  const readStyle = {
+    padding: "10px 12px", border: "2px solid #E0D8CA", borderRadius: 6,
+    fontSize: 14, minHeight: 42, display: "flex", alignItems: "center",
+  };
+  const Label = ({ children }: { children: React.ReactNode }) => (
+    <label style={{ display: "block", fontSize: 11, fontWeight: 800, color: "#9B8F7A", textTransform: "uppercase" as const, letterSpacing: "0.08em", marginBottom: 6 }}>
+      {children}
+    </label>
+  );
 
   return (
     <>
       <style>{`
-        .ad-tab:hover    { background: #F5F0E8 !important; }
-        .ad-img-th:hover { border-color: #FFD400 !important; opacity: 0.8; }
+        .ad-tab:hover { background: #F5F0E8 !important; }
+        .ad-input:focus { border-color: #FFD400 !important; box-shadow: 0 0 0 3px rgba(255,212,0,0.15) !important; }
         .ad-action:hover { background: #F5F0E8 !important; }
-        .ad-input:focus  { border-color: #FFD400 !important; box-shadow: 0 0 0 3px rgba(255,212,0,0.2) !important; }
+        .ad-imgth:hover { border-color: #FFD400 !important; }
       `}</style>
 
       <div>
-        {/* ── PAGE HEADER ── */}
+        {/* Page header */}
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 28 }}>
           <Link href="/dashboard/artworks">
-            <button style={{
-              width: 36, height: 36, border: "2px solid #111110", borderRadius: 6,
-              background: "#fff", display: "flex", alignItems: "center", justifyContent: "center",
-              cursor: "pointer", boxShadow: "2px 2px 0 #111110",
-            }}>
+            <button style={{ width: 36, height: 36, border: "2px solid #111110", borderRadius: 6, background: "#fff", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", boxShadow: "2px 2px 0 #111110" }}>
               <ArrowLeft size={15} />
             </button>
           </Link>
-          <div style={{ flex: 1 }}>
-            <h1 style={{ fontSize: 24, fontWeight: 900, color: "#111110", letterSpacing: "-0.3px" }}>
-              {artwork.title}
-            </h1>
-          </div>
+          <h1 style={{ fontSize: 22, fontWeight: 900, color: "#111110", letterSpacing: "-0.3px", flex: 1 }}>{artwork.title}</h1>
           <div style={{ display: "flex", gap: 8 }}>
-            <button
-              onClick={() => setEditing(!editing)}
-              style={{
-                display: "flex", alignItems: "center", gap: 6,
-                padding: "8px 16px", border: "2px solid #111110", borderRadius: 6,
-                background: editing ? "#FFD400" : "#fff", color: "#111110",
-                fontWeight: 700, fontSize: 13, cursor: "pointer",
-                boxShadow: "2px 2px 0 #111110",
-              }}
-            >
+            <button onClick={() => setEditing(!editing)} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 16px", border: "2px solid #111110", borderRadius: 6, background: editing ? "#FFD400" : "#fff", fontWeight: 700, fontSize: 13, cursor: "pointer", boxShadow: "2px 2px 0 #111110" }}>
               <Edit2 size={13} /> {editing ? "Cancel" : "Edit"}
             </button>
-            <button
-              onClick={handleDelete}
-              style={{
-                display: "flex", alignItems: "center", gap: 6,
-                padding: "8px 16px", border: "2px solid #cc0000", borderRadius: 6,
-                background: "#fff", color: "#cc0000",
-                fontWeight: 700, fontSize: 13, cursor: "pointer",
-              }}
-            >
+            <button onClick={handleDelete} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 16px", border: "2px solid #cc0000", borderRadius: 6, background: "#fff", color: "#cc0000", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
               <Trash2 size={13} /> Delete
             </button>
           </div>
         </div>
 
-        {/* ── MAIN LAYOUT: LEFT + RIGHT ── */}
+        {/* Two-column layout */}
         <div style={{ display: "grid", gridTemplateColumns: "280px 1fr", gap: 24 }}>
 
-          {/* ── LEFT PANEL ── */}
-          <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
-
-            {/* Cover image */}
-            <div style={{
-              border: "2px solid #111110", borderRadius: 8, overflow: "hidden",
-              boxShadow: "4px 4px 0 #111110", marginBottom: 16,
-              background: "#F5F0E8",
-            }}>
+          {/* LEFT PANEL */}
+          <div>
+            {/* Image gallery */}
+            <div style={{ border: "2px solid #111110", borderRadius: 8, overflow: "hidden", boxShadow: "4px 4px 0 #111110", marginBottom: 16, background: "#F5F0E8" }}>
               <div style={{ position: "relative", aspectRatio: "1/1" }}>
-                {coverImg
-                  ? <img src={coverImg} alt={artwork.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                  : <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 8 }}>
-                      <ImageIcon size={40} color="#9B8F7A" />
-                      <span style={{ fontSize: 12, color: "#9B8F7A" }}>No image</span>
-                    </div>
-                }
+                {(artwork.images?.[activeImg] ?? null) ? (
+                  <img src={artwork.images![activeImg]} alt={artwork.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                ) : (
+                  <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8 }}>
+                    <ImageIcon size={40} color="#9B8F7A" />
+                    <span style={{ fontSize: 12, color: "#9B8F7A" }}>No image</span>
+                  </div>
+                )}
               </div>
-              {/* Thumbnail strip */}
               {(artwork.images?.length ?? 0) > 1 && (
-                <div style={{ display: "flex", gap: 6, padding: "10px 10px", borderTop: "2px solid #111110" }}>
+                <div style={{ display: "flex", gap: 6, padding: "10px", borderTop: "2px solid #111110" }}>
                   {artwork.images!.map((img, i) => (
-                    <button
-                      key={i}
-                      onClick={() => setActiveImg(i)}
-                      className="ad-img-th"
-                      style={{
-                        width: 44, height: 44, border: `2px solid ${activeImg === i ? "#FFD400" : "#d4cfc4"}`,
-                        borderRadius: 4, overflow: "hidden", padding: 0, cursor: "pointer",
-                        background: "none", transition: "border-color 0.1s",
-                      }}
-                    >
+                    <button key={i} onClick={() => setActiveImg(i)} className="ad-imgth" style={{ width: 44, height: 44, border: `2px solid ${activeImg === i ? "#FFD400" : "#d4cfc4"}`, borderRadius: 4, overflow: "hidden", padding: 0, cursor: "pointer", background: "none", transition: "border-color 0.1s" }}>
                       <img src={img} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                     </button>
                   ))}
@@ -244,357 +225,223 @@ export default function ArtworkDetailPage() {
             </div>
 
             {/* Info card */}
-            <div style={{
-              border: "2px solid #111110", borderRadius: 8,
-              boxShadow: "4px 4px 0 #111110", background: "#fff",
-              overflow: "hidden",
-            }}>
-              {/* Title block */}
-              <div style={{ padding: "16px 18px", borderBottom: "1px solid #E0D8CA" }}>
-                <div style={{ fontSize: 16, fontWeight: 900, color: "#111110", marginBottom: 4 }}>{artwork.title}</div>
-                {artwork.year && (
-                  <div style={{ fontSize: 12, color: "#9B8F7A", fontWeight: 600 }}>{artwork.year}</div>
-                )}
+            <div style={{ border: "2px solid #111110", borderRadius: 8, boxShadow: "4px 4px 0 #111110", background: "#fff", overflow: "hidden" }}>
+              {/* Identity */}
+              <div style={{ padding: "14px 16px", borderBottom: "1px solid #E0D8CA" }}>
+                <div style={{ fontSize: 15, fontWeight: 900, color: "#111110", marginBottom: 2 }}>{artwork.title}</div>
+                {artwork.year && <div style={{ fontSize: 11, color: "#9B8F7A" }}>{artwork.year}</div>}
                 {artwork.medium && (
-                  <span style={{
-                    marginTop: 8, display: "inline-block",
-                    padding: "3px 10px", border: "1.5px solid #d4cfc4",
-                    borderRadius: 20, fontSize: 11, fontWeight: 600, color: "#5C5346",
-                    background: "#F5F0E8",
-                  }}>{artwork.medium}</span>
+                  <span style={{ marginTop: 6, display: "inline-block", padding: "2px 9px", border: "1.5px solid #d4cfc4", borderRadius: 20, fontSize: 10, fontWeight: 600, color: "#5C5346", background: "#F5F0E8" }}>{artwork.medium}</span>
                 )}
               </div>
 
-              {/* Stats */}
+              {/* Detail rows */}
               {[
-                { label: "Price",      value: artwork.price ? `$${artwork.price.toLocaleString()}` : "—", delta: null },
-                { label: "Status",     value: null, badge: statusCfg },
-                { label: "Dimensions", value: artwork.dimensions || "—", delta: null },
-                { label: "Location",   value: artwork.location || "—", delta: null },
+                { label: "Price",      value: artwork.price ? `$${artwork.price.toLocaleString()}` : "—", mono: true },
+                { label: "Dimensions", value: artwork.dimensions || "—", mono: false },
+                { label: "Location",   value: artwork.location || "—", mono: false },
               ].map(row => (
-                <div key={row.label} style={{
-                  display: "flex", alignItems: "center", justifyContent: "space-between",
-                  padding: "12px 18px", borderBottom: "1px solid #E0D8CA",
-                }}>
-                  <span style={{ fontSize: 11, fontWeight: 700, color: "#9B8F7A", textTransform: "uppercase", letterSpacing: "0.08em" }}>
-                    {row.label}
-                  </span>
-                  {row.badge ? (
-                    <span style={{
-                      background: row.badge.bg, color: row.badge.color,
-                      border: "2px solid #111110",
-                      padding: "2px 10px", borderRadius: 4,
-                      fontSize: 11, fontWeight: 800, textTransform: "uppercase",
-                    }}>{row.badge.label}</span>
-                  ) : (
-                    <span style={{ fontSize: 13, fontWeight: 700, color: "#111110", fontFamily: row.label === "Price" ? "monospace" : "inherit" }}>
-                      {row.value}
-                    </span>
-                  )}
+                <div key={row.label} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "11px 16px", borderBottom: "1px solid #E0D8CA" }}>
+                  <span style={{ fontSize: 10, fontWeight: 700, color: "#9B8F7A", textTransform: "uppercase", letterSpacing: "0.08em" }}>{row.label}</span>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: "#111110", fontFamily: row.mono ? "monospace" : "inherit" }}>{row.value}</span>
                 </div>
               ))}
 
+              {/* Status row */}
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "11px 16px", borderBottom: "1px solid #E0D8CA" }}>
+                <span style={{ fontSize: 10, fontWeight: 700, color: "#9B8F7A", textTransform: "uppercase", letterSpacing: "0.08em" }}>Status</span>
+                <span style={{ background: statusCfg.bg, color: statusCfg.color, border: "2px solid #111110", padding: "2px 9px", borderRadius: 4, fontSize: 10, fontWeight: 800, textTransform: "uppercase" }}>{statusCfg.label}</span>
+              </div>
+
+              {/* Sale method row */}
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "11px 16px", borderBottom: "1px solid #E0D8CA" }}>
+                <span style={{ fontSize: 10, fontWeight: 700, color: "#9B8F7A", textTransform: "uppercase", letterSpacing: "0.08em" }}>Sale Method</span>
+                <span style={{ fontSize: 12, fontWeight: 600, color: "#5C5346" }}>
+                  {currentSaleMethod?.value ? `${currentSaleMethod.icon} ${currentSaleMethod.label}` : "—"}
+                </span>
+              </div>
+
               {/* Actions */}
               <div style={{ padding: "10px 12px", display: "flex", gap: 6 }}>
-                <button className="ad-action" style={{
-                  flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
-                  padding: "8px", border: "1.5px solid #d4cfc4", borderRadius: 6,
-                  fontSize: 12, fontWeight: 600, color: "#5C5346", background: "#fff",
-                  cursor: "pointer", transition: "background 0.1s",
-                }}>
-                  <Share2 size={12} /> Share
+                <button className="ad-action" style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 5, padding: "8px", border: "1.5px solid #d4cfc4", borderRadius: 6, fontSize: 11, fontWeight: 600, color: "#5C5346", background: "#fff", cursor: "pointer", transition: "background 0.1s" }}>
+                  <Share2 size={11} /> Share
                 </button>
-                <button className="ad-action" style={{
-                  flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
-                  padding: "8px", border: "1.5px solid #d4cfc4", borderRadius: 6,
-                  fontSize: 12, fontWeight: 600, color: "#5C5346", background: "#fff",
-                  cursor: "pointer", transition: "background 0.1s",
-                }}>
-                  <ExternalLink size={12} /> Portfolio
+                <button className="ad-action" style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 5, padding: "8px", border: "1.5px solid #d4cfc4", borderRadius: 6, fontSize: 11, fontWeight: 600, color: "#5C5346", background: "#fff", cursor: "pointer", transition: "background 0.1s" }}>
+                  <ExternalLink size={11} /> Portfolio
                 </button>
-                <button className="ad-action" style={{
-                  width: 36, display: "flex", alignItems: "center", justifyContent: "center",
-                  padding: "8px", border: "1.5px solid #d4cfc4", borderRadius: 6,
-                  fontSize: 12, color: "#5C5346", background: "#fff",
-                  cursor: "pointer", transition: "background 0.1s",
-                }}>
-                  <MoreHorizontal size={14} />
+                <button className="ad-action" style={{ width: 34, display: "flex", alignItems: "center", justifyContent: "center", padding: "8px", border: "1.5px solid #d4cfc4", borderRadius: 6, color: "#5C5346", background: "#fff", cursor: "pointer", transition: "background 0.1s" }}>
+                  <MoreHorizontal size={13} />
                 </button>
               </div>
             </div>
           </div>
-          {/* end left panel */}
 
-          {/* ── RIGHT PANEL ── */}
+          {/* RIGHT PANEL */}
           <div>
             {/* Tabs */}
-            <div style={{
-              display: "flex", alignItems: "center", gap: 0,
-              marginBottom: 0,
-              borderBottom: "2px solid #111110",
-            }}>
-              {TABS.map(tab => (
-                <button
-                  key={tab}
-                  className="ad-tab"
-                  onClick={() => setActiveTab(tab)}
-                  style={{
-                    padding: "11px 20px",
-                    border: "none", borderBottom: activeTab === tab ? "3px solid #FFD400" : "none",
-                    background: activeTab === tab ? "#FFD400" : "transparent",
-                    fontSize: 13, fontWeight: 700, color: "#111110",
-                    cursor: "pointer", transition: "background 0.1s",
-                    marginBottom: activeTab === tab ? -2 : 0,
-                  }}
-                >{tab}</button>
+            <div style={{ display: "flex", alignItems: "center", borderBottom: "2px solid #111110" }}>
+              {TABS.map(t => (
+                <button key={t} className="ad-tab" onClick={() => setActiveTab(t)} style={{ padding: "11px 18px", border: "none", borderBottom: activeTab === t ? "3px solid #FFD400" : "none", background: activeTab === t ? "#FFD400" : "transparent", fontSize: 12, fontWeight: 700, color: "#111110", cursor: "pointer", marginBottom: activeTab === t ? -2 : 0, transition: "background 0.1s" }}>
+                  {t}
+                </button>
               ))}
               <div style={{ marginLeft: "auto" }}>
-                <button style={{
-                  display: "flex", alignItems: "center", gap: 6,
-                  padding: "8px 14px", border: "2px solid #111110", borderRadius: 6,
-                  background: "#fff", color: "#111110",
-                  fontWeight: 700, fontSize: 12, cursor: "pointer",
-                  boxShadow: "2px 2px 0 #111110",
-                }}>
+                <button style={{ display: "flex", alignItems: "center", gap: 5, padding: "7px 14px", border: "2px solid #111110", borderRadius: 6, background: "#fff", color: "#111110", fontWeight: 700, fontSize: 12, cursor: "pointer", boxShadow: "2px 2px 0 #111110" }}>
                   <MoreHorizontal size={13} /> Actions
                 </button>
               </div>
             </div>
 
-            {/* Tab content */}
-            <div style={{
-              border: "2px solid #111110", borderTop: "none",
-              borderRadius: "0 0 8px 8px",
-              boxShadow: "4px 4px 0 #111110",
-              background: "#fff", padding: 24,
-            }}>
+            {/* Tab body */}
+            <div style={{ border: "2px solid #111110", borderTop: "none", borderRadius: "0 0 8px 8px", boxShadow: "4px 4px 0 #111110", background: "#fff", padding: "24px" }}>
 
               {activeTab === "General Information" && (
                 <form onSubmit={handleSave}>
 
-                  {/* Image gallery / upload */}
-                  <div style={{ marginBottom: 24 }}>
-                    <div style={{ fontSize: 13, fontWeight: 800, color: "#111110", marginBottom: 12, textTransform: "uppercase", letterSpacing: "0.08em" }}>
-                      Images
-                    </div>
-                    <div style={{
-                      border: "2px dashed #d4cfc4", borderRadius: 8,
-                      padding: 16, display: "flex", gap: 10, flexWrap: "wrap",
-                    }}>
+                  {/* Images */}
+                  <div style={{ marginBottom: 22 }}>
+                    <Label>Images</Label>
+                    <div style={{ border: "2px dashed #d4cfc4", borderRadius: 8, padding: 14, display: "flex", gap: 10, flexWrap: "wrap" }}>
                       {existingImages.map((src, i) => (
                         <div key={i} style={{ position: "relative", width: 80, height: 80 }}>
-                          <img src={src} alt="" style={{
-                            width: 80, height: 80, objectFit: "cover",
-                            border: "2px solid #111110", borderRadius: 4,
-                          }} />
+                          <img src={src} alt="" style={{ width: 80, height: 80, objectFit: "cover", border: "2px solid #111110", borderRadius: 4 }} />
                           {editing && (
-                            <button
-                              type="button"
-                              onClick={() => setExistingImages(p => p.filter((_, idx) => idx !== i))}
-                              style={{
-                                position: "absolute", top: -6, right: -6,
-                                width: 20, height: 20, borderRadius: "50%",
-                                background: "#111110", color: "#fff",
-                                border: "none", cursor: "pointer",
-                                display: "flex", alignItems: "center", justifyContent: "center",
-                                fontSize: 10,
-                              }}
-                            ><X size={10} /></button>
+                            <button type="button" onClick={() => setExistingImages(p => p.filter((_, idx) => idx !== i))} style={{ position: "absolute", top: -6, right: -6, width: 20, height: 20, borderRadius: "50%", background: "#111110", color: "#fff", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                              <X size={10} />
+                            </button>
                           )}
                         </div>
                       ))}
                       {newPreviews.map((src, i) => (
                         <div key={`new-${i}`} style={{ position: "relative", width: 80, height: 80 }}>
-                          <img src={src} alt="" style={{
-                            width: 80, height: 80, objectFit: "cover",
-                            border: "2px solid #4ECDC4", borderRadius: 4,
-                          }} />
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setNewPreviews(p => p.filter((_, idx) => idx !== i));
-                              setNewFiles(p => p.filter((_, idx) => idx !== i));
-                            }}
-                            style={{
-                              position: "absolute", top: -6, right: -6,
-                              width: 20, height: 20, borderRadius: "50%",
-                              background: "#111110", color: "#fff",
-                              border: "none", cursor: "pointer",
-                              display: "flex", alignItems: "center", justifyContent: "center",
-                            }}
-                          ><X size={10} /></button>
+                          <img src={src} alt="" style={{ width: 80, height: 80, objectFit: "cover", border: "2px solid #4ECDC4", borderRadius: 4 }} />
+                          <button type="button" onClick={() => { setNewPreviews(p => p.filter((_, idx) => idx !== i)); setNewFiles(p => p.filter((_, idx) => idx !== i)); }} style={{ position: "absolute", top: -6, right: -6, width: 20, height: 20, borderRadius: "50%", background: "#111110", color: "#fff", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                            <X size={10} />
+                          </button>
                         </div>
                       ))}
                       {editing && existingImages.length + newFiles.length < 5 && (
-                        <label style={{
-                          width: 80, height: 80,
-                          border: "2px dashed #9B8F7A", borderRadius: 4,
-                          display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-                          cursor: "pointer", gap: 4,
-                        }}>
+                        <label style={{ width: 80, height: 80, border: "2px dashed #9B8F7A", borderRadius: 4, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", cursor: "pointer", gap: 4 }}>
                           <Upload size={16} color="#9B8F7A" />
                           <span style={{ fontSize: 10, color: "#9B8F7A", fontWeight: 600 }}>Add</span>
                           <input type="file" multiple accept="image/*" style={{ display: "none" }} onChange={e => handleNewImages(e.target.files)} />
                         </label>
                       )}
-                      {!editing && existingImages.length === 0 && (
-                        <div style={{ color: "#9B8F7A", fontSize: 13, padding: "10px 0" }}>No images uploaded</div>
-                      )}
+                      {!editing && existingImages.length === 0 && <div style={{ color: "#9B8F7A", fontSize: 13 }}>No images uploaded</div>}
                     </div>
                   </div>
 
-                  {/* Form fields */}
+                  {/* Title + Status */}
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
                     <div>
-                      <label style={{ display: "block", fontSize: 11, fontWeight: 800, color: "#9B8F7A", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>
-                        Title *
-                      </label>
-                      {editing ? (
-                        <input required className="ad-input" value={form.title} onChange={set("title")} style={{
-                          width: "100%", padding: "10px 12px", border: "2px solid #111110", borderRadius: 6,
-                          fontSize: 14, fontFamily: "inherit", fontWeight: 600, outline: "none",
-                          transition: "border-color 0.1s, box-shadow 0.1s", boxSizing: "border-box",
-                        }} />
-                      ) : (
-                        <div style={{ padding: "10px 12px", border: "2px solid #E0D8CA", borderRadius: 6, fontSize: 14, fontWeight: 600, color: "#111110" }}>
-                          {artwork.title}
-                        </div>
-                      )}
+                      <Label>Title *</Label>
+                      {editing
+                        ? <input required className="ad-input" value={form.title} onChange={set("title")} style={inputStyle} />
+                        : <div style={{ ...readStyle, fontWeight: 600, color: "#111110" }}>{artwork.title}</div>
+                      }
                     </div>
                     <div>
-                      <label style={{ display: "block", fontSize: 11, fontWeight: 800, color: "#9B8F7A", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>
-                        Status
-                      </label>
-                      {editing ? (
-                        <select className="ad-input" value={form.status} onChange={set("status")} style={{
-                          width: "100%", padding: "10px 12px", border: "2px solid #111110", borderRadius: 6,
-                          fontSize: 14, fontFamily: "inherit", fontWeight: 600, outline: "none",
-                          background: "#fff", cursor: "pointer", boxSizing: "border-box",
-                        }}>
-                          <option>Available</option>
-                          <option>Sold</option>
-                          <option>Reserved</option>
-                          <option>Not for Sale</option>
-                          <option>In Storage</option>
-                        </select>
-                      ) : (
-                        <div style={{ padding: "8px 12px" }}>
-                          <span style={{
-                            background: statusCfg.bg, color: statusCfg.color,
-                            border: "2px solid #111110",
-                            padding: "4px 14px", borderRadius: 4,
-                            fontSize: 12, fontWeight: 800, textTransform: "uppercase",
-                          }}>{statusCfg.label}</span>
-                        </div>
-                      )}
+                      <Label>Status</Label>
+                      {editing
+                        ? <select className="ad-input" value={form.status} onChange={set("status")} style={{ ...inputStyle, background: "#fff", cursor: "pointer" }}>
+                            <option>Available</option><option>Sold</option><option>Reserved</option>
+                            <option>Not for Sale</option><option>In Storage</option>
+                          </select>
+                        : <div style={readStyle}>
+                            <span style={{ background: statusCfg.bg, color: statusCfg.color, border: "2px solid #111110", padding: "3px 10px", borderRadius: 4, fontSize: 11, fontWeight: 800, textTransform: "uppercase" }}>{statusCfg.label}</span>
+                          </div>
+                      }
                     </div>
                   </div>
 
+                  {/* Medium + Year */}
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
                     <div>
-                      <label style={{ display: "block", fontSize: 11, fontWeight: 800, color: "#9B8F7A", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Medium</label>
-                      {editing ? (
-                        <input className="ad-input" value={form.medium} onChange={set("medium")} placeholder="Oil on canvas" style={{
-                          width: "100%", padding: "10px 12px", border: "2px solid #111110", borderRadius: 6,
-                          fontSize: 14, fontFamily: "inherit", outline: "none", boxSizing: "border-box",
-                        }} />
-                      ) : (
-                        <div style={{ padding: "10px 12px", border: "2px solid #E0D8CA", borderRadius: 6, fontSize: 14, color: artwork.medium ? "#111110" : "#9B8F7A" }}>
-                          {artwork.medium || "—"}
-                        </div>
-                      )}
+                      <Label>Medium</Label>
+                      {editing
+                        ? <input className="ad-input" value={form.medium} onChange={set("medium")} placeholder="Oil on canvas" style={inputStyle} />
+                        : <div style={{ ...readStyle, color: artwork.medium ? "#111110" : "#9B8F7A" }}>{artwork.medium || "—"}</div>
+                      }
                     </div>
                     <div>
-                      <label style={{ display: "block", fontSize: 11, fontWeight: 800, color: "#9B8F7A", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Year</label>
-                      {editing ? (
-                        <input className="ad-input" type="number" value={form.year} onChange={set("year")} placeholder="2024" style={{
-                          width: "100%", padding: "10px 12px", border: "2px solid #111110", borderRadius: 6,
-                          fontSize: 14, fontFamily: "inherit", outline: "none", boxSizing: "border-box",
-                        }} />
-                      ) : (
-                        <div style={{ padding: "10px 12px", border: "2px solid #E0D8CA", borderRadius: 6, fontSize: 14, color: artwork.year ? "#111110" : "#9B8F7A" }}>
-                          {artwork.year || "—"}
-                        </div>
-                      )}
+                      <Label>Year</Label>
+                      {editing
+                        ? <input className="ad-input" type="number" value={form.year} onChange={set("year")} placeholder="2024" style={inputStyle} />
+                        : <div style={{ ...readStyle, color: artwork.year ? "#111110" : "#9B8F7A" }}>{artwork.year || "—"}</div>
+                      }
                     </div>
                   </div>
 
+                  {/* Dimensions + Price */}
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
                     <div>
-                      <label style={{ display: "block", fontSize: 11, fontWeight: 800, color: "#9B8F7A", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Dimensions</label>
-                      {editing ? (
-                        <input className="ad-input" value={form.dimensions} onChange={set("dimensions")} placeholder='24" × 36"' style={{
-                          width: "100%", padding: "10px 12px", border: "2px solid #111110", borderRadius: 6,
-                          fontSize: 14, fontFamily: "inherit", outline: "none", boxSizing: "border-box",
-                        }} />
-                      ) : (
-                        <div style={{ padding: "10px 12px", border: "2px solid #E0D8CA", borderRadius: 6, fontSize: 14, color: artwork.dimensions ? "#111110" : "#9B8F7A" }}>
-                          {artwork.dimensions || "—"}
-                        </div>
-                      )}
+                      <Label>Dimensions</Label>
+                      {editing
+                        ? <input className="ad-input" value={form.dimensions} onChange={set("dimensions")} placeholder='24" × 36"' style={inputStyle} />
+                        : <div style={{ ...readStyle, color: artwork.dimensions ? "#111110" : "#9B8F7A" }}>{artwork.dimensions || "—"}</div>
+                      }
                     </div>
                     <div>
-                      <label style={{ display: "block", fontSize: 11, fontWeight: 800, color: "#9B8F7A", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Price (USD)</label>
-                      {editing ? (
-                        <input className="ad-input" type="number" value={form.price} onChange={set("price")} placeholder="0.00" style={{
-                          width: "100%", padding: "10px 12px", border: "2px solid #111110", borderRadius: 6,
-                          fontSize: 14, fontFamily: "monospace", outline: "none", boxSizing: "border-box",
-                        }} />
-                      ) : (
-                        <div style={{ padding: "10px 12px", border: "2px solid #E0D8CA", borderRadius: 6, fontSize: 14, fontFamily: "monospace", fontWeight: 700, color: artwork.price ? "#111110" : "#9B8F7A" }}>
-                          {artwork.price ? `$${artwork.price.toLocaleString()}` : "—"}
-                        </div>
-                      )}
+                      <Label>Price (USD)</Label>
+                      {editing
+                        ? <input className="ad-input" type="number" value={form.price} onChange={set("price")} placeholder="0.00" style={{ ...inputStyle, fontFamily: "monospace" }} />
+                        : <div style={{ ...readStyle, fontFamily: "monospace", fontWeight: 700, color: artwork.price ? "#111110" : "#9B8F7A" }}>{artwork.price ? `$${artwork.price.toLocaleString()}` : "—"}</div>
+                      }
                     </div>
                   </div>
 
+                  {/* Location */}
                   <div style={{ marginBottom: 16 }}>
-                    <label style={{ display: "block", fontSize: 11, fontWeight: 800, color: "#9B8F7A", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Location</label>
+                    <Label>Location</Label>
+                    {editing
+                      ? <input className="ad-input" value={form.location} onChange={set("location")} placeholder="Studio / Gallery name / Storage…" style={inputStyle} />
+                      : <div style={{ ...readStyle, color: artwork.location ? "#111110" : "#9B8F7A" }}>{artwork.location || "—"}</div>
+                    }
+                  </div>
+
+                  {/* ── SALE METHOD ── */}
+                  <div style={{ marginBottom: 16 }}>
+                    <Label>Sale Method</Label>
                     {editing ? (
-                      <input className="ad-input" value={form.location} onChange={set("location")} placeholder="Studio, Gallery name..." style={{
-                        width: "100%", padding: "10px 12px", border: "2px solid #111110", borderRadius: 6,
-                        fontSize: 14, fontFamily: "inherit", outline: "none", boxSizing: "border-box",
-                      }} />
+                      <select className="ad-input" value={form.sale_method} onChange={set("sale_method")} style={{ ...inputStyle, background: "#fff", cursor: "pointer" }}>
+                        {SALE_METHODS.map(m => (
+                          <option key={m.value} value={m.value}>{m.icon ? `${m.icon} ` : ""}{m.label}</option>
+                        ))}
+                      </select>
                     ) : (
-                      <div style={{ padding: "10px 12px", border: "2px solid #E0D8CA", borderRadius: 6, fontSize: 14, color: artwork.location ? "#111110" : "#9B8F7A" }}>
-                        {artwork.location || "—"}
+                      <div style={readStyle}>
+                        {currentSaleMethod?.value ? (
+                          <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <span style={{ fontSize: 16 }}>{currentSaleMethod.icon}</span>
+                            <span style={{ fontSize: 14, fontWeight: 600, color: "#111110" }}>{currentSaleMethod.label}</span>
+                          </span>
+                        ) : (
+                          <span style={{ color: "#9B8F7A" }}>Not specified</span>
+                        )}
                       </div>
+                    )}
+                    {!editing && (
+                      <p style={{ fontSize: 11, color: "#9B8F7A", marginTop: 6 }}>
+                        This appears on your public portfolio so collectors know how to acquire the work.
+                      </p>
                     )}
                   </div>
 
-                  <div style={{ marginBottom: 24 }}>
-                    <label style={{ display: "block", fontSize: 11, fontWeight: 800, color: "#9B8F7A", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Description</label>
-                    {editing ? (
-                      <textarea className="ad-input" rows={4} value={form.description} onChange={set("description")} placeholder="Describe this work..." style={{
-                        width: "100%", padding: "10px 12px", border: "2px solid #111110", borderRadius: 6,
-                        fontSize: 14, fontFamily: "inherit", outline: "none", resize: "vertical", boxSizing: "border-box",
-                      }} />
-                    ) : (
-                      <div style={{
-                        padding: "10px 12px", border: "2px solid #E0D8CA", borderRadius: 6,
-                        fontSize: 14, color: artwork.description ? "#111110" : "#9B8F7A",
-                        lineHeight: 1.6, minHeight: 80,
-                      }}>
-                        {artwork.description || "No description added."}
-                      </div>
-                    )}
+                  {/* Description */}
+                  <div style={{ marginBottom: editing ? 24 : 0 }}>
+                    <Label>Description</Label>
+                    {editing
+                      ? <textarea className="ad-input" rows={4} value={form.description} onChange={set("description")} placeholder="Describe this work…" style={{ ...inputStyle, resize: "vertical" }} />
+                      : <div style={{ ...readStyle, alignItems: "flex-start", lineHeight: 1.6, minHeight: 80, color: artwork.description ? "#111110" : "#9B8F7A" }}>{artwork.description || "No description added."}</div>
+                    }
                   </div>
 
-                  {/* Action buttons */}
                   {editing && (
-                    <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
-                      <button type="button" onClick={() => setEditing(false)} style={{
-                        padding: "11px 24px", border: "2px solid #111110", borderRadius: 6,
-                        background: "#fff", fontWeight: 700, fontSize: 14, cursor: "pointer",
-                      }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", gap: 12, marginTop: 24 }}>
+                      <button type="button" onClick={() => setEditing(false)} style={{ padding: "11px 24px", border: "2px solid #111110", borderRadius: 6, background: "#fff", fontWeight: 700, fontSize: 14, cursor: "pointer" }}>
                         Reset Changes
                       </button>
-                      <button type="submit" disabled={saving} style={{
-                        padding: "11px 28px", border: "2px solid #111110", borderRadius: 6,
-                        background: "#FFD400", color: "#111110",
-                        fontWeight: 800, fontSize: 14, cursor: saving ? "not-allowed" : "pointer",
-                        boxShadow: "3px 3px 0 #111110",
-                      }}>
+                      <button type="submit" disabled={saving} style={{ padding: "11px 28px", border: "2px solid #111110", borderRadius: 6, background: "#FFD400", color: "#111110", fontWeight: 800, fontSize: 14, cursor: saving ? "not-allowed" : "pointer", boxShadow: "3px 3px 0 #111110" }}>
                         {saving ? "Saving…" : "Update Artwork"}
                       </button>
                     </div>
@@ -604,14 +451,8 @@ export default function ArtworkDetailPage() {
 
               {activeTab === "Notes" && (
                 <div>
-                  <div style={{ fontSize: 13, fontWeight: 800, color: "#111110", marginBottom: 12, textTransform: "uppercase", letterSpacing: "0.08em" }}>
-                    Internal Notes
-                  </div>
-                  <div style={{
-                    padding: "16px", border: "2px solid #E0D8CA", borderRadius: 8,
-                    fontSize: 14, color: artwork.notes ? "#111110" : "#9B8F7A",
-                    lineHeight: 1.7, background: "#FAFAF8", minHeight: 120,
-                  }}>
+                  <Label>Internal Notes</Label>
+                  <div style={{ padding: "16px", border: "2px solid #E0D8CA", borderRadius: 8, fontSize: 14, color: artwork.notes ? "#111110" : "#9B8F7A", lineHeight: 1.7, background: "#FAFAF8", minHeight: 120 }}>
                     {artwork.notes || "No notes yet. Switch to edit mode to add notes."}
                   </div>
                 </div>
@@ -624,10 +465,8 @@ export default function ArtworkDetailPage() {
                   <div style={{ fontSize: 13 }}>This section is coming soon.</div>
                 </div>
               )}
-
             </div>
           </div>
-          {/* end right panel */}
         </div>
       </div>
     </>

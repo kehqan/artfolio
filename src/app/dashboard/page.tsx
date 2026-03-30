@@ -1,9 +1,8 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
-import type { Database } from '@/types/database'
+import { createBrowserClient } from '@supabase/ssr'
 
 // ── Types ──────────────────────────────────────────────────────────────────
 interface StatCard {
@@ -61,7 +60,10 @@ const SPARKLINES: Record<string, { heights: number[]; highlights: number[] }> = 
 
 // ── Component ──────────────────────────────────────────────────────────────
 export default function DashboardPage() {
-  const supabase = createClientComponentClient<Database>()
+  const supabase = useMemo(() => createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  ), [])
 
   const [profile, setProfile]       = useState<{ full_name: string; username: string } | null>(null)
   const [artworks, setArtworks]     = useState<ArtworkItem[]>([])

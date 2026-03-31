@@ -8,7 +8,6 @@ export default async function ArtistRedirectPage({
 }) {
   const supabase = createClient();
 
-  // Check profiles table first (modern accounts like kasra)
   const { data: profile } = await supabase
     .from("profiles")
     .select("username")
@@ -19,7 +18,6 @@ export default async function ArtistRedirectPage({
     redirect(`/profile/${params.username}`);
   }
 
-  // Check legacy artists table (old accounts like lenamora)
   const { data: artist } = await supabase
     .from("artists")
     .select("username")
@@ -32,4 +30,3 @@ export default async function ArtistRedirectPage({
 
   notFound();
 }
-```

@@ -121,6 +121,7 @@ export default async function PublicProfilePage({
 
         {/* HERO */}
         <div style={{ display: "flex", gap: 36, alignItems: "flex-start", paddingTop: 48, paddingBottom: 40, borderBottom: "2px solid #111110", marginBottom: 40, flexWrap: "wrap" }}>
+          {/* Avatar */}
           <div style={{ flexShrink: 0 }}>
             {profileAvatar ? (
               // eslint-disable-next-line @next/next/no-img-element
@@ -132,6 +133,7 @@ export default async function PublicProfilePage({
             )}
           </div>
 
+          {/* Identity */}
           <div style={{ flex: 1, minWidth: 260 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8, flexWrap: "wrap" }}>
               <h1 style={{ fontSize: 28, fontWeight: 900, color: "#111110", letterSpacing: "-0.5px", margin: 0 }}>{profileName}</h1>
@@ -157,26 +159,27 @@ export default async function PublicProfilePage({
               </div>
             )}
 
+            {/* Stats */}
             <div style={{ display: "flex", gap: 0, border: "2px solid #111110", width: "fit-content" }}>
               {[
                 { label: "Artworks",    value: artworkCount },
                 { label: "Exhibitions", value: exhibitions.length },
                 { label: "Followers",   value: followers },
               ].map((s, i) => (
-                <div key={s.label} style={{ padding: "12px 20px", borderRight: i < 2 ? "2px solid #111110" : "none", background: "#fff", minWidth: 80, textAlign: "center" as const }}>
+                <div key={s.label} style={{ padding: "12px 20px", borderRight: i < 2 ? "2px solid #111110" : "none", background: "#fff", minWidth: 80, textAlign: "center" }}>
                   <div style={{ fontSize: 22, fontWeight: 900, color: "#111110" }}>{s.value}</div>
-                  <div style={{ fontSize: 10, fontWeight: 700, color: "#9B8F7A", textTransform: "uppercase" as const, letterSpacing: "0.08em" }}>{s.label}</div>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: "#9B8F7A", textTransform: "uppercase", letterSpacing: "0.08em" }}>{s.label}</div>
                 </div>
               ))}
             </div>
           </div>
         </div>
 
-        {/* ARTWORKS */}
+        {/* ── ARTWORKS — Each card is clickable ── */}
         {artworks.length > 0 && (
           <section style={{ marginBottom: 52 }}>
             <h2 style={{ fontSize: 20, fontWeight: 900, color: "#111110", marginBottom: 18 }}>Works</h2>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 14 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14 }}>
               {artworks.map((a) => {
                 const cfg = STATUS_CFG[a.status as string ?? ""] ?? { label: a.status, bg: "#F5F0E8", color: "#5C5346" };
                 const imgs = Array.isArray(a.images) ? a.images as string[] : [];
@@ -185,6 +188,7 @@ export default async function PublicProfilePage({
                 const saleTag = saleM ? SALE_METHOD_LABEL[saleM] : null;
 
                 return (
+                  // ── CLICKABLE LINK to individual artwork page ──
                   <Link
                     key={a.id}
                     href={`/portfolio/${params.username}/artwork/${a.id}`}
@@ -195,6 +199,7 @@ export default async function PublicProfilePage({
                       onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = "translate(-2px,-2px)"; (e.currentTarget as HTMLElement).style.boxShadow = "5px 5px 0 #111110"; }}
                       onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = ""; (e.currentTarget as HTMLElement).style.boxShadow = "3px 3px 0 #111110"; }}
                     >
+                      {/* Image */}
                       <div style={{ aspectRatio: "1/1", background: "#F5F0E8", position: "relative" }}>
                         {img ? (
                           // eslint-disable-next-line @next/next/no-img-element
@@ -204,18 +209,21 @@ export default async function PublicProfilePage({
                             <ImageIcon size={28} color="#9B8F7A" />
                           </div>
                         )}
+                        {/* Sale method overlay badge */}
                         {saleTag && (
-                          <div style={{ position: "absolute", top: 8, right: 8, background: "#fff", border: "1.5px solid #111110", borderRadius: 4, padding: "2px 7px", fontSize: 9, fontWeight: 800, color: "#111110" }}>
-                            {saleTag.icon}
+                          <div style={{ position: "absolute", top: 8, right: 8, background: "#fff", border: "1.5px solid #111110", borderRadius: 4, padding: "2px 7px", fontSize: 9, fontWeight: 800, color: "#111110", display: "flex", alignItems: "center", gap: 3 }}>
+                            <span>{saleTag.icon}</span>
                           </div>
                         )}
                       </div>
+
+                      {/* Info */}
                       <div style={{ padding: "10px 12px" }}>
                         <div style={{ fontSize: 13, fontWeight: 700, color: "#111110", marginBottom: 5, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                           {a.title as string}
                         </div>
                         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6 }}>
-                          <span style={{ fontSize: 9, fontWeight: 800, padding: "2px 7px", border: "1.5px solid #111110", borderRadius: 3, background: cfg.bg, color: cfg.color, textTransform: "uppercase" as const, flexShrink: 0 }}>
+                          <span style={{ fontSize: 9, fontWeight: 800, padding: "2px 7px", border: "1.5px solid #111110", borderRadius: 3, background: cfg.bg, color: cfg.color, textTransform: "uppercase", flexShrink: 0 }}>
                             {cfg.label}
                           </span>
                           {typeof a.price === "number" && (a.status as string)?.toLowerCase() === "available" && (
@@ -224,9 +232,10 @@ export default async function PublicProfilePage({
                             </span>
                           )}
                         </div>
+                        {/* Sale method label */}
                         {saleTag && (
-                          <div style={{ fontSize: 10, color: "#9B8F7A", marginTop: 5 }}>
-                            {saleTag.icon} {saleTag.label}
+                          <div style={{ fontSize: 10, color: "#9B8F7A", marginTop: 5, display: "flex", alignItems: "center", gap: 3 }}>
+                            <span>{saleTag.icon}</span> {saleTag.label}
                           </div>
                         )}
                       </div>
@@ -242,14 +251,15 @@ export default async function PublicProfilePage({
         {exhibitions.length > 0 && (
           <section style={{ marginBottom: 52 }}>
             <h2 style={{ fontSize: 20, fontWeight: 900, color: "#111110", marginBottom: 18 }}>Exhibitions</h2>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 14 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14 }}>
               {exhibitions.map((ex) => (
                 <div key={ex.id} style={{ background: "#fff", border: "2px solid #111110", borderRadius: 8, overflow: "hidden", boxShadow: "3px 3px 0 #111110" }}>
                   <div style={{ height: 100, background: "#F5F0E8" }}>
                     {ex.cover_image
                       // eslint-disable-next-line @next/next/no-img-element
                       ? <img src={ex.cover_image as string} alt={ex.title as string} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                      : <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 28 }}>🏛</div>}
+                      : <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 28 }}>🏛</div>
+                    }
                   </div>
                   <div style={{ padding: "12px 14px" }}>
                     <div style={{ fontSize: 13, fontWeight: 700, color: "#111110", marginBottom: 4 }}>{ex.title as string}</div>
@@ -259,7 +269,7 @@ export default async function PublicProfilePage({
                         {fmtDate(ex.start_date as string | null)}{ex.end_date ? ` — ${fmtDate(ex.end_date as string | null)}` : ""}
                       </div>
                     )}
-                    <span style={{ display: "inline-block", marginTop: 8, fontSize: 9, fontWeight: 800, padding: "2px 7px", border: "1.5px solid #111110", borderRadius: 3, background: String(ex.status).toLowerCase() === "current" ? "#FFD400" : "#F5F0E8", color: "#111110", textTransform: "uppercase" as const }}>
+                    <span style={{ display: "inline-block", marginTop: 8, fontSize: 9, fontWeight: 800, padding: "2px 7px", border: "1.5px solid #111110", borderRadius: 3, background: String(ex.status).toLowerCase() === "current" ? "#FFD400" : "#F5F0E8", color: "#111110", textTransform: "uppercase" }}>
                       {ex.status as string}
                     </span>
                   </div>
@@ -273,12 +283,12 @@ export default async function PublicProfilePage({
         {collabs.length > 0 && (
           <section style={{ marginBottom: 52 }}>
             <h2 style={{ fontSize: 20, fontWeight: 900, color: "#111110", marginBottom: 18 }}>Collaborations</h2>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 14 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14 }}>
               {collabs.map((c) => (
                 <div key={c.id} style={{ background: "#fff", border: "2px solid #111110", borderRadius: 8, padding: "14px 16px", boxShadow: "3px 3px 0 #111110" }}>
                   <div style={{ display: "flex", alignItems: "flex-start", gap: 8, marginBottom: 8 }}>
                     <span style={{ fontSize: 13, fontWeight: 700, color: "#111110", flex: 1 }}>{c.title as string}</span>
-                    {c.type && <span style={{ fontSize: 9, fontWeight: 800, padding: "2px 7px", border: "1.5px solid #111110", borderRadius: 3, background: "#F5F0E8", color: "#5C5346", textTransform: "uppercase" as const, flexShrink: 0 }}>{c.type as string}</span>}
+                    {c.type && <span style={{ fontSize: 9, fontWeight: 800, padding: "2px 7px", border: "1.5px solid #111110", borderRadius: 3, background: "#F5F0E8", color: "#5C5346", textTransform: "uppercase", flexShrink: 0 }}>{c.type as string}</span>}
                   </div>
                   {c.description && <p style={{ fontSize: 12, color: "#9B8F7A", lineHeight: 1.5 }}>{c.description as string}</p>}
                   {c.partner_name && <div style={{ fontSize: 11, color: "#5C5346", marginTop: 6 }}>With: <strong>{c.partner_name as string}</strong></div>}
@@ -292,7 +302,7 @@ export default async function PublicProfilePage({
         {postsWithImages.length > 0 && (
           <section style={{ marginBottom: 52 }}>
             <h2 style={{ fontSize: 20, fontWeight: 900, color: "#111110", marginBottom: 18 }}>Posts</h2>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 14 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14 }}>
               {postsWithImages.map((p) => {
                 const imgs = p.images as string[];
                 return (
@@ -315,13 +325,14 @@ export default async function PublicProfilePage({
 
         {/* EMPTY */}
         {artworks.length === 0 && exhibitions.length === 0 && collabs.length === 0 && (
-          <div style={{ padding: "64px 24px", textAlign: "center" as const }}>
+          <div style={{ padding: "64px 24px", textAlign: "center" }}>
             <div style={{ fontSize: 40, marginBottom: 12 }}>🎨</div>
             <div style={{ fontSize: 16, fontWeight: 800, color: "#111110", marginBottom: 6 }}>{profileName}&apos;s portfolio is taking shape</div>
             <div style={{ fontSize: 13, color: "#9B8F7A" }}>No public works yet — check back soon.</div>
           </div>
         )}
 
+        {/* Footer */}
         <div style={{ borderTop: "1px solid #E0D8CA", paddingTop: 20, display: "flex", justifyContent: "space-between", fontSize: 11, color: "#9B8F7A", fontWeight: 600 }}>
           <span>Artfolio ✦ {new Date().getFullYear()}</span>
           <Link href="/register" style={{ textDecoration: "none" }}>

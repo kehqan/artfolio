@@ -112,7 +112,7 @@ export default function DiscoverPage() {
                   </div>
                 )}
                 <div className="min-w-0">
-                  <Link href={p.username ? `/portfolio/${p.username}` : "#"} className="font-semibold text-stone-900 hover:underline text-sm truncate block">
+                  <Link href={p.username ? `/profile/${p.username}` : "#"} className="font-semibold text-stone-900 hover:underline text-sm truncate block">
                     {p.full_name}
                   </Link>
                   <span className={`badge capitalize mt-0.5 ${p.role === "gallery" ? "badge-storage" : "badge-available"}`}>

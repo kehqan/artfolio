@@ -33,11 +33,3 @@ export default async function ArtistRedirectPage({
   notFound();
 }
 ```
-
----
-
-## Step 4 — Create a new file: `src/app/profile/[username]/page.tsx`
-
-You need to **create** this folder path and file. On GitHub.com, go to `src/app/`, click "Add file" → "Create new file", then type the filename as:
-```
-profile/[username]/page.tsx

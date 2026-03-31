@@ -313,65 +313,238 @@ export default function HomePage() {
       </section>
 
       {/* ── FEATURES SECTION ────────────────────────────────────── */}
-      <section id="features" style={{ background: "#FAFAF8", borderBottom: "4px solid #111110" }}>
+<section id="features" style={{ background: "#FAFAF8" }}>
 
-        {/* Section header */}
-        <div style={{ maxWidth: 1200, margin: "0 auto", padding: "64px 24px 0" }}>
-          <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: 48, flexWrap: "wrap", gap: 16 }}>
-            <div>
-              <div style={{ display: "inline-block", background: "#111110", color: "#FFD400", padding: "4px 12px", fontSize: 10, fontWeight: 800, letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: 12 }}>
-                Everything you need
+  {/* Section header */}
+  <div style={{ maxWidth: 1200, margin: "0 auto", padding: "72px 24px 56px" }}>
+    <div style={{ display: "inline-block", background: "#111110", color: "#FFD400", padding: "4px 12px", fontSize: 10, fontWeight: 800, letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: 16 }}>
+      Everything you need
+    </div>
+    <h2 style={{ fontSize: "clamp(28px, 4vw, 44px)", fontWeight: 900, color: "#111110", letterSpacing: "-1.5px", margin: 0, lineHeight: 1.1 }}>
+      Built for every player<br />in the art scene
+    </h2>
+  </div>
+
+  {/* Feature strips */}
+  {[
+    {
+      num: "01", group: "For Artists", flip: false,
+      title: "Every artwork,\nalways accounted for",
+      desc: "Add a piece once — photo, title, medium, size, price, location, status. Never lose track of where a work is, who's holding it, or what it sold for.",
+      tag: "Art Inventory System",
+      visual: (
+        <div style={{ position: "relative", width: 260, height: 270 }}>
+          {[2,1,0].map(i => (
+            <div key={i} style={{ position: "absolute", top: i*12, left: i*12, width: 220, background: "#fff", border: "2px solid #111110", opacity: i===0?1:i===1?0.5:0.25, transform: `scale(${1-i*0.02})`, zIndex: 3-i, boxShadow: i===0?"6px 6px 0 #111110":"none" }}>
+              <div style={{ height: 110, background: "linear-gradient(135deg,#E8D5B7,#A07850)", borderBottom: "2px solid #111110", position: "relative" }}>
+                {i===0 && <div style={{ position: "absolute", top: 8, left: 8, background: "#4ECDC4", border: "1.5px solid #111110", padding: "2px 8px", fontSize: 9, fontWeight: 800, textTransform: "uppercase" }}>Available</div>}
               </div>
-              <h2 style={{ fontSize: "clamp(28px, 4vw, 40px)", fontWeight: 900, color: "#111110", letterSpacing: "-1px", margin: 0, lineHeight: 1.1 }}>
-                Built for every<br />player in the art scene
-              </h2>
+              {i===0 && (
+                <div style={{ padding: "10px 12px" }}>
+                  <div style={{ fontSize: 13, fontWeight: 800, color: "#111110", marginBottom: 6 }}>Untitled No. 7</div>
+                  {[["Medium","Oil on canvas"],["Size","80 × 60 cm"],["Location","Studio A"],["Price","$2,400"]].map(([k,v]) => (
+                    <div key={k} style={{ display: "flex", justifyContent: "space-between", fontSize: 10, padding: "3px 0", borderBottom: "1px solid #F0EBE1", color: "#9B8F7A", fontWeight: 600 }}>
+                      <span>{k}</span><span style={{ color: "#111110", fontWeight: 700 }}>{v}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
-            <p style={{ fontSize: 14, color: "#9B8F7A", fontWeight: 600, maxWidth: 300, lineHeight: 1.6, margin: 0 }}>
-              From inventory to community — every tool an artist or venue needs, in one platform.
-            </p>
+          ))}
+          <div style={{ position: "absolute", bottom: 0, right: 0, background: "#FFD400", border: "2.5px solid #111110", padding: "8px 14px", boxShadow: "3px 3px 0 #111110", zIndex: 10 }}>
+            <div style={{ fontSize: 22, fontWeight: 900, color: "#111110", lineHeight: 1 }}>47</div>
+            <div style={{ fontSize: 8, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.12em", color: "#5C5346" }}>Works tracked</div>
           </div>
         </div>
-
-        {/* Feature groups */}
-        {FEATURES.map((group, gi) => (
-          <div key={group.group} style={{ borderTop: "2px solid #E0D8CA", maxWidth: 1200, margin: "0 auto", padding: gi === FEATURES.length - 1 ? "48px 24px 64px" : "48px 24px" }}>
-            {/* Group header */}
-            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 28 }}>
-              <div style={{ width: 40, height: 40, background: group.accent, border: "3px solid #111110", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "3px 3px 0 #111110" }}>
-                <group.icon size={18} color="#111110" />
-              </div>
-              <div>
-                <div style={{ fontSize: 11, fontWeight: 800, color: "#9B8F7A", textTransform: "uppercase", letterSpacing: "0.12em" }}>Tools for</div>
-                <div style={{ fontSize: 18, fontWeight: 900, color: "#111110", letterSpacing: "-0.3px" }}>{group.group}</div>
-              </div>
-            </div>
-
-            {/* Feature grid */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 16 }}>
-              {group.items.map((item, idx) => (
-                <div key={item.title} style={{
-                  background: "#fff",
-                  border: "2px solid #111110",
-                  padding: "20px 22px",
-                  boxShadow: "3px 3px 0 #111110",
-                  transition: "transform 0.1s, box-shadow 0.1s",
-                  cursor: "default",
-                }}
-                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = "translate(-2px,-2px)"; (e.currentTarget as HTMLElement).style.boxShadow = "5px 5px 0 #111110"; }}
-                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = ""; (e.currentTarget as HTMLElement).style.boxShadow = "3px 3px 0 #111110"; }}>
-                  <div style={{ display: "flex", alignItems: "flex-start", gap: 12, marginBottom: 10 }}>
-                    <div style={{ width: 32, height: 32, background: group.accent, border: "2px solid #111110", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                      <item.icon size={14} color="#111110" />
-                    </div>
-                    <h3 style={{ fontSize: 14, fontWeight: 800, color: "#111110", margin: 0, letterSpacing: "-0.2px" }}>{item.title}</h3>
-                  </div>
-                  <p style={{ fontSize: 12, color: "#9B8F7A", lineHeight: 1.6, margin: 0, fontWeight: 500 }}>{item.desc}</p>
-                </div>
-              ))}
+      ),
+    },
+    {
+      num: "02", group: "For Artists", flip: true,
+      title: "Your gallery,\nlive on the web",
+      desc: "Your works become a public portfolio page at artfolio.com/yourname. Clean, fast, shareable — send it to galleries, collectors, or anyone. No design skills needed.",
+      tag: "Public Portfolio",
+      vbg: "#111110",
+      visual: (
+        <div style={{ width: 240, background: "#fff", border: "2px solid #111110", boxShadow: "4px 4px 0 #111110" }}>
+          <div style={{ padding: "12px 14px", borderBottom: "2px solid #111110", display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{ width: 36, height: 36, borderRadius: "50%", background: "#FFD400", border: "2px solid #111110", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 900, color: "#111110", flexShrink: 0 }}>N</div>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 800, color: "#111110" }}>Neda Rahimi</div>
+              <div style={{ fontSize: 10, color: "#9B8F7A", fontWeight: 600 }}>Tehran · Oil & Mixed Media</div>
             </div>
           </div>
-        ))}
-      </section>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr" }}>
+            {["#FF6B6B","#4ECDC4","#FFD400","#95E1D3"].map((c,i) => (
+              <div key={i} style={{ aspectRatio: "1", background: c, borderBottom: i<2?"2px solid #111110":"none", borderRight: i%2===0?"1px solid #111110":"none" }} />
+            ))}
+          </div>
+          <div style={{ padding: "8px 12px", background: "#111110", color: "#FFD400", fontSize: 9, fontWeight: 800, letterSpacing: "0.08em" }}>artfolio.com/nedarahimi</div>
+        </div>
+      ),
+    },
+    {
+      num: "03", group: "For Artists", flip: false,
+      title: "Know your numbers.\nKnow your collectors.",
+      desc: "Log every sale, track commissions, manage your collector relationships. See who bought what, when, for how much — and who you should follow up with next.",
+      tag: "Sales Tracking · CRM",
+      visual: (
+        <div style={{ width: 270, display: "flex", flexDirection: "column", gap: 8 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6 }}>
+            {[["$18k","Revenue"],["$15k","Net"],["12","Sales"]].map(([v,l]) => (
+              <div key={l} style={{ background: "#fff", border: "2px solid #111110", padding: "8px 10px", textAlign: "center" }}>
+                <div style={{ fontSize: 16, fontWeight: 900, color: "#111110" }}>{v}</div>
+                <div style={{ fontSize: 8, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.1em", color: "#9B8F7A" }}>{l}</div>
+              </div>
+            ))}
+          </div>
+          <div style={{ background: "#fff", border: "2px solid #111110" }}>
+            {[["Dariush M.","$3,200","Paid","#DCFCE7","#166534"],["Azadeh Gallery","$5,800","Pending","#FEF9C3","#854D0E"],["Leila Shirazi","$1,400","Paid","#DCFCE7","#166534"],["Tehran Art Fair","$7,600","Paid","#DCFCE7","#166534"]].map(([name,amt,status,bg,col]) => (
+              <div key={name as string} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", borderBottom: "1px solid #E0D8CA" }}>
+                <div style={{ flex: 1, fontSize: 11, fontWeight: 700, color: "#111110" }}>{name}</div>
+                <div style={{ fontSize: 11, fontFamily: "monospace", fontWeight: 800, color: "#111110" }}>{amt}</div>
+                <div style={{ fontSize: 8, fontWeight: 800, textTransform: "uppercase", padding: "2px 6px", background: bg as string, color: col as string, border: "1.5px solid #111110", letterSpacing: "0.08em" }}>{status}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ),
+    },
+    {
+      num: "04", group: "For Artists", flip: true,
+      title: "See what's working.\nGrow what matters.",
+      desc: "Track followers, profile views, and revenue month by month. Understand which works get the most attention and where your collectors are coming from.",
+      tag: "Analytics",
+      visual: (
+        <div style={{ width: 260, background: "#fff", border: "2px solid #111110", boxShadow: "4px 4px 0 #111110" }}>
+          <div style={{ padding: "10px 12px", borderBottom: "2px solid #111110", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div style={{ fontSize: 11, fontWeight: 800, color: "#111110", textTransform: "uppercase", letterSpacing: "0.08em" }}>Revenue</div>
+            <div style={{ fontSize: 9, fontWeight: 700, color: "#9B8F7A", background: "#F5F0E8", border: "1px solid #E0D8CA", padding: "2px 7px" }}>6 months</div>
+          </div>
+          <div style={{ padding: "14px 12px 0", display: "flex", alignItems: "flex-end", gap: 5, height: 110 }}>
+            {[[35,"Jan"],[55,"Feb"],[40,"Mar"],[70,"Apr"],[88,"May"],[100,"Jun"]].map(([h,l],i) => (
+              <div key={l as string} style={{ flex: 1, height: `${h}%`, background: i>=3?"#FFD400":"#F5F0E8", border: "1.5px solid #111110", borderBottom: "none", position: "relative", minHeight: 4 }}>
+                <span style={{ position: "absolute", bottom: -16, left: "50%", transform: "translateX(-50%)", fontSize: 8, fontWeight: 700, color: "#9B8F7A", whiteSpace: "nowrap" }}>{l}</span>
+              </div>
+            ))}
+          </div>
+          <div style={{ height: 24 }} />
+          <div style={{ borderTop: "2px solid #111110", display: "grid", gridTemplateColumns: "1fr 1fr 1fr" }}>
+            {[["284","Followers"],["1.2k","Views"],["$18k","Revenue"]].map(([v,l],i) => (
+              <div key={l as string} style={{ padding: "8px 0", textAlign: "center", borderRight: i<2?"1px solid #E0D8CA":"none" }}>
+                <div style={{ fontSize: 13, fontWeight: 900, color: "#111110" }}>{v}</div>
+                <div style={{ fontSize: 8, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.08em", color: "#9B8F7A" }}>{l}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ),
+    },
+    {
+      num: "05", group: "For Artists", flip: false,
+      title: "Plan shows.\nManage everything.",
+      desc: "Create exhibitions, assign artworks, track venues and dates. Upcoming shows, past appearances, current displays — all in one timeline.",
+      tag: "Exhibition Management",
+      visual: (
+        <div style={{ width: 250, display: "flex", flexDirection: "column", gap: 8 }}>
+          <div style={{ background: "#fff", border: "2px solid #111110", overflow: "hidden", boxShadow: "3px 3px 0 #111110" }}>
+            <div style={{ height: 72, background: "linear-gradient(135deg,#1a1a1a,#2a2a2a)", borderBottom: "2px solid #111110", position: "relative" }}>
+              <div style={{ position: "absolute", top: 8, right: 8, background: "#FF6B6B", border: "1.5px solid #111110", padding: "2px 8px", fontSize: 8, fontWeight: 800, textTransform: "uppercase", color: "#111110" }}>Current</div>
+              <div style={{ position: "absolute", bottom: 8, left: 12 }}>
+                <div style={{ fontSize: 15, fontWeight: 900, color: "#FFD400", letterSpacing: "-0.3px" }}>Forms & Shadows</div>
+                <div style={{ fontSize: 9, fontWeight: 700, color: "#888", textTransform: "uppercase", letterSpacing: "0.1em" }}>Azad Gallery · Tehran</div>
+              </div>
+            </div>
+            <div style={{ padding: "10px 12px" }}>
+              {[["Opens","1 Jun 2026"],["Closes","30 Jun 2026"],["Works","8 artworks"]].map(([k,v]) => (
+                <div key={k as string} style={{ display: "flex", justifyContent: "space-between", fontSize: 10, padding: "3px 0", borderBottom: "1px dotted #E0D8CA", color: "#9B8F7A", fontWeight: 600 }}>
+                  <span>{k}</span><span style={{ color: "#111110", fontWeight: 700 }}>{v}</span>
+                </div>
+              ))}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 3, marginTop: 8 }}>
+                {["#E8D5B7","#A8C5E0","#D4B8E0","#B8D4A8"].map(c => (
+                  <div key={c} style={{ aspectRatio: "1", background: c, border: "1px solid #E0D8CA" }} />
+                ))}
+              </div>
+            </div>
+          </div>
+          <div style={{ background: "#fff", border: "2px solid #E0D8CA", padding: "10px 12px", opacity: 0.6 }}>
+            <div style={{ fontSize: 9, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.1em", color: "#9B8F7A", marginBottom: 3 }}>Planning</div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: "#111110" }}>Winter Group Show</div>
+          </div>
+        </div>
+      ),
+    },
+    {
+      num: "06", group: "Artists + Venues", flip: true,
+      title: "Find the right partner.\nPost. Match. Create.",
+      desc: "Artists post that they're looking for wall space. Venues post that they need artworks. The Discovery Pool connects both sides — and you track every collaboration from first message to final show.",
+      tag: "Collabs · Discovery Pool",
+      vbg: "#1a1a1a",
+      visual: (
+        <div style={{ width: 250, display: "flex", flexDirection: "column", gap: 8 }}>
+          {[
+            { type: "Artist seeking venue", typeBg: "#4ECDC4", title: "Oil painter seeking gallery space", tags: ["Oil","Realism","Large format"], budget: "$500–$2k", dark: false },
+            { type: "Venue seeking art", typeBg: "#FFD400", title: "Café wall — looking for abstract prints", tags: ["Abstract","Digital"], budget: "up to $800", dark: true },
+          ].map(card => (
+            <div key={card.type} style={{ background: card.dark ? "#2a2a2a" : "#fff", border: `2px solid ${card.dark?"#444":"#111110"}`, padding: 12, boxShadow: card.dark?"none":"3px 3px 0 #111110" }}>
+              <div style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "2px 8px", background: card.typeBg, border: "1.5px solid #111110", fontSize: 8, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 6, color: "#111110" }}>
+                {card.type}
+              </div>
+              <div style={{ fontSize: 12, fontWeight: 800, color: card.dark?"#fff":"#111110", marginBottom: 6 }}>{card.title}</div>
+              <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 8 }}>
+                {card.tags.map(t => (
+                  <div key={t} style={{ background: card.dark?"#333":"#F5F0E8", border: `1px solid ${card.dark?"#444":"#E0D8CA"}`, padding: "2px 6px", fontSize: 8, fontWeight: 700, color: card.dark?"#aaa":"#5C5346" }}>{t}</div>
+                ))}
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div style={{ fontSize: 9, fontFamily: "monospace", fontWeight: 700, color: card.dark?"#666":"#9B8F7A" }}>Budget: {card.budget}</div>
+                <div style={{ background: "#FFD400", border: "1.5px solid #111110", padding: "3px 9px", fontSize: 8, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.08em", color: "#111110", cursor: "default" }}>Respond →</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      ),
+    },
+  ].map(feature => (
+    <div key={feature.num} style={{
+      display: "grid",
+      gridTemplateColumns: "1fr 1fr",
+      borderTop: "3px solid #111110",
+    }}>
+      {/* Copy side */}
+      <div style={{
+        padding: "56px 52px",
+        background: "#FFFBEA",
+        borderRight: feature.flip ? "none" : "3px solid #111110",
+        borderLeft: feature.flip ? "3px solid #111110" : "none",
+        order: feature.flip ? 2 : 1,
+        display: "flex", flexDirection: "column", justifyContent: "center", gap: 14,
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 11, fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase", color: "#9B8F7A" }}>
+          <div style={{ width: 28, height: 2, background: "#FFD400" }} />
+          {feature.num} · {feature.group}
+        </div>
+        <h3 style={{ fontSize: "clamp(22px, 2.5vw, 30px)", fontWeight: 900, color: "#111110", letterSpacing: "-0.5px", margin: 0, lineHeight: 1.2, whiteSpace: "pre-line" }}>
+          {feature.title}
+        </h3>
+        <p style={{ fontSize: 14, lineHeight: 1.7, color: "#5C5346", fontWeight: 500, maxWidth: 380, margin: 0 }}>{feature.desc}</p>
+        <div style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "#111110", color: "#FFD400", padding: "4px 12px", fontSize: 10, fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase", width: "fit-content" }}>
+          {feature.tag}
+        </div>
+      </div>
+
+      {/* Visual side */}
+      <div style={{
+        background: (feature as any).vbg || "#F5F0E8",
+        order: feature.flip ? 1 : 2,
+        display: "flex", alignItems: "center", justifyContent: "center",
+        padding: 32, minHeight: 320,
+      }}>
+        {feature.visual}
+      </div>
+    </div>
+  ))}
+</section>
 
       {/* ── COMMUNITY POSTS (Admin-curated) ────────────────────── */}
       {featuredPosts.length > 0 && (

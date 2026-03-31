@@ -118,7 +118,7 @@ export default function HomePage() {
       setFollowing(p => { const n = new Set(p); n.delete(targetId); return n; });
     } else {
       await supabase.from("follows").insert({ follower_id: userId, following_id: targetId });
-      setFollowing(p => new Set([...p, targetId]));
+      setFollowing(p => new Set([...Array.from(p), targetId]));
     }
   }
 

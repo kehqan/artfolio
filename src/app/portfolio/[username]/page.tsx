@@ -66,6 +66,7 @@ export default async function PublicProfilePage({
       .eq("user_id", profile.id)
       .order("created_at", { ascending: false })
       .limit(9),
+    // Fixed: use following_id instead of target_id
     supabase
       .from("follows")
       .select("id", { count: "exact", head: true })
@@ -175,11 +176,11 @@ export default async function PublicProfilePage({
           </div>
         </div>
 
-        {/* ── ARTWORKS — Each card is clickable ── */}
+        {/* ── ARTWORKS — Each card links to individual artwork page ── */}
         {artworks.length > 0 && (
           <section style={{ marginBottom: 52 }}>
             <h2 style={{ fontSize: 20, fontWeight: 900, color: "#111110", marginBottom: 18 }}>Works</h2>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 14 }}>
               {artworks.map((a) => {
                 const cfg = STATUS_CFG[a.status as string ?? ""] ?? { label: a.status, bg: "#F5F0E8", color: "#5C5346" };
                 const imgs = Array.isArray(a.images) ? a.images as string[] : [];
@@ -188,7 +189,6 @@ export default async function PublicProfilePage({
                 const saleTag = saleM ? SALE_METHOD_LABEL[saleM] : null;
 
                 return (
-                  // ── CLICKABLE LINK to individual artwork page ──
                   <Link
                     key={a.id}
                     href={`/portfolio/${params.username}/artwork/${a.id}`}
@@ -251,7 +251,7 @@ export default async function PublicProfilePage({
         {exhibitions.length > 0 && (
           <section style={{ marginBottom: 52 }}>
             <h2 style={{ fontSize: 20, fontWeight: 900, color: "#111110", marginBottom: 18 }}>Exhibitions</h2>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 14 }}>
               {exhibitions.map((ex) => (
                 <div key={ex.id} style={{ background: "#fff", border: "2px solid #111110", borderRadius: 8, overflow: "hidden", boxShadow: "3px 3px 0 #111110" }}>
                   <div style={{ height: 100, background: "#F5F0E8" }}>
@@ -283,7 +283,7 @@ export default async function PublicProfilePage({
         {collabs.length > 0 && (
           <section style={{ marginBottom: 52 }}>
             <h2 style={{ fontSize: 20, fontWeight: 900, color: "#111110", marginBottom: 18 }}>Collaborations</h2>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 14 }}>
               {collabs.map((c) => (
                 <div key={c.id} style={{ background: "#fff", border: "2px solid #111110", borderRadius: 8, padding: "14px 16px", boxShadow: "3px 3px 0 #111110" }}>
                   <div style={{ display: "flex", alignItems: "flex-start", gap: 8, marginBottom: 8 }}>
@@ -298,11 +298,11 @@ export default async function PublicProfilePage({
           </section>
         )}
 
-        {/* POSTS */}
+        {/* POSTS (images only) */}
         {postsWithImages.length > 0 && (
           <section style={{ marginBottom: 52 }}>
             <h2 style={{ fontSize: 20, fontWeight: 900, color: "#111110", marginBottom: 18 }}>Posts</h2>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 14 }}>
               {postsWithImages.map((p) => {
                 const imgs = p.images as string[];
                 return (
@@ -323,7 +323,7 @@ export default async function PublicProfilePage({
           </section>
         )}
 
-        {/* EMPTY */}
+        {/* EMPTY STATE */}
         {artworks.length === 0 && exhibitions.length === 0 && collabs.length === 0 && (
           <div style={{ padding: "64px 24px", textAlign: "center" }}>
             <div style={{ fontSize: 40, marginBottom: 12 }}>🎨</div>

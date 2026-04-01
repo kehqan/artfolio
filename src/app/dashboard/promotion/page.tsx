@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -55,7 +55,6 @@ type ViewTab = "kanban" | "calendar" | "list";
 
 export default function PromotionPage() {
   const params       = useParams<{ id?: string }>();
-  const searchParams = useSearchParams();
   const artworkId    = params?.id || null; // If accessed from /dashboard/artworks/[id]/promotion
 
   const [content, setContent]       = useState<ContentItem[]>([]);

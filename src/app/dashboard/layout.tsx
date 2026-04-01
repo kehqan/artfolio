@@ -7,7 +7,7 @@ import {
   LayoutDashboard, ImageIcon, Globe, Users, BarChart3,
   CalendarDays, LogOut, Palette, Menu, Bell, Search,
   Plus, X, ChevronRight, ChevronDown, Handshake,
-  FolderOpen, TrendingUp, CheckSquare,
+  FolderOpen, TrendingUp, CheckSquare, MapPin, CalendarRange,
 } from "lucide-react";
 
 // ── Nav structure with collapsible sections ───────────────────────
@@ -26,12 +26,12 @@ const NAV_SECTIONS = [
   {
     key: "scene",
     label: "Scene",
-    icon: Globe,
+    icon: CalendarRange,
     color: "#4ECDC4",
     items: [
-      { href: "/dashboard/exhibitions", label: "Exhibitions", icon: Globe       },
-      { href: "/dashboard/pool",        label: "Collabs",     icon: Handshake   },
-      { href: "/",                      label: "Explore",     icon: Users       },
+      { href: "/dashboard/exhibitions", label: "Events",      icon: CalendarRange },
+      { href: "/dashboard/pool",        label: "Collabs",     icon: Handshake     },
+      { href: "/dashboard/map",         label: "Map",         icon: MapPin        },
     ],
   },
   {

@@ -1,13 +1,13 @@
 "use client";
 import { useState, useEffect } from "react";
-import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import {
-  Plus, X, ArrowLeft, Filter, Search, ChevronLeft,
-  ChevronRight, MoreHorizontal, Trash2, Edit2, ExternalLink,
-  Instagram, Globe, Mail, Columns, Table2, CalendarDays,
-  ImageIcon, Megaphone,
+  Plus, X, ArrowLeft, Search, ChevronLeft,
+  ChevronRight, MoreHorizontal, Trash2,
+  Columns, Table2, CalendarDays,
+  Megaphone,
 } from "lucide-react";
 
 // ── Config ──────────────────────────────────────────────────────
@@ -334,10 +334,10 @@ export default function PromotionPage() {
           <div style={{ display:"flex", gap:8, alignItems:"center", flexWrap:"wrap" }}>
             {/* View tabs */}
             <div style={{ display:"flex", border:"2px solid #111110", overflow:"hidden" }}>
-              {[["kanban","Kanban",Columns],["calendar","Calendar",CalendarDays],["list","List",Table2]].map(([k,l,Icon])=>(
-                <button key={k as string} onClick={()=>setTab(k as ViewTab)}
+              {[["kanban","Kanban","columns"],["calendar","Calendar","calendar"],["list","List","table"]].map(([k,l,_iconKey])=>(
+                <button key={k} onClick={()=>setTab(k as ViewTab)}
                   style={{ display:"flex", alignItems:"center", gap:5, padding:"7px 12px", border:"none", borderRight:"1px solid #E0D8CA", background:tab===k?"#111110":"#fff", color:tab===k?"#FFD400":"#111110", fontSize:11, fontWeight:700, cursor:"pointer" }}>
-                  {<(Icon as any) size={13}/>} {l}
+                  {l}
                 </button>
               ))}
             </div>
@@ -588,7 +588,7 @@ export default function PromotionPage() {
                 </div>
                 <div>
                   <label style={{ display:"block", fontSize:10, fontWeight:800, color:"#9B8F7A", textTransform:"uppercase", letterSpacing:"0.1em", marginBottom:6 }}>Caption / Text</label>
-                  <textarea rows={4} value={form.caption} onChange={sf("caption") as any} placeholder="Write your post caption here…"
+                  <textarea rows={4} value={form.caption} onChange={(e) => setForm(p => ({...p, caption: e.target.value}))} placeholder="Write your post caption here…"
                     style={{ ...inputStyle, resize:"vertical" }}
                     onFocus={e=>(e.target.style.borderColor="#FFD400")} onBlur={e=>(e.target.style.borderColor="#E0D8CA")}/>
                 </div>
@@ -599,7 +599,7 @@ export default function PromotionPage() {
                 </div>
                 <div>
                   <label style={{ display:"block", fontSize:10, fontWeight:800, color:"#9B8F7A", textTransform:"uppercase", letterSpacing:"0.1em", marginBottom:6 }}>Notes</label>
-                  <textarea rows={2} value={form.notes} onChange={sf("notes") as any} placeholder="Internal notes…"
+                  <textarea rows={2} value={form.notes} onChange={(e) => setForm(p => ({...p, notes: e.target.value}))} placeholder="Internal notes…"
                     style={{ ...inputStyle, resize:"vertical" }}
                     onFocus={e=>(e.target.style.borderColor="#FFD400")} onBlur={e=>(e.target.style.borderColor="#E0D8CA")}/>
                 </div>

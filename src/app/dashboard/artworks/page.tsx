@@ -6,9 +6,8 @@ import { createClient } from "@/lib/supabase/client";
 import {
   Plus, X, ImageIcon, Edit2, Copy, DollarSign,
   Table2, Columns, Search, ChevronUp, ChevronDown,
-  Frame, Layers, MoreHorizontal, Trash2, Check,
+  Frame, MoreHorizontal, Trash2,
   ArrowUpDown, ExternalLink, Megaphone, MapPin,
-  Globe, ShoppingCart, Save,
 } from "lucide-react";
 
 const STAGES = [

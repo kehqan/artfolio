@@ -1,232 +1,271 @@
-'use client'
+"use client";
+import { useState, useEffect } from "react";
+import Link from "next/link";
+import { createClient } from "@/lib/supabase/client";
+import {
+  ImageIcon, Globe, BarChart3, CalendarDays,
+  FolderOpen, Handshake, Users, TrendingUp,
+  CheckSquare, Plus, ArrowRight, ExternalLink,
+  Eye, DollarSign, Clock,
+} from "lucide-react";
 
-import { useState, useEffect, useMemo } from 'react'
-import Link from 'next/link'
-import { createBrowserClient } from '@supabase/ssr'
+type Stats = {
+  artworks: number; available: number; sold: number;
+  exhibitions: number; collabs: number;
+  sales_total: number; tasks_pending: number;
+};
 
-interface ArtworkItem {
-  id: string; title: string; medium: string | null; price: number | null;
-  status: string | null; images: string[] | null; created_at: string;
-}
-interface ClientItem {
-  id: string; name: string; email: string | null;
-  status: 'online' | 'away' | 'offline'; initials: string; color: string;
-}
-
-function timeAgo(dateStr: string): string {
-  const diff = Date.now() - new Date(dateStr).getTime()
-  const h = Math.floor(diff / 3_600_000)
-  if (h < 1) return 'Just now'
-  if (h < 24) return `${h}h ago`
-  const d = Math.floor(h / 24)
-  return d < 30 ? `${d}d ago` : `${Math.floor(d / 30)}mo ago`
-}
-
-function getInitials(name: string) {
-  return name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
-}
-
-const CLIENT_COLORS = ['#d1fae5','#fef3c7','#ffe4e6','#e0f2fe','#f3e8ff','#dcfce7']
-const CLIENT_STATUSES: ('online'|'away'|'offline')[] = ['online','away','offline','online','away','online']
-const SPARKLINES = {
-  artworks:    { heights: [16,22,14,30,36,38], highlights: [3,4,5] },
-  collections: { heights: [18,28,20,32,24,38], highlights: [1,3,5] },
-  exhibitions: { heights: [38,30,20,28,16,22], highlights: [0,3,5] },
-  followers:   { heights: [8,8,8,8,8,8],       highlights: [5]     },
-}
+const SECTION_CARDS = [
+  {
+    key: "studio",
+    label: "Studio",
+    desc: "Your artworks, collections & public portfolio",
+    color: "#FFD400",
+    textColor: "#111110",
+    icon: ImageIcon,
+    links: [
+      { href: "/dashboard/artworks",    label: "Artworks",    icon: ImageIcon,  desc: "Manage inventory"    },
+      { href: "/dashboard/collections", label: "Collections", icon: FolderOpen, desc: "Group your works"     },
+      { href: "/dashboard/portfolio",   label: "Portfolio",   icon: Globe,      desc: "Your public page"    },
+    ],
+    cta: { href: "/dashboard/artworks/new", label: "Add Artwork" },
+  },
+  {
+    key: "scene",
+    label: "Scene",
+    desc: "Exhibitions, collaborations & community",
+    color: "#4ECDC4",
+    textColor: "#111110",
+    icon: Globe,
+    links: [
+      { href: "/dashboard/exhibitions", label: "Exhibitions", icon: Globe,       desc: "Plan shows"          },
+      { href: "/dashboard/pool",        label: "Collabs",     icon: Handshake,   desc: "Find partners"       },
+      { href: "/",                      label: "Explore",     icon: Users,       desc: "Browse community"    },
+    ],
+    cta: { href: "/dashboard/exhibitions/new", label: "New Exhibition" },
+  },
+  {
+    key: "business",
+    label: "Business",
+    desc: "Sales, clients & performance analytics",
+    color: "#FF6B6B",
+    textColor: "#111110",
+    icon: BarChart3,
+    links: [
+      { href: "/dashboard/sales",       label: "Sales",       icon: BarChart3,   desc: "Track revenue"       },
+      { href: "/dashboard/clients",     label: "Clients",     icon: Users,       desc: "Collector CRM"       },
+      { href: "/dashboard/analytics",   label: "Analytics",   icon: TrendingUp,  desc: "Growth insights"     },
+    ],
+    cta: { href: "/dashboard/sales/new", label: "Log Sale" },
+  },
+  {
+    key: "planner",
+    label: "Planner",
+    desc: "Tasks, deadlines & calendar events",
+    color: "#8B5CF6",
+    textColor: "#fff",
+    icon: CalendarDays,
+    links: [
+      { href: "/dashboard/tasks",       label: "Tasks",       icon: CheckSquare, desc: "To-dos & checklist"  },
+      { href: "/dashboard/calendar",    label: "Calendar",    icon: CalendarDays, desc: "Events & deadlines" },
+    ],
+    cta: { href: "/dashboard/tasks", label: "Add Task" },
+  },
+];
 
 export default function DashboardPage() {
-  const supabase = useMemo(() => createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  ), [])
-
-  const [profile, setProfile]     = useState<{full_name:string;username:string}|null>(null)
-  const [artworks, setArtworks]   = useState<ArtworkItem[]>([])
-  const [stats, setStats]         = useState({artworks:0,collections:0,exhibitions:0,followers:0})
-  const [clients, setClients]     = useState<ClientItem[]>([])
-  const [loading, setLoading]     = useState(true)
-  const [note, setNote]           = useState('')
+  const [profile, setProfile] = useState<{ full_name?: string; role?: string; username?: string } | null>(null);
+  const [stats, setStats]     = useState<Stats>({ artworks:0, available:0, sold:0, exhibitions:0, collabs:0, sales_total:0, tasks_pending:0 });
+  const [artworks, setArtworks] = useState<any[]>([]);
+  const [greeting, setGreeting] = useState("Good morning");
+  const today = new Date();
 
   useEffect(() => {
-    async function load() {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { setLoading(false); return }
-      const [pr, ar, co, ex, fo, cl] = await Promise.all([
-        supabase.from('profiles').select('full_name,username').eq('id',user.id).single(),
-        supabase.from('artworks').select('id,title,medium,price,status,images,created_at').eq('user_id',user.id).order('created_at',{ascending:false}).limit(3),
-        supabase.from('collections').select('id',{count:'exact',head:true}).eq('user_id',user.id),
-        supabase.from('exhibitions').select('id',{count:'exact',head:true}).eq('user_id',user.id),
-        supabase.from('follows').select('id',{count:'exact',head:true}).eq('following_id',user.id),
-        supabase.from('clients').select('id,name,email').eq('user_id',user.id).limit(6),
-      ])
-      if (pr.data) setProfile(pr.data)
-      const raws = (ar.data ?? []) as ArtworkItem[]
-      setArtworks(raws)
-      setStats({ artworks: ar.count ?? raws.length, collections: co.count ?? 0, exhibitions: ex.count ?? 0, followers: fo.count ?? 0 })
-      const rawC = (cl.data ?? []) as {id:string;name:string;email:string|null}[]
-      setClients(rawC.map((c,i) => ({ ...c, initials: getInitials(c.name), color: CLIENT_COLORS[i%CLIENT_COLORS.length], status: CLIENT_STATUSES[i%CLIENT_STATUSES.length] })))
-      setLoading(false)
-    }
-    load()
-  }, [supabase])
+    const h = today.getHours();
+    if (h >= 5  && h < 12) setGreeting("Good morning");
+    else if (h >= 12 && h < 17) setGreeting("Good afternoon");
+    else setGreeting("Good evening");
+  }, []);
 
-  const name = profile?.full_name ?? 'Artist'
-  const initial = name[0]?.toUpperCase() ?? 'A'
-  const statCards = [
-    { label:'Total Artworks',  value:stats.artworks,    delta:'+1 this month', pos:true,  spark:SPARKLINES.artworks    },
-    { label:'Collections',     value:stats.collections, delta:'+0 this month', pos:true,  spark:SPARKLINES.collections },
-    { label:'Exhibitions',     value:stats.exhibitions, delta:'Upcoming',      pos:false, spark:SPARKLINES.exhibitions },
-    { label:'Followers',       value:stats.followers,   delta:'No change',     pos:true,  spark:SPARKLINES.followers   },
-  ]
+  useEffect(() => {
+    const supabase = createClient();
+    supabase.auth.getUser().then(async ({ data: { user } }) => {
+      if (!user) return;
+
+      const [{ data: prof }, { data: aw }, { data: ex }, { data: co }, { data: tk }] = await Promise.all([
+        supabase.from("profiles").select("full_name,role,username").eq("id", user.id).single(),
+        supabase.from("artworks").select("id,title,status,images,price,medium").eq("user_id", user.id).order("created_at", { ascending: false }).limit(6),
+        supabase.from("exhibitions").select("id", { count: "exact", head: true }).eq("user_id", user.id),
+        supabase.from("collaborations").select("id", { count: "exact", head: true }).eq("user_id", user.id),
+        supabase.from("tasks").select("id,status").eq("user_id", user.id),
+      ]);
+
+      setProfile(prof);
+      setArtworks(aw || []);
+
+      const awList = aw || [];
+      const tkList = tk || [];
+      setStats({
+        artworks:      awList.length,
+        available:     awList.filter((a: any) => String(a.status).toLowerCase() === "available").length,
+        sold:          awList.filter((a: any) => String(a.status).toLowerCase() === "sold").length,
+        exhibitions:   (ex as any)?.count || 0,
+        collabs:       (co as any)?.count || 0,
+        sales_total:   0,
+        tasks_pending: tkList.filter((t: any) => t.status === "pending" || t.status === "in_progress").length,
+      });
+    });
+  }, []);
+
+  const fname = profile?.full_name?.split(" ")[0] || "Artist";
 
   return (
-    <>
-      <style>{`
-        .sc:hover { transform:translate(-2px,-2px); box-shadow:5px 5px 0 #111110 !important; }
-        .qa:hover { background:#F0EBE1; }
-        .ar:hover { background:#F5F0E8 !important; }
-        .cl:hover { transform:translate(-1px,-1px); box-shadow:3px 3px 0 #111110 !important; }
-        .ci:focus { background:#fff; box-shadow:3px 3px 0 #111110; }
-      `}</style>
-      <div>
-        <div style={{marginBottom:24}}>
-          <h1 style={{fontSize:26,fontWeight:900,color:'#111110',letterSpacing:'-0.5px',marginBottom:2}}>
-            {loading ? 'Dashboard' : `Welcome back, ${name} ✦`}
-          </h1>
-          <p style={{fontSize:13,color:'#9B8F7A'}}>Here&apos;s what&apos;s happening with your work.</p>
+    <div>
+      {/* ── Header ── */}
+      <div style={{ marginBottom: 28 }}>
+        <div style={{ fontSize: 11, fontWeight: 800, color: "#9B8F7A", textTransform: "uppercase", letterSpacing: "0.15em", marginBottom: 4 }}>
+          {today.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
         </div>
-
-        {/* Stats */}
-        <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:14,marginBottom:24}}>
-          {statCards.map((s,i) => (
-            <div key={s.label} className="sc" style={{background:'#fff',border:'2px solid #111110',boxShadow:'3px 3px 0 #111110',borderRadius:8,padding:'16px 18px',display:'flex',alignItems:'flex-end',justifyContent:'space-between',cursor:'pointer',transition:'transform 0.1s,box-shadow 0.1s'}}>
-              <div>
-                <div style={{fontSize:10,fontWeight:700,color:'#9B8F7A',textTransform:'uppercase',letterSpacing:'0.5px',marginBottom:6}}>{s.label}</div>
-                <div style={{fontSize:28,fontWeight:900,letterSpacing:'-1px',color:'#111110'}}>{loading?'—':s.value}</div>
-                <div style={{fontSize:11,fontWeight:600,marginTop:4,color:s.pos?'#00C853':'#9B8F7A'}}>{s.pos&&s.value!==0?'↑ ':''}{s.delta}</div>
-              </div>
-              <div style={{display:'flex',alignItems:'flex-end',gap:3,height:38}}>
-                {s.spark.heights.map((h,bi) => (
-                  <div key={bi} style={{width:6,height:h,borderRadius:2,background:s.spark.highlights.includes(bi)?'#FFD400':'#E0D8CA',border:s.spark.highlights.includes(bi)?'1px solid #111110':'none'}} />
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Grid */}
-        <div style={{display:'grid',gridTemplateColumns:'1fr 300px',gap:18}}>
-
-          {/* Left — Recent artworks, each fully clickable */}
-          <div style={{background:'#fff',border:'2px solid #111110',boxShadow:'3px 3px 0 #111110',borderRadius:8,overflow:'hidden'}}>
-            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'14px 18px',borderBottom:'2px solid #111110',fontSize:14,fontWeight:800,color:'#111110'}}>
-              Recent Artworks
-              <Link href="/dashboard/artworks" className="cl" style={{fontSize:12,fontWeight:700,color:'#111110',textDecoration:'none',padding:'4px 10px',border:'2px solid #111110',borderRadius:20,background:'#FFD400',boxShadow:'2px 2px 0 #111110',transition:'transform 0.1s,box-shadow 0.1s'}}>View all →</Link>
-            </div>
-
-            {loading ? (
-              <div style={{padding:'32px',textAlign:'center',color:'#9B8F7A',fontSize:13}}>Loading…</div>
-            ) : artworks.length === 0 ? (
-              <div style={{padding:'40px 18px',textAlign:'center'}}>
-                <div style={{fontSize:36,marginBottom:10}}>🎨</div>
-                <div style={{fontSize:15,fontWeight:800,color:'#111110',marginBottom:6}}>No artworks yet</div>
-                <div style={{fontSize:13,color:'#9B8F7A',marginBottom:18}}>Add your first piece to get started.</div>
-                <Link href="/dashboard/artworks/new"><button style={{padding:'10px 20px',border:'2px solid #111110',borderRadius:6,background:'#FFD400',fontWeight:700,fontSize:13,cursor:'pointer',boxShadow:'3px 3px 0 #111110'}}>＋ Add Artwork</button></Link>
-              </div>
-            ) : artworks.map((art, idx) => {
-              const img = art.images?.[0] ?? null
-              const sold = art.status?.toLowerCase() === 'sold'
-              return (
-                <Link key={art.id} href={`/dashboard/artworks/${art.id}`} style={{textDecoration:'none',display:'block'}}>
-                  <div className="ar" style={{padding:'13px 18px',borderBottom:idx<artworks.length-1?'1px solid #E0D8CA':'none',cursor:'pointer',transition:'background 0.1s',background:'#fff'}}>
-                    <div style={{display:'flex',alignItems:'center',gap:12}}>
-                      <div style={{width:50,height:50,borderRadius:6,border:'2px solid #111110',overflow:'hidden',background:'#F5F0E8',flexShrink:0}}>
-                        {img ? <img src={img} alt={art.title} style={{width:'100%',height:'100%',objectFit:'cover'}} /> : <div style={{width:'100%',height:'100%',display:'flex',alignItems:'center',justifyContent:'center',fontSize:18}}>🖼</div>}
-                      </div>
-                      <div style={{flex:1,minWidth:0}}>
-                        <div style={{display:'flex',alignItems:'center',gap:7,marginBottom:3}}>
-                          <span style={{fontSize:13,fontWeight:700,color:'#111110',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{art.title}</span>
-                          <span style={{display:'inline-block',fontSize:9,fontWeight:800,textTransform:'uppercase',padding:'2px 6px',border:'1.5px solid #111110',borderRadius:3,background:sold?'#111110':'#FFD400',color:sold?'#FFD400':'#111110',flexShrink:0}}>{art.status??'Available'}</span>
-                        </div>
-                        <div style={{display:'flex',alignItems:'center',gap:8}}>
-                          {art.medium && <span style={{fontSize:11,color:'#9B8F7A'}}>{art.medium}</span>}
-                          {art.price && <span style={{fontSize:11,fontFamily:'monospace',fontWeight:700,color:'#5C5346'}}>${art.price.toLocaleString()}</span>}
-                          <span style={{fontSize:10,color:'#d4cfc4',marginLeft:'auto'}}>{timeAgo(art.created_at)}</span>
-                        </div>
-                      </div>
-                      <span style={{fontSize:13,color:'#d4cfc4',flexShrink:0}}>→</span>
-                    </div>
-                  </div>
-                </Link>
-              )
-            })}
-
-            {/* Note input */}
-            <div style={{padding:'12px 18px',borderTop:'2px solid #111110',display:'flex',alignItems:'center',gap:10}}>
-              <div style={{width:28,height:28,borderRadius:'50%',background:'#FFD400',border:'2px solid #111110',display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,fontWeight:800,color:'#111110',flexShrink:0}}>{initial}</div>
-              <input className="ci" type="text" placeholder="Add a note…" value={note} onChange={e=>setNote(e.target.value)} style={{flex:1,padding:'8px 12px',border:'2px solid #111110',borderRadius:6,fontSize:13,fontFamily:'inherit',background:'#F0EBE1',outline:'none',transition:'background 0.1s,box-shadow 0.1s'}} />
-              <button style={{width:34,height:34,background:'#FFD400',border:'2px solid #111110',boxShadow:'3px 3px 0 #111110',borderRadius:6,display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',fontSize:14,flexShrink:0}}>→</button>
-            </div>
-          </div>
-
-          {/* Right */}
-          <div style={{display:'flex',flexDirection:'column',gap:16}}>
-            {/* Quick Actions */}
-            <div style={{background:'#fff',border:'2px solid #111110',boxShadow:'3px 3px 0 #111110',borderRadius:8,overflow:'hidden'}}>
-              <div style={{padding:'14px 18px',borderBottom:'2px solid #111110',fontSize:14,fontWeight:800,color:'#111110'}}>Quick Actions</div>
-              <div>
-                <Link href="/dashboard/artworks/new" style={{textDecoration:'none'}}>
-                  <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',background:'#111110',color:'#fff',margin:'8px 12px',borderRadius:6,border:'2px solid #111110',boxShadow:'3px 3px 0 #111110',padding:'11px 14px',cursor:'pointer',fontSize:13,fontWeight:700}}>
-                    <span>＋ Add Artwork</span><span style={{color:'#FFD400'}}>→</span>
-                  </div>
-                </Link>
-                {[
-                  {icon:'📁',label:'New Collection',href:'/dashboard/collections/new'},
-                  {icon:'💬',label:'Post to Feed',href:'/dashboard/feed'},
-                  {icon:'🔍',label:'Discover Artists',href:'/dashboard/discover'},
-                  {icon:'🏛',label:'New Exhibition',href:'/dashboard/exhibitions/new'},
-                  {icon:'📊',label:'Record Sale',href:'/dashboard/sales'},
-                ].map(item => (
-                  <Link key={item.href} href={item.href} style={{textDecoration:'none'}}>
-                    <div className="qa" style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'10px 18px',borderBottom:'1px solid #E0D8CA',fontSize:13,fontWeight:600,color:'#111110',cursor:'pointer',transition:'background 0.1s'}}>
-                      <span><span style={{marginRight:8,opacity:0.7}}>{item.icon}</span>{item.label}</span>
-                      <span style={{color:'#9B8F7A',fontSize:14}}>→</span>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            </div>
-
-            {/* Clients */}
-            <div style={{background:'#fff',border:'2px solid #111110',boxShadow:'3px 3px 0 #111110',borderRadius:8,overflow:'hidden'}}>
-              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'14px 18px',borderBottom:'2px solid #111110',fontSize:14,fontWeight:800,color:'#111110'}}>
-                Collectors
-                <Link href="/dashboard/clients" className="cl" style={{fontSize:12,fontWeight:700,color:'#111110',textDecoration:'none',padding:'4px 10px',border:'2px solid #111110',borderRadius:20,background:'#FFD400',boxShadow:'2px 2px 0 #111110',transition:'transform 0.1s,box-shadow 0.1s'}}>All →</Link>
-              </div>
-              <div>
-                {loading ? <div style={{padding:'20px',color:'#9B8F7A',fontSize:13}}>Loading…</div>
-                : clients.length === 0 ? <div style={{padding:'24px',textAlign:'center',color:'#9B8F7A',fontSize:13}}>No clients yet. <Link href="/dashboard/clients" style={{color:'#111110',fontWeight:700}}>Add one →</Link></div>
-                : clients.map((c,i) => (
-                  <div key={c.id} style={{display:'flex',alignItems:'center',gap:10,padding:'10px 18px',borderBottom:i<clients.length-1?'1px solid #E0D8CA':'none'}}>
-                    <div style={{width:28,height:28,borderRadius:'50%',background:c.color,border:'2px solid #111110',display:'flex',alignItems:'center',justifyContent:'center',fontSize:10,fontWeight:700,color:'#111110',flexShrink:0}}>{c.initials}</div>
-                    <div style={{flex:1,minWidth:0}}>
-                      <div style={{fontSize:12,fontWeight:700,color:'#111110',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{c.name}</div>
-                      <div style={{fontSize:10,color:'#9B8F7A'}}>{c.email??'—'}</div>
-                    </div>
-                    <span style={{fontSize:9,fontWeight:800,padding:'2px 7px',border:'1.5px solid #111110',borderRadius:20,flexShrink:0,textTransform:'uppercase',background:c.status==='online'?'#CFFDE1':c.status==='away'?'#FFF3CD':'#E0D8CA',color:c.status==='online'?'#00874A':c.status==='away'?'#856404':'#5C5346'}}>{c.status}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div style={{padding:'14px 0',marginTop:24,borderTop:'1px solid #E0D8CA',display:'flex',justifyContent:'space-between',fontSize:11,color:'#9B8F7A',fontWeight:600}}>
-          <span>Artfolio ✦ {new Date().getFullYear()}</span>
-          <span>Artist Dashboard</span>
-        </div>
+        <h1 style={{ fontSize: "clamp(22px,3vw,32px)", fontWeight: 900, color: "#111110", letterSpacing: "-0.5px", margin: 0 }}>
+          {greeting}, {fname} 👋
+        </h1>
       </div>
-    </>
-  )
+
+      {/* ── Stat strip ── */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 28 }}>
+        {[
+          { label: "Total Works",    value: stats.artworks,      icon: ImageIcon,    color: "#FFD400" },
+          { label: "Available",      value: stats.available,     icon: Eye,          color: "#4ECDC4" },
+          { label: "Exhibitions",    value: stats.exhibitions,   icon: Globe,        color: "#FF6B6B" },
+          { label: "Active Tasks",   value: stats.tasks_pending, icon: Clock,        color: "#8B5CF6" },
+        ].map(stat => {
+          const Icon = stat.icon;
+          return (
+            <div key={stat.label} style={{ background: "#fff", border: "2px solid #111110", padding: "16px 18px", boxShadow: "3px 3px 0 #111110", position: "relative", overflow: "hidden" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                <div style={{ width: 32, height: 32, background: stat.color, border: "2px solid #111110", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <Icon size={14} color="#111110" />
+                </div>
+              </div>
+              <div style={{ fontSize: 28, fontWeight: 900, color: "#111110", lineHeight: 1, marginBottom: 4 }}>{stat.value}</div>
+              <div style={{ fontSize: 10, fontWeight: 800, color: "#9B8F7A", textTransform: "uppercase", letterSpacing: "0.1em" }}>{stat.label}</div>
+              {/* Accent corner */}
+              <div style={{ position: "absolute", bottom: 0, right: 0, width: 40, height: 40, background: stat.color, opacity: 0.1, borderTopLeftRadius: 40 }} />
+            </div>
+          );
+        })}
+      </div>
+
+      {/* ── 4 Section cards ── */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 16, marginBottom: 28 }}>
+        {SECTION_CARDS.map(section => {
+          const SIcon = section.icon;
+          return (
+            <div key={section.key} style={{ background: "#fff", border: "2px solid #111110", overflow: "hidden", boxShadow: "3px 3px 0 #111110" }}>
+              {/* Section header */}
+              <div style={{ padding: "16px 20px 12px", borderBottom: "2px solid #111110", background: section.color, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <div style={{ width: 28, height: 28, background: "#111110", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <SIcon size={13} color={section.color} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 14, fontWeight: 900, color: "#111110", letterSpacing: "-0.2px" }}>{section.label}</div>
+                    <div style={{ fontSize: 10, fontWeight: 600, color: "rgba(17,17,16,0.6)" }}>{section.desc}</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Links */}
+              <div style={{ padding: "8px 0" }}>
+                {section.links.map((link, i) => {
+                  const LIcon = link.icon;
+                  return (
+                    <Link key={link.href} href={link.href} style={{ textDecoration: "none" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "11px 20px", borderBottom: i < section.links.length - 1 ? "1px solid #F5F0E8" : "none", transition: "background 0.1s", cursor: "pointer" }}
+                        onMouseEnter={e => (e.currentTarget.style.background="#FFFBEA")}
+                        onMouseLeave={e => (e.currentTarget.style.background="transparent")}>
+                        <div style={{ width: 30, height: 30, background: "#F5F0E8", border: "1.5px solid #E0D8CA", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                          <LIcon size={13} color="#5C5346" />
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 13, fontWeight: 700, color: "#111110" }}>{link.label}</div>
+                          <div style={{ fontSize: 11, color: "#9B8F7A", fontWeight: 500 }}>{link.desc}</div>
+                        </div>
+                        <ArrowRight size={13} color="#d4cfc4" />
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
+
+              {/* CTA */}
+              <div style={{ padding: "10px 16px", borderTop: "1px solid #E0D8CA", background: "#FAFAF8" }}>
+                <Link href={section.cta.href} style={{ textDecoration: "none" }}>
+                  <button style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", border: "2px solid #111110", background: "#111110", color: "#FFD400", fontSize: 11, fontWeight: 800, cursor: "pointer", boxShadow: "2px 2px 0 " + section.color }}>
+                    <Plus size={12} strokeWidth={3} /> {section.cta.label}
+                  </button>
+                </Link>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* ── Recent artworks ── */}
+      {artworks.length > 0 && (
+        <div style={{ background: "#fff", border: "2px solid #111110", boxShadow: "3px 3px 0 #111110", overflow: "hidden" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 20px", borderBottom: "2px solid #111110" }}>
+            <div style={{ fontSize: 14, fontWeight: 900, color: "#111110" }}>Recent Artworks</div>
+            <Link href="/dashboard/artworks" style={{ textDecoration: "none", display: "flex", alignItems: "center", gap: 4, fontSize: 11, fontWeight: 700, color: "#9B8F7A" }}>
+              View all <ArrowRight size={11} />
+            </Link>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)" }}>
+            {artworks.slice(0, 6).map((aw: any, i: number) => {
+              const img = Array.isArray(aw.images) ? aw.images[0] : null;
+              const statusColor: Record<string, string> = { available: "#4ECDC4", sold: "#111110", reserved: "#FFD400", "in progress": "#8B5CF6", concept: "#9B8F7A" };
+              const sc = statusColor[String(aw.status).toLowerCase()] || "#9B8F7A";
+              return (
+                <Link key={aw.id} href={`/dashboard/artworks/${aw.id}`} style={{ textDecoration: "none" }}>
+                  <div style={{ borderRight: i < 5 ? "1px solid #E0D8CA" : "none", cursor: "pointer", transition: "background 0.1s" }}
+                    onMouseEnter={e => (e.currentTarget.style.background="#FFFBEA")}
+                    onMouseLeave={e => (e.currentTarget.style.background="transparent")}>
+                    <div style={{ aspectRatio: "1/1", background: "#F5F0E8", position: "relative", overflow: "hidden" }}>
+                      {img
+                        ? <img src={img} alt={aw.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                        : <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                            <ImageIcon size={20} color="#9B8F7A" />
+                          </div>
+                      }
+                      <div style={{ position: "absolute", bottom: 6, left: 6, width: 8, height: 8, borderRadius: "50%", background: sc, border: "1.5px solid #fff" }} />
+                    </div>
+                    <div style={{ padding: "8px 10px" }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: "#111110", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{aw.title}</div>
+                      <div style={{ fontSize: 9, color: "#9B8F7A", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{aw.medium || "—"}</div>
+                    </div>
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ── Quick links row ── */}
+      {profile?.username && (
+        <div style={{ marginTop: 16, display: "flex", gap: 10, flexWrap: "wrap" }}>
+          <Link href={`/profile/${profile.username}`} style={{ textDecoration: "none" }}>
+            <button style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", border: "2px solid #111110", background: "#fff", fontSize: 11, fontWeight: 700, cursor: "pointer", boxShadow: "2px 2px 0 #111110" }}>
+              <ExternalLink size={11} /> View Public Portfolio
+            </button>
+          </Link>
+          <Link href="/dashboard/artworks/new" style={{ textDecoration: "none" }}>
+            <button style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", border: "2px solid #111110", background: "#FFD400", fontSize: 11, fontWeight: 800, cursor: "pointer", boxShadow: "2px 2px 0 #111110" }}>
+              <Plus size={11} strokeWidth={3} /> Add Artwork
+            </button>
+          </Link>
+        </div>
+      )}
+    </div>
+  );
 }

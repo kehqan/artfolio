@@ -4,10 +4,10 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import {
-  Plus, X, ImageIcon, Edit2, Copy, DollarSign,
+  Plus, ImageIcon, Edit2, Copy, DollarSign,
   Table2, Columns, Search, ChevronUp, ChevronDown,
   Frame, MoreHorizontal, Trash2,
-  ArrowUpDown, ExternalLink, Megaphone, MapPin,
+  ArrowUpDown, ExternalLink, Megaphone, MapPin, PencilLine,
 } from "lucide-react";
 
 const STAGES = [
@@ -64,6 +64,7 @@ export default function ArtworksPage() {
   const [dragId, setDragId]         = useState<string | null>(null);
   const [dragOver, setDragOver]     = useState<string | null>(null);
   const [savingCell, setSavingCell] = useState(false);
+  const [editMode, setEditMode]     = useState(false); // global table edit mode toggle
   const editInputRef = useRef<HTMLInputElement | HTMLSelectElement | null>(null);
 
   useEffect(() => { load(); }, []);
@@ -197,9 +198,9 @@ export default function ArtworksPage() {
       );
     }
     return (
-      <td style={{ padding: "10px 12px", borderBottom: "1px solid #E0D8CA", borderRight: "1px solid #E0D8CA", cursor: "text", maxWidth: width || "auto" }}
-        onDoubleClick={e => { e.stopPropagation(); startEdit(artwork, field); }}
-        title="Double-click to edit">
+      <td style={{ padding: "10px 12px", borderBottom: "1px solid #E0D8CA", borderRight: "1px solid #E0D8CA", cursor: editMode ? "text" : "pointer", maxWidth: width || "auto", background: editMode ? "#FFFEF5" : "inherit" }}
+        onClick={e => { if (editMode) { e.stopPropagation(); startEdit(artwork, field); } }}
+        title={editMode ? "Click to edit" : "Click row to view detail"}>
         {children}
       </td>
     );
@@ -315,6 +316,13 @@ export default function ArtworksPage() {
                 <Columns size={13}/> Kanban
               </button>
             </div>
+            {/* Edit mode toggle — only shown in table view */}
+            {tab === "table" && (
+              <button onClick={()=>{ setEditMode(p=>!p); setEditCell(null); }}
+                style={{ display:"flex", alignItems:"center", gap:6, padding:"7px 13px", border:"2px solid #111110", background:editMode?"#FFD400":"#fff", color:"#111110", fontSize:11, fontWeight:700, cursor:"pointer", boxShadow: editMode?"2px 2px 0 #111110":"none" }}>
+                <PencilLine size={13}/> {editMode ? "Done editing" : "Edit cells"}
+              </button>
+            )}
             {/* Search */}
             <div style={{ display:"flex", alignItems:"center", gap:6, border:"2px solid #111110", padding:"0 10px", background:"#fff", height:34 }}>
               <Search size={12} color="#9B8F7A"/>
@@ -356,6 +364,19 @@ export default function ArtworksPage() {
         ════════════════════════════════════════ */}
         {tab === "table" && (
           <div style={{ background:"#fff", border:"2px solid #111110", boxShadow:"3px 3px 0 #111110", overflow:"hidden" }}>
+            {/* Edit mode banner */}
+            {editMode && (
+              <div style={{ padding:"10px 16px", background:"#FFD400", borderBottom:"2px solid #111110", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+                <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                  <PencilLine size={14} color="#111110"/>
+                  <span style={{ fontSize:12, fontWeight:800, color:"#111110" }}>Edit mode active — click any cell to edit it inline</span>
+                </div>
+                <button onClick={()=>{ setEditMode(false); setEditCell(null); }}
+                  style={{ padding:"4px 12px", border:"2px solid #111110", background:"#111110", color:"#FFD400", fontSize:11, fontWeight:800, cursor:"pointer" }}>
+                  Done editing
+                </button>
+              </div>
+            )}
             <div style={{ overflowX:"auto" }}>
               <table style={{ width:"100%", borderCollapse:"collapse", minWidth:1100 }}>
                 <thead>
@@ -399,25 +420,15 @@ export default function ArtworksPage() {
                     const menuOpen = rowMenu === aw.id;
                     return (
                       <tr key={aw.id} className="aw-row"
-                        style={{ cursor:"pointer" }}
-                        onClick={() => router.push(`/dashboard/artworks/${aw.id}`)}>
-
-                        {/* ── LARGE IMAGE CELL (1/3 row concept) ── */}
+                        style={{ cursor: editMode ? "default" : "pointer" }}
+                        onClick={() => { if (!editMode && !editCell) router.push(`/dashboard/artworks/${aw.id}`); }}>
+                        {/* ── LARGE IMAGE CELL ── */}
                         <td style={{ padding:0, width:180, borderBottom:"1px solid #E0D8CA", borderRight:"1px solid #E0D8CA", verticalAlign:"top" }}>
                           <div style={{ width:180, height:130, background:st.bg, overflow:"hidden", position:"relative", flexShrink:0 }}>
                             {img
                               ? <img src={img} alt={aw.title} style={{ width:"100%", height:"100%", objectFit:"cover", display:"block" }}/>
                               : <div style={{ width:"100%", height:"100%", display:"flex", alignItems:"center", justifyContent:"center" }}><ImageIcon size={28} color="#d4cfc4"/></div>
                             }
-                            {/* Edit overlay on hover */}
-                            <Link href={`/dashboard/artworks/${aw.id}/edit`} onClick={e=>e.stopPropagation()}>
-                              <div style={{ position:"absolute", inset:0, background:"rgba(0,0,0,0)", display:"flex", alignItems:"center", justifyContent:"center", opacity:0, transition:"opacity 0.15s" }}
-                                className="img-edit-overlay">
-                                <div style={{ background:"rgba(0,0,0,0.6)", color:"#fff", padding:"4px 10px", fontSize:11, fontWeight:700, display:"flex", alignItems:"center", gap:5 }}>
-                                  <Edit2 size={11}/> Edit
-                                </div>
-                              </div>
-                            </Link>
                           </div>
                         </td>
 
@@ -426,7 +437,6 @@ export default function ArtworksPage() {
                           <div style={{ fontSize:13, fontWeight:700, color:"#111110", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", maxWidth:160 }}>
                             {aw.title}
                           </div>
-                          <div style={{ fontSize:10, color:"#d4cfc4", marginTop:2 }}>double-click to edit</div>
                         </EditableCell>
 
                         {/* Medium */}
@@ -494,7 +504,7 @@ export default function ArtworksPage() {
 
             {/* Table footer */}
             <div style={{ padding:"10px 16px", borderTop:"1px solid #E0D8CA", background:"#FAFAF8", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-              <span style={{ fontSize:11, fontWeight:700, color:"#9B8F7A" }}>{filtered.length} of {artworks.length} artworks · Double-click any cell to edit inline</span>
+              <span style={{ fontSize:11, fontWeight:700, color:"#9B8F7A" }}>{filtered.length} of {artworks.length} artworks · {editMode ? "Click any cell to edit · Click 'Done editing' when finished" : "Click 'Edit cells' to edit inline · Click row to view detail"}</span>
               <span style={{ fontSize:11, fontWeight:700, color:"#9B8F7A" }}>Click row to view detail</span>
             </div>
           </div>

@@ -104,7 +104,7 @@ export default function ArtworkDetailPage() {
           </button>
           {/* Film strip */}
           <div style={{ position: "absolute", bottom: 20, left: "50%", transform: "translateX(-50%)", display: "flex", gap: 8 }}>
-            {images.map((img, i) => (
+            {images.map((img: string, i: number) => (
               <div key={i} onClick={e => { e.stopPropagation(); setLightbox(i); }}
                 className="album-thumb"
                 style={{ width: 56, height: 42, border: `2px solid ${i === lightbox ? "#FFD400" : "rgba(255,255,255,0.2)"}`, overflow: "hidden", cursor: "pointer", opacity: i === lightbox ? 1 : 0.5, transition: "opacity 0.15s, border-color 0.15s" }}>

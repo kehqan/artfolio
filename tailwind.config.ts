@@ -9,9 +9,8 @@ const config: Config = {
   theme: {
     extend: {
       fontFamily: {
-        // Single unified font — Darker Grotesque everywhere
-        sans:  ["var(--font-darker-grotesque)", "system-ui", "sans-serif"],
-        mono:  ["'Courier New'", "Courier", "monospace"],
+        sans: ["'Darker Grotesque'", "system-ui", "sans-serif"],
+        mono: ["'Courier New'", "Courier", "monospace"],
       },
       colors: {
         paper: "#FFFBEA",

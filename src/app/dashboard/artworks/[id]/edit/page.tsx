@@ -4,6 +4,7 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { ArrowLeft, Upload, X, Save, ImageIcon } from "lucide-react";
+import PlacesAutocomplete, { PlaceResult } from "@/components/PlacesAutocomplete";
 
 const STAGES = [
   { key: "concept",     label: "Concept"     },
@@ -54,10 +55,12 @@ export default function EditArtworkPage() {
     title: "", year: "", medium: "", description: "",
     width_cm: "", height_cm: "", depth_cm: "",
     price: "", currency: "USD", status: "available",
-    sale_method: "", location: "", venue_location: "",
+    sale_method: "", location: "", venue_location: "", location_name: "",
     notes: "", framed: false, editions: "",
     materials_cost: "", time_spent: "",
   });
+  const [locationCoords, setLocationCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [venueCoords, setVenueCoords]       = useState<{ lat: number; lng: number } | null>(null);
 
   const [existingImages, setExistingImages] = useState<string[]>([]);
   const [newFiles, setNewFiles]             = useState<File[]>([]);
@@ -84,12 +87,14 @@ export default function EditArtworkPage() {
           sale_method:    data.sale_method    || "",
           location:       data.location       || "",
           venue_location: data.venue_location || "",
+          location_name:  data.location_name  || data.venue_location || "",
           notes:          data.notes          || "",
           framed:         data.framed         || false,
           editions:       data.editions       ? String(data.editions)       : "",
           materials_cost: data.materials_cost ? String(data.materials_cost) : "",
           time_spent:     data.time_spent     ? String(data.time_spent)     : "",
         });
+        if (data.location_lat && data.location_lng) setVenueCoords({ lat: data.location_lat, lng: data.location_lng });
         setExistingImages(Array.isArray(data.images) ? data.images.filter(Boolean) : []);
       }
       setLoading(false);
@@ -163,7 +168,10 @@ export default function EditArtworkPage() {
       status:         form.status,
       sale_method:    form.sale_method    || null,
       location:       form.location       || null,
-      venue_location: form.venue_location || null,
+      venue_location: form.venue_location || form.location_name || null,
+      location_name:  form.location_name  || form.venue_location || null,
+      location_lat:   venueCoords?.lat    || null,
+      location_lng:   venueCoords?.lng    || null,
       notes:          form.notes          || null,
       framed:         form.framed,
       editions:       numOrNull(form.editions),
@@ -408,16 +416,31 @@ export default function EditArtworkPage() {
                 </div>
               </Section>
 
-              {/* Location & Visibility */}
               <Section title="Location & Visibility">
-                <div>
-                  <Label>Current location / studio</Label>
-                  <input value={form.location} onChange={sf("location")} placeholder="Studio A, Storage unit, On loan to…" style={inputStyle} {...focusStyle} />
-                </div>
-                <div>
-                  <Label>Venue / exhibition location</Label>
-                  <input value={form.venue_location} onChange={sf("venue_location")} placeholder="Azad Gallery, Tehran · Online at artfolio.com" style={inputStyle} {...focusStyle} />
-                </div>
+                <PlacesAutocomplete
+                  label="Current location / studio"
+                  value={form.location}
+                  placeholder="Search address…"
+                  onChange={(result, raw) => {
+                    setForm(p => ({ ...p, location: raw }));
+                    if (result) setLocationCoords({ lat: result.lat, lng: result.lng });
+                  }}
+                />
+                <PlacesAutocomplete
+                  label="Venue / exhibition location"
+                  value={form.location_name || form.venue_location}
+                  placeholder="Gallery, museum, café…"
+                  onChange={(result, raw) => {
+                    setForm(p => ({ ...p, location_name: raw, venue_location: raw }));
+                    if (result) setVenueCoords({ lat: result.lat, lng: result.lng });
+                    else setVenueCoords(null);
+                  }}
+                />
+                {venueCoords && (
+                  <div style={{ fontSize: 10, color: "#4ECDC4", fontWeight: 700, display: "flex", alignItems: "center", gap: 6 }}>
+                    ✓ Location saved — will appear on the map
+                  </div>
+                )}
               </Section>
 
               {/* Save button at bottom too */}

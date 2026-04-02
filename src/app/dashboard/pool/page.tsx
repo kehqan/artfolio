@@ -4,8 +4,9 @@ import { createClient } from "@/lib/supabase/client";
 import {
   Plus, Building2, Palette, X, ChevronDown, ChevronUp,
   MessageCircle, Search, Filter, Calendar, DollarSign,
-  Clock, CheckCircle, Circle, Handshake,
+  Clock, CheckCircle, Circle, Handshake, MapPin,
 } from "lucide-react";
+import PlacesAutocomplete from "@/components/PlacesAutocomplete";
 
 // ── Types ──────────────────────────────────────────────────────────
 type Collab = {
@@ -44,12 +45,14 @@ export default function CollabPoolPage() {
   const [saving, setSaving]           = useState(false);
   const [respondingId, setRespondingId] = useState<string | null>(null);
   const [responseMsg, setResponseMsg] = useState("");
+  const [poolLocationCoords, setPoolLocationCoords]     = useState<{ lat: number; lng: number } | null>(null);
+  const [collabLocationCoords, setCollabLocationCoords] = useState<{ lat: number; lng: number } | null>(null);
 
   // Pool form
   const [poolForm, setPoolForm] = useState({
     poster_type: "artist" as "artist" | "venue",
     title: "", description: "", art_styles: [] as string[],
-    budget_min: "", budget_max: "", venue_city: "",
+    budget_min: "", budget_max: "", venue_city: "", location_name: "",
     contact_email: "", contact_note: "", deadline: "",
   });
 
@@ -57,6 +60,7 @@ export default function CollabPoolPage() {
   const [collabForm, setCollabForm] = useState({
     title: "", description: "", type: "Co-creation",
     partner_name: "", partner_email: "", deadline: "", status: "Open",
+    location_name: "",
   });
 
   useEffect(() => { load(); }, []);
@@ -96,7 +100,10 @@ export default function CollabPoolPage() {
       art_styles: poolForm.art_styles,
       budget_min: poolForm.budget_min ? Number(poolForm.budget_min) : null,
       budget_max: poolForm.budget_max ? Number(poolForm.budget_max) : null,
-      venue_city: poolForm.venue_city || null,
+      venue_city:    poolForm.location_name || poolForm.venue_city || null,
+      location_name: poolForm.location_name || poolForm.venue_city || null,
+      lat:           poolLocationCoords?.lat  || null,
+      lng:           poolLocationCoords?.lng  || null,
       contact_email: poolForm.contact_email || null,
       contact_note: poolForm.contact_note || null,
       deadline: poolForm.deadline || null,
@@ -112,7 +119,19 @@ export default function CollabPoolPage() {
     if (!userId) return;
     setSaving(true);
     const supabase = createClient();
-    await supabase.from("collaborations").insert({ user_id: userId, ...collabForm });
+    await supabase.from("collaborations").insert({
+      user_id: userId,
+      title:         collabForm.title,
+      description:   collabForm.description || null,
+      type:          collabForm.type,
+      partner_name:  collabForm.partner_name || null,
+      partner_email: collabForm.partner_email || null,
+      deadline:      collabForm.deadline || null,
+      status:        collabForm.status,
+      location_name: collabForm.location_name || null,
+      lat:           collabLocationCoords?.lat || null,
+      lng:           collabLocationCoords?.lng || null,
+    });
     setShowForm(false);
     setSaving(false);
     load();
@@ -247,7 +266,11 @@ export default function CollabPoolPage() {
                       {(r.budget_min || r.budget_max) && (
                         <span className="text-xs text-stone-500 font-mono">${r.budget_min?.toLocaleString() || "0"} – ${r.budget_max?.toLocaleString() || "?"}</span>
                       )}
-                      {r.venue_city && <span className="text-xs text-stone-500">📍 {r.venue_city}</span>}
+                      {(r.venue_city||r.location_name) && (
+                        <span className="text-xs text-stone-500 flex items-center gap-1">
+                          <MapPin size={10}/> {r.location_name||r.venue_city}
+                        </span>
+                      )}
                     </div>
                   </div>
 
@@ -408,17 +431,25 @@ export default function CollabPoolPage() {
                     <input type="number" className="input" value={poolForm.budget_max} onChange={e => setPoolForm(p => ({...p,budget_max:e.target.value}))} placeholder="5000" />
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-3">
-                  {poolForm.poster_type === "venue" && (
-                    <div>
-                      <label className="label">City</label>
-                      <input className="input" value={poolForm.venue_city} onChange={e => setPoolForm(p => ({...p,venue_city:e.target.value}))} placeholder="Tehran" />
-                    </div>
-                  )}
-                  <div>
-                    <label className="label">Deadline</label>
-                    <input type="date" className="input" value={poolForm.deadline} onChange={e => setPoolForm(p => ({...p,deadline:e.target.value}))} />
+                {/* Location with autocomplete */}
+                <PlacesAutocomplete
+                  label="Location / city"
+                  value={poolForm.location_name || poolForm.venue_city}
+                  placeholder="Search city or venue…"
+                  onChange={(result, raw) => {
+                    setPoolForm(p => ({ ...p, location_name: raw, venue_city: raw }));
+                    if (result) setPoolLocationCoords({ lat: result.lat, lng: result.lng });
+                    else setPoolLocationCoords(null);
+                  }}
+                />
+                {poolLocationCoords && (
+                  <div style={{ fontSize:11, color:"#4ECDC4", fontWeight:700, display:"flex", alignItems:"center", gap:6 }}>
+                    <MapPin size={11}/> Location saved — will appear on the Prague map
                   </div>
+                )}
+                <div>
+                  <label className="label">Deadline</label>
+                  <input type="date" className="input" value={poolForm.deadline} onChange={e => setPoolForm(p => ({...p,deadline:e.target.value}))} />
                 </div>
                 <div>
                   <label className="label">Contact email (optional)</label>
@@ -471,6 +502,21 @@ export default function CollabPoolPage() {
                   <label className="label">Deadline</label>
                   <input type="date" className="input" value={collabForm.deadline} onChange={setCollabField("deadline")} />
                 </div>
+                <PlacesAutocomplete
+                  label="Location (optional)"
+                  value={collabForm.location_name}
+                  placeholder="Where will this collab happen?"
+                  onChange={(result, raw) => {
+                    setCollabForm(p => ({ ...p, location_name: raw }));
+                    if (result) setCollabLocationCoords({ lat: result.lat, lng: result.lng });
+                    else setCollabLocationCoords(null);
+                  }}
+                />
+                {collabLocationCoords && (
+                  <div style={{ fontSize:11, color:"#4ECDC4", fontWeight:700, display:"flex", alignItems:"center", gap:6 }}>
+                    <MapPin size={11}/> Location saved — will appear on the Prague map
+                  </div>
+                )}
                 <div className="flex gap-3 pt-2">
                   <button type="button" onClick={() => setShowForm(false)} className="btn-secondary flex-1 justify-center">Cancel</button>
                   <button type="submit" disabled={saving} className="btn-primary flex-1 justify-center">{saving ? "Saving…" : "Create"}</button>

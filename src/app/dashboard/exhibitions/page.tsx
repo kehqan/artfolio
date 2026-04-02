@@ -1,119 +1,253 @@
 "use client";
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import { Plus, LayoutGrid, MapPin, Calendar, Trash2, Edit2 } from "lucide-react";
+import { ArrowLeft, Plus, Save, Calendar, MapPin, Edit2, Trash2, ExternalLink } from "lucide-react";
+import PlacesAutocomplete, { PlaceResult } from "@/components/PlacesAutocomplete";
 
-type Exhibition = {
-  id: string; title: string; description?: string; venue?: string;
-  start_date?: string; end_date?: string; status: string;
-  is_public: boolean; cover_image?: string; artwork_count?: number;
+const STATUS_OPTIONS = ["planning","upcoming","current","closed","cancelled"];
+const STATUS_CFG: Record<string,{color:string;bg:string}> = {
+  planning:  { color:"#9B8F7A", bg:"#F5F0E8" },
+  upcoming:  { color:"#8B5CF6", bg:"#EDE9FE" },
+  current:   { color:"#16A34A", bg:"#DCFCE7" },
+  closed:    { color:"#CA8A04", bg:"#FEF9C3" },
+  cancelled: { color:"#FF6B6B", bg:"#FFE4E6" },
 };
 
-const STATUS_BADGE: Record<string, string> = {
-  planning: "badge-planning", upcoming: "badge-upcoming",
-  current: "badge-current", past: "badge-past",
+const inputStyle: React.CSSProperties = {
+  width:"100%", padding:"10px 12px", background:"#fff",
+  border:"2px solid #E0D8CA", fontSize:13, fontFamily:"inherit",
+  outline:"none", color:"#111110", boxSizing:"border-box",
 };
+const Label = ({ children }: { children: React.ReactNode }) => (
+  <div style={{ fontSize:10, fontWeight:800, color:"#9B8F7A", textTransform:"uppercase", letterSpacing:"0.1em", marginBottom:6 }}>{children}</div>
+);
+
+type Exhibition = { id:string; title:string; venue:string|null; start_date:string|null; end_date:string|null; status:string; is_public:boolean; description:string|null; location_name:string|null; lat:number|null; lng:number|null };
 
 export default function ExhibitionsPage() {
+  const router = useRouter();
   const [exhibitions, setExhibitions] = useState<Exhibition[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading]         = useState(true);
+  const [showForm, setShowForm]       = useState(false);
+  const [editId, setEditId]           = useState<string|null>(null);
+  const [saving, setSaving]           = useState(false);
+  const [locationCoords, setLocationCoords] = useState<{lat:number;lng:number}|null>(null);
+
+  const [form, setForm] = useState({
+    title:"", venue:"", description:"", start_date:"", end_date:"",
+    status:"planning", is_public:true, location_name:"",
+  });
 
   useEffect(() => { load(); }, []);
 
   async function load() {
     const supabase = createClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const { data:{ user } } = await supabase.auth.getUser();
     if (!user) return;
-    const { data } = await supabase.from("exhibitions").select("*").eq("user_id", user.id).order("created_at", { ascending: false });
-    const enriched = await Promise.all((data || []).map(async (ex) => {
-      const { count } = await supabase.from("exhibition_artworks").select("*", { count: "exact", head: true }).eq("exhibition_id", ex.id);
-      return { ...ex, artwork_count: count || 0 };
-    }));
-    setExhibitions(enriched);
+    const { data } = await supabase.from("exhibitions").select("*").eq("user_id", user.id).order("created_at",{ascending:false});
+    setExhibitions(data || []);
     setLoading(false);
   }
 
-  async function deleteExhibition(id: string) {
-    if (!confirm("Delete this exhibition?")) return;
+  function openCreate() {
+    setEditId(null);
+    setForm({ title:"", venue:"", description:"", start_date:"", end_date:"", status:"planning", is_public:true, location_name:"" });
+    setLocationCoords(null);
+    setShowForm(true);
+  }
+
+  function openEdit(ex: Exhibition) {
+    setEditId(ex.id);
+    setForm({ title:ex.title, venue:ex.venue||"", description:ex.description||"", start_date:ex.start_date||"", end_date:ex.end_date||"", status:ex.status, is_public:ex.is_public, location_name:ex.location_name||ex.venue||"" });
+    setLocationCoords(ex.lat&&ex.lng ? {lat:ex.lat,lng:ex.lng} : null);
+    setShowForm(true);
+  }
+
+  async function handleSave(e: React.FormEvent) {
+    e.preventDefault(); setSaving(true);
+    const supabase = createClient();
+    const { data:{ user } } = await supabase.auth.getUser();
+    if (!user) { setSaving(false); return; }
+
+    const payload = {
+      title:         form.title,
+      venue:         form.venue         || form.location_name || null,
+      description:   form.description   || null,
+      start_date:    form.start_date    || null,
+      end_date:      form.end_date      || null,
+      status:        form.status,
+      is_public:     form.is_public,
+      location_name: form.location_name || form.venue || null,
+      lat:           locationCoords?.lat || null,
+      lng:           locationCoords?.lng || null,
+      updated_at:    new Date().toISOString(),
+    };
+
+    if (editId) {
+      await supabase.from("exhibitions").update(payload).eq("id", editId);
+    } else {
+      await supabase.from("exhibitions").insert({ ...payload, user_id: user.id });
+    }
+
+    setShowForm(false); setSaving(false); load();
+  }
+
+  async function deleteEx(id: string) {
+    if (!confirm("Delete this event?")) return;
     const supabase = createClient();
     await supabase.from("exhibitions").delete().eq("id", id);
-    setExhibitions((p) => p.filter((e) => e.id !== id));
+    load();
   }
 
-  function formatDate(d?: string) {
-    if (!d) return "";
-    return new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-  }
+  const sf = (k: string) => (e: React.ChangeEvent<any>) => setForm(p => ({ ...p, [k]: e.target.type==="checkbox" ? e.target.checked : e.target.value }));
 
   return (
-    <div>
-      <div className="flex items-start justify-between mb-8">
-        <div>
-          <h1 className="page-title">Exhibitions</h1>
-          <p className="page-subtitle">Plan and track your shows and appearances</p>
-        </div>
-        <Link href="/dashboard/exhibitions/new" className="btn-primary">
-          <Plus className="w-4 h-4" /> New Exhibition
-        </Link>
-      </div>
+    <>
+      <style>{`*{box-sizing:border-box} input:focus,select:focus,textarea:focus{border-color:#FFD400!important}`}</style>
 
-      {loading ? (
-        <div className="card p-12 text-center text-stone-400">Loading...</div>
-      ) : exhibitions.length === 0 ? (
-        <div className="card p-16 text-center">
-          <div className="w-16 h-16 bg-stone-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-            <LayoutGrid className="w-8 h-8 text-stone-400" />
+      <div>
+        {/* Header */}
+        <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:24, flexWrap:"wrap", gap:12 }}>
+          <div>
+            <h1 style={{ fontSize:26, fontWeight:900, color:"#111110", letterSpacing:"-0.5px", margin:0, display:"flex", alignItems:"center", gap:10 }}>
+              <Calendar size={22}/> Events
+            </h1>
+            <p style={{ fontSize:13, color:"#9B8F7A", margin:"4px 0 0" }}>{exhibitions.length} events · exhibitions, shows & appearances</p>
           </div>
-          <h3 className="heading-sm mb-2">No exhibitions yet</h3>
-          <p className="body-lg mb-6">Plan your first show or exhibition</p>
-          <Link href="/dashboard/exhibitions/new" className="btn-primary">
-            <Plus className="w-4 h-4" /> Create Exhibition
-          </Link>
+          <button onClick={openCreate}
+            style={{ display:"flex", alignItems:"center", gap:6, padding:"9px 18px", background:"#FFD400", border:"2px solid #111110", fontSize:12, fontWeight:800, cursor:"pointer", boxShadow:"2px 2px 0 #111110" }}>
+            <Plus size={14} strokeWidth={3}/> New Event
+          </button>
         </div>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-          {exhibitions.map((ex) => (
-            <div key={ex.id} className="card-hover overflow-hidden group">
-              <div className="h-36 bg-stone-100">
-                {ex.cover_image ? (
-                  <img src={ex.cover_image} alt="" className="w-full h-full object-cover" />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center">
-                    <LayoutGrid className="w-10 h-10 text-stone-300" />
+
+        {/* Event cards */}
+        {loading ? (
+          <div style={{ padding:40, textAlign:"center", color:"#9B8F7A" }}>Loading…</div>
+        ) : exhibitions.length === 0 ? (
+          <div style={{ padding:"60px 24px", textAlign:"center", border:"2px dashed #E0D8CA" }}>
+            <Calendar size={40} color="#d4cfc4" style={{ marginBottom:12 }}/>
+            <div style={{ fontSize:15, fontWeight:800, color:"#111110", marginBottom:6 }}>No events yet</div>
+            <div style={{ fontSize:13, color:"#9B8F7A", marginBottom:20 }}>Create your first exhibition, show or appearance</div>
+            <button onClick={openCreate} style={{ padding:"10px 20px", border:"2px solid #111110", background:"#FFD400", fontSize:13, fontWeight:800, cursor:"pointer", boxShadow:"3px 3px 0 #111110" }}>
+              + New Event
+            </button>
+          </div>
+        ) : (
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(300px,1fr))", gap:16 }}>
+            {exhibitions.map(ex => {
+              const cfg = STATUS_CFG[ex.status] || STATUS_CFG.planning;
+              return (
+                <div key={ex.id} style={{ background:"#fff", border:"2px solid #111110", boxShadow:"3px 3px 0 #111110", overflow:"hidden" }}>
+                  {/* Status bar */}
+                  <div style={{ padding:"8px 14px", background:cfg.bg, borderBottom:"2px solid #111110", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+                    <div style={{ display:"inline-flex", alignItems:"center", gap:5, padding:"2px 8px", background:cfg.bg, border:`1.5px solid ${cfg.color}`, fontSize:9, fontWeight:900, color:cfg.color, textTransform:"uppercase", letterSpacing:"0.1em" }}>
+                      <div style={{ width:6, height:6, borderRadius:"50%", background:cfg.color }}/>{ex.status}
+                    </div>
+                    <div style={{ display:"flex", gap:6 }}>
+                      <button onClick={()=>openEdit(ex)} style={{ width:26, height:26, border:"1.5px solid #E0D8CA", background:"#fff", display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer" }}><Edit2 size={11}/></button>
+                      <button onClick={()=>deleteEx(ex.id)} style={{ width:26, height:26, border:"1.5px solid #FF6B6B", background:"#fff", display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer" }}><Trash2 size={11} color="#FF6B6B"/></button>
+                    </div>
                   </div>
-                )}
+                  <div style={{ padding:"14px 16px" }}>
+                    <h3 style={{ fontSize:15, fontWeight:900, color:"#111110", letterSpacing:"-0.3px", margin:"0 0 8px" }}>{ex.title}</h3>
+                    {(ex.location_name||ex.venue) && (
+                      <div style={{ display:"flex", alignItems:"flex-start", gap:6, fontSize:12, color:"#9B8F7A", fontWeight:600, marginBottom:6 }}>
+                        <MapPin size={12} style={{ flexShrink:0, marginTop:1 }}/> {ex.location_name||ex.venue}
+                        {ex.lat && <span style={{ fontSize:9, color:"#4ECDC4", fontWeight:700 }}>· on map</span>}
+                      </div>
+                    )}
+                    {ex.description && <p style={{ fontSize:12, color:"#5C5346", lineHeight:1.6, margin:"0 0 8px" }}>{ex.description.slice(0,100)}{ex.description.length>100?"…":""}</p>}
+                    {(ex.start_date||ex.end_date) && (
+                      <div style={{ fontSize:11, color:"#9B8F7A", fontWeight:600 }}>
+                        <Calendar size={10} style={{ display:"inline", marginRight:4 }}/>
+                        {ex.start_date ? new Date(ex.start_date).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"}) : ""}
+                        {ex.end_date ? ` → ${new Date(ex.end_date).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})}` : ""}
+                      </div>
+                    )}
+                  </div>
+                  {ex.lat && (
+                    <div style={{ padding:"8px 14px", borderTop:"1px solid #E0D8CA", background:"#FAFAF8" }}>
+                      <Link href="/dashboard/map" style={{ textDecoration:"none", display:"inline-flex", alignItems:"center", gap:5, fontSize:10, fontWeight:700, color:"#FF6B6B" }}>
+                        <MapPin size={10}/> View on map
+                      </Link>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Form modal */}
+        {showForm && (
+          <div style={{ position:"fixed", inset:0, zIndex:50, background:"rgba(0,0,0,0.6)", display:"flex", alignItems:"center", justifyContent:"center", padding:16 }}
+            onClick={()=>setShowForm(false)}>
+            <div onClick={e=>e.stopPropagation()}
+              style={{ background:"#fff", border:"2px solid #111110", boxShadow:"8px 8px 0 #111110", width:"100%", maxWidth:540, maxHeight:"90vh", overflowY:"auto" }}>
+              <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"16px 20px", borderBottom:"2px solid #111110", background:"#FFD400", flexShrink:0 }}>
+                <h2 style={{ fontSize:16, fontWeight:900, color:"#111110", margin:0 }}>{editId ? "Edit Event" : "New Event"}</h2>
+                <button onClick={()=>setShowForm(false)} style={{ background:"none", border:"none", cursor:"pointer", fontSize:18 }}>✕</button>
               </div>
-              <div className="p-4">
-                <div className="flex items-start justify-between gap-2 mb-2">
-                  <h3 className="font-semibold text-stone-900">{ex.title}</h3>
-                  <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-                    <Link href={`/dashboard/exhibitions/${ex.id}/edit`} className="p-1 hover:bg-stone-100 rounded"><Edit2 className="w-3.5 h-3.5 text-stone-500" /></Link>
-                    <button onClick={() => deleteExhibition(ex.id)} className="p-1 hover:bg-rose-50 rounded"><Trash2 className="w-3.5 h-3.5 text-rose-500" /></button>
+              <form onSubmit={handleSave} style={{ padding:20, display:"flex", flexDirection:"column", gap:14 }}>
+                <div>
+                  <Label>Title *</Label>
+                  <input required value={form.title} onChange={sf("title")} placeholder="Exhibition or event name" style={inputStyle}/>
+                </div>
+
+                {/* Location with autocomplete */}
+                <PlacesAutocomplete
+                  label="Venue / location"
+                  value={form.location_name || form.venue}
+                  placeholder="Search gallery, museum, café…"
+                  onChange={(result, raw) => {
+                    setForm(p => ({ ...p, venue: raw, location_name: raw }));
+                    if (result) setLocationCoords({ lat: result.lat, lng: result.lng });
+                    else setLocationCoords(null);
+                  }}
+                />
+                {locationCoords && <div style={{ fontSize:10, color:"#4ECDC4", fontWeight:700 }}>✓ Location saved — will appear on the Prague map</div>}
+
+                <div>
+                  <Label>Description</Label>
+                  <textarea rows={3} value={form.description} onChange={(e)=>setForm(p=>({...p,description:e.target.value}))} placeholder="About this event…"
+                    style={{ ...inputStyle, resize:"vertical" }}/>
+                </div>
+                <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12 }}>
+                  <div>
+                    <Label>Start date</Label>
+                    <input type="date" value={form.start_date} onChange={sf("start_date")} style={inputStyle}/>
+                  </div>
+                  <div>
+                    <Label>End date</Label>
+                    <input type="date" value={form.end_date} onChange={sf("end_date")} style={inputStyle}/>
                   </div>
                 </div>
-                <span className={STATUS_BADGE[ex.status?.toLowerCase()] || "badge-nfs"}>{ex.status}</span>
-                {ex.venue && (
-                  <div className="flex items-center gap-1.5 text-xs text-stone-500 mt-2">
-                    <MapPin className="w-3 h-3" /> {ex.venue}
-                  </div>
-                )}
-                {(ex.start_date || ex.end_date) && (
-                  <div className="flex items-center gap-1.5 text-xs text-stone-500 mt-1">
-                    <Calendar className="w-3 h-3" />
-                    {formatDate(ex.start_date)}
-                    {ex.end_date && ` — ${formatDate(ex.end_date)}`}
-                  </div>
-                )}
-                <div className="flex items-center justify-between mt-3">
-                  <span className="text-xs text-stone-400">{ex.artwork_count} artworks</span>
-                  <Link href={`/dashboard/exhibitions/${ex.id}`} className="text-xs text-emerald-600 font-semibold hover:underline">View →</Link>
+                <div>
+                  <Label>Status</Label>
+                  <select value={form.status} onChange={sf("status")} style={{ ...inputStyle, cursor:"pointer" }}>
+                    {STATUS_OPTIONS.map(s=><option key={s} value={s}>{s.charAt(0).toUpperCase()+s.slice(1)}</option>)}
+                  </select>
                 </div>
-              </div>
+                <div style={{ display:"flex", alignItems:"center", gap:10, padding:"10px 12px", background:"#F5F0E8", cursor:"pointer" }}
+                  onClick={()=>setForm(p=>({...p,is_public:!p.is_public}))}>
+                  <div style={{ width:20, height:20, border:`2px solid ${form.is_public?"#FFD400":"#E0D8CA"}`, background:form.is_public?"#FFD400":"#fff", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+                    {form.is_public && <div style={{ width:10, height:10, background:"#111110" }}/>}
+                  </div>
+                  <label style={{ fontSize:13, fontWeight:700, color:"#111110", cursor:"pointer" }}>Public event (visible on profile)</label>
+                </div>
+                <div style={{ display:"flex", gap:10 }}>
+                  <button type="button" onClick={()=>setShowForm(false)} style={{ flex:1, padding:"11px", border:"2px solid #111110", background:"#fff", fontSize:13, fontWeight:700, cursor:"pointer" }}>Cancel</button>
+                  <button type="submit" disabled={saving} style={{ flex:1, padding:"11px", border:"2px solid #111110", background:"#FFD400", color:"#111110", fontSize:13, fontWeight:800, cursor:"pointer", boxShadow:"3px 3px 0 #111110" }}>
+                    <Save size={13} style={{ display:"inline", marginRight:6 }}/>{saving?"Saving…":"Save Event"}
+                  </button>
+                </div>
+              </form>
             </div>
-          ))}
-        </div>
-      )}
-    </div>
+          </div>
+        )}
+      </div>
+    </>
   );
 }

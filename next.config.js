@@ -1,15 +1,10 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  images: {
-    remotePatterns: [
-      {
-        protocol: 'https',
-        hostname: '*.supabase.co',
-        port: '',
-        pathname: '/storage/v1/object/public/**',
-      },
-    ],
+  // Explicitly pass env vars to client bundle at build time
+  // This ensures NEXT_PUBLIC_ vars are always available even if set after initial build
+  env: {
+    NEXT_PUBLIC_GOOGLE_MAPS_API_KEY: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "",
   },
-}
+};
 
-module.exports = nextConfig
+module.exports = nextConfig;

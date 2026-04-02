@@ -13,14 +13,16 @@ type Collab = {
   id: string; title: string; description?: string; status: string;
   partner_name?: string; partner_email?: string; type?: string;
   deadline?: string; created_at: string; user_id: string;
+  location_name?: string; lat?: number; lng?: number;
 };
 
 type PoolRequest = {
   id: string; poster_type: "artist" | "venue"; title: string;
   description?: string; art_styles?: string[];
   budget_min?: number; budget_max?: number;
-  venue_city?: string; contact_email?: string;
-  contact_note?: string; deadline?: string;
+  venue_city?: string; location_name?: string;
+  lat?: number; lng?: number;
+  contact_email?: string; contact_note?: string; deadline?: string;
   status: string; created_at: string; user_id: string;
   profile_name?: string; profile_avatar?: string;
 };

@@ -141,7 +141,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   // ── Sidebar ────────────────────────────────────────────────────
   const Sidebar = () => (
-    <aside style={{ display:"flex", flexDirection:"column", height:"100%", width:224, background:"#111110", flexShrink:0 }}>
+    <aside style={{ display:"flex", flexDirection:"column", height:"100%", width:224, background:"#FCEEDC", flexShrink:0 }}>
 
       {/* Logo */}
       <div style={{ display:"flex", alignItems:"center", gap:10, padding:"18px 16px 14px", borderBottom:"1px solid #1e1e1e" }}>

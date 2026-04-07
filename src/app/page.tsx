@@ -1,768 +1,1075 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/client";
-import {
-  ArrowRight, Search, ImageIcon, MapPin, ChevronDown,
-  Palette, Building2, LayoutDashboard, LogOut, User,
-  Menu, X, BarChart3, Users, Handshake, FolderOpen,
-  Globe, Heart, MessageCircle, Share2, Star, Zap,
-  ShieldCheck, TrendingUp, Package,
-} from "lucide-react";
-
-type AppProfile = { full_name: string; avatar_url?: string; username?: string } | null;
-type Artwork = { id: string; title: string; images?: string[]; price?: number; status: string; artist_name?: string };
-type Artist  = { id: string; name: string; username?: string; city?: string; avatar_url?: string };
-type Venue   = { id: string; name: string; type: string; city?: string; logo_url?: string };
-type FeaturedPost = { id: string; content?: string; images?: string[]; profile_name?: string; profile_avatar?: string; is_review?: boolean; rating?: number };
-type HeroSettings = { headline?: string; subheadline?: string; cta_primary?: string; cta_secondary?: string; artwork_url?: string; artwork_caption?: string };
-
-function timeAgo(d?: string) {
-  if (!d) return "";
-  const s = Math.floor((Date.now() - new Date(d).getTime()) / 1000);
-  if (s < 3600) return `${Math.floor(s / 60)}m ago`;
-  if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
-  return `${Math.floor(s / 86400)}d ago`;
-}
-
-const FEATURES = [
-  {
-    group: "For Artists",
-    accent: "#FF6B6B",
-    icon: Palette,
-    items: [
-      { icon: Package,    title: "Art Inventory",    desc: "Track every work — images, status, pricing, location, provenance. Your complete artwork database." },
-      { icon: FolderOpen, title: "Collections",      desc: "Group works into series and themed sets. Organize exactly how you think." },
-      { icon: Globe,      title: "Public Portfolio", desc: "A stunning gallery page at artfolio.com/yourname. Share it with the world." },
-      { icon: BarChart3,  title: "Sales & CRM",      desc: "Record sales, track revenue, commissions, and manage your collector relationships." },
-      { icon: TrendingUp, title: "Analytics",        desc: "Understand your audience, track followers, and measure what's working." },
-      { icon: Handshake,  title: "Collabs & Pool",   desc: "Post opportunities, find partners, and track all your joint projects in one place." },
-    ],
-  },
-  {
-    group: "For Venues",
-    accent: "#4ECDC4",
-    icon: Building2,
-    items: [
-      { icon: Search,     title: "Discover Artists", desc: "Browse local talent by style, medium, and location. Find the perfect fit for your walls." },
-      { icon: Handshake,  title: "Discovery Pool",   desc: "Post what you're looking for. Artists apply directly with their portfolios." },
-      { icon: Globe,      title: "Venue Profile",    desc: "Showcase your space, display current exhibitions, and attract the right artists." },
-      { icon: Users,      title: "Community",        desc: "Connect with the broader art community. Post updates. Follow artists you love." },
-    ],
-  },
-];
 
 export default function HomePage() {
-  const [appProfile, setAppProfile]   = useState<AppProfile>(null);
-  const [userLoaded, setUserLoaded]   = useState(false);
-  const [menuOpen, setMenuOpen]       = useState(false);
-  const [mobileNav, setMobileNav]     = useState(false);
-  const [loading, setLoading]         = useState(true);
-  const [artworks, setArtworks]       = useState<Artwork[]>([]);
-  const [artists, setArtists]         = useState<Artist[]>([]);
-  const [venues, setVenues]           = useState<Venue[]>([]);
-  const [featuredPosts, setFeaturedPosts] = useState<FeaturedPost[]>([]);
-  const [hero, setHero]               = useState<HeroSettings>({});
-  const [tab, setTab]                 = useState<"artworks"|"artists"|"venues">("artworks");
-  const [search, setSearch]           = useState("");
-  const exploreRef = useRef<HTMLDivElement>(null);
+  const [scrolled, setScrolled] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [activeFeature, setActiveFeature] = useState(0);
+  const [ticker, setTicker] = useState(0);
 
   useEffect(() => {
-    async function init() {
-      const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const { data: p } = await supabase.from("profiles").select("full_name, avatar_url, username").eq("id", user.id).single();
-        setAppProfile(p);
-      }
-      setUserLoaded(true);
-
-      // Hero settings
-      const { data: heroData } = await supabase.from("hero_settings").select("*").eq("id", 1).single();
-      if (heroData) setHero(heroData);
-
-      // Featured/curated posts
-      const { data: featuredData } = await supabase
-        .from("featured_posts")
-        .select("*, posts(content, images, user_id, created_at), profiles(full_name, avatar_url)")
-        .eq("is_active", true)
-        .order("sort_order", { ascending: true })
-        .limit(6);
-
-      if (featuredData && featuredData.length > 0) {
-        setFeaturedPosts(featuredData.map((f: any) => ({
-          id: f.id,
-          content: f.custom_text || f.posts?.content,
-          images: f.posts?.images,
-          profile_name: f.profiles?.full_name || f.custom_author,
-          profile_avatar: f.profiles?.avatar_url || f.custom_avatar,
-          is_review: f.is_review,
-          rating: f.rating,
-        })));
-      }
-
-      // Explore data
-      const [{ data: rawAw }, { data: rawAr }, { data: rawVe }, { data: rawPr }] = await Promise.all([
-        supabase.from("artworks").select("id,title,images,price,status,user_id").eq("status","Available").order("created_at",{ascending:false}).limit(12),
-        supabase.from("profiles").select("id,full_name,username,location,avatar_url").eq("role","artist").limit(12),
-        supabase.from("venues").select("id,name,type,city,logo_url").limit(8),
-        supabase.from("profiles").select("id,full_name").limit(300),
-      ]);
-      const pm: Record<string,string> = {};
-      for (const p of rawPr||[]) pm[p.id] = p.full_name;
-      setArtworks((rawAw||[]).map(a => ({ id:a.id, title:a.title, images:a.images, price:a.price, status:a.status, artist_name:pm[a.user_id] })));
-      setArtists((rawAr||[]).map(a => ({ id:a.id, name:a.full_name, username:a.username, city:a.location, avatar_url:a.avatar_url })));
-      setVenues((rawVe||[]).map(v => ({ id:v.id, name:v.name, type:v.type, city:v.city, logo_url:v.logo_url })));
-      setLoading(false);
-    }
-    init();
+    const onScroll = () => setScrolled(window.scrollY > 20);
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  async function handleLogout() {
-    const supabase = createClient();
-    await supabase.auth.signOut();
-    setAppProfile(null); setMenuOpen(false);
-    window.location.reload();
-  }
+  useEffect(() => {
+    const id = setInterval(() => setTicker(t => t + 1), 50);
+    return () => clearInterval(id);
+  }, []);
 
-  const fArt    = artworks.filter(a => !search || a.title?.toLowerCase().includes(search.toLowerCase()));
-  const fArtist = artists.filter(a => !search || a.name?.toLowerCase().includes(search.toLowerCase()));
-  const fVen    = venues.filter(v => !search || v.name?.toLowerCase().includes(search.toLowerCase()));
-  const initial = appProfile?.full_name?.[0]?.toUpperCase() || "?";
+  const features = [
+    { id: "studio",   emoji: "🎨", label: "Studio",   title: "Every artwork.\nAlways tracked.", desc: "Inventory, images, location, price, status — one place, zero spreadsheets.", tag: "Art Inventory" },
+    { id: "portfolio",emoji: "🌐", label: "Portfolio", title: "Your gallery,\nlive on the web.", desc: "A public portfolio page at artomango.com/you. Send it anywhere. No design needed.", tag: "Public Profile" },
+    { id: "scene",    emoji: "🗺️", label: "Scene",     title: "Prague art scene,\non one map.", desc: "Events, collabs, venues — discover and connect with the local art world.", tag: "Art Scene Map" },
+    { id: "collabs",  emoji: "🤝", label: "Collabs",   title: "Post. Match.\nCreate.", desc: "Artists find wall space. Venues find art. The Discovery Pool connects both sides.", tag: "Collaboration" },
+    { id: "business", emoji: "📊", label: "Business",  title: "Know your numbers.\nGrow what matters.", desc: "Sales, commissions, collectors, analytics — your art is also your business.", tag: "Sales & CRM" },
+    { id: "planner",  emoji: "📅", label: "Planner",   title: "Plan shows.\nManage everything.", desc: "Exhibitions, tasks, calendar — organized so you can focus on making work.", tag: "Planner" },
+  ];
+
+  const tickerWords = ["Manage.", "Exhibit.", "Collab.", "Grow.", "Discover.", "Connect.", "Create.", "Manage.", "Exhibit.", "Collab."];
 
   return (
-    <div className="min-h-screen" style={{ background: "#FAFAF8", fontFamily: "var(--font-plus-jakarta), system-ui, sans-serif" }}>
+    <>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Darker+Grotesque:wght@300;400;500;600;700;800;900&display=swap');
 
-      {/* ── STICKY NAV ──────────────────────────────────────────── */}
-      <header style={{ position: "sticky", top: 0, zIndex: 50, background: "#111110", borderBottom: "3px solid #111110" }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 24px", height: 56, maxWidth: 1400, margin: "0 auto" }}>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-          {/* Logo */}
-          <Link href="/" style={{ textDecoration: "none", display: "flex", alignItems: "center", gap: 9 }}>
-            <div style={{ width: 28, height: 28, background: "#FFD400", border: "2px solid #333", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <Palette size={13} color="#111110" />
-            </div>
-            <span style={{ fontSize: 16, fontWeight: 900, color: "#fff", letterSpacing: "-0.3px" }}>Artfolio</span>
-          </Link>
+        html { scroll-behavior: smooth; }
 
-          {/* Desktop nav links */}
-          <nav style={{ display: "flex", alignItems: "center", gap: 0 }} className="hidden-mobile">
-            {[["Features","#features"],["Explore","#explore"],["Artists","/directory/artists"],["Venues","/directory/venues"]].map(([label, href]) => (
-              <a key={label} href={href} style={{ padding: "0 16px", height: 56, display: "flex", alignItems: "center", fontSize: 13, fontWeight: 700, color: "#888", textDecoration: "none", borderRight: "1px solid #1e1e1e", transition: "color 0.1s" }}
-                onMouseEnter={e => (e.currentTarget.style.color = "#FFD400")}
-                onMouseLeave={e => (e.currentTarget.style.color = "#888")}>
-                {label}
-              </a>
-            ))}
-          </nav>
+        body {
+          font-family: 'Darker Grotesque', system-ui, sans-serif;
+          background: #FFFBEA;
+          color: #111110;
+          overflow-x: hidden;
+        }
 
-          {/* Auth */}
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <button onClick={() => setMobileNav(p=>!p)} style={{ width: 34, height: 34, background: "none", border: "1px solid #333", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "#888" }} className="show-mobile">
-              <Menu size={15} />
-            </button>
+        /* ── NAVBAR ── */
+        .nav {
+          position: fixed;
+          top: 0; left: 0; right: 0;
+          z-index: 100;
+          padding: 12px 20px;
+          transition: padding 0.2s;
+        }
+        .nav.scrolled { padding: 8px 20px; }
 
-            {userLoaded && (
-              appProfile ? (
-                <div style={{ position: "relative", display: "flex", alignItems: "center", gap: 8 }}>
-                  <Link href="/dashboard" style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 12px", background: "transparent", border: "1px solid #333", color: "#888", fontSize: 12, fontWeight: 700, textDecoration: "none", transition: "all 0.1s" }}
-                    onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "#FFD400"; (e.currentTarget as HTMLElement).style.color = "#111110"; (e.currentTarget as HTMLElement).style.borderColor = "#FFD400"; }}
-                    onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "transparent"; (e.currentTarget as HTMLElement).style.color = "#888"; (e.currentTarget as HTMLElement).style.borderColor = "#333"; }}>
-                    <LayoutDashboard size={13} /> Dashboard
-                  </Link>
-                  <button onClick={() => setMenuOpen(p=>!p)} style={{ background: "none", border: "none", cursor: "pointer", padding: 0 }}>
-                    {appProfile.avatar_url
-                      ? <img src={appProfile.avatar_url} alt="" style={{ width: 32, height: 32, borderRadius: "50%", objectFit: "cover", border: "2px solid #333" }} />
-                      : <div style={{ width: 32, height: 32, borderRadius: "50%", background: "#FFD400", border: "2px solid #333", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 800, color: "#111110" }}>{initial}</div>}
-                  </button>
-                  {menuOpen && (
-                    <div style={{ position: "absolute", right: 0, top: "calc(100% + 8px)", width: 160, background: "#1a1a1a", border: "1px solid #333", zIndex: 50 }}>
-                      <Link href="/dashboard/profile" onClick={() => setMenuOpen(false)} style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", fontSize: 12, fontWeight: 700, color: "#ccc", textDecoration: "none", borderBottom: "1px solid #2a2a2a" }}
-                        onMouseEnter={e => (e.currentTarget.style.background = "#FFD400") && (e.currentTarget.style.color = "#111110")}
-                        onMouseLeave={e => (e.currentTarget.style.background = "transparent") && (e.currentTarget.style.color = "#ccc")}>
-                        <User size={13} /> Profile
-                      </Link>
-                      <button onClick={handleLogout} style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", fontSize: 12, fontWeight: 700, color: "#f44", background: "none", border: "none", cursor: "pointer", width: "100%" }}>
-                        <LogOut size={13} /> Sign out
-                      </button>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div style={{ display: "flex" }}>
-                  <Link href="/login" style={{ padding: "8px 16px", fontSize: 12, fontWeight: 700, color: "#888", textDecoration: "none", border: "1px solid #333", marginRight: -1, transition: "all 0.1s" }}
-                    onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = "#fff"; }}
-                    onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = "#888"; }}>
-                    Sign in
-                  </Link>
-                  <Link href="/register" style={{ padding: "8px 16px", fontSize: 12, fontWeight: 800, color: "#111110", background: "#FFD400", border: "1px solid #FFD400", textDecoration: "none", transition: "background 0.1s" }}
-                    onMouseEnter={e => ((e.currentTarget as HTMLElement).style.background = "#fff")}
-                    onMouseLeave={e => ((e.currentTarget as HTMLElement).style.background = "#FFD400")}>
-                    Join free
-                  </Link>
-                </div>
-              )
-            )}
+        .nav-pill {
+          max-width: 1100px;
+          margin: 0 auto;
+          display: flex;
+          align-items: center;
+          gap: 4px;
+          background: #fff;
+          border: 2.5px solid #111110;
+          border-radius: 9999px;
+          padding: 5px 6px 5px 10px;
+          box-shadow: 4px 4px 0 #111110;
+          transition: box-shadow 0.15s;
+        }
+        .nav-pill:hover { box-shadow: 6px 6px 0 #111110; }
+
+        .nav-logo {
+          font-size: 22px;
+          line-height: 1;
+          text-decoration: none;
+          flex-shrink: 0;
+          display: flex;
+          align-items: center;
+          gap: 6px;
+        }
+        .nav-logo-text {
+          font-size: 16px;
+          font-weight: 900;
+          color: #111110;
+          letter-spacing: -0.3px;
+        }
+        .nav-links {
+          display: flex;
+          align-items: center;
+          gap: 0;
+          flex: 1;
+          justify-content: center;
+        }
+        .nav-link {
+          padding: 7px 14px;
+          font-size: 14px;
+          font-weight: 700;
+          color: #111110;
+          text-decoration: none;
+          border-radius: 9999px;
+          transition: background 0.1s;
+          white-space: nowrap;
+        }
+        .nav-link:hover { background: #F5F0E8; }
+
+        .nav-divider {
+          width: 1px; height: 22px;
+          background: #E0D8CA;
+          flex-shrink: 0;
+          margin: 0 4px;
+        }
+
+        .nav-cta {
+          display: flex;
+          align-items: center;
+          gap: 4px;
+        }
+        .btn-ghost-sm {
+          padding: 7px 14px;
+          font-size: 13px;
+          font-weight: 700;
+          color: #111110;
+          text-decoration: none;
+          border-radius: 9999px;
+          border: 2px solid transparent;
+          transition: background 0.1s, border-color 0.1s;
+          font-family: inherit;
+          background: none;
+          cursor: pointer;
+          white-space: nowrap;
+        }
+        .btn-ghost-sm:hover { background: #F5F0E8; border-color: #E0D8CA; }
+        .btn-primary-sm {
+          padding: 7px 18px;
+          font-size: 13px;
+          font-weight: 800;
+          color: #111110;
+          background: #FFD400;
+          border-radius: 9999px;
+          border: 2px solid #111110;
+          text-decoration: none;
+          white-space: nowrap;
+          transition: box-shadow 0.1s;
+          cursor: pointer;
+          font-family: inherit;
+        }
+        .btn-primary-sm:hover { box-shadow: 2px 2px 0 #111110; }
+
+        /* ── HERO ── */
+        .hero {
+          min-height: 100vh;
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          border-bottom: 3px solid #111110;
+          padding-top: 80px;
+        }
+
+        .hero-left {
+          padding: 80px 60px 80px 40px;
+          border-right: 3px solid #111110;
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+          position: relative;
+          background: #FFD400;
+        }
+
+        .hero-eyebrow {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          background: #111110;
+          color: #FFD400;
+          padding: 4px 12px;
+          font-size: 10px;
+          font-weight: 800;
+          letter-spacing: 0.2em;
+          text-transform: uppercase;
+          margin-bottom: 28px;
+          width: fit-content;
+        }
+
+        .hero-title {
+          font-size: clamp(52px, 7vw, 88px);
+          font-weight: 900;
+          letter-spacing: -3px;
+          line-height: 0.92;
+          color: #111110;
+          margin-bottom: 28px;
+        }
+
+        .hero-title .invert {
+          display: inline-block;
+          background: #111110;
+          color: #FFD400;
+          padding: 2px 12px 6px;
+          line-height: 1;
+        }
+
+        .hero-sub {
+          font-size: 18px;
+          font-weight: 600;
+          color: #111110;
+          line-height: 1.5;
+          max-width: 380px;
+          margin-bottom: 40px;
+          opacity: 0.75;
+        }
+
+        .hero-actions {
+          display: flex;
+          gap: 12px;
+          flex-wrap: wrap;
+        }
+
+        .btn-hero-primary {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          padding: 14px 28px;
+          background: #111110;
+          color: #FFD400;
+          font-family: inherit;
+          font-size: 15px;
+          font-weight: 800;
+          border: 2.5px solid #111110;
+          text-decoration: none;
+          cursor: pointer;
+          transition: box-shadow 0.1s, transform 0.1s;
+          box-shadow: 4px 4px 0 rgba(0,0,0,0.25);
+        }
+        .btn-hero-primary:hover {
+          box-shadow: 6px 6px 0 rgba(0,0,0,0.3);
+          transform: translate(-1px, -1px);
+        }
+
+        .btn-hero-secondary {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          padding: 14px 28px;
+          background: transparent;
+          color: #111110;
+          font-family: inherit;
+          font-size: 15px;
+          font-weight: 800;
+          border: 2.5px solid #111110;
+          text-decoration: none;
+          cursor: pointer;
+          transition: background 0.1s;
+        }
+        .btn-hero-secondary:hover { background: rgba(0,0,0,0.06); }
+
+        .hero-right {
+          background: #111110;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          padding: 60px 40px;
+          position: relative;
+          overflow: hidden;
+        }
+
+        .hero-mango {
+          font-size: 140px;
+          line-height: 1;
+          display: block;
+          animation: floatMango 3s ease-in-out infinite;
+          filter: drop-shadow(0 20px 40px rgba(0,0,0,0.5));
+          margin-bottom: 32px;
+        }
+
+        @keyframes floatMango {
+          0%, 100% { transform: translateY(0) rotate(-3deg); }
+          50% { transform: translateY(-16px) rotate(3deg); }
+        }
+
+        .hero-stats {
+          display: grid;
+          grid-template-columns: 1fr 1fr 1fr;
+          gap: 0;
+          border: 2px solid #333;
+          width: 100%;
+          max-width: 340px;
+        }
+
+        .hero-stat {
+          padding: 16px 12px;
+          text-align: center;
+          border-right: 1px solid #333;
+        }
+        .hero-stat:last-child { border-right: none; }
+        .hero-stat-num {
+          font-size: 28px;
+          font-weight: 900;
+          color: #FFD400;
+          letter-spacing: -1px;
+          display: block;
+        }
+        .hero-stat-label {
+          font-size: 10px;
+          font-weight: 700;
+          color: #666;
+          text-transform: uppercase;
+          letter-spacing: 0.12em;
+        }
+
+        /* ── TICKER ── */
+        .ticker-wrap {
+          background: #FFD400;
+          border-top: 3px solid #111110;
+          border-bottom: 3px solid #111110;
+          padding: 14px 0;
+          overflow: hidden;
+          white-space: nowrap;
+        }
+        .ticker-track {
+          display: inline-flex;
+          gap: 48px;
+          animation: ticker 20s linear infinite;
+        }
+        @keyframes ticker {
+          from { transform: translateX(0); }
+          to { transform: translateX(-50%); }
+        }
+        .ticker-item {
+          font-size: 15px;
+          font-weight: 800;
+          color: #111110;
+          letter-spacing: 0.05em;
+          text-transform: uppercase;
+          display: inline-flex;
+          align-items: center;
+          gap: 12px;
+          flex-shrink: 0;
+        }
+        .ticker-dot {
+          width: 6px;
+          height: 6px;
+          background: #111110;
+          border-radius: 50%;
+          flex-shrink: 0;
+        }
+
+        /* ── FEATURES ── */
+        .features {
+          display: grid;
+          grid-template-columns: 280px 1fr;
+          border-bottom: 3px solid #111110;
+          min-height: 560px;
+        }
+
+        .features-nav {
+          border-right: 3px solid #111110;
+          background: #FFFBEA;
+        }
+        .features-nav-header {
+          padding: 28px 24px 16px;
+          border-bottom: 1px solid #E0D8CA;
+        }
+        .features-nav-label {
+          font-size: 10px;
+          font-weight: 800;
+          color: #9B8F7A;
+          text-transform: uppercase;
+          letter-spacing: 0.2em;
+        }
+        .features-nav-title {
+          font-size: 20px;
+          font-weight: 900;
+          color: #111110;
+          letter-spacing: -0.5px;
+          margin-top: 4px;
+        }
+
+        .feature-tab {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          padding: 16px 24px;
+          cursor: pointer;
+          border-bottom: 1px solid #E0D8CA;
+          transition: background 0.1s;
+          background: transparent;
+          border-left: 3px solid transparent;
+          width: 100%;
+          text-align: left;
+          font-family: inherit;
+        }
+        .feature-tab:hover { background: #F5F0E8; }
+        .feature-tab.active {
+          background: #FFD400;
+          border-left-color: #111110;
+          border-bottom-color: #111110;
+        }
+        .feature-tab-emoji { font-size: 20px; line-height: 1; }
+        .feature-tab-label {
+          font-size: 14px;
+          font-weight: 800;
+          color: #111110;
+        }
+        .feature-tab-tag {
+          font-size: 10px;
+          font-weight: 600;
+          color: #9B8F7A;
+          margin-top: 1px;
+        }
+        .feature-tab.active .feature-tab-tag { color: #5C5346; }
+
+        .features-content {
+          padding: 56px 60px;
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+          background: #FFFBEA;
+          position: relative;
+        }
+
+        .feature-num {
+          font-size: 120px;
+          font-weight: 900;
+          color: #F5F0E8;
+          position: absolute;
+          top: 20px;
+          right: 32px;
+          line-height: 1;
+          letter-spacing: -4px;
+          pointer-events: none;
+          user-select: none;
+        }
+
+        .feature-emoji-large {
+          font-size: 56px;
+          line-height: 1;
+          margin-bottom: 20px;
+          display: block;
+        }
+
+        .feature-title {
+          font-size: clamp(32px, 4vw, 48px);
+          font-weight: 900;
+          color: #111110;
+          letter-spacing: -1.5px;
+          line-height: 1;
+          white-space: pre-line;
+          margin-bottom: 20px;
+        }
+
+        .feature-desc {
+          font-size: 16px;
+          font-weight: 500;
+          color: #5C5346;
+          line-height: 1.7;
+          max-width: 480px;
+          margin-bottom: 28px;
+        }
+
+        .feature-badge {
+          display: inline-flex;
+          align-items: center;
+          background: #111110;
+          color: #FFD400;
+          padding: 5px 14px;
+          font-size: 11px;
+          font-weight: 800;
+          letter-spacing: 0.12em;
+          text-transform: uppercase;
+        }
+
+        /* ── HOW IT WORKS ── */
+        .how {
+          background: #111110;
+          padding: 80px 40px;
+          border-bottom: 3px solid #111110;
+        }
+
+        .how-inner {
+          max-width: 1100px;
+          margin: 0 auto;
+        }
+
+        .how-header {
+          margin-bottom: 56px;
+        }
+
+        .section-eyebrow {
+          display: inline-block;
+          background: #FFD400;
+          color: #111110;
+          padding: 3px 12px;
+          font-size: 10px;
+          font-weight: 800;
+          letter-spacing: 0.2em;
+          text-transform: uppercase;
+          margin-bottom: 16px;
+        }
+        .section-eyebrow.light {
+          background: #1a1a1a;
+          color: #FFD400;
+          border: 1px solid #333;
+        }
+
+        .section-title {
+          font-size: clamp(32px, 4vw, 52px);
+          font-weight: 900;
+          letter-spacing: -2px;
+          line-height: 1.05;
+        }
+        .section-title.light { color: #fff; }
+        .section-title.dark { color: #111110; }
+
+        .steps {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 0;
+          border: 2px solid #333;
+        }
+
+        .step {
+          padding: 40px 32px;
+          border-right: 1px solid #333;
+          position: relative;
+        }
+        .step:last-child { border-right: none; }
+
+        .step-num {
+          font-size: 11px;
+          font-weight: 800;
+          color: #FFD400;
+          letter-spacing: 0.2em;
+          text-transform: uppercase;
+          margin-bottom: 20px;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+        .step-num::after {
+          content: '';
+          flex: 1;
+          height: 1px;
+          background: #333;
+        }
+
+        .step-emoji { font-size: 36px; line-height: 1; margin-bottom: 16px; display: block; }
+
+        .step-title {
+          font-size: 22px;
+          font-weight: 900;
+          color: #fff;
+          letter-spacing: -0.5px;
+          margin-bottom: 12px;
+        }
+
+        .step-desc {
+          font-size: 14px;
+          font-weight: 500;
+          color: #666;
+          line-height: 1.7;
+        }
+
+        /* ── CTA BAND ── */
+        .cta-band {
+          background: #FFD400;
+          border-bottom: 3px solid #111110;
+          padding: 80px 40px;
+          display: grid;
+          grid-template-columns: 1fr auto;
+          align-items: center;
+          gap: 40px;
+          max-width: 100%;
+        }
+
+        .cta-inner { max-width: 1100px; margin: 0 auto; width: 100%; display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 40px; }
+
+        .cta-title {
+          font-size: clamp(36px, 5vw, 64px);
+          font-weight: 900;
+          color: #111110;
+          letter-spacing: -2px;
+          line-height: 1;
+        }
+
+        .cta-title .strikethrough {
+          position: relative;
+          display: inline-block;
+        }
+        .cta-title .strikethrough::after {
+          content: '';
+          position: absolute;
+          left: 0; right: 0;
+          top: 50%;
+          height: 4px;
+          background: #111110;
+          transform: rotate(-2deg);
+        }
+
+        .btn-hero-dark {
+          display: inline-flex;
+          align-items: center;
+          gap: 10px;
+          padding: 18px 36px;
+          background: #111110;
+          color: #FFD400;
+          font-family: inherit;
+          font-size: 16px;
+          font-weight: 800;
+          border: none;
+          text-decoration: none;
+          cursor: pointer;
+          transition: box-shadow 0.1s, transform 0.1s;
+          box-shadow: 6px 6px 0 rgba(0,0,0,0.3);
+          white-space: nowrap;
+          flex-shrink: 0;
+        }
+        .btn-hero-dark:hover {
+          box-shadow: 8px 8px 0 rgba(0,0,0,0.3);
+          transform: translate(-1px, -1px);
+        }
+
+        /* ── SOCIAL PROOF ── */
+        .proof {
+          background: #FFFBEA;
+          padding: 80px 40px;
+          border-bottom: 3px solid #111110;
+        }
+        .proof-inner { max-width: 1100px; margin: 0 auto; }
+        .proof-grid {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 0;
+          border: 2.5px solid #111110;
+          box-shadow: 6px 6px 0 #111110;
+          margin-top: 48px;
+        }
+        .proof-card {
+          padding: 36px 32px;
+          border-right: 2px solid #111110;
+          position: relative;
+        }
+        .proof-card:last-child { border-right: none; }
+        .proof-card::before {
+          content: '"';
+          position: absolute;
+          top: 16px;
+          left: 24px;
+          font-size: 72px;
+          font-weight: 900;
+          color: #FFD400;
+          line-height: 1;
+          opacity: 0.5;
+        }
+        .proof-quote {
+          font-size: 16px;
+          font-weight: 600;
+          color: #111110;
+          line-height: 1.6;
+          margin-top: 40px;
+          margin-bottom: 24px;
+        }
+        .proof-author {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+        }
+        .proof-avatar {
+          width: 36px;
+          height: 36px;
+          border-radius: 50%;
+          background: #FFD400;
+          border: 2px solid #111110;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 16px;
+          font-weight: 900;
+          color: #111110;
+          flex-shrink: 0;
+        }
+        .proof-name {
+          font-size: 13px;
+          font-weight: 800;
+          color: #111110;
+        }
+        .proof-role {
+          font-size: 11px;
+          font-weight: 600;
+          color: #9B8F7A;
+        }
+
+        /* ── FOOTER ── */
+        .footer {
+          background: #111110;
+          padding: 48px 40px 28px;
+        }
+        .footer-inner {
+          max-width: 1100px;
+          margin: 0 auto;
+        }
+        .footer-top {
+          display: grid;
+          grid-template-columns: 1fr 1fr 1fr 1fr;
+          gap: 40px;
+          padding-bottom: 40px;
+          border-bottom: 1px solid #222;
+          margin-bottom: 28px;
+        }
+        .footer-brand {
+          grid-column: span 1;
+        }
+        .footer-logo {
+          font-size: 32px;
+          display: block;
+          margin-bottom: 8px;
+        }
+        .footer-brand-name {
+          font-size: 18px;
+          font-weight: 900;
+          color: #fff;
+          letter-spacing: -0.3px;
+          display: block;
+          margin-bottom: 8px;
+        }
+        .footer-tagline {
+          font-size: 12px;
+          font-weight: 600;
+          color: #555;
+          line-height: 1.5;
+        }
+        .footer-col-title {
+          font-size: 10px;
+          font-weight: 800;
+          color: #FFD400;
+          text-transform: uppercase;
+          letter-spacing: 0.15em;
+          margin-bottom: 16px;
+        }
+        .footer-link {
+          display: block;
+          font-size: 13px;
+          font-weight: 600;
+          color: #555;
+          text-decoration: none;
+          margin-bottom: 10px;
+          transition: color 0.1s;
+        }
+        .footer-link:hover { color: #fff; }
+        .footer-bottom {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          flex-wrap: wrap;
+          gap: 12px;
+        }
+        .footer-copy {
+          font-size: 11px;
+          font-weight: 600;
+          color: #333;
+        }
+
+        /* ── MOBILE ── */
+        .mobile-menu {
+          position: fixed;
+          inset: 0;
+          z-index: 200;
+          display: flex;
+          flex-direction: column;
+        }
+        .mobile-overlay {
+          position: absolute;
+          inset: 0;
+          background: rgba(0,0,0,0.6);
+          backdrop-filter: blur(2px);
+        }
+        .mobile-panel {
+          position: relative;
+          background: #FFFBEA;
+          border-bottom: 3px solid #111110;
+          padding: 20px;
+          z-index: 1;
+          max-height: 85vh;
+          overflow-y: auto;
+          margin-top: 72px;
+        }
+
+        @keyframes fadeInUp {
+          from { opacity: 0; transform: translateY(24px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+        .animate-in { animation: fadeInUp 0.5s ease forwards; }
+        .delay-1 { animation-delay: 0.1s; opacity: 0; }
+        .delay-2 { animation-delay: 0.2s; opacity: 0; }
+        .delay-3 { animation-delay: 0.3s; opacity: 0; }
+        .delay-4 { animation-delay: 0.4s; opacity: 0; }
+
+        @media (max-width: 900px) {
+          .hero { grid-template-columns: 1fr; }
+          .hero-right { min-height: 300px; padding: 40px 24px; }
+          .hero-mango { font-size: 80px; }
+          .hero-left { padding: 60px 24px; border-right: none; border-bottom: 3px solid #111110; }
+          .features { grid-template-columns: 1fr; }
+          .features-nav { border-right: none; border-bottom: 3px solid #111110; }
+          .features-content { padding: 40px 24px; }
+          .steps { grid-template-columns: 1fr; }
+          .step { border-right: none; border-bottom: 1px solid #333; }
+          .proof-grid { grid-template-columns: 1fr; }
+          .proof-card { border-right: none; border-bottom: 2px solid #111110; }
+          .cta-inner { grid-template-columns: 1fr; gap: 24px; }
+          .footer-top { grid-template-columns: 1fr 1fr; gap: 28px; }
+          .nav-links { display: none; }
+        }
+
+        @media (max-width: 600px) {
+          .footer-top { grid-template-columns: 1fr; }
+          .hero-stats { grid-template-columns: 1fr 1fr 1fr; }
+        }
+      `}</style>
+
+      {/* ── NAVBAR ── */}
+      <nav className={`nav${scrolled ? " scrolled" : ""}`}>
+        <div className="nav-pill">
+          <a href="/" className="nav-logo">
+            🥭
+            <span className="nav-logo-text">artomango</span>
+          </a>
+          <div className="nav-divider" />
+          <div className="nav-links">
+            <a href="#features" className="nav-link">Features</a>
+            <a href="#how" className="nav-link">How it works</a>
+            <a href="/directory/artists" className="nav-link">Artists</a>
+            <a href="/directory/venues" className="nav-link">Venues</a>
+          </div>
+          <div className="nav-cta" style={{ marginLeft: "auto" }}>
+            <a href="/login" className="btn-ghost-sm">Sign in</a>
+            <a href="/signup" className="btn-primary-sm">Get started →</a>
+          </div>
+        </div>
+      </nav>
+
+      {/* ── HERO ── */}
+      <section className="hero">
+        <div className="hero-left">
+          <div className="hero-eyebrow animate-in">
+            🥭 artomango · art platform
+          </div>
+
+          <h1 className="hero-title animate-in delay-1">
+            Your art.<br />
+            <span className="invert">Managed.</span><br />
+            Exhibited.
+          </h1>
+
+          <p className="hero-sub animate-in delay-2">
+            The platform for artists and venues to manage work, discover collaborations, and grow in the art scene.
+          </p>
+
+          <div className="hero-actions animate-in delay-3">
+            <a href="/signup" className="btn-hero-primary">
+              Start for free →
+            </a>
+            <a href="#features" className="btn-hero-secondary">
+              See features
+            </a>
+          </div>
+
+          <div style={{ position: "absolute", bottom: 24, left: 40, display: "flex", alignItems: "center", gap: 8, opacity: 0.5 }}>
+            <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", color: "#111110" }}>
+              Manage, Exhibit, Collab
+            </span>
           </div>
         </div>
 
-        {/* Mobile menu */}
-        {mobileNav && (
-          <div style={{ background: "#1a1a1a", borderTop: "1px solid #2a2a2a", padding: "8px 0" }}>
-            {[["Features","#features"],["Explore","#explore"],["Artists","/directory/artists"],["Venues","/directory/venues"]].map(([label, href]) => (
-              <a key={label} href={href} onClick={() => setMobileNav(false)} style={{ display: "block", padding: "10px 24px", fontSize: 13, fontWeight: 700, color: "#888", textDecoration: "none" }}>
-                {label}
-              </a>
-            ))}
-            {!appProfile && (
-              <div style={{ display: "flex", gap: 8, padding: "10px 24px" }}>
-                <Link href="/login" style={{ padding: "8px 16px", fontSize: 12, fontWeight: 700, color: "#888", textDecoration: "none", border: "1px solid #333" }}>Sign in</Link>
-                <Link href="/register" style={{ padding: "8px 16px", fontSize: 12, fontWeight: 800, color: "#111110", background: "#FFD400", textDecoration: "none" }}>Join free</Link>
-              </div>
-            )}
+        <div className="hero-right">
+          <span className="hero-mango animate-in delay-2">🥭</span>
+
+          <div className="hero-stats animate-in delay-3">
+            <div className="hero-stat">
+              <span className="hero-stat-num">47</span>
+              <span className="hero-stat-label">Works</span>
+            </div>
+            <div className="hero-stat">
+              <span className="hero-stat-num">12</span>
+              <span className="hero-stat-label">Shows</span>
+            </div>
+            <div className="hero-stat">
+              <span className="hero-stat-num">$18k</span>
+              <span className="hero-stat-label">Revenue</span>
+            </div>
           </div>
-        )}
-      </header>
 
-      {/* ── HERO SECTION ────────────────────────────────────────── */}
-      <section style={{ background: "#FFD400", borderBottom: "4px solid #111110", position: "relative", overflow: "hidden" }}>
-        {/* Dot grid */}
-        <div style={{ position: "absolute", inset: 0, opacity: 0.04, backgroundImage: "radial-gradient(circle, #000 1px, transparent 1px)", backgroundSize: "12px 12px", pointerEvents: "none" }} />
+          {/* Floating cards */}
+          <div style={{
+            position: "absolute", top: 120, left: 32,
+            background: "#FFD400", border: "2px solid #111110",
+            padding: "8px 14px", boxShadow: "3px 3px 0 #FFD400",
+            animation: "floatMango 4s ease-in-out infinite",
+            animationDelay: "0.5s"
+          }}>
+            <div style={{ fontSize: 10, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.1em", color: "#111110" }}>New collab request</div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: "#111110", marginTop: 2 }}>Galerie Nord · Prague</div>
+          </div>
 
-        <div style={{ maxWidth: 1200, margin: "0 auto", padding: "0 24px" }}>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", minHeight: 480, alignItems: "center", gap: 0 }}>
-
-            {/* LEFT — copy */}
-            <div style={{ padding: "64px 48px 64px 0", borderRight: "4px solid #111110" }}>
-              {/* Eyebrow */}
-              <div style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "#111110", color: "#FFD400", padding: "5px 12px", fontSize: 10, fontWeight: 800, letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: 24 }}>
-                <span>Art · Community · Discovery</span>
-              </div>
-
-              {/* Headline */}
-              <h1 style={{ margin: "0 0 8px 0", lineHeight: 1 }}>
-                <span style={{ display: "inline-block", background: "#111110", color: "#fff", padding: "6px 14px", fontSize: "clamp(36px, 5vw, 56px)", fontWeight: 900, letterSpacing: "-2px", marginBottom: 8 }}>
-                  {hero.headline?.split(" ")[0] || "artist"}
-                </span>
-                <br />
-                <span style={{ display: "inline-block", background: "#fff", color: "#111110", padding: "6px 14px", fontSize: "clamp(36px, 5vw, 56px)", fontWeight: 900, letterSpacing: "-2px", border: "3px solid #111110" }}>
-                  {"+ " + (hero.headline?.split(" ").slice(1).join(" ") || "venue")}
-                </span>
-              </h1>
-
-              <p style={{ fontSize: 16, fontWeight: 600, color: "#111110", lineHeight: 1.6, maxWidth: 420, margin: "20px 0 32px 0", opacity: 0.8 }}>
-                {hero.subheadline || "Where local artists meet venues. Showcase work. Fill walls. Build community."}
-              </p>
-
-              {/* CTAs */}
-              {userLoaded && (
-                appProfile ? (
-                  <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                    <Link href="/dashboard" style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "13px 24px", background: "#111110", color: "#FFD400", fontSize: 13, fontWeight: 800, textDecoration: "none", border: "3px solid #111110", boxShadow: "4px 4px 0 #000" }}>
-                      <LayoutDashboard size={15} /> {hero.cta_primary || "Go to Dashboard"}
-                    </Link>
-                    <button onClick={() => exploreRef.current?.scrollIntoView({behavior:"smooth"})} style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "13px 24px", background: "#fff", color: "#111110", fontSize: 13, fontWeight: 800, border: "3px solid #111110", cursor: "pointer" }}>
-                      Explore <ChevronDown size={15} />
-                    </button>
-                  </div>
-                ) : (
-                  <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                    <Link href="/register" style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "13px 24px", background: "#111110", color: "#FFD400", fontSize: 13, fontWeight: 800, textDecoration: "none", border: "3px solid #111110", boxShadow: "4px 4px 0 #000" }}>
-                      {hero.cta_primary || "Join free"} <ArrowRight size={15} />
-                    </Link>
-                    <Link href="/login" style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "13px 24px", background: "#fff", color: "#111110", fontSize: 13, fontWeight: 800, textDecoration: "none", border: "3px solid #111110" }}>
-                      {hero.cta_secondary || "Sign in"}
-                    </Link>
-                    <button onClick={() => exploreRef.current?.scrollIntoView({behavior:"smooth"})} style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "13px 8px", background: "transparent", color: "#111110", fontSize: 12, fontWeight: 700, border: "none", cursor: "pointer", opacity: 0.6 }}>
-                      Browse first <ChevronDown size={13} />
-                    </button>
-                  </div>
-                )
-              )}
-            </div>
-
-            {/* RIGHT — artwork frame */}
-            <div style={{ padding: "40px 0 40px 48px", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <div style={{ width: "100%", maxWidth: 380, position: "relative" }}>
-                {/* Main frame */}
-                <div style={{ border: "4px solid #111110", boxShadow: "8px 8px 0 #111110", background: "#fff", aspectRatio: "4/3", overflow: "hidden", position: "relative" }}>
-                  {hero.artwork_url ? (
-                    <img src={hero.artwork_url} alt="Featured artwork" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                  ) : (
-                    <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: "#F5F0E8", gap: 12 }}>
-                      <ImageIcon size={40} color="#9B8F7A" />
-                      <span style={{ fontSize: 11, fontWeight: 700, color: "#9B8F7A", textAlign: "center", padding: "0 16px" }}>
-                        Set featured artwork<br />in Admin Panel
-                      </span>
-                    </div>
-                  )}
-                  {/* Corner tag */}
-                  <div style={{ position: "absolute", bottom: 0, left: 0, background: "#FFD400", border: "2px solid #111110", borderTop: "2px solid #111110", padding: "4px 10px", fontSize: 10, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.1em" }}>
-                    Featured
-                  </div>
-                </div>
-                {hero.artwork_caption && (
-                  <div style={{ marginTop: 8, fontSize: 11, fontWeight: 600, color: "#111110", opacity: 0.6 }}>{hero.artwork_caption}</div>
-                )}
-                {/* Decorative offset block */}
-                <div style={{ position: "absolute", top: -10, right: -10, width: "100%", height: "100%", border: "4px solid #111110", zIndex: -1, background: "#FFD400", maxWidth: 380 }} />
-              </div>
-            </div>
+          <div style={{
+            position: "absolute", bottom: 140, right: 28,
+            background: "#fff", border: "2px solid #333",
+            padding: "8px 14px", boxShadow: "3px 3px 0 #333",
+            animation: "floatMango 3.5s ease-in-out infinite",
+            animationDelay: "1s"
+          }}>
+            <div style={{ fontSize: 10, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.1em", color: "#9B8F7A" }}>Artwork sold</div>
+            <div style={{ fontSize: 13, fontWeight: 900, color: "#111110", marginTop: 2 }}>$2,400 ✓</div>
           </div>
         </div>
       </section>
 
-      {/* ── FEATURES SECTION ────────────────────────────────────── */}
-<section id="features" style={{ background: "#FAFAF8" }}>
-
-  {/* Section header */}
-  <div style={{ maxWidth: 1200, margin: "0 auto", padding: "72px 24px 56px" }}>
-    <div style={{ display: "inline-block", background: "#111110", color: "#FFD400", padding: "4px 12px", fontSize: 10, fontWeight: 800, letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: 16 }}>
-      Everything you need
-    </div>
-    <h2 style={{ fontSize: "clamp(28px, 4vw, 44px)", fontWeight: 900, color: "#111110", letterSpacing: "-1.5px", margin: 0, lineHeight: 1.1 }}>
-      Built for every player<br />in the art scene
-    </h2>
-  </div>
-
-  {/* Feature strips */}
-  {[
-    {
-      num: "01", group: "For Artists", flip: false,
-      title: "Every artwork,\nalways accounted for",
-      desc: "Add a piece once — photo, title, medium, size, price, location, status. Never lose track of where a work is, who's holding it, or what it sold for.",
-      tag: "Art Inventory System",
-      visual: (
-        <div style={{ position: "relative", width: 260, height: 270 }}>
-          {[2,1,0].map(i => (
-            <div key={i} style={{ position: "absolute", top: i*12, left: i*12, width: 220, background: "#fff", border: "2px solid #111110", opacity: i===0?1:i===1?0.5:0.25, transform: `scale(${1-i*0.02})`, zIndex: 3-i, boxShadow: i===0?"6px 6px 0 #111110":"none" }}>
-              <div style={{ height: 110, background: "linear-gradient(135deg,#E8D5B7,#A07850)", borderBottom: "2px solid #111110", position: "relative" }}>
-                {i===0 && <div style={{ position: "absolute", top: 8, left: 8, background: "#4ECDC4", border: "1.5px solid #111110", padding: "2px 8px", fontSize: 9, fontWeight: 800, textTransform: "uppercase" }}>Available</div>}
-              </div>
-              {i===0 && (
-                <div style={{ padding: "10px 12px" }}>
-                  <div style={{ fontSize: 13, fontWeight: 800, color: "#111110", marginBottom: 6 }}>Untitled No. 7</div>
-                  {[["Medium","Oil on canvas"],["Size","80 × 60 cm"],["Location","Studio A"],["Price","$2,400"]].map(([k,v]) => (
-                    <div key={k} style={{ display: "flex", justifyContent: "space-between", fontSize: 10, padding: "3px 0", borderBottom: "1px solid #F0EBE1", color: "#9B8F7A", fontWeight: 600 }}>
-                      <span>{k}</span><span style={{ color: "#111110", fontWeight: 700 }}>{v}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          ))}
-          <div style={{ position: "absolute", bottom: 0, right: 0, background: "#FFD400", border: "2.5px solid #111110", padding: "8px 14px", boxShadow: "3px 3px 0 #111110", zIndex: 10 }}>
-            <div style={{ fontSize: 22, fontWeight: 900, color: "#111110", lineHeight: 1 }}>47</div>
-            <div style={{ fontSize: 8, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.12em", color: "#5C5346" }}>Works tracked</div>
-          </div>
-        </div>
-      ),
-    },
-    {
-      num: "02", group: "For Artists", flip: true,
-      title: "Your gallery,\nlive on the web",
-      desc: "Your works become a public portfolio page at artfolio.com/yourname. Clean, fast, shareable — send it to galleries, collectors, or anyone. No design skills needed.",
-      tag: "Public Portfolio",
-      vbg: "#111110",
-      visual: (
-        <div style={{ width: 240, background: "#fff", border: "2px solid #111110", boxShadow: "4px 4px 0 #111110" }}>
-          <div style={{ padding: "12px 14px", borderBottom: "2px solid #111110", display: "flex", alignItems: "center", gap: 10 }}>
-            <div style={{ width: 36, height: 36, borderRadius: "50%", background: "#FFD400", border: "2px solid #111110", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 900, color: "#111110", flexShrink: 0 }}>N</div>
-            <div>
-              <div style={{ fontSize: 13, fontWeight: 800, color: "#111110" }}>Neda Rahimi</div>
-              <div style={{ fontSize: 10, color: "#9B8F7A", fontWeight: 600 }}>Tehran · Oil & Mixed Media</div>
-            </div>
-          </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr" }}>
-            {["#FF6B6B","#4ECDC4","#FFD400","#95E1D3"].map((c,i) => (
-              <div key={i} style={{ aspectRatio: "1", background: c, borderBottom: i<2?"2px solid #111110":"none", borderRight: i%2===0?"1px solid #111110":"none" }} />
-            ))}
-          </div>
-          <div style={{ padding: "8px 12px", background: "#111110", color: "#FFD400", fontSize: 9, fontWeight: 800, letterSpacing: "0.08em" }}>artfolio.com/nedarahimi</div>
-        </div>
-      ),
-    },
-    {
-      num: "03", group: "For Artists", flip: false,
-      title: "Know your numbers.\nKnow your collectors.",
-      desc: "Log every sale, track commissions, manage your collector relationships. See who bought what, when, for how much — and who you should follow up with next.",
-      tag: "Sales Tracking · CRM",
-      visual: (
-        <div style={{ width: 270, display: "flex", flexDirection: "column", gap: 8 }}>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6 }}>
-            {[["$18k","Revenue"],["$15k","Net"],["12","Sales"]].map(([v,l]) => (
-              <div key={l} style={{ background: "#fff", border: "2px solid #111110", padding: "8px 10px", textAlign: "center" }}>
-                <div style={{ fontSize: 16, fontWeight: 900, color: "#111110" }}>{v}</div>
-                <div style={{ fontSize: 8, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.1em", color: "#9B8F7A" }}>{l}</div>
-              </div>
-            ))}
-          </div>
-          <div style={{ background: "#fff", border: "2px solid #111110" }}>
-            {[["Dariush M.","$3,200","Paid","#DCFCE7","#166534"],["Azadeh Gallery","$5,800","Pending","#FEF9C3","#854D0E"],["Leila Shirazi","$1,400","Paid","#DCFCE7","#166534"],["Tehran Art Fair","$7,600","Paid","#DCFCE7","#166534"]].map(([name,amt,status,bg,col]) => (
-              <div key={name as string} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", borderBottom: "1px solid #E0D8CA" }}>
-                <div style={{ flex: 1, fontSize: 11, fontWeight: 700, color: "#111110" }}>{name}</div>
-                <div style={{ fontSize: 11, fontFamily: "monospace", fontWeight: 800, color: "#111110" }}>{amt}</div>
-                <div style={{ fontSize: 8, fontWeight: 800, textTransform: "uppercase", padding: "2px 6px", background: bg as string, color: col as string, border: "1.5px solid #111110", letterSpacing: "0.08em" }}>{status}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      ),
-    },
-    {
-      num: "04", group: "For Artists", flip: true,
-      title: "See what's working.\nGrow what matters.",
-      desc: "Track followers, profile views, and revenue month by month. Understand which works get the most attention and where your collectors are coming from.",
-      tag: "Analytics",
-      visual: (
-        <div style={{ width: 260, background: "#fff", border: "2px solid #111110", boxShadow: "4px 4px 0 #111110" }}>
-          <div style={{ padding: "10px 12px", borderBottom: "2px solid #111110", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <div style={{ fontSize: 11, fontWeight: 800, color: "#111110", textTransform: "uppercase", letterSpacing: "0.08em" }}>Revenue</div>
-            <div style={{ fontSize: 9, fontWeight: 700, color: "#9B8F7A", background: "#F5F0E8", border: "1px solid #E0D8CA", padding: "2px 7px" }}>6 months</div>
-          </div>
-          <div style={{ padding: "14px 12px 0", display: "flex", alignItems: "flex-end", gap: 5, height: 110 }}>
-            {[[35,"Jan"],[55,"Feb"],[40,"Mar"],[70,"Apr"],[88,"May"],[100,"Jun"]].map(([h,l],i) => (
-              <div key={l as string} style={{ flex: 1, height: `${h}%`, background: i>=3?"#FFD400":"#F5F0E8", border: "1.5px solid #111110", borderBottom: "none", position: "relative", minHeight: 4 }}>
-                <span style={{ position: "absolute", bottom: -16, left: "50%", transform: "translateX(-50%)", fontSize: 8, fontWeight: 700, color: "#9B8F7A", whiteSpace: "nowrap" }}>{l}</span>
-              </div>
-            ))}
-          </div>
-          <div style={{ height: 24 }} />
-          <div style={{ borderTop: "2px solid #111110", display: "grid", gridTemplateColumns: "1fr 1fr 1fr" }}>
-            {[["284","Followers"],["1.2k","Views"],["$18k","Revenue"]].map(([v,l],i) => (
-              <div key={l as string} style={{ padding: "8px 0", textAlign: "center", borderRight: i<2?"1px solid #E0D8CA":"none" }}>
-                <div style={{ fontSize: 13, fontWeight: 900, color: "#111110" }}>{v}</div>
-                <div style={{ fontSize: 8, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.08em", color: "#9B8F7A" }}>{l}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      ),
-    },
-    {
-      num: "05", group: "For Artists", flip: false,
-      title: "Plan shows.\nManage everything.",
-      desc: "Create exhibitions, assign artworks, track venues and dates. Upcoming shows, past appearances, current displays — all in one timeline.",
-      tag: "Exhibition Management",
-      visual: (
-        <div style={{ width: 250, display: "flex", flexDirection: "column", gap: 8 }}>
-          <div style={{ background: "#fff", border: "2px solid #111110", overflow: "hidden", boxShadow: "3px 3px 0 #111110" }}>
-            <div style={{ height: 72, background: "linear-gradient(135deg,#1a1a1a,#2a2a2a)", borderBottom: "2px solid #111110", position: "relative" }}>
-              <div style={{ position: "absolute", top: 8, right: 8, background: "#FF6B6B", border: "1.5px solid #111110", padding: "2px 8px", fontSize: 8, fontWeight: 800, textTransform: "uppercase", color: "#111110" }}>Current</div>
-              <div style={{ position: "absolute", bottom: 8, left: 12 }}>
-                <div style={{ fontSize: 15, fontWeight: 900, color: "#FFD400", letterSpacing: "-0.3px" }}>Forms & Shadows</div>
-                <div style={{ fontSize: 9, fontWeight: 700, color: "#888", textTransform: "uppercase", letterSpacing: "0.1em" }}>Azad Gallery · Tehran</div>
-              </div>
-            </div>
-            <div style={{ padding: "10px 12px" }}>
-              {[["Opens","1 Jun 2026"],["Closes","30 Jun 2026"],["Works","8 artworks"]].map(([k,v]) => (
-                <div key={k as string} style={{ display: "flex", justifyContent: "space-between", fontSize: 10, padding: "3px 0", borderBottom: "1px dotted #E0D8CA", color: "#9B8F7A", fontWeight: 600 }}>
-                  <span>{k}</span><span style={{ color: "#111110", fontWeight: 700 }}>{v}</span>
-                </div>
-              ))}
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 3, marginTop: 8 }}>
-                {["#E8D5B7","#A8C5E0","#D4B8E0","#B8D4A8"].map(c => (
-                  <div key={c} style={{ aspectRatio: "1", background: c, border: "1px solid #E0D8CA" }} />
-                ))}
-              </div>
-            </div>
-          </div>
-          <div style={{ background: "#fff", border: "2px solid #E0D8CA", padding: "10px 12px", opacity: 0.6 }}>
-            <div style={{ fontSize: 9, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.1em", color: "#9B8F7A", marginBottom: 3 }}>Planning</div>
-            <div style={{ fontSize: 12, fontWeight: 700, color: "#111110" }}>Winter Group Show</div>
-          </div>
-        </div>
-      ),
-    },
-    {
-      num: "06", group: "Artists + Venues", flip: true,
-      title: "Find the right partner.\nPost. Match. Create.",
-      desc: "Artists post that they're looking for wall space. Venues post that they need artworks. The Discovery Pool connects both sides — and you track every collaboration from first message to final show.",
-      tag: "Collabs · Discovery Pool",
-      vbg: "#1a1a1a",
-      visual: (
-        <div style={{ width: 250, display: "flex", flexDirection: "column", gap: 8 }}>
-          {[
-            { type: "Artist seeking venue", typeBg: "#4ECDC4", title: "Oil painter seeking gallery space", tags: ["Oil","Realism","Large format"], budget: "$500–$2k", dark: false },
-            { type: "Venue seeking art", typeBg: "#FFD400", title: "Café wall — looking for abstract prints", tags: ["Abstract","Digital"], budget: "up to $800", dark: true },
-          ].map(card => (
-            <div key={card.type} style={{ background: card.dark ? "#2a2a2a" : "#fff", border: `2px solid ${card.dark?"#444":"#111110"}`, padding: 12, boxShadow: card.dark?"none":"3px 3px 0 #111110" }}>
-              <div style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "2px 8px", background: card.typeBg, border: "1.5px solid #111110", fontSize: 8, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 6, color: "#111110" }}>
-                {card.type}
-              </div>
-              <div style={{ fontSize: 12, fontWeight: 800, color: card.dark?"#fff":"#111110", marginBottom: 6 }}>{card.title}</div>
-              <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 8 }}>
-                {card.tags.map(t => (
-                  <div key={t} style={{ background: card.dark?"#333":"#F5F0E8", border: `1px solid ${card.dark?"#444":"#E0D8CA"}`, padding: "2px 6px", fontSize: 8, fontWeight: 700, color: card.dark?"#aaa":"#5C5346" }}>{t}</div>
-                ))}
-              </div>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <div style={{ fontSize: 9, fontFamily: "monospace", fontWeight: 700, color: card.dark?"#666":"#9B8F7A" }}>Budget: {card.budget}</div>
-                <div style={{ background: "#FFD400", border: "1.5px solid #111110", padding: "3px 9px", fontSize: 8, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.08em", color: "#111110", cursor: "default" }}>Respond →</div>
-              </div>
-            </div>
-          ))}
-        </div>
-      ),
-    },
-  ].map(feature => (
-    <div key={feature.num} style={{
-      display: "grid",
-      gridTemplateColumns: "1fr 1fr",
-      borderTop: "3px solid #111110",
-    }}>
-      {/* Copy side */}
-      <div style={{
-        padding: "56px 52px",
-        background: "#FFFBEA",
-        borderRight: feature.flip ? "none" : "3px solid #111110",
-        borderLeft: feature.flip ? "3px solid #111110" : "none",
-        order: feature.flip ? 2 : 1,
-        display: "flex", flexDirection: "column", justifyContent: "center", gap: 14,
-      }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 11, fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase", color: "#9B8F7A" }}>
-          <div style={{ width: 28, height: 2, background: "#FFD400" }} />
-          {feature.num} · {feature.group}
-        </div>
-        <h3 style={{ fontSize: "clamp(22px, 2.5vw, 30px)", fontWeight: 900, color: "#111110", letterSpacing: "-0.5px", margin: 0, lineHeight: 1.2, whiteSpace: "pre-line" }}>
-          {feature.title}
-        </h3>
-        <p style={{ fontSize: 14, lineHeight: 1.7, color: "#5C5346", fontWeight: 500, maxWidth: 380, margin: 0 }}>{feature.desc}</p>
-        <div style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "#111110", color: "#FFD400", padding: "4px 12px", fontSize: 10, fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase", width: "fit-content" }}>
-          {feature.tag}
-        </div>
-      </div>
-
-      {/* Visual side */}
-      <div style={{
-        background: (feature as any).vbg || "#F5F0E8",
-        order: feature.flip ? 1 : 2,
-        display: "flex", alignItems: "center", justifyContent: "center",
-        padding: 32, minHeight: 320,
-      }}>
-        {feature.visual}
-      </div>
-    </div>
-  ))}
-</section>
-
-      {/* ── COMMUNITY POSTS (Admin-curated) ────────────────────── */}
-      {featuredPosts.length > 0 && (
-        <section style={{ background: "#111110", borderBottom: "4px solid #111110", padding: "64px 0" }}>
-          <div style={{ maxWidth: 1200, margin: "0 auto", padding: "0 24px" }}>
-            <div style={{ marginBottom: 40 }}>
-              <div style={{ display: "inline-block", background: "#FFD400", color: "#111110", padding: "4px 12px", fontSize: 10, fontWeight: 800, letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: 12, border: "2px solid #FFD400" }}>
-                From the community
-              </div>
-              <h2 style={{ fontSize: "clamp(24px, 3vw, 32px)", fontWeight: 900, color: "#fff", letterSpacing: "-0.5px", margin: 0 }}>
-                What artists & venues are saying
-              </h2>
-            </div>
-
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 16 }}>
-              {featuredPosts.map(post => (
-                <div key={post.id} style={{ background: "#1a1a1a", border: "2px solid #2a2a2a", padding: "20px" }}>
-                  {/* Stars if review */}
-                  {post.is_review && post.rating && (
-                    <div style={{ display: "flex", gap: 3, marginBottom: 12 }}>
-                      {Array.from({length: 5}).map((_,i) => (
-                        <Star key={i} size={13} fill={i < post.rating! ? "#FFD400" : "transparent"} color={i < post.rating! ? "#FFD400" : "#444"} />
-                      ))}
-                    </div>
-                  )}
-                  {post.images?.[0] && (
-                    <div style={{ marginBottom: 14, border: "2px solid #2a2a2a", overflow: "hidden", aspectRatio: "16/9" }}>
-                      <img src={post.images[0]} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                    </div>
-                  )}
-                  {post.content && (
-                    <p style={{ fontSize: 13, color: "#ccc", lineHeight: 1.7, margin: "0 0 16px", fontWeight: 500 }}>
-                      "{post.content}"
-                    </p>
-                  )}
-                  {post.profile_name && (
-                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                      {post.profile_avatar
-                        ? <img src={post.profile_avatar} alt="" style={{ width: 32, height: 32, borderRadius: "50%", objectFit: "cover", border: "2px solid #333" }} />
-                        : <div style={{ width: 32, height: 32, borderRadius: "50%", background: "#FFD400", border: "2px solid #333", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 800, color: "#111110" }}>{post.profile_name[0]}</div>}
-                      <span style={{ fontSize: 12, fontWeight: 700, color: "#888" }}>{post.profile_name}</span>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-      )}
-
-      {/* ── EXPLORE SECTION ─────────────────────────────────────── */}
-      <div ref={exploreRef} id="explore" style={{ background: "#FAFAF8", borderBottom: "4px solid #111110", padding: "64px 0" }}>
-        <div style={{ maxWidth: 1200, margin: "0 auto", padding: "0 24px" }}>
-
-          {/* Header */}
-          <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: 32, flexWrap: "wrap", gap: 16 }}>
-            <div>
-              <div style={{ display: "inline-block", background: "#111110", color: "#FFD400", padding: "4px 12px", fontSize: 10, fontWeight: 800, letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: 12 }}>
-                Browse the platform
-              </div>
-              <h2 style={{ fontSize: "clamp(24px, 3vw, 36px)", fontWeight: 900, color: "#111110", letterSpacing: "-0.5px", margin: 0 }}>Explore Artfolio</h2>
-            </div>
-            {/* Search */}
-            <div style={{ display: "flex", alignItems: "center", gap: 2, border: "2px solid #111110", background: "#fff" }}>
-              <Search size={14} color="#9B8F7A" style={{ marginLeft: 12 }} />
-              <input value={search} onChange={e => setSearch(e.target.value)}
-                placeholder="Search…"
-                style={{ padding: "10px 12px", border: "none", outline: "none", fontSize: 13, fontWeight: 600, fontFamily: "inherit", minWidth: 200 }} />
-            </div>
-          </div>
-
-          {/* Tabs */}
-          <div style={{ display: "flex", alignItems: "center", borderBottom: "3px solid #111110", marginBottom: 28 }}>
-            {(["artworks","artists","venues"] as const).map(t => (
-              <button key={t} onClick={() => setTab(t)} style={{
-                padding: "10px 24px", border: "none", borderBottom: tab === t ? "4px solid #FFD400" : "4px solid transparent",
-                background: tab === t ? "#FFD400" : "transparent",
-                fontSize: 12, fontWeight: 800, color: "#111110", cursor: "pointer", textTransform: "capitalize",
-                marginBottom: -3, letterSpacing: "0.05em",
-              }}>{t}</button>
-            ))}
-            <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
-              <Link href="/directory/artists" style={{ padding: "7px 14px", border: "2px solid #111110", background: "#fff", fontSize: 11, fontWeight: 800, color: "#111110", textDecoration: "none", display: "flex", alignItems: "center", gap: 5 }}>
-                <Palette size={11} /> All Artists
-              </Link>
-              <Link href="/directory/venues" style={{ padding: "7px 14px", border: "2px solid #111110", background: "#FFD400", fontSize: 11, fontWeight: 800, color: "#111110", textDecoration: "none", display: "flex", alignItems: "center", gap: 5 }}>
-                <Building2 size={11} /> All Venues
-              </Link>
-            </div>
-          </div>
-
-          {/* Content */}
-          {loading ? (
-            <div style={{ padding: "48px", textAlign: "center", color: "#9B8F7A", fontSize: 14, fontWeight: 700 }}>Loading…</div>
-          ) : tab === "artworks" ? (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 16 }}>
-              {fArt.map((a, i) => {
-                const bgs = ["#fff","#FFF3C4","#fff","#111110"];
-                const txs = ["#111110","#111110","#111110","#FFD400"];
-                return (
-                  <div key={a.id} style={{ background: bgs[i%4], border: "2px solid #111110", boxShadow: "3px 3px 0 #111110", transition: "transform 0.1s" }}
-                    onMouseEnter={e => (e.currentTarget as HTMLElement).style.transform = "translate(-2px,-2px)"}
-                    onMouseLeave={e => (e.currentTarget as HTMLElement).style.transform = ""}>
-                    <div style={{ aspectRatio: "1/1", background: "#F5F0E8", overflow: "hidden", borderBottom: "2px solid #111110", position: "relative" }}>
-                      {a.images?.[0]
-                        ? <img src={a.images[0]} alt={a.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                        : <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}><ImageIcon size={28} color="#9B8F7A" /></div>}
-                      <div style={{ position: "absolute", top: 0, left: 0, background: "#FFD400", border: "1px solid #111110", padding: "2px 7px", fontSize: 9, fontWeight: 800, textTransform: "uppercase" }}>{a.status}</div>
-                    </div>
-                    <div style={{ padding: "10px 12px" }}>
-                      <p style={{ fontSize: 12, fontWeight: 800, color: txs[i%4], margin: "0 0 3px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{a.title}</p>
-                      {a.artist_name && <p style={{ fontSize: 10, color: txs[i%4], opacity: 0.5, margin: 0, fontWeight: 600 }}>{a.artist_name}</p>}
-                      {a.price && <p style={{ fontSize: 12, fontFamily: "monospace", fontWeight: 800, color: txs[i%4], margin: "6px 0 0" }}>${a.price.toLocaleString()}</p>}
-                    </div>
-                  </div>
-                );
-              })}
-              {fArt.length === 0 && <div style={{ gridColumn: "1/-1", textAlign: "center", padding: 40, color: "#9B8F7A", fontWeight: 700 }}>No artworks found</div>}
-            </div>
-          ) : tab === "artists" ? (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 16 }}>
-              {fArtist.map((a, i) => {
-                const acs = ["#FF6B6B","#4ECDC4","#FFD400","#95E1D3"];
-                return (
-                  <Link key={a.id} href={a.username ? `/profile/${a.username}` : "#"} style={{ textDecoration: "none" }}>
-                    <div style={{ background: "#fff", border: "2px solid #111110", boxShadow: "3px 3px 0 #111110", transition: "transform 0.1s" }}
-                      onMouseEnter={e => (e.currentTarget as HTMLElement).style.transform = "translate(-2px,-2px)"}
-                      onMouseLeave={e => (e.currentTarget as HTMLElement).style.transform = ""}>
-                      <div style={{ height: 120, background: acs[i%4], borderBottom: "2px solid #111110", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
-                        {a.avatar_url
-                          ? <img src={a.avatar_url} alt={a.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                          : <span style={{ fontSize: 36, fontWeight: 900, color: "#111110" }}>{a.name?.[0]}</span>}
-                      </div>
-                      <div style={{ padding: "10px 12px" }}>
-                        <p style={{ fontSize: 13, fontWeight: 800, color: "#111110", margin: "0 0 3px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{a.name}</p>
-                        {a.city && <p style={{ fontSize: 10, color: "#9B8F7A", margin: 0, fontWeight: 600, display: "flex", alignItems: "center", gap: 3 }}><MapPin size={9} />{a.city}</p>}
-                      </div>
-                    </div>
-                  </Link>
-                );
-              })}
-              {fArtist.length === 0 && <div style={{ gridColumn: "1/-1", textAlign: "center", padding: 40, color: "#9B8F7A", fontWeight: 700 }}>No artists found</div>}
-            </div>
-          ) : (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 16 }}>
-              {fVen.map(v => (
-                <Link key={v.id} href={`/venue/${v.id}`} style={{ textDecoration: "none" }}>
-                  <div style={{ background: "#fff", border: "2px solid #111110", boxShadow: "3px 3px 0 #111110", display: "flex", alignItems: "center", gap: 14, padding: 16, transition: "transform 0.1s" }}
-                    onMouseEnter={e => (e.currentTarget as HTMLElement).style.transform = "translate(-2px,-2px)"}
-                    onMouseLeave={e => (e.currentTarget as HTMLElement).style.transform = ""}>
-                    {v.logo_url
-                      ? <img src={v.logo_url} alt="" style={{ width: 48, height: 48, border: "2px solid #111110", objectFit: "cover", flexShrink: 0 }} />
-                      : <div style={{ width: 48, height: 48, background: "#4ECDC4", border: "2px solid #111110", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, fontWeight: 900, color: "#111110", flexShrink: 0 }}>{v.name?.[0]}</div>}
-                    <div style={{ minWidth: 0 }}>
-                      <p style={{ fontSize: 13, fontWeight: 800, color: "#111110", margin: "0 0 3px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v.name}</p>
-                      <p style={{ fontSize: 10, fontWeight: 700, color: "#9B8F7A", textTransform: "uppercase", letterSpacing: "0.08em", margin: "0 0 2px" }}>{v.type}</p>
-                      {v.city && <p style={{ fontSize: 10, color: "#9B8F7A", margin: 0, display: "flex", alignItems: "center", gap: 3 }}><MapPin size={9} />{v.city}</p>}
-                    </div>
-                  </div>
-                </Link>
-              ))}
-              {fVen.length === 0 && <div style={{ gridColumn: "1/-1", textAlign: "center", padding: 40, color: "#9B8F7A", fontWeight: 700 }}>No venues found</div>}
-            </div>
+      {/* ── TICKER ── */}
+      <div className="ticker-wrap">
+        <div className="ticker-track">
+          {[...Array(2)].map((_, i) =>
+            ["Manage your artworks", "Exhibit anywhere", "Collab with venues", "Track every sale", "Map the art scene", "Build your portfolio", "Grow your practice"].map((word, j) => (
+              <span key={`${i}-${j}`} className="ticker-item">
+                {word} <span className="ticker-dot" />
+              </span>
+            ))
           )}
         </div>
       </div>
 
-      {/* ── BOTTOM CTA (guests only) ─────────────────────────────── */}
-      {!appProfile && userLoaded && (
-        <section style={{ background: "#111110", padding: "80px 24px", textAlign: "center" }}>
-          <div style={{ maxWidth: 600, margin: "0 auto" }}>
-            <div style={{ display: "inline-block", background: "#FFD400", color: "#111110", padding: "4px 12px", fontSize: 10, fontWeight: 800, letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: 20, border: "2px solid #FFD400" }}>
-              Get started today
+      {/* ── FEATURES ── */}
+      <section id="features">
+        <div className="features">
+          <div className="features-nav">
+            <div className="features-nav-header">
+              <div className="features-nav-label">What you get</div>
+              <div className="features-nav-title">Everything<br />you need</div>
             </div>
-            <h2 style={{ fontSize: "clamp(28px, 4vw, 40px)", fontWeight: 900, color: "#fff", letterSpacing: "-1px", margin: "0 0 16px", lineHeight: 1.1 }}>
-              Ready to showcase<br />your work?
+            {features.map((f, i) => (
+              <button
+                key={f.id}
+                className={`feature-tab${activeFeature === i ? " active" : ""}`}
+                onClick={() => setActiveFeature(i)}
+              >
+                <span className="feature-tab-emoji">{f.emoji}</span>
+                <div>
+                  <div className="feature-tab-label">{f.label}</div>
+                  <div className="feature-tab-tag">{f.tag}</div>
+                </div>
+              </button>
+            ))}
+          </div>
+
+          <div className="features-content">
+            <div className="feature-num">0{activeFeature + 1}</div>
+            <span className="feature-emoji-large">{features[activeFeature].emoji}</span>
+            <h2 className="feature-title">{features[activeFeature].title}</h2>
+            <p className="feature-desc">{features[activeFeature].desc}</p>
+            <span className="feature-badge">{features[activeFeature].tag} →</span>
+          </div>
+        </div>
+      </section>
+
+      {/* ── HOW IT WORKS ── */}
+      <section id="how" className="how">
+        <div className="how-inner">
+          <div className="how-header">
+            <div className="section-eyebrow light">How it works</div>
+            <h2 className="section-title light">Three steps to<br />your art business.</h2>
+          </div>
+          <div className="steps">
+            {[
+              { n: "01", emoji: "🎨", title: "Add your work", desc: "Upload artworks with photos, details, prices, and location. Build your complete inventory in minutes." },
+              { n: "02", emoji: "🌐", title: "Go public", desc: "Your portfolio page goes live instantly. Share it with galleries, collectors, and curators — or let them find you." },
+              { n: "03", emoji: "🤝", title: "Grow & collaborate", desc: "Find exhibitions, connect with venues, track sales, and manage every collaboration from first contact to final show." },
+            ].map((step) => (
+              <div key={step.n} className="step">
+                <div className="step-num">{step.n}</div>
+                <span className="step-emoji">{step.emoji}</span>
+                <div className="step-title">{step.title}</div>
+                <div className="step-desc">{step.desc}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── CTA BAND ── */}
+      <div className="cta-band">
+        <div className="cta-inner">
+          <div>
+            <h2 className="cta-title">
+              Stop managing art<br />
+              in <span className="strikethrough">spreadsheets.</span>
             </h2>
-            <p style={{ fontSize: 15, color: "#888", fontWeight: 600, lineHeight: 1.6, margin: "0 0 36px" }}>
-              Join artists and venues already building the art community on Artfolio.
+            <p style={{ fontSize: 16, fontWeight: 600, color: "#5C5346", marginTop: 16 }}>
+              Join artists and venues already using Artomango.
             </p>
-            <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
-              <Link href="/register" style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "14px 28px", background: "#FFD400", color: "#111110", fontSize: 14, fontWeight: 800, textDecoration: "none", border: "3px solid #FFD400", boxShadow: "4px 4px 0 #FFD400" }}>
-                Join as Artist <ArrowRight size={16} />
-              </Link>
-              <Link href="/register" style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "14px 28px", background: "transparent", color: "#fff", fontSize: 14, fontWeight: 800, textDecoration: "none", border: "3px solid #444" }}>
-                Register a Venue
-              </Link>
+          </div>
+          <a href="/signup" className="btn-hero-dark">
+            🥭 Get started free →
+          </a>
+        </div>
+      </div>
+
+      {/* ── SOCIAL PROOF ── */}
+      <section className="proof">
+        <div className="proof-inner">
+          <div className="section-eyebrow">What they say</div>
+          <h2 className="section-title dark" style={{ marginBottom: 0 }}>Artists love it.</h2>
+          <div className="proof-grid">
+            {[
+              { quote: "Finally — a platform that gets how artists actually work. Not just a portfolio, a full business tool.", name: "Neda R.", role: "Oil painter · Prague", avatar: "N" },
+              { quote: "The collab pool alone was worth it. I found three venue partners in my first month on Artomango.", name: "Arman K.", role: "Photographer · Brno", avatar: "A" },
+              { quote: "I used to track everything in a notes app. Now I actually know where every piece is and what it's worth.", name: "Leila S.", role: "Mixed media artist · Berlin", avatar: "L" },
+            ].map((t, i) => (
+              <div key={i} className="proof-card">
+                <div className="proof-quote">{t.quote}</div>
+                <div className="proof-author">
+                  <div className="proof-avatar">{t.avatar}</div>
+                  <div>
+                    <div className="proof-name">{t.name}</div>
+                    <div className="proof-role">{t.role}</div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── FOOTER ── */}
+      <footer className="footer">
+        <div className="footer-inner">
+          <div className="footer-top">
+            <div className="footer-brand">
+              <span className="footer-logo">🥭</span>
+              <span className="footer-brand-name">artomango</span>
+              <span className="footer-tagline">Manage, Exhibit, Collab.<br />The platform for artists and venues.</span>
+            </div>
+            <div>
+              <div className="footer-col-title">Platform</div>
+              <a href="/dashboard" className="footer-link">Dashboard</a>
+              <a href="/dashboard/artworks" className="footer-link">Artworks</a>
+              <a href="/dashboard/exhibitions" className="footer-link">Events</a>
+              <a href="/dashboard/map" className="footer-link">Map</a>
+              <a href="/dashboard/pool" className="footer-link">Collabs</a>
+            </div>
+            <div>
+              <div className="footer-col-title">Explore</div>
+              <a href="/directory/artists" className="footer-link">Artists</a>
+              <a href="/directory/venues" className="footer-link">Venues</a>
+              <a href="/dashboard/analytics" className="footer-link">Analytics</a>
+              <a href="/dashboard/sales" className="footer-link">Sales</a>
+            </div>
+            <div>
+              <div className="footer-col-title">Account</div>
+              <a href="/login" className="footer-link">Sign in</a>
+              <a href="/signup" className="footer-link">Get started</a>
+              <a href="/dashboard/profile" className="footer-link">Profile</a>
+              <a href="/admin" className="footer-link">Admin</a>
             </div>
           </div>
-        </section>
-      )}
-
-      {/* Footer */}
-      <footer style={{ background: "#0a0a09", borderTop: "2px solid #1e1e1e", padding: "20px 24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <span style={{ fontSize: 12, fontWeight: 700, color: "#444", textTransform: "uppercase", letterSpacing: "0.1em" }}>Artfolio ✦</span>
-        <div style={{ display: "flex", gap: 20 }}>
-          {["Privacy","Support","Admin"].map(l => (
-            <Link key={l} href={l === "Admin" ? "/admin" : "#"} style={{ fontSize: 11, fontWeight: 700, color: "#444", textDecoration: "none", textTransform: "uppercase", letterSpacing: "0.08em" }}
-              onMouseEnter={e => ((e.currentTarget as HTMLElement).style.color = "#FFD400")}
-              onMouseLeave={e => ((e.currentTarget as HTMLElement).style.color = "#444")}>
-              {l}
-            </Link>
-          ))}
+          <div className="footer-bottom">
+            <span className="footer-copy">🥭 artomango · © 2026 · Manage, Exhibit, Collab</span>
+            <div style={{ display: "flex", gap: 20 }}>
+              <a href="#" className="footer-link" style={{ marginBottom: 0, fontSize: 11 }}>Privacy</a>
+              <a href="#" className="footer-link" style={{ marginBottom: 0, fontSize: 11 }}>Support</a>
+            </div>
+          </div>
         </div>
-        <span style={{ fontSize: 11, color: "#2a2a2a", fontWeight: 700 }}>© 2026</span>
       </footer>
-
-      <style>{`
-        @media (max-width: 768px) {
-          .hidden-mobile { display: none !important; }
-          section > div > div[style*="grid-template-columns: 1fr 1fr"] {
-            grid-template-columns: 1fr !important;
-          }
-        }
-        @media (min-width: 769px) {
-          .show-mobile { display: none !important; }
-        }
-      `}</style>
-    </div>
+    </>
   );
 }

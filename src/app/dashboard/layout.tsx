@@ -141,12 +141,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   // ── Sidebar ────────────────────────────────────────────────────
   const Sidebar = () => (
-    <aside style={{ display:"flex", flexDirection:"column", height:"100%", width:224, background:"#FCEEDC", flexShrink:0 }}>
+    <aside style={{ display:"flex", flexDirection:"column", height:"100%", width:224, background:"#111110", flexShrink:0 }}>
 
       {/* Logo */}
       <div style={{ display:"flex", alignItems:"center", gap:10, padding:"18px 16px 14px", borderBottom:"1px solid #1e1e1e" }}>
         <div style={{ width:30, height:30, background:"#FFD400", border:"2px solid #2a2a2a", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
-          <Palette size={14} color="#FCEEDC" />
+          <Palette size={14} color="#111110" />
         </div>
         <span style={{ fontSize:15, fontWeight:900, color:"#fff", letterSpacing:"-0.3px" }}>
           Artfolio<sup style={{ fontSize:7, opacity:0.4 }}>✦</sup>
@@ -165,7 +165,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             onMouseLeave={e => (e.currentTarget.style.background="transparent")}>
             {profile.avatar_url
               ? <img src={profile.avatar_url} alt="" style={{ width:34, height:34, borderRadius:"50%", objectFit:"cover", border:"2px solid #2a2a2a", flexShrink:0 }} />
-              : <div style={{ width:34, height:34, borderRadius:"50%", background:"#FFD400", border:"2px solid #2a2a2a", display:"flex", alignItems:"center", justifyContent:"center", fontSize:13, fontWeight:900, color:"#FCEEDC", flexShrink:0 }}>
+              : <div style={{ width:34, height:34, borderRadius:"50%", background:"#FFD400", border:"2px solid #2a2a2a", display:"flex", alignItems:"center", justifyContent:"center", fontSize:13, fontWeight:900, color:"#111110", flexShrink:0 }}>
                   {profile.full_name?.[0]?.toUpperCase() || "A"}
                 </div>
             }
@@ -173,11 +173,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <div style={{ fontSize:12, fontWeight:700, color:"#fff", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
                 {profile.full_name || "Artist"}
               </div>
-              <div style={{ fontSize:10, color:"#555", textTransform:"capitalize", fontWeight:600 }}>
+              <div style={{ fontSize:10, color:"#777", textTransform:"capitalize", fontWeight:600 }}>
                 {profile.role || "artist"}
               </div>
             </div>
-            <ChevronRight size={11} color="#333" />
+            <ChevronRight size={11} color="#555" />
           </div>
         </Link>
       )}
@@ -190,8 +190,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <div style={{ display:"flex", alignItems:"center", gap:10, padding:"9px 12px", marginBottom:6, background: pathname==="/dashboard"?"#FFD400":"transparent", transition:"background 0.1s", cursor:"pointer" }}
             onMouseEnter={e => { if (pathname!=="/dashboard") e.currentTarget.style.background="#1a1a1a"; }}
             onMouseLeave={e => { if (pathname!=="/dashboard") e.currentTarget.style.background="transparent"; }}>
-            <LayoutDashboard size={14} color={pathname==="/dashboard"?"#FCEEDC":"#555"} />
-            <span style={{ fontSize:13, fontWeight: pathname==="/dashboard"?800:600, color: pathname==="/dashboard"?"#FCEEDC":"#aaa" }}>Dashboard</span>
+            <LayoutDashboard size={14} color={pathname==="/dashboard"?"#111110":"#777"} />
+            <span style={{ fontSize:13, fontWeight: pathname==="/dashboard"?800:600, color: pathname==="/dashboard"?"#111110":"#ccc" }}>Dashboard</span>
           </div>
         </Link>
 
@@ -209,11 +209,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 onMouseEnter={e => (e.currentTarget.style.background="#161616")}
                 onMouseLeave={e => (e.currentTarget.style.background= secActive && !isOpen ? "#1c1c1c" : "transparent")}>
                 {/* Colored section dot */}
-                <div style={{ width:6, height:6, borderRadius:"50%", background: secActive ? section.color : "#333", flexShrink:0, transition:"background 0.2s" }} />
-                <span style={{ fontSize:10, fontWeight:800, color: secActive ? "#fff" : "#444", textTransform:"uppercase", letterSpacing:"0.15em", flex:1 }}>
+                <div style={{ width:6, height:6, borderRadius:"50%", background: secActive ? section.color : "#555", flexShrink:0, transition:"background 0.2s" }} />
+                <span style={{ fontSize:10, fontWeight:800, color: secActive ? "#fff" : "#666", textTransform:"uppercase", letterSpacing:"0.15em", flex:1 }}>
                   {section.label}
                 </span>
-                <ChevronDown size={11} color="#444" style={{ transform: isOpen ? "rotate(0deg)" : "rotate(-90deg)", transition:"transform 0.2s", flexShrink:0 }} />
+                <ChevronDown size={11} color="#555" style={{ transform: isOpen ? "rotate(0deg)" : "rotate(-90deg)", transition:"transform 0.2s", flexShrink:0 }} />
               </button>
 
               {/* Items (animated collapse) */}
@@ -227,8 +227,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                         <div style={{ display:"flex", alignItems:"center", gap:9, padding:"7px 10px 7px 12px", borderLeft: `2px solid ${active ? section.color : "transparent"}`, background: active ? "#1c1c1c" : "transparent", transition:"all 0.1s", cursor:"pointer" }}
                           onMouseEnter={e => { if (!active) e.currentTarget.style.background="#161616"; }}
                           onMouseLeave={e => { if (!active) e.currentTarget.style.background="transparent"; }}>
-                          <IIcon size={13} color={active ? section.color : "#4a4a4a"} />
-                          <span style={{ fontSize:13, fontWeight: active ? 700 : 500, color: active ? "#fff" : "#666", flex:1 }}>
+                          <IIcon size={13} color={active ? section.color : "#666"} />
+                          <span style={{ fontSize:13, fontWeight: active ? 700 : 500, color: active ? "#fff" : "#bbb", flex:1 }}>
                             {item.label}
                           </span>
                           {active && <div style={{ width:5, height:5, borderRadius:"50%", background: section.color, flexShrink:0 }} />}
@@ -249,16 +249,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <div style={{ display:"flex", alignItems:"center", gap:8, padding:"10px 14px", background:"#FFD400", marginBottom:4, cursor:"pointer", transition:"box-shadow 0.1s" }}
             onMouseEnter={e => (e.currentTarget.style.boxShadow="3px 3px 0 #444")}
             onMouseLeave={e => (e.currentTarget.style.boxShadow="none")}>
-            <Plus size={14} color="#FCEEDC" strokeWidth={3} />
-            <span style={{ fontSize:12, fontWeight:800, color:"#FCEEDC" }}>Add Artwork</span>
+            <Plus size={14} color="#111110" strokeWidth={3} />
+            <span style={{ fontSize:12, fontWeight:800, color:"#111110" }}>Add Artwork</span>
           </div>
         </Link>
         <button onClick={handleLogout}
           style={{ display:"flex", alignItems:"center", gap:8, width:"100%", padding:"8px 14px", background:"transparent", border:"none", cursor:"pointer", transition:"background 0.1s" }}
           onMouseEnter={e => (e.currentTarget.style.background="#1a1a1a")}
           onMouseLeave={e => (e.currentTarget.style.background="transparent")}>
-          <LogOut size={13} color="#444" />
-          <span style={{ fontSize:12, fontWeight:600, color:"#555" }}>Sign out</span>
+          <LogOut size={13} color="#666" />
+          <span style={{ fontSize:12, fontWeight:600, color:"#888" }}>Sign out</span>
         </button>
       </div>
     </aside>
@@ -296,11 +296,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <div style={{ flex:1, display:"flex", flexDirection:"column", overflow:"hidden", minWidth:0 }}>
 
           {/* Topbar */}
-          <header style={{ flexShrink:0, display:"flex", alignItems:"center", justifyContent:"space-between", padding:"0 20px", height:54, borderBottom:"2px solid #FCEEDC", background:"#fff", gap:12 }}>
+          <header style={{ flexShrink:0, display:"flex", alignItems:"center", justifyContent:"space-between", padding:"0 20px", height:54, borderBottom:"2px solid #111110", background:"#fff", gap:12 }}>
 
             <div style={{ display:"flex", alignItems:"center", gap:12 }}>
               <button className="mob-btn" onClick={() => setSidebarOpen(true)}
-                style={{ width:34, height:34, border:"2px solid #FCEEDC", background:"#fff", display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer" }}>
+                style={{ width:34, height:34, border:"2px solid #111110", background:"#fff", display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer" }}>
                 <Menu size={15} />
               </button>
               {/* Breadcrumb */}
@@ -311,7 +311,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     <ChevronRight size={11} color="#d4cfc4" />
                   </>
                 )}
-                <span style={{ fontSize:13, fontWeight:800, color:"#FCEEDC" }}>{activeItem?.label || "Dashboard"}</span>
+                <span style={{ fontSize:13, fontWeight:800, color:"#111110" }}>{activeItem?.label || "Dashboard"}</span>
               </div>
             </div>
 
@@ -320,15 +320,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               {/* Search */}
               <div style={{ position:"relative" }}>
                 <button onClick={() => setSearchOpen(p=>!p)}
-                  style={{ width:34, height:34, border:"2px solid #FCEEDC", background:searchOpen?"#FFD400":"#fff", display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", boxShadow:"2px 2px 0 #FCEEDC" }}>
+                  style={{ width:34, height:34, border:"2px solid #111110", background:searchOpen?"#FFD400":"#fff", display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", boxShadow:"2px 2px 0 #111110" }}>
                   {searchOpen ? <X size={14}/> : <Search size={14}/>}
                 </button>
                 {searchOpen && (
-                  <div style={{ position:"absolute", top:"calc(100% + 8px)", right:0, width:280, background:"#fff", border:"2px solid #FCEEDC", boxShadow:"4px 4px 0 #FCEEDC", zIndex:50, overflow:"hidden" }}>
+                  <div style={{ position:"absolute", top:"calc(100% + 8px)", right:0, width:280, background:"#fff", border:"2px solid #111110", boxShadow:"4px 4px 0 #111110", zIndex:50, overflow:"hidden" }}>
                     <div style={{ padding:"10px 12px", borderBottom:"1px solid #E0D8CA", display:"flex", alignItems:"center", gap:8 }}>
                       <Search size={13} color="#9B8F7A"/>
                       <input ref={searchRef} value={searchQuery} onChange={e=>setSearchQuery(e.target.value)} placeholder="Search pages…"
-                        style={{ flex:1, border:"none", outline:"none", fontSize:13, fontFamily:"inherit", background:"transparent", color:"#FCEEDC" }}
+                        style={{ flex:1, border:"none", outline:"none", fontSize:13, fontFamily:"inherit", background:"transparent", color:"#111110" }}
                         onKeyDown={e=>{
                           if(e.key==="Escape"){setSearchOpen(false);setSearchQuery("");}
                           if(e.key==="Enter"&&searchResults.length>0){router.push(searchResults[0].href);setSearchOpen(false);setSearchQuery("");}
@@ -341,7 +341,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                           <Link key={item.href} href={item.href} style={{textDecoration:"none"}} onClick={()=>{setSearchOpen(false);setSearchQuery("");}}>
                             <div className="dbs-hover" style={{display:"flex",alignItems:"center",gap:10,padding:"10px 14px",cursor:"pointer",borderBottom:"1px solid #F5F0E8"}}>
                               <item.icon size={14} color="#9B8F7A"/>
-                              <span style={{fontSize:13,fontWeight:600,color:"#FCEEDC"}}>{item.label}</span>
+                              <span style={{fontSize:13,fontWeight:600,color:"#111110"}}>{item.label}</span>
                             </div>
                           </Link>
                         ))
@@ -365,22 +365,22 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               {/* Bell */}
               <div ref={bellRef} style={{position:"relative"}}>
                 <button onClick={()=>setBellOpen(p=>!p)}
-                  style={{width:34,height:34,border:"2px solid #FCEEDC",background:bellOpen?"#FFD400":"#fff",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",boxShadow:"2px 2px 0 #FCEEDC",position:"relative"}}>
+                  style={{width:34,height:34,border:"2px solid #111110",background:bellOpen?"#FFD400":"#fff",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",boxShadow:"2px 2px 0 #111110",position:"relative"}}>
                   <Bell size={14}/>
-                  {unread>0 && <span style={{position:"absolute",top:-6,right:-6,width:16,height:16,borderRadius:"50%",background:"#FFD400",border:"2px solid #FCEEDC",display:"flex",alignItems:"center",justifyContent:"center",fontSize:8,fontWeight:900,color:"#FCEEDC"}}>{unread}</span>}
+                  {unread>0 && <span style={{position:"absolute",top:-6,right:-6,width:16,height:16,borderRadius:"50%",background:"#FFD400",border:"2px solid #111110",display:"flex",alignItems:"center",justifyContent:"center",fontSize:8,fontWeight:900,color:"#111110"}}>{unread}</span>}
                 </button>
                 {bellOpen && (
-                  <div style={{position:"absolute",top:"calc(100% + 8px)",right:0,width:300,background:"#fff",border:"2px solid #FCEEDC",boxShadow:"4px 4px 0 #FCEEDC",zIndex:50,overflow:"hidden"}}>
-                    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 14px",borderBottom:"2px solid #FCEEDC",background:"#F5F0E8"}}>
-                      <span style={{fontSize:12,fontWeight:800,color:"#FCEEDC"}}>Notifications</span>
+                  <div style={{position:"absolute",top:"calc(100% + 8px)",right:0,width:300,background:"#fff",border:"2px solid #111110",boxShadow:"4px 4px 0 #111110",zIndex:50,overflow:"hidden"}}>
+                    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 14px",borderBottom:"2px solid #111110",background:"#F5F0E8"}}>
+                      <span style={{fontSize:12,fontWeight:800,color:"#111110"}}>Notifications</span>
                       <button onClick={()=>setNotifs(p=>p.map(n=>({...n,read:true})))} style={{fontSize:10,fontWeight:700,color:"#9B8F7A",background:"none",border:"none",cursor:"pointer"}}>Mark all read</button>
                     </div>
                     {notifs.map((n,i)=>(
                       <div key={n.id} className="dbn-hover" onClick={()=>setNotifs(p=>p.map(x=>x.id===n.id?{...x,read:true}:x))}
                         style={{display:"flex",alignItems:"flex-start",gap:10,padding:"11px 14px",borderBottom:i<notifs.length-1?"1px solid #F5F0E8":"none",background:n.read?"#fff":"#FFFBEA",cursor:"pointer"}}>
-                        <div style={{width:8,height:8,borderRadius:"50%",background:n.read?"#d4cfc4":n.dot,flexShrink:0,marginTop:4,border:n.read?"none":"1.5px solid #FCEEDC"}}/>
+                        <div style={{width:8,height:8,borderRadius:"50%",background:n.read?"#d4cfc4":n.dot,flexShrink:0,marginTop:4,border:n.read?"none":"1.5px solid #111110"}}/>
                         <div style={{flex:1,minWidth:0}}>
-                          <div style={{fontSize:12,fontWeight:n.read?500:700,color:"#FCEEDC",lineHeight:1.4}}>{n.text}</div>
+                          <div style={{fontSize:12,fontWeight:n.read?500:700,color:"#111110",lineHeight:1.4}}>{n.text}</div>
                           <div style={{fontSize:10,color:"#9B8F7A",marginTop:2}}>{n.time}</div>
                         </div>
                       </div>
@@ -393,8 +393,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               {profile && (
                 <Link href="/dashboard/profile">
                   {profile.avatar_url
-                    ? <img src={profile.avatar_url} alt="" style={{width:34,height:34,borderRadius:"50%",objectFit:"cover",border:"2px solid #FCEEDC",cursor:"pointer"}}/>
-                    : <div style={{width:34,height:34,borderRadius:"50%",background:"#FFD400",border:"2px solid #FCEEDC",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:900,color:"#FCEEDC",cursor:"pointer"}}>
+                    ? <img src={profile.avatar_url} alt="" style={{width:34,height:34,borderRadius:"50%",objectFit:"cover",border:"2px solid #111110",cursor:"pointer"}}/>
+                    : <div style={{width:34,height:34,borderRadius:"50%",background:"#FFD400",border:"2px solid #111110",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:900,color:"#111110",cursor:"pointer"}}>
                         {profile.full_name?.[0]?.toUpperCase()||"A"}
                       </div>
                   }
@@ -403,7 +403,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
               {/* New CTA */}
               <Link href="/dashboard/artworks/new" style={{textDecoration:"none"}} className="hidden sm:block">
-                <button style={{display:"flex",alignItems:"center",gap:6,padding:"7px 14px",border:"2px solid #FCEEDC",background:"#FCEEDC",color:"#FFD400",fontWeight:800,fontSize:12,cursor:"pointer",boxShadow:"2px 2px 0 #FFD400"}}>
+                <button style={{display:"flex",alignItems:"center",gap:6,padding:"7px 14px",border:"2px solid #111110",background:"#111110",color:"#FFD400",fontWeight:800,fontSize:12,cursor:"pointer",boxShadow:"2px 2px 0 #FFD400"}}>
                   <Plus size={13} strokeWidth={3}/> New
                 </button>
               </Link>
@@ -418,7 +418,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </main>
 
           {/* Footer */}
-          <footer style={{flexShrink:0,borderTop:"2px solid #FCEEDC",background:"#fff",display:"flex",alignItems:"center",justifyContent:"space-between",padding:"6px 20px"}}>
+          <footer style={{flexShrink:0,borderTop:"2px solid #111110",background:"#fff",display:"flex",alignItems:"center",justifyContent:"space-between",padding:"6px 20px"}}>
             <span style={{fontSize:10,fontWeight:700,color:"#9B8F7A",textTransform:"uppercase",letterSpacing:"0.1em"}}>Artfolio ✦</span>
             <span style={{fontSize:10,fontWeight:700,color:"#d4cfc4"}}>© 2026</span>
           </footer>

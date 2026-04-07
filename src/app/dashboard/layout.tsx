@@ -388,19 +388,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           {/* ══ PILL NAV ══ */}
           <div className="am-nav-pill" style={{ display: "flex", alignItems: "center", gap: 4, padding: "5px 6px 5px 10px", position: "relative" }}>
 
-            {/* Artomango logo glyph */}
-            <Link href="/dashboard" style={{ display: "flex", alignItems: "center", textDecoration: "none", flexShrink: 0 }}>
-              <svg width="28" height="28" viewBox="-70 -60 140 130" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M -8,-46 C 8,-50 38,-42 52,-24 C 66,-6 62,18 48,34 C 34,50 10,58 -14,54 C -38,50 -54,34 -54,14 C -54,-8 -44,-30 -28,-40 C -20,-44 -14,-44 -8,-46 Z" stroke="#111110" strokeWidth="7" strokeLinecap="round" strokeLinejoin="round"/>
-                <path d="M 38,-36 C 44,-44 56,-48 62,-42 C 56,-36 46,-34 38,-36 Z" stroke="#111110" strokeWidth="6" strokeLinecap="round" strokeLinejoin="round"/>
-                <path d="M 44,-30 C 52,-36 62,-34 64,-26 C 56,-26 48,-28 44,-30 Z" stroke="#111110" strokeWidth="6" strokeLinecap="round" strokeLinejoin="round"/>
-                <path d="M -30,-22 C -22,-32 -8,-34 2,-28" stroke="#111110" strokeWidth="5" strokeLinecap="round"/>
-                <path d="M -34,40 C -24,54 -4,60 10,40 C -4,60 -24,54 -34,40" stroke="#111110" strokeWidth="2" strokeLinecap="round" fill="none"/>
-                <ellipse cx="-4" cy="14" rx="30" ry="26" stroke="#111110" strokeWidth="6" strokeLinecap="round"/>
-                <path d="M -18,20 C -12,32 4,32 12,20" stroke="#111110" strokeWidth="6" strokeLinecap="round"/>
-                <circle cx="-12" cy="6" r="5.5" fill="#111110"/>
-                <circle cx="8" cy="6" r="5.5" fill="#111110"/>
-              </svg>
+            {/* Artomango logo */}
+            <Link href="/dashboard" style={{ display: "flex", alignItems: "center", textDecoration: "none", flexShrink: 0, fontSize: 24, lineHeight: 1, padding: "2px 2px" }}>
+              🥭
             </Link>
 
             <div className="am-divider" />
@@ -590,16 +580,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <div className="am-mobile-panel" style={{ marginTop: 64 }}>
             {/* Brand header */}
             <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 12px 12px", borderBottom: "1px solid #E0D8CA", marginBottom: 8 }}>
-              <svg width="24" height="24" viewBox="-70 -60 140 130" fill="none">
-                <path d="M -8,-46 C 8,-50 38,-42 52,-24 C 66,-6 62,18 48,34 C 34,50 10,58 -14,54 C -38,50 -54,34 -54,14 C -54,-8 -44,-30 -28,-40 C -20,-44 -14,-44 -8,-46 Z" stroke="#111110" strokeWidth="7" strokeLinecap="round" strokeLinejoin="round"/>
-                <path d="M 38,-36 C 44,-44 56,-48 62,-42 C 56,-36 46,-34 38,-36 Z" stroke="#111110" strokeWidth="6" strokeLinecap="round" strokeLinejoin="round"/>
-                <path d="M 44,-30 C 52,-36 62,-34 64,-26 C 56,-26 48,-28 44,-30 Z" stroke="#111110" strokeWidth="6" strokeLinecap="round" strokeLinejoin="round"/>
-                <path d="M -30,-22 C -22,-32 -8,-34 2,-28" stroke="#111110" strokeWidth="5" strokeLinecap="round"/>
-                <ellipse cx="-4" cy="14" rx="30" ry="26" stroke="#111110" strokeWidth="6"/>
-                <path d="M -18,20 C -12,32 4,32 12,20" stroke="#111110" strokeWidth="6" strokeLinecap="round"/>
-                <circle cx="-12" cy="6" r="5.5" fill="#111110"/>
-                <circle cx="8" cy="6" r="5.5" fill="#111110"/>
-              </svg>
+              <span style={{ fontSize: 22, lineHeight: 1 }}>🥭</span>
               <span style={{ fontSize: 16, fontWeight: 900, color: "#111110", letterSpacing: "-0.3px" }}>artomango</span>
             </div>
             {/* Dashboard */}

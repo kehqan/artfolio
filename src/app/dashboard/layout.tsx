@@ -8,7 +8,7 @@ import {
   CalendarDays, LogOut, Bell, Search, Plus, X,
   ChevronDown, Handshake, TrendingUp, CheckSquare,
   MapPin, CalendarRange, Menu, DollarSign, Sparkles,
-  BellOff, Check,
+  BellOff, Check, ShoppingBag,
 } from "lucide-react";
 
 // ── Nav structure ──────────────────────────────────────────────────
@@ -19,6 +19,7 @@ const NAV_SECTIONS = [
     icon: ImageIcon,
     items: [
       { href: "/dashboard/artworks",   label: "Artworks",  icon: ImageIcon,    desc: "Manage your artwork inventory" },
+      { href: "/dashboard/mystore",    label: "MyStore",   icon: ShoppingBag,  desc: "Your public storefront"        },
       { href: "/dashboard/portfolio",  label: "Portfolio", icon: Globe,        desc: "Your public portfolio page"    },
     ],
   },

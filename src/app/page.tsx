@@ -1,820 +1,471 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
+import { createClient } from "@/lib/supabase/client";
+import {
+  Search, MapPin, ArrowRight, X, ChevronDown,
+  Palette, Building2, Users, Grid3X3,
+} from "lucide-react";
+
+// ── Types ─────────────────────────────────────────────────────────
+type Artwork = {
+  id: string; title: string; medium?: string; year?: number;
+  price?: number; currency?: string; images?: string[];
+  venue_location?: string; location?: string; user_id?: string;
+  artist_name?: string; artist_avatar?: string;
+};
+
+type Artist = {
+  id: string; full_name: string; username?: string; role?: string;
+  bio?: string; location?: string; avatar_url?: string;
+  mediums?: string[]; style_tags?: string[]; artwork_count?: number;
+  cover_image?: string;
+};
+
+type Tab = "artworks" | "artists";
+
+const MEDIUMS = ["All","Oil","Photography","Sculpture","Digital","Printmaking","Mixed media","Ceramics"];
+
+// ── Ripe style tokens ─────────────────────────────────────────────
+const R = {
+  yellow:  "#FFD400",
+  black:   "#111110",
+  paper:   "#FFFBEA",
+  cream:   "#F5F0E8",
+  linen:   "#FAF7F3",
+  warm:    "#9B8F7A",
+  border:  "#E8E0D0",
+  shadow:  "#D4C9A8",
+};
+
+// ── Hero ticker words ─────────────────────────────────────────────
+const TICKER = ["Manage.", "Exhibit.", "Collab.", "Discover.", "Collect.", "Connect.", "Create.", "Manage.", "Exhibit.", "Collab."];
 
 export default function HomePage() {
-  const [scrolled, setScrolled] = useState(false);
-  const [mobileOpen, setMobileOpen] = useState(false);
-  const [activeFeature, setActiveFeature] = useState(0);
-  const [ticker, setTicker] = useState(0);
+  const [tab,        setTab]        = useState<Tab>("artworks");
+  const [artworks,   setArtworks]   = useState<Artwork[]>([]);
+  const [artists,    setArtists]    = useState<Artist[]>([]);
+  const [search,     setSearch]     = useState("");
+  const [medium,     setMedium]     = useState("All");
+  const [loading,    setLoading]    = useState(true);
+  const [scrolled,   setScrolled]   = useState(false);
+  const [hoverCard,  setHoverCard]  = useState<string | null>(null);
+  const [mobileMenu, setMobileMenu] = useState(false);
+  const exploreRef   = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    loadData();
     const onScroll = () => setScrolled(window.scrollY > 20);
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  useEffect(() => {
-    const id = setInterval(() => setTicker(t => t + 1), 50);
-    return () => clearInterval(id);
-  }, []);
+  async function loadData() {
+    setLoading(true);
+    const sb = createClient();
 
-  const features = [
-    { id: "studio",   emoji: "🎨", label: "Studio",   title: "Every artwork.\nAlways tracked.", desc: "Inventory, images, location, price, status — one place, zero spreadsheets.", tag: "Art Inventory" },
-    { id: "portfolio",emoji: "🌐", label: "Portfolio", title: "Your gallery,\nlive on the web.", desc: "A public portfolio page at artomango.com/you. Send it anywhere. No design needed.", tag: "Public Profile" },
-    { id: "scene",    emoji: "🗺️", label: "Scene",     title: "Prague art scene,\non one map.", desc: "Events, collabs, venues — discover and connect with the local art world.", tag: "Art Scene Map" },
-    { id: "collabs",  emoji: "🤝", label: "Collabs",   title: "Post. Match.\nCreate.", desc: "Artists find wall space. Venues find art. The Discovery Pool connects both sides.", tag: "Collaboration" },
-    { id: "business", emoji: "📊", label: "Business",  title: "Know your numbers.\nGrow what matters.", desc: "Sales, commissions, collectors, analytics — your art is also your business.", tag: "Sales & CRM" },
-    { id: "planner",  emoji: "📅", label: "Planner",   title: "Plan shows.\nManage everything.", desc: "Exhibitions, tasks, calendar — organized so you can focus on making work.", tag: "Planner" },
-  ];
+    // Load artworks with artist info
+    const { data: awData } = await sb
+      .from("artworks")
+      .select("id, title, medium, year, price, currency, images, venue_location, location, user_id")
+      .in("status", ["available", "Available"])
+      .not("images", "is", null)
+      .order("created_at", { ascending: false })
+      .limit(48);
 
-  const tickerWords = ["Manage.", "Exhibit.", "Collab.", "Grow.", "Discover.", "Connect.", "Create.", "Manage.", "Exhibit.", "Collab."];
+    if (awData?.length) {
+      // Enrich with artist name/avatar
+      const userIds = [...new Set(awData.map(a => a.user_id).filter(Boolean))];
+      const { data: profiles } = await sb.from("profiles").select("id, full_name, avatar_url").in("id", userIds);
+      const profMap: Record<string, any> = {};
+      profiles?.forEach(p => { profMap[p.id] = p; });
+      setArtworks(awData.map(a => ({
+        ...a,
+        artist_name:   profMap[a.user_id!]?.full_name || "Artist",
+        artist_avatar: profMap[a.user_id!]?.avatar_url || null,
+      })));
+    }
+
+    // Load artists/venues
+    const { data: artistData } = await sb
+      .from("profiles")
+      .select("id, full_name, username, role, bio, location, avatar_url, mediums, style_tags")
+      .not("full_name", "is", null)
+      .neq("full_name", "")
+      .limit(40);
+
+    if (artistData?.length) {
+      const enriched = await Promise.all(artistData.map(async p => {
+        const [{ count }, { data: cover }] = await Promise.all([
+          sb.from("artworks").select("*", { count: "exact", head: true }).eq("user_id", p.id),
+          sb.from("artworks").select("images").eq("user_id", p.id).not("images", "is", null).limit(1).maybeSingle(),
+        ]);
+        return { ...p, artwork_count: count || 0, cover_image: cover?.images?.[0] || null };
+      }));
+      setArtists(enriched);
+    }
+
+    setLoading(false);
+  }
+
+  function scrollToExplore() {
+    exploreRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  // Filter
+  const filteredArtworks = artworks.filter(a => {
+    const q = search.toLowerCase();
+    const matchQ = !search || a.title.toLowerCase().includes(q) || (a.medium||"").toLowerCase().includes(q) || (a.artist_name||"").toLowerCase().includes(q);
+    const matchM = medium === "All" || (a.medium||"").toLowerCase().includes(medium.toLowerCase());
+    return matchQ && matchM;
+  });
+
+  const filteredArtists = artists.filter(a => {
+    const q = search.toLowerCase();
+    return !search || (a.full_name||"").toLowerCase().includes(q) || (a.location||"").toLowerCase().includes(q);
+  });
+
+  const initials = (name: string) => name?.split(" ").map(w => w[0]).join("").slice(0,2).toUpperCase() || "A";
 
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Darker+Grotesque:wght@300;400;500;600;700;800;900&display=swap');
-
+        @import url('https://fonts.googleapis.com/css2?family=Darker+Grotesque:wght@400;500;600;700;800;900&display=swap');
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
         html { scroll-behavior: smooth; }
-
         body {
           font-family: 'Darker Grotesque', system-ui, sans-serif;
-          background: #FFFBEA;
-          color: #111110;
+          background: ${R.paper};
+          color: ${R.black};
           overflow-x: hidden;
         }
 
-        /* ── NAVBAR ── */
+        /* ── Sticky nav ── */
         .nav {
-          position: fixed;
-          top: 0; left: 0; right: 0;
-          z-index: 100;
-          padding: 12px 20px;
+          position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+          padding: 10px 20px;
           transition: padding 0.2s;
         }
-        .nav.scrolled { padding: 8px 20px; }
-
+        .nav.scrolled { padding: 7px 20px; }
         .nav-pill {
-          max-width: 1100px;
-          margin: 0 auto;
-          display: flex;
-          align-items: center;
-          gap: 4px;
-          background: #fff;
-          border: 2.5px solid #111110;
-          border-radius: 9999px;
-          padding: 5px 6px 5px 10px;
-          box-shadow: 4px 4px 0 #111110;
+          max-width: 1100px; margin: 0 auto;
+          display: flex; align-items: center; gap: 4px;
+          background: #fff; border: 2.5px solid ${R.black};
+          border-radius: 9999px; padding: 5px 6px 5px 10px;
+          box-shadow: 4px 4px 0 ${R.black};
           transition: box-shadow 0.15s;
         }
-        .nav-pill:hover { box-shadow: 6px 6px 0 #111110; }
-
-        .nav-logo {
-          font-size: 22px;
-          line-height: 1;
-          text-decoration: none;
-          flex-shrink: 0;
-          display: flex;
-          align-items: center;
-          gap: 6px;
-        }
-        .nav-logo-text {
-          font-size: 16px;
-          font-weight: 900;
-          color: #111110;
-          letter-spacing: -0.3px;
-        }
-        .nav-links {
-          display: flex;
-          align-items: center;
-          gap: 0;
-          flex: 1;
-          justify-content: center;
-        }
+        .nav-pill:hover { box-shadow: 5px 5px 0 ${R.black}; }
+        .nav-logo { display: flex; align-items: center; gap: 6px; text-decoration: none; flex-shrink: 0; }
+        .nav-logo-text { font-size: 16px; font-weight: 900; color: ${R.black}; letter-spacing: -0.3px; }
+        .nav-links { display: flex; flex: 1; justify-content: center; gap: 2px; }
         .nav-link {
-          padding: 7px 14px;
-          font-size: 14px;
-          font-weight: 700;
-          color: #111110;
-          text-decoration: none;
-          border-radius: 9999px;
-          transition: background 0.1s;
+          padding: 7px 13px; font-size: 14px; font-weight: 700; color: ${R.black};
+          text-decoration: none; border-radius: 9999px; transition: background 0.1s;
           white-space: nowrap;
         }
-        .nav-link:hover { background: #F5F0E8; }
+        .nav-link:hover { background: ${R.cream}; }
+        .nav-divider { width: 1px; height: 22px; background: ${R.border}; margin: 0 4px; flex-shrink: 0; }
+        .btn-ghost { padding: 7px 14px; font-size: 13px; font-weight: 700; color: ${R.black}; text-decoration: none; border-radius: 9999px; border: 2px solid transparent; transition: background 0.1s; font-family: inherit; background: none; cursor: pointer; white-space: nowrap; }
+        .btn-ghost:hover { background: ${R.cream}; }
+        .btn-pill-cta { padding: 7px 18px; font-size: 13px; font-weight: 800; color: ${R.black}; background: ${R.yellow}; border-radius: 9999px; border: 2px solid ${R.black}; text-decoration: none; white-space: nowrap; transition: box-shadow 0.1s; }
+        .btn-pill-cta:hover { box-shadow: 2px 2px 0 ${R.black}; }
 
-        .nav-divider {
-          width: 1px; height: 22px;
-          background: #E0D8CA;
-          flex-shrink: 0;
-          margin: 0 4px;
-        }
-
-        .nav-cta {
-          display: flex;
-          align-items: center;
-          gap: 4px;
-        }
-        .btn-ghost-sm {
-          padding: 7px 14px;
-          font-size: 13px;
-          font-weight: 700;
-          color: #111110;
-          text-decoration: none;
-          border-radius: 9999px;
-          border: 2px solid transparent;
-          transition: background 0.1s, border-color 0.1s;
-          font-family: inherit;
-          background: none;
-          cursor: pointer;
-          white-space: nowrap;
-        }
-        .btn-ghost-sm:hover { background: #F5F0E8; border-color: #E0D8CA; }
-        .btn-primary-sm {
-          padding: 7px 18px;
-          font-size: 13px;
-          font-weight: 800;
-          color: #111110;
-          background: #FFD400;
-          border-radius: 9999px;
-          border: 2px solid #111110;
-          text-decoration: none;
-          white-space: nowrap;
-          transition: box-shadow 0.1s;
-          cursor: pointer;
-          font-family: inherit;
-        }
-        .btn-primary-sm:hover { box-shadow: 2px 2px 0 #111110; }
-
-        /* ── HERO ── */
+        /* ── Hero ── */
         .hero {
           min-height: 100vh;
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          border-bottom: 3px solid #111110;
-          padding-top: 80px;
-        }
-
-        .hero-left {
-          padding: 80px 60px 80px 40px;
-          border-right: 3px solid #111110;
-          display: flex;
-          flex-direction: column;
-          justify-content: center;
-          position: relative;
-          background: #FFD400;
-        }
-
-        .hero-eyebrow {
-          display: inline-flex;
-          align-items: center;
-          gap: 8px;
-          background: #111110;
-          color: #FFD400;
-          padding: 4px 12px;
-          font-size: 10px;
-          font-weight: 800;
-          letter-spacing: 0.2em;
-          text-transform: uppercase;
-          margin-bottom: 28px;
-          width: fit-content;
-        }
-
-        .hero-title {
-          font-size: clamp(52px, 7vw, 88px);
-          font-weight: 900;
-          letter-spacing: -3px;
-          line-height: 0.92;
-          color: #111110;
-          margin-bottom: 28px;
-        }
-
-        .hero-title .invert {
-          display: inline-block;
-          background: #111110;
-          color: #FFD400;
-          padding: 2px 12px 6px;
-          line-height: 1;
-        }
-
-        .hero-sub {
-          font-size: 18px;
-          font-weight: 600;
-          color: #111110;
-          line-height: 1.5;
-          max-width: 380px;
-          margin-bottom: 40px;
-          opacity: 0.75;
-        }
-
-        .hero-actions {
-          display: flex;
-          gap: 12px;
-          flex-wrap: wrap;
-        }
-
-        .btn-hero-primary {
-          display: inline-flex;
-          align-items: center;
-          gap: 8px;
-          padding: 14px 28px;
-          background: #111110;
-          color: #FFD400;
-          font-family: inherit;
-          font-size: 15px;
-          font-weight: 800;
-          border: 2.5px solid #111110;
-          text-decoration: none;
-          cursor: pointer;
-          transition: box-shadow 0.1s, transform 0.1s;
-          box-shadow: 4px 4px 0 rgba(0,0,0,0.25);
-        }
-        .btn-hero-primary:hover {
-          box-shadow: 6px 6px 0 rgba(0,0,0,0.3);
-          transform: translate(-1px, -1px);
-        }
-
-        .btn-hero-secondary {
-          display: inline-flex;
-          align-items: center;
-          gap: 8px;
-          padding: 14px 28px;
-          background: transparent;
-          color: #111110;
-          font-family: inherit;
-          font-size: 15px;
-          font-weight: 800;
-          border: 2.5px solid #111110;
-          text-decoration: none;
-          cursor: pointer;
-          transition: background 0.1s;
-        }
-        .btn-hero-secondary:hover { background: rgba(0,0,0,0.06); }
-
-        .hero-right {
-          background: #111110;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          padding: 60px 40px;
-          position: relative;
-          overflow: hidden;
-        }
-
-        .hero-mango {
-          font-size: 140px;
-          line-height: 1;
-          display: block;
-          animation: floatMango 3s ease-in-out infinite;
-          filter: drop-shadow(0 20px 40px rgba(0,0,0,0.5));
-          margin-bottom: 32px;
-        }
-
-        @keyframes floatMango {
-          0%, 100% { transform: translateY(0) rotate(-3deg); }
-          50% { transform: translateY(-16px) rotate(3deg); }
-        }
-
-        .hero-stats {
-          display: grid;
-          grid-template-columns: 1fr 1fr 1fr;
-          gap: 0;
-          border: 2px solid #333;
-          width: 100%;
-          max-width: 340px;
-        }
-
-        .hero-stat {
-          padding: 16px 12px;
-          text-align: center;
-          border-right: 1px solid #333;
-        }
-        .hero-stat:last-child { border-right: none; }
-        .hero-stat-num {
-          font-size: 28px;
-          font-weight: 900;
-          color: #FFD400;
-          letter-spacing: -1px;
-          display: block;
-        }
-        .hero-stat-label {
-          font-size: 10px;
-          font-weight: 700;
-          color: #666;
-          text-transform: uppercase;
-          letter-spacing: 0.12em;
-        }
-
-        /* ── TICKER ── */
-        .ticker-wrap {
-          background: #FFD400;
-          border-top: 3px solid #111110;
-          border-bottom: 3px solid #111110;
-          padding: 14px 0;
-          overflow: hidden;
-          white-space: nowrap;
-        }
-        .ticker-track {
-          display: inline-flex;
-          gap: 48px;
-          animation: ticker 20s linear infinite;
-        }
-        @keyframes ticker {
-          from { transform: translateX(0); }
-          to { transform: translateX(-50%); }
-        }
-        .ticker-item {
-          font-size: 15px;
-          font-weight: 800;
-          color: #111110;
-          letter-spacing: 0.05em;
-          text-transform: uppercase;
-          display: inline-flex;
-          align-items: center;
-          gap: 12px;
-          flex-shrink: 0;
-        }
-        .ticker-dot {
-          width: 6px;
-          height: 6px;
-          background: #111110;
-          border-radius: 50%;
-          flex-shrink: 0;
-        }
-
-        /* ── FEATURES ── */
-        .features {
-          display: grid;
-          grid-template-columns: 280px 1fr;
-          border-bottom: 3px solid #111110;
-          min-height: 560px;
-        }
-
-        .features-nav {
-          border-right: 3px solid #111110;
-          background: #FFFBEA;
-        }
-        .features-nav-header {
-          padding: 28px 24px 16px;
-          border-bottom: 1px solid #E0D8CA;
-        }
-        .features-nav-label {
-          font-size: 10px;
-          font-weight: 800;
-          color: #9B8F7A;
-          text-transform: uppercase;
-          letter-spacing: 0.2em;
-        }
-        .features-nav-title {
-          font-size: 20px;
-          font-weight: 900;
-          color: #111110;
-          letter-spacing: -0.5px;
-          margin-top: 4px;
-        }
-
-        .feature-tab {
-          display: flex;
-          align-items: center;
-          gap: 12px;
-          padding: 16px 24px;
-          cursor: pointer;
-          border-bottom: 1px solid #E0D8CA;
-          transition: background 0.1s;
-          background: transparent;
-          border-left: 3px solid transparent;
-          width: 100%;
-          text-align: left;
-          font-family: inherit;
-        }
-        .feature-tab:hover { background: #F5F0E8; }
-        .feature-tab.active {
-          background: #FFD400;
-          border-left-color: #111110;
-          border-bottom-color: #111110;
-        }
-        .feature-tab-emoji { font-size: 20px; line-height: 1; }
-        .feature-tab-label {
-          font-size: 14px;
-          font-weight: 800;
-          color: #111110;
-        }
-        .feature-tab-tag {
-          font-size: 10px;
-          font-weight: 600;
-          color: #9B8F7A;
-          margin-top: 1px;
-        }
-        .feature-tab.active .feature-tab-tag { color: #5C5346; }
-
-        .features-content {
-          padding: 56px 60px;
-          display: flex;
-          flex-direction: column;
-          justify-content: center;
-          background: #FFFBEA;
-          position: relative;
-        }
-
-        .feature-num {
-          font-size: 120px;
-          font-weight: 900;
-          color: #F5F0E8;
-          position: absolute;
-          top: 20px;
-          right: 32px;
-          line-height: 1;
-          letter-spacing: -4px;
-          pointer-events: none;
-          user-select: none;
-        }
-
-        .feature-emoji-large {
-          font-size: 56px;
-          line-height: 1;
-          margin-bottom: 20px;
-          display: block;
-        }
-
-        .feature-title {
-          font-size: clamp(32px, 4vw, 48px);
-          font-weight: 900;
-          color: #111110;
-          letter-spacing: -1.5px;
-          line-height: 1;
-          white-space: pre-line;
-          margin-bottom: 20px;
-        }
-
-        .feature-desc {
-          font-size: 16px;
-          font-weight: 500;
-          color: #5C5346;
-          line-height: 1.7;
-          max-width: 480px;
-          margin-bottom: 28px;
-        }
-
-        .feature-badge {
-          display: inline-flex;
-          align-items: center;
-          background: #111110;
-          color: #FFD400;
-          padding: 5px 14px;
-          font-size: 11px;
-          font-weight: 800;
-          letter-spacing: 0.12em;
-          text-transform: uppercase;
-        }
-
-        /* ── HOW IT WORKS ── */
-        .how {
-          background: #111110;
-          padding: 80px 40px;
-          border-bottom: 3px solid #111110;
-        }
-
-        .how-inner {
-          max-width: 1100px;
-          margin: 0 auto;
-        }
-
-        .how-header {
-          margin-bottom: 56px;
-        }
-
-        .section-eyebrow {
-          display: inline-block;
-          background: #FFD400;
-          color: #111110;
-          padding: 3px 12px;
-          font-size: 10px;
-          font-weight: 800;
-          letter-spacing: 0.2em;
-          text-transform: uppercase;
-          margin-bottom: 16px;
-        }
-        .section-eyebrow.light {
-          background: #1a1a1a;
-          color: #FFD400;
-          border: 1px solid #333;
-        }
-
-        .section-title {
-          font-size: clamp(32px, 4vw, 52px);
-          font-weight: 900;
-          letter-spacing: -2px;
-          line-height: 1.05;
-        }
-        .section-title.light { color: #fff; }
-        .section-title.dark { color: #111110; }
-
-        .steps {
-          display: grid;
-          grid-template-columns: repeat(3, 1fr);
-          gap: 0;
-          border: 2px solid #333;
-        }
-
-        .step {
-          padding: 40px 32px;
-          border-right: 1px solid #333;
-          position: relative;
-        }
-        .step:last-child { border-right: none; }
-
-        .step-num {
-          font-size: 11px;
-          font-weight: 800;
-          color: #FFD400;
-          letter-spacing: 0.2em;
-          text-transform: uppercase;
-          margin-bottom: 20px;
-          display: flex;
-          align-items: center;
-          gap: 8px;
-        }
-        .step-num::after {
-          content: '';
-          flex: 1;
-          height: 1px;
-          background: #333;
-        }
-
-        .step-emoji { font-size: 36px; line-height: 1; margin-bottom: 16px; display: block; }
-
-        .step-title {
-          font-size: 22px;
-          font-weight: 900;
-          color: #fff;
-          letter-spacing: -0.5px;
-          margin-bottom: 12px;
-        }
-
-        .step-desc {
-          font-size: 14px;
-          font-weight: 500;
-          color: #666;
-          line-height: 1.7;
-        }
-
-        /* ── CTA BAND ── */
-        .cta-band {
-          background: #FFD400;
-          border-bottom: 3px solid #111110;
-          padding: 80px 40px;
-          display: grid;
-          grid-template-columns: 1fr auto;
-          align-items: center;
-          gap: 40px;
-          max-width: 100%;
-        }
-
-        .cta-inner { max-width: 1100px; margin: 0 auto; width: 100%; display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 40px; }
-
-        .cta-title {
-          font-size: clamp(36px, 5vw, 64px);
-          font-weight: 900;
-          color: #111110;
-          letter-spacing: -2px;
-          line-height: 1;
-        }
-
-        .cta-title .strikethrough {
-          position: relative;
-          display: inline-block;
-        }
-        .cta-title .strikethrough::after {
-          content: '';
-          position: absolute;
-          left: 0; right: 0;
-          top: 50%;
-          height: 4px;
-          background: #111110;
-          transform: rotate(-2deg);
-        }
-
-        .btn-hero-dark {
-          display: inline-flex;
-          align-items: center;
-          gap: 10px;
-          padding: 18px 36px;
-          background: #111110;
-          color: #FFD400;
-          font-family: inherit;
-          font-size: 16px;
-          font-weight: 800;
-          border: none;
-          text-decoration: none;
-          cursor: pointer;
-          transition: box-shadow 0.1s, transform 0.1s;
-          box-shadow: 6px 6px 0 rgba(0,0,0,0.3);
-          white-space: nowrap;
-          flex-shrink: 0;
-        }
-        .btn-hero-dark:hover {
-          box-shadow: 8px 8px 0 rgba(0,0,0,0.3);
-          transform: translate(-1px, -1px);
-        }
-
-        /* ── SOCIAL PROOF ── */
-        .proof {
-          background: #FFFBEA;
-          padding: 80px 40px;
-          border-bottom: 3px solid #111110;
-        }
-        .proof-inner { max-width: 1100px; margin: 0 auto; }
-        .proof-grid {
-          display: grid;
-          grid-template-columns: repeat(3, 1fr);
-          gap: 0;
-          border: 2.5px solid #111110;
-          box-shadow: 6px 6px 0 #111110;
-          margin-top: 48px;
-        }
-        .proof-card {
-          padding: 36px 32px;
-          border-right: 2px solid #111110;
-          position: relative;
-        }
-        .proof-card:last-child { border-right: none; }
-        .proof-card::before {
-          content: '"';
-          position: absolute;
-          top: 16px;
-          left: 24px;
-          font-size: 72px;
-          font-weight: 900;
-          color: #FFD400;
-          line-height: 1;
-          opacity: 0.5;
-        }
-        .proof-quote {
-          font-size: 16px;
-          font-weight: 600;
-          color: #111110;
-          line-height: 1.6;
-          margin-top: 40px;
-          margin-bottom: 24px;
-        }
-        .proof-author {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-        }
-        .proof-avatar {
-          width: 36px;
-          height: 36px;
-          border-radius: 50%;
-          background: #FFD400;
-          border: 2px solid #111110;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-size: 16px;
-          font-weight: 900;
-          color: #111110;
-          flex-shrink: 0;
-        }
-        .proof-name {
-          font-size: 13px;
-          font-weight: 800;
-          color: #111110;
-        }
-        .proof-role {
-          font-size: 11px;
-          font-weight: 600;
-          color: #9B8F7A;
-        }
-
-        /* ── FOOTER ── */
-        .footer {
-          background: #111110;
-          padding: 48px 40px 28px;
-        }
-        .footer-inner {
-          max-width: 1100px;
-          margin: 0 auto;
-        }
-        .footer-top {
-          display: grid;
-          grid-template-columns: 1fr 1fr 1fr 1fr;
-          gap: 40px;
-          padding-bottom: 40px;
-          border-bottom: 1px solid #222;
-          margin-bottom: 28px;
-        }
-        .footer-brand {
-          grid-column: span 1;
-        }
-        .footer-logo {
-          font-size: 32px;
-          display: block;
-          margin-bottom: 8px;
-        }
-        .footer-brand-name {
-          font-size: 18px;
-          font-weight: 900;
-          color: #fff;
-          letter-spacing: -0.3px;
-          display: block;
-          margin-bottom: 8px;
-        }
-        .footer-tagline {
-          font-size: 12px;
-          font-weight: 600;
-          color: #555;
-          line-height: 1.5;
-        }
-        .footer-col-title {
-          font-size: 10px;
-          font-weight: 800;
-          color: #FFD400;
-          text-transform: uppercase;
-          letter-spacing: 0.15em;
-          margin-bottom: 16px;
-        }
-        .footer-link {
-          display: block;
-          font-size: 13px;
-          font-weight: 600;
-          color: #555;
-          text-decoration: none;
-          margin-bottom: 10px;
-          transition: color 0.1s;
-        }
-        .footer-link:hover { color: #fff; }
-        .footer-bottom {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          flex-wrap: wrap;
-          gap: 12px;
-        }
-        .footer-copy {
-          font-size: 11px;
-          font-weight: 600;
-          color: #333;
-        }
-
-        /* ── MOBILE ── */
-        .mobile-menu {
-          position: fixed;
-          inset: 0;
-          z-index: 200;
-          display: flex;
-          flex-direction: column;
-        }
-        .mobile-overlay {
-          position: absolute;
-          inset: 0;
-          background: rgba(0,0,0,0.6);
-          backdrop-filter: blur(2px);
-        }
-        .mobile-panel {
-          position: relative;
-          background: #FFFBEA;
-          border-bottom: 3px solid #111110;
-          padding: 20px;
+          display: flex; flex-direction: column;
+          position: relative; overflow: hidden;
+        }
+        .hero-bg {
+          position: absolute; inset: 0;
+          background: ${R.yellow};
+          z-index: 0;
+        }
+        .hero-grid {
+          position: absolute; inset: 0;
+          background-image:
+            linear-gradient(${R.black}22 1px, transparent 1px),
+            linear-gradient(90deg, ${R.black}22 1px, transparent 1px);
+          background-size: 40px 40px;
           z-index: 1;
-          max-height: 85vh;
-          overflow-y: auto;
-          margin-top: 72px;
+        }
+        .hero-inner {
+          position: relative; z-index: 2;
+          flex: 1; display: flex; flex-direction: column;
+          justify-content: center;
+          max-width: 1100px; margin: 0 auto; width: 100%;
+          padding: 120px 24px 80px;
+          gap: 0;
         }
 
-        @keyframes fadeInUp {
-          from { opacity: 0; transform: translateY(24px); }
-          to   { opacity: 1; transform: translateY(0); }
+        /* Hero type */
+        .hero-eyebrow {
+          display: inline-flex; align-items: center; gap: 8px;
+          background: ${R.black}; color: ${R.yellow};
+          padding: 4px 14px; border-radius: 9999px;
+          font-size: 11px; font-weight: 800; letter-spacing: 0.18em;
+          text-transform: uppercase; margin-bottom: 24px; width: fit-content;
         }
-        .animate-in { animation: fadeInUp 0.5s ease forwards; }
-        .delay-1 { animation-delay: 0.1s; opacity: 0; }
-        .delay-2 { animation-delay: 0.2s; opacity: 0; }
-        .delay-3 { animation-delay: 0.3s; opacity: 0; }
-        .delay-4 { animation-delay: 0.4s; opacity: 0; }
+        .hero-title {
+          font-size: clamp(52px, 8vw, 100px);
+          font-weight: 900; letter-spacing: -4px; line-height: 0.9;
+          color: ${R.black}; margin-bottom: 24px;
+        }
+        .hero-title .block-white {
+          display: inline-block; background: #fff;
+          color: ${R.black}; padding: 4px 16px 8px;
+          border-radius: 16px; border: 2.5px solid ${R.black};
+        }
+        .hero-sub {
+          font-size: 18px; font-weight: 600; color: rgba(17,17,16,0.65);
+          line-height: 1.5; max-width: 480px; margin-bottom: 36px;
+        }
+        .hero-ctas { display: flex; gap: 12px; flex-wrap: wrap; }
+        .btn-hero-primary {
+          display: inline-flex; align-items: center; gap: 8px;
+          padding: 14px 28px; background: ${R.black}; color: ${R.yellow};
+          font-family: inherit; font-size: 15px; font-weight: 800;
+          border: 2.5px solid ${R.black}; border-radius: 14px;
+          text-decoration: none; cursor: pointer;
+          box-shadow: 4px 4px 0 rgba(0,0,0,0.2);
+          transition: box-shadow 0.12s, transform 0.12s;
+        }
+        .btn-hero-primary:hover { box-shadow: 6px 6px 0 rgba(0,0,0,0.25); transform: translate(-1px,-1px); }
+        .btn-hero-secondary {
+          display: inline-flex; align-items: center; gap: 8px;
+          padding: 14px 28px; background: rgba(255,255,255,0.7);
+          color: ${R.black}; font-family: inherit; font-size: 15px; font-weight: 800;
+          border: 2.5px solid ${R.black}; border-radius: 14px;
+          text-decoration: none; cursor: pointer;
+          transition: background 0.12s;
+        }
+        .btn-hero-secondary:hover { background: #fff; }
 
+        /* Floating artwork preview cards */
+        .hero-right {
+          position: absolute; right: 0; top: 0; bottom: 0; width: 45%;
+          display: flex; align-items: center; justify-content: center;
+          pointer-events: none; z-index: 2;
+          overflow: hidden;
+        }
+        .preview-stack { position: relative; width: 320px; height: 420px; }
+        .preview-card {
+          position: absolute; border-radius: 20px; overflow: hidden;
+          border: 2.5px solid ${R.black};
+          box-shadow: 5px 6px 0 ${R.black};
+        }
+
+        /* ── Ticker ── */
+        .ticker-wrap {
+          background: ${R.black}; border-top: 3px solid ${R.black};
+          border-bottom: 3px solid ${R.black};
+          padding: 14px 0; overflow: hidden; white-space: nowrap;
+          position: relative; z-index: 2;
+        }
+        .ticker-track { display: inline-flex; gap: 48px; animation: tick 22s linear infinite; }
+        @keyframes tick { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+        .ticker-item {
+          font-size: 14px; font-weight: 800; color: ${R.yellow};
+          letter-spacing: 0.08em; text-transform: uppercase;
+          display: inline-flex; align-items: center; gap: 14px; flex-shrink: 0;
+        }
+        .ticker-dot { width: 5px; height: 5px; border-radius: 50%; background: ${R.yellow}; flex-shrink: 0; }
+
+        /* ── Stats bar ── */
+        .stats-bar {
+          background: #fff; border-bottom: 2px solid ${R.border};
+          padding: 0; position: relative; z-index: 2;
+        }
+        .stats-inner {
+          max-width: 1100px; margin: 0 auto;
+          display: grid; grid-template-columns: repeat(4, 1fr);
+        }
+        .stat-item {
+          padding: 20px 24px; border-right: 1px solid ${R.border};
+          display: flex; flex-direction: column; gap: 4px;
+        }
+        .stat-item:last-child { border-right: none; }
+        .stat-num { font-size: 28px; font-weight: 900; color: ${R.black}; letter-spacing: -1px; line-height: 1; }
+        .stat-label { font-size: 11px; font-weight: 700; color: ${R.warm}; text-transform: uppercase; letter-spacing: 0.12em; }
+
+        /* ── Explore section ── */
+        .explore {
+          max-width: 1100px; margin: 0 auto;
+          padding: 64px 24px 80px;
+        }
+        .explore-header { margin-bottom: 32px; }
+        .explore-title {
+          font-size: 40px; font-weight: 900; color: ${R.black};
+          letter-spacing: -1.5px; margin-bottom: 6px;
+        }
+        .explore-sub { font-size: 15px; font-weight: 600; color: ${R.warm}; }
+
+        /* Tabs */
+        .tabs {
+          display: flex; gap: 0;
+          background: #fff; border: 2px solid ${R.black}; border-radius: 12px;
+          overflow: hidden; width: fit-content; margin-bottom: 24px;
+        }
+        .tab-btn {
+          display: flex; align-items: center; gap: 6px;
+          padding: 9px 20px; border: none; border-right: 1px solid ${R.border};
+          font-family: inherit; font-size: 13px; font-weight: 700;
+          cursor: pointer; transition: all 0.12s;
+        }
+        .tab-btn:last-child { border-right: none; }
+        .tab-btn.active { background: ${R.black}; color: ${R.yellow}; }
+        .tab-btn:not(.active) { background: #fff; color: ${R.warm}; }
+        .tab-btn:not(.active):hover { background: ${R.linen}; color: ${R.black}; }
+
+        /* Controls */
+        .controls {
+          display: flex; gap: 10px; align-items: center;
+          flex-wrap: wrap; margin-bottom: 28px;
+        }
+        .search-wrap {
+          display: flex; align-items: center; gap: 8px;
+          background: #fff; border: 2px solid ${R.border}; border-radius: 10px;
+          padding: 0 12px; height: 40px; flex: 1; min-width: 200px; max-width: 340px;
+          transition: border-color 0.15s;
+        }
+        .search-wrap:focus-within { border-color: ${R.yellow}; }
+        .search-inp {
+          flex: 1; border: none; outline: none; font-size: 13px;
+          font-family: inherit; font-weight: 500; color: ${R.black}; background: transparent;
+        }
+        .medium-pills { display: flex; gap: 6px; flex-wrap: wrap; }
+        .medium-pill {
+          padding: 6px 14px; border-radius: 9999px; border: 2px solid ${R.border};
+          background: #fff; font-family: inherit; font-size: 12px; font-weight: 700;
+          color: ${R.warm}; cursor: pointer; transition: all 0.1s;
+          white-space: nowrap;
+        }
+        .medium-pill.active { background: ${R.black}; border-color: ${R.black}; color: ${R.yellow}; }
+        .medium-pill:not(.active):hover { border-color: ${R.black}; color: ${R.black}; }
+
+        /* Artwork grid */
+        .art-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+          gap: 18px;
+        }
+        .art-card {
+          background: #fff; border-radius: 18px;
+          border: 2px solid ${R.border};
+          box-shadow: 3px 4px 0 ${R.shadow};
+          overflow: hidden; cursor: pointer;
+          transition: box-shadow 0.15s, transform 0.15s, border-color 0.15s;
+        }
+        .art-card:hover {
+          box-shadow: 6px 8px 0 ${R.black};
+          transform: translate(-2px, -3px);
+          border-color: ${R.black};
+        }
+        .art-thumb { position: relative; aspect-ratio: 4/3; overflow: hidden; background: ${R.linen}; }
+        .art-thumb img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.3s; }
+        .art-card:hover .art-thumb img { transform: scale(1.05); }
+        .art-thumb-empty { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 6px; }
+        .art-body { padding: 14px 16px 12px; }
+        .art-title { font-size: 15px; font-weight: 800; color: ${R.black}; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; letter-spacing: -0.2px; margin-bottom: 2px; }
+        .art-medium { font-size: 12px; color: ${R.warm}; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-bottom: 10px; }
+        .art-footer { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+        .art-price { font-size: 16px; font-weight: 900; color: ${R.black}; font-family: monospace; letter-spacing: -0.5px; }
+        .art-price.empty { color: #D4C9A8; }
+        .art-artist { display: flex; align-items: center; gap: 6px; }
+        .art-avatar { width: 22px; height: 22px; border-radius: 50%; object-fit: cover; border: 1.5px solid ${R.border}; background: ${R.yellow}; display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 800; color: ${R.black}; flex-shrink: 0; overflow: hidden; }
+        .art-avatar-name { font-size: 11px; font-weight: 600; color: ${R.warm}; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 90px; }
+
+        /* Location badge */
+        .loc-badge { display: flex; align-items: center; gap: 3px; font-size: 10px; color: ${R.warm}; font-weight: 600; overflow: hidden; max-width: 110px; }
+        .loc-badge span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+        /* Artist grid */
+        .artist-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+          gap: 18px;
+        }
+        .artist-card {
+          background: #fff; border-radius: 18px;
+          border: 2px solid ${R.border}; overflow: hidden;
+          box-shadow: 3px 4px 0 ${R.shadow};
+          cursor: pointer;
+          transition: box-shadow 0.15s, transform 0.15s, border-color 0.15s;
+        }
+        .artist-card:hover { box-shadow: 6px 8px 0 ${R.black}; transform: translate(-2px,-3px); border-color: ${R.black}; }
+        .artist-cover { height: 100px; background: ${R.linen}; overflow: hidden; position: relative; }
+        .artist-cover img { width: 100%; height: 100%; object-fit: cover; }
+        .artist-body { padding: 14px 16px 16px; }
+        .artist-avatar-wrap { margin-top: -28px; margin-bottom: 10px; }
+        .artist-avatar-lg {
+          width: 52px; height: 52px; border-radius: 50%; border: 3px solid #fff;
+          background: ${R.yellow}; display: flex; align-items: center; justify-content: center;
+          font-size: 18px; font-weight: 900; color: ${R.black}; overflow: hidden;
+          box-shadow: 2px 2px 0 ${R.border};
+        }
+        .artist-avatar-lg img { width: 100%; height: 100%; object-fit: cover; }
+        .artist-name { font-size: 16px; font-weight: 800; color: ${R.black}; letter-spacing: -0.2px; margin-bottom: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .artist-role { display: inline-block; font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.12em; padding: 2px 8px; border-radius: 9999px; background: ${R.linen}; color: ${R.warm}; margin-bottom: 6px; }
+        .artist-bio { font-size: 12px; color: ${R.warm}; font-weight: 500; line-height: 1.5; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; margin-bottom: 10px; min-height: 36px; }
+        .artist-footer { display: flex; align-items: center; justify-content: space-between; padding-top: 10px; border-top: 1px solid ${R.linen}; }
+        .artist-count { font-size: 12px; font-weight: 700; color: ${R.warm}; }
+        .artist-loc { display: flex; align-items: center; gap: 3px; font-size: 11px; color: ${R.warm}; font-weight: 600; overflow: hidden; max-width: 110px; }
+        .artist-loc span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+        /* View profile btn */
+        .view-btn {
+          display: inline-flex; align-items: center; gap: 5px;
+          padding: 6px 12px; border-radius: 8px; border: 1.5px solid ${R.border};
+          background: ${R.linen}; font-size: 12px; font-weight: 700; color: ${R.black};
+          text-decoration: none; transition: all 0.12s;
+        }
+        .view-btn:hover { background: ${R.yellow}; border-color: ${R.black}; }
+
+        /* CTA section */
+        .cta-section {
+          background: ${R.black}; padding: 80px 24px;
+          border-top: 3px solid ${R.black};
+        }
+        .cta-inner { max-width: 1100px; margin: 0 auto; display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 40px; }
+        .cta-title { font-size: clamp(32px, 4vw, 52px); font-weight: 900; color: #fff; letter-spacing: -1.5px; line-height: 1; }
+        .cta-title em { color: ${R.yellow}; font-style: normal; }
+        .cta-sub { font-size: 15px; color: #555; font-weight: 600; margin-top: 12px; }
+
+        /* Footer */
+        .footer { background: #0a0a09; padding: 40px 24px 24px; }
+        .footer-inner { max-width: 1100px; margin: 0 auto; }
+        .footer-top { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 32px; padding-bottom: 32px; border-bottom: 1px solid #1a1a1a; margin-bottom: 20px; }
+        .footer-brand-name { font-size: 18px; font-weight: 900; color: #fff; display: block; margin-bottom: 6px; }
+        .footer-tagline { font-size: 12px; color: #444; font-weight: 600; line-height: 1.5; }
+        .footer-col-title { font-size: 10px; font-weight: 800; color: ${R.yellow}; text-transform: uppercase; letter-spacing: 0.15em; margin-bottom: 14px; display: block; }
+        .footer-link { display: block; font-size: 13px; color: #444; text-decoration: none; font-weight: 600; margin-bottom: 8px; transition: color 0.1s; }
+        .footer-link:hover { color: #fff; }
+        .footer-bottom { display: flex; align-items: center; justify-content: space-between; }
+        .footer-copy { font-size: 11px; color: #333; font-weight: 600; }
+
+        /* Skeleton */
+        .skeleton { background: ${R.linen}; border-radius: 18px; border: 2px solid ${R.border}; overflow: hidden; animation: shimmer 1.5s infinite; }
+        @keyframes shimmer { 0%,100%{opacity:1} 50%{opacity:0.6} }
+
+        /* Animations */
+        @keyframes fadeUp { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:none; } }
+        .fade-up { animation: fadeUp 0.4s ease forwards; }
+
+        /* Mobile */
         @media (max-width: 900px) {
-          .hero { grid-template-columns: 1fr; }
-          .hero-right { min-height: 300px; padding: 40px 24px; }
-          .hero-mango { font-size: 80px; }
-          .hero-left { padding: 60px 24px; border-right: none; border-bottom: 3px solid #111110; }
-          .features { grid-template-columns: 1fr; }
-          .features-nav { border-right: none; border-bottom: 3px solid #111110; }
-          .features-content { padding: 40px 24px; }
-          .steps { grid-template-columns: 1fr; }
-          .step { border-right: none; border-bottom: 1px solid #333; }
-          .proof-grid { grid-template-columns: 1fr; }
-          .proof-card { border-right: none; border-bottom: 2px solid #111110; }
-          .cta-inner { grid-template-columns: 1fr; gap: 24px; }
-          .footer-top { grid-template-columns: 1fr 1fr; gap: 28px; }
+          .hero-right { display: none; }
+          .hero-inner { padding: 100px 20px 60px; }
+          .stats-inner { grid-template-columns: 1fr 1fr; }
+          .stat-item:nth-child(2) { border-right: none; }
           .nav-links { display: none; }
+          .footer-top { grid-template-columns: 1fr 1fr; }
+          .cta-inner { grid-template-columns: 1fr; }
         }
-
         @media (max-width: 600px) {
+          .stats-inner { grid-template-columns: 1fr 1fr; }
           .footer-top { grid-template-columns: 1fr; }
-          .hero-stats { grid-template-columns: 1fr 1fr 1fr; }
+          .art-grid, .artist-grid { grid-template-columns: 1fr 1fr; }
         }
       `}</style>
 
@@ -822,95 +473,73 @@ export default function HomePage() {
       <nav className={`nav${scrolled ? " scrolled" : ""}`}>
         <div className="nav-pill">
           <a href="/" className="nav-logo">
-            🥭
+            <span style={{ fontSize:22, lineHeight:1 }}>🥭</span>
             <span className="nav-logo-text">artomango</span>
           </a>
           <div className="nav-divider" />
           <div className="nav-links">
+            <a href="#explore" className="nav-link">Explore</a>
             <a href="#features" className="nav-link">Features</a>
-            <a href="#how" className="nav-link">How it works</a>
             <a href="/directory/artists" className="nav-link">Artists</a>
             <a href="/directory/venues" className="nav-link">Venues</a>
           </div>
-          <div className="nav-cta" style={{ marginLeft: "auto" }}>
-            <a href="/login" className="btn-ghost-sm">Sign in</a>
-            <a href="/register" className="btn-primary-sm">Get started →</a>
+          <div style={{ marginLeft:"auto", display:"flex", alignItems:"center", gap:4 }}>
+            <a href="/login"    className="btn-ghost">Sign in</a>
+            <a href="/register" className="btn-pill-cta">Get started →</a>
           </div>
         </div>
       </nav>
 
       {/* ── HERO ── */}
       <section className="hero">
-        <div className="hero-left">
-          <div className="hero-eyebrow animate-in">
-            🥭 artomango · art platform
-          </div>
+        <div className="hero-bg" />
+        <div className="hero-grid" />
 
-          <h1 className="hero-title animate-in delay-1">
-            Your art.<br />
-            <span className="invert">Managed.</span><br />
-            Exhibited.
-          </h1>
-
-          <p className="hero-sub animate-in delay-2">
-            The platform for artists and venues to manage work, discover collaborations, and grow in the art scene.
-          </p>
-
-          <div className="hero-actions animate-in delay-3">
-            <a href="/register" className="btn-hero-primary">
-              Start for free →
-            </a>
-            <a href="#features" className="btn-hero-secondary">
-              See features
-            </a>
-          </div>
-
-          <div style={{ position: "absolute", bottom: 24, left: 40, display: "flex", alignItems: "center", gap: 8, opacity: 0.5 }}>
-            <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", color: "#111110" }}>
-              Manage, Exhibit, Collab
-            </span>
+        {/* Floating artwork previews */}
+        <div className="hero-right">
+          <div className="preview-stack">
+            {/* Card 1 — back */}
+            <div className="preview-card" style={{ width:200, height:250, top:20, right:40, transform:"rotate(6deg)", zIndex:1, background:"#fff" }}>
+              <img src="https://images.unsplash.com/photo-1578301978693-85fa9c0320b9?w=400&q=80" alt="" style={{ width:"100%", height:"75%", objectFit:"cover" }}/>
+              <div style={{ padding:"10px 12px" }}>
+                <div style={{ fontSize:12, fontWeight:800, color:R.black }}>Untitled (Blue Migration)</div>
+                <div style={{ fontSize:10, color:R.warm, fontWeight:600 }}>Oil on Linen · $9,500</div>
+              </div>
+            </div>
+            {/* Card 2 — middle */}
+            <div className="preview-card" style={{ width:230, height:280, top:60, left:20, transform:"rotate(-4deg)", zIndex:2, background:"#fff" }}>
+              <img src="https://images.unsplash.com/photo-1541961017774-22349e4a1262?w=400&q=80" alt="" style={{ width:"100%", height:"75%", objectFit:"cover" }}/>
+              <div style={{ padding:"10px 12px" }}>
+                <div style={{ fontSize:12, fontWeight:800, color:R.black }}>Dissolving Tehran</div>
+                <div style={{ fontSize:10, color:R.warm, fontWeight:600 }}>Oil on Canvas · $4,800</div>
+              </div>
+            </div>
+            {/* Card 3 — front */}
+            <div className="preview-card" style={{ width:210, height:260, bottom:20, right:20, transform:"rotate(2deg)", zIndex:3, background:"#fff" }}>
+              <img src="https://images.unsplash.com/photo-1549490349-8643362247b5?w=400&q=80" alt="" style={{ width:"100%", height:"75%", objectFit:"cover" }}/>
+              <div style={{ padding:"10px 12px" }}>
+                <div style={{ fontSize:12, fontWeight:800, color:R.black }}>Golden Hour</div>
+                <div style={{ fontSize:10, color:R.warm, fontWeight:600 }}>Oil on Canvas · $3,600</div>
+              </div>
+            </div>
           </div>
         </div>
 
-        <div className="hero-right">
-          <span className="hero-mango animate-in delay-2">🥭</span>
-
-          <div className="hero-stats animate-in delay-3">
-            <div className="hero-stat">
-              <span className="hero-stat-num">47</span>
-              <span className="hero-stat-label">Works</span>
-            </div>
-            <div className="hero-stat">
-              <span className="hero-stat-num">12</span>
-              <span className="hero-stat-label">Shows</span>
-            </div>
-            <div className="hero-stat">
-              <span className="hero-stat-num">$18k</span>
-              <span className="hero-stat-label">Revenue</span>
-            </div>
-          </div>
-
-          {/* Floating cards */}
-          <div style={{
-            position: "absolute", top: 120, left: 32,
-            background: "#FFD400", border: "2px solid #111110",
-            padding: "8px 14px", boxShadow: "3px 3px 0 #FFD400",
-            animation: "floatMango 4s ease-in-out infinite",
-            animationDelay: "0.5s"
-          }}>
-            <div style={{ fontSize: 10, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.1em", color: "#111110" }}>New collab request</div>
-            <div style={{ fontSize: 12, fontWeight: 700, color: "#111110", marginTop: 2 }}>Galerie Nord · Prague</div>
-          </div>
-
-          <div style={{
-            position: "absolute", bottom: 140, right: 28,
-            background: "#fff", border: "2px solid #333",
-            padding: "8px 14px", boxShadow: "3px 3px 0 #333",
-            animation: "floatMango 3.5s ease-in-out infinite",
-            animationDelay: "1s"
-          }}>
-            <div style={{ fontSize: 10, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.1em", color: "#9B8F7A" }}>Artwork sold</div>
-            <div style={{ fontSize: 13, fontWeight: 900, color: "#111110", marginTop: 2 }}>$2,400 ✓</div>
+        <div className="hero-inner">
+          <div className="hero-eyebrow">🥭 artomango — art platform</div>
+          <h1 className="hero-title">
+            Your art,<br />
+            <span className="block-white">managed.</span><br />
+            Exhibited.
+          </h1>
+          <p className="hero-sub">
+            The platform for artists and venues to manage work, discover collaborations, and grow in the art scene.
+          </p>
+          <div className="hero-ctas">
+            <a href="/register" className="btn-hero-primary">Start for free →</a>
+            <button className="btn-hero-secondary" onClick={scrollToExplore}>
+              Explore artworks <ChevronDown size={16}/>
+            </button>
           </div>
         </div>
       </section>
@@ -919,153 +548,245 @@ export default function HomePage() {
       <div className="ticker-wrap">
         <div className="ticker-track">
           {[...Array(2)].map((_, i) =>
-            ["Manage your artworks", "Exhibit anywhere", "Collab with venues", "Track every sale", "Map the art scene", "Build your portfolio", "Grow your practice"].map((word, j) => (
+            TICKER.map((w, j) => (
               <span key={`${i}-${j}`} className="ticker-item">
-                {word} <span className="ticker-dot" />
+                {w} <span className="ticker-dot"/>
               </span>
             ))
           )}
         </div>
       </div>
 
-      {/* ── FEATURES ── */}
-      <section id="features">
-        <div className="features">
-          <div className="features-nav">
-            <div className="features-nav-header">
-              <div className="features-nav-label">What you get</div>
-              <div className="features-nav-title">Everything<br />you need</div>
+      {/* ── STATS ── */}
+      <div className="stats-bar">
+        <div className="stats-inner">
+          {[
+            { num: artworks.length || "48+", label: "Artworks" },
+            { num: artists.filter(a=>a.role==="artist").length || "24+", label: "Artists" },
+            { num: artists.filter(a=>a.role!=="artist").length || "12+", label: "Venues" },
+            { num: "Prague", label: "Based in" },
+          ].map(s => (
+            <div key={s.label} className="stat-item">
+              <div className="stat-num">{s.num}</div>
+              <div className="stat-label">{s.label}</div>
             </div>
-            {features.map((f, i) => (
-              <button
-                key={f.id}
-                className={`feature-tab${activeFeature === i ? " active" : ""}`}
-                onClick={() => setActiveFeature(i)}
-              >
-                <span className="feature-tab-emoji">{f.emoji}</span>
-                <div>
-                  <div className="feature-tab-label">{f.label}</div>
-                  <div className="feature-tab-tag">{f.tag}</div>
-                </div>
-              </button>
-            ))}
-          </div>
-
-          <div className="features-content">
-            <div className="feature-num">0{activeFeature + 1}</div>
-            <span className="feature-emoji-large">{features[activeFeature].emoji}</span>
-            <h2 className="feature-title">{features[activeFeature].title}</h2>
-            <p className="feature-desc">{features[activeFeature].desc}</p>
-            <span className="feature-badge">{features[activeFeature].tag} →</span>
-          </div>
+          ))}
         </div>
-      </section>
+      </div>
 
-      {/* ── HOW IT WORKS ── */}
-      <section id="how" className="how">
-        <div className="how-inner">
-          <div className="how-header">
-            <div className="section-eyebrow light">How it works</div>
-            <h2 className="section-title light">Three steps to<br />your art business.</h2>
+      {/* ── EXPLORE SECTION ── */}
+      <div ref={exploreRef} id="explore" style={{ background: R.paper, borderTop:`3px solid ${R.border}` }}>
+        <div className="explore">
+          <div className="explore-header">
+            <h2 className="explore-title">Explore the scene</h2>
+            <p className="explore-sub">Discover artworks and connect with artists and venues</p>
           </div>
-          <div className="steps">
-            {[
-              { n: "01", emoji: "🎨", title: "Add your work", desc: "Upload artworks with photos, details, prices, and location. Build your complete inventory in minutes." },
-              { n: "02", emoji: "🌐", title: "Go public", desc: "Your portfolio page goes live instantly. Share it with galleries, collectors, and curators — or let them find you." },
-              { n: "03", emoji: "🤝", title: "Grow & collaborate", desc: "Find exhibitions, connect with venues, track sales, and manage every collaboration from first contact to final show." },
-            ].map((step) => (
-              <div key={step.n} className="step">
-                <div className="step-num">{step.n}</div>
-                <span className="step-emoji">{step.emoji}</span>
-                <div className="step-title">{step.title}</div>
-                <div className="step-desc">{step.desc}</div>
+
+          {/* Tabs */}
+          <div className="tabs">
+            <button className={`tab-btn${tab==="artworks"?" active":""}`} onClick={() => setTab("artworks")}>
+              <Grid3X3 size={14}/> Artworks
+            </button>
+            <button className={`tab-btn${tab==="artists"?" active":""}`} onClick={() => setTab("artists")}>
+              <Users size={14}/> Artists & Venues
+            </button>
+          </div>
+
+          {/* Controls */}
+          <div className="controls">
+            <div className="search-wrap">
+              <Search size={14} color={R.warm}/>
+              <input className="search-inp" value={search} onChange={e => setSearch(e.target.value)}
+                placeholder={tab==="artworks" ? "Search artworks, mediums, artists…" : "Search artists or venues…"}/>
+              {search && <button onClick={() => setSearch("")} style={{ background:"none", border:"none", cursor:"pointer", color:"#C0B8A8", padding:0, display:"flex" }}><X size={12}/></button>}
+            </div>
+
+            {tab === "artworks" && (
+              <div className="medium-pills">
+                {MEDIUMS.map(m => (
+                  <button key={m} className={`medium-pill${medium===m?" active":""}`} onClick={() => setMedium(m)}>{m}</button>
+                ))}
               </div>
-            ))}
-          </div>
-        </div>
-      </section>
+            )}
 
-      {/* ── CTA BAND ── */}
-      <div className="cta-band">
+            {tab === "artists" && (
+              <div style={{ display:"flex", gap:6 }}>
+                {["All","Artists","Venues"].map(r => {
+                  const key = r==="All"?"all":r==="Artists"?"artist":"gallery";
+                  const isActive = (medium===r || (r==="All"&&medium==="All"));
+                  return <button key={r} className={`medium-pill${isActive?" active":""}`} onClick={()=>setMedium(r)}>{r}</button>;
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* ── ARTWORKS GRID ── */}
+          {tab === "artworks" && (
+            loading ? (
+              <div className="art-grid">
+                {[...Array(8)].map((_,i) => <div key={i} className="skeleton" style={{ aspectRatio:"3/4", animationDelay:`${i*0.06}s` }}/>)}
+              </div>
+            ) : filteredArtworks.length === 0 ? (
+              <div style={{ textAlign:"center", padding:"60px 20px", color:R.warm, fontSize:15, fontWeight:600 }}>
+                No artworks match your filters — try removing some.
+              </div>
+            ) : (
+              <div className="art-grid">
+                {filteredArtworks.map((aw, i) => {
+                  const img = Array.isArray(aw.images) ? aw.images[0] : null;
+                  return (
+                    <Link key={aw.id} href={`/dashboard/artworks/${aw.id}`} style={{ textDecoration:"none" }}>
+                      <div className="art-card fade-up" style={{ animationDelay:`${Math.min(i,12)*0.04}s` }}>
+                        <div className="art-thumb">
+                          {img
+                            ? <img src={img} alt={aw.title} loading="lazy"/>
+                            : <div className="art-thumb-empty"><Palette size={28} color="#D4C9A8"/></div>
+                          }
+                          {(aw.venue_location||aw.location) && (
+                            <div style={{ position:"absolute", bottom:8, left:8, background:"rgba(255,255,255,0.92)", borderRadius:9999, padding:"3px 9px", display:"flex", alignItems:"center", gap:4, fontSize:10, fontWeight:700, color:R.black, backdropFilter:"blur(4px)" }}>
+                              <MapPin size={9} color="#FF6B6B"/>{(aw.venue_location||aw.location||"").split(",")[0]}
+                            </div>
+                          )}
+                        </div>
+                        <div className="art-body">
+                          <div className="art-title">{aw.title}</div>
+                          <div className="art-medium">{[aw.medium, aw.year].filter(Boolean).join(" · ") || "—"}</div>
+                          <div className="art-footer">
+                            <div className={`art-price${aw.price?"":" empty"}`}>
+                              {aw.price ? `$${Number(aw.price).toLocaleString()}` : "Inquiry"}
+                            </div>
+                            <div className="art-artist">
+                              <div className="art-avatar">
+                                {aw.artist_avatar
+                                  ? <img src={aw.artist_avatar} alt=""/>
+                                  : initials(aw.artist_name||"A")
+                                }
+                              </div>
+                              <span className="art-avatar-name">{aw.artist_name}</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
+            )
+          )}
+
+          {/* ── ARTISTS GRID ── */}
+          {tab === "artists" && (
+            loading ? (
+              <div className="artist-grid">
+                {[...Array(6)].map((_,i) => <div key={i} className="skeleton" style={{ height:240, animationDelay:`${i*0.06}s` }}/>)}
+              </div>
+            ) : filteredArtists.length === 0 ? (
+              <div style={{ textAlign:"center", padding:"60px 20px", color:R.warm, fontSize:15, fontWeight:600 }}>
+                No profiles found.
+              </div>
+            ) : (
+              <div className="artist-grid">
+                {filteredArtists
+                  .filter(a => medium==="All" || (medium==="Artists"?a.role==="artist":a.role!=="artist"))
+                  .map((artist, i) => (
+                    <div key={artist.id} className="artist-card fade-up" style={{ animationDelay:`${Math.min(i,12)*0.04}s` }}>
+                      {/* Cover */}
+                      <div className="artist-cover">
+                        {artist.cover_image
+                          ? <img src={artist.cover_image} alt="" loading="lazy"/>
+                          : <div style={{ width:"100%", height:"100%", background:`linear-gradient(135deg, ${R.yellow}33, ${R.cream})`, display:"flex", alignItems:"center", justifyContent:"center" }}>
+                              {artist.role==="artist"? <Palette size={28} color={R.warm}/> : <Building2 size={28} color={R.warm}/>}
+                            </div>
+                        }
+                      </div>
+                      {/* Body */}
+                      <div className="artist-body">
+                        <div className="artist-avatar-wrap">
+                          <div className="artist-avatar-lg">
+                            {artist.avatar_url
+                              ? <img src={artist.avatar_url} alt=""/>
+                              : initials(artist.full_name||"A")
+                            }
+                          </div>
+                        </div>
+                        <div className="artist-name">{artist.full_name || "Artist"}</div>
+                        <div className="artist-role">{artist.role || "artist"}</div>
+                        <div className="artist-bio">{artist.bio || "No bio yet."}</div>
+                        <div className="artist-footer">
+                          <div>
+                            <div className="artist-count">{artist.artwork_count} work{artist.artwork_count!==1?"s":""}</div>
+                            {artist.location && (
+                              <div className="artist-loc">
+                                <MapPin size={10} color="#FF6B6B"/>
+                                <span>{artist.location}</span>
+                              </div>
+                            )}
+                          </div>
+                          <Link href={`/portfolio/${artist.username||artist.id}`} className="view-btn">
+                            View profile <ArrowRight size={12}/>
+                          </Link>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            )
+          )}
+        </div>
+      </div>
+
+      {/* ── CTA SECTION ── */}
+      <div className="cta-section">
         <div className="cta-inner">
           <div>
             <h2 className="cta-title">
               Stop managing art<br />
-              in <span className="strikethrough">spreadsheets.</span>
+              in <em>spreadsheets.</em>
             </h2>
-            <p style={{ fontSize: 16, fontWeight: 600, color: "#5C5346", marginTop: 16 }}>
-              Join artists and venues already using Artomango.
-            </p>
+            <p className="cta-sub">Join artists and venues already on Artomango.</p>
           </div>
-          <a href="/register" className="btn-hero-dark">
+          <a href="/register" style={{ display:"inline-flex", alignItems:"center", gap:10, padding:"16px 32px", background:R.yellow, color:R.black, fontFamily:"inherit", fontSize:16, fontWeight:900, borderRadius:14, border:"none", textDecoration:"none", boxShadow:`5px 5px 0 rgba(255,212,0,0.3)`, transition:"all 0.12s", whiteSpace:"nowrap" }}
+            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.boxShadow="7px 7px 0 rgba(255,212,0,0.4)"; (e.currentTarget as HTMLElement).style.transform="translate(-1px,-1px)"; }}
+            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.boxShadow=`5px 5px 0 rgba(255,212,0,0.3)`; (e.currentTarget as HTMLElement).style.transform=""; }}>
             🥭 Get started free →
           </a>
         </div>
       </div>
 
-      {/* ── SOCIAL PROOF ── */}
-      <section className="proof">
-        <div className="proof-inner">
-          <div className="section-eyebrow">What they say</div>
-          <h2 className="section-title dark" style={{ marginBottom: 0 }}>Artists love it.</h2>
-          <div className="proof-grid">
-            {[
-              { quote: "Finally — a platform that gets how artists actually work. Not just a portfolio, a full business tool.", name: "Neda R.", role: "Oil painter · Prague", avatar: "N" },
-              { quote: "The collab pool alone was worth it. I found three venue partners in my first month on Artomango.", name: "Arman K.", role: "Photographer · Brno", avatar: "A" },
-              { quote: "I used to track everything in a notes app. Now I actually know where every piece is and what it's worth.", name: "Leila S.", role: "Mixed media artist · Berlin", avatar: "L" },
-            ].map((t, i) => (
-              <div key={i} className="proof-card">
-                <div className="proof-quote">{t.quote}</div>
-                <div className="proof-author">
-                  <div className="proof-avatar">{t.avatar}</div>
-                  <div>
-                    <div className="proof-name">{t.name}</div>
-                    <div className="proof-role">{t.role}</div>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
       {/* ── FOOTER ── */}
       <footer className="footer">
         <div className="footer-inner">
           <div className="footer-top">
-            <div className="footer-brand">
-              <span className="footer-logo">🥭</span>
+            <div>
+              <span style={{ fontSize:28 }}>🥭</span>
               <span className="footer-brand-name">artomango</span>
-              <span className="footer-tagline">Manage, Exhibit, Collab.<br />The platform for artists and venues.</span>
+              <span className="footer-tagline">Manage, Exhibit, Collab.<br/>The platform for artists and venues.</span>
             </div>
             <div>
-              <div className="footer-col-title">Platform</div>
+              <span className="footer-col-title">Platform</span>
               <a href="/dashboard" className="footer-link">Dashboard</a>
               <a href="/dashboard/artworks" className="footer-link">Artworks</a>
               <a href="/dashboard/exhibitions" className="footer-link">Events</a>
               <a href="/dashboard/map" className="footer-link">Map</a>
-              <a href="/dashboard/pool" className="footer-link">Collabs</a>
             </div>
             <div>
-              <div className="footer-col-title">Explore</div>
+              <span className="footer-col-title">Explore</span>
               <a href="/directory/artists" className="footer-link">Artists</a>
               <a href="/directory/venues" className="footer-link">Venues</a>
-              <a href="/dashboard/analytics" className="footer-link">Analytics</a>
-              <a href="/dashboard/sales" className="footer-link">Sales</a>
+              <a href="#explore" className="footer-link">Artworks</a>
             </div>
             <div>
-              <div className="footer-col-title">Account</div>
+              <span className="footer-col-title">Account</span>
               <a href="/login" className="footer-link">Sign in</a>
               <a href="/register" className="footer-link">Get started</a>
-              <a href="/dashboard/profile" className="footer-link">Profile</a>
               <a href="/admin" className="footer-link">Admin</a>
             </div>
           </div>
           <div className="footer-bottom">
             <span className="footer-copy">🥭 artomango · © 2026 · Manage, Exhibit, Collab</span>
-            <div style={{ display: "flex", gap: 20 }}>
-              <a href="#" className="footer-link" style={{ marginBottom: 0, fontSize: 11 }}>Privacy</a>
-              <a href="#" className="footer-link" style={{ marginBottom: 0, fontSize: 11 }}>Support</a>
+            <div style={{ display:"flex", gap:16 }}>
+              <a href="#" className="footer-link" style={{ marginBottom:0, fontSize:11 }}>Privacy</a>
+              <a href="#" className="footer-link" style={{ marginBottom:0, fontSize:11 }}>Support</a>
             </div>
           </div>
         </div>

@@ -22,162 +22,197 @@ interface Props {
 declare global {
   interface Window {
     google: any;
-    __artfolioMapsLoaded: boolean;
-    __artfolioMapsCallbacks: (() => void)[];
-    __artfolioMapsReady: () => void;
+    __amLoaded: boolean;
+    __amQueue: Array<() => void>;
+    __amInit: () => void;
   }
 }
 
 const PRAGUE = { lat: 50.0755, lng: 14.4378 };
 
 const MAP_STYLE = [
-  { elementType: "geometry", stylers: [{ color: "#F5F0E8" }] },
+  { elementType: "geometry",         stylers: [{ color: "#F5F0E8" }] },
   { elementType: "labels.text.fill", stylers: [{ color: "#5C5346" }] },
-  { elementType: "labels.text.stroke", stylers: [{ color: "#FFFBEA" }] },
-  { featureType: "water", elementType: "geometry", stylers: [{ color: "#A8C8E0" }] },
-  { featureType: "road", elementType: "geometry", stylers: [{ color: "#E0D8CA" }] },
-  { featureType: "road.arterial", elementType: "geometry", stylers: [{ color: "#D4C9A8" }] },
-  { featureType: "road.highway", elementType: "geometry", stylers: [{ color: "#C8B89A" }] },
-  { featureType: "poi", elementType: "geometry", stylers: [{ color: "#E8E0CC" }] },
-  { featureType: "poi.park", elementType: "geometry", stylers: [{ color: "#D4E8C8" }] },
-  { featureType: "landscape", elementType: "geometry", stylers: [{ color: "#EAE4D0" }] },
+  { featureType: "water",     elementType: "geometry", stylers: [{ color: "#A8C8E0" }] },
+  { featureType: "road",      elementType: "geometry", stylers: [{ color: "#E0D8CA" }] },
+  { featureType: "poi.park",  elementType: "geometry", stylers: [{ color: "#D4E8C8" }] },
 ];
 
-// ── Read API key from multiple sources ─────────────────────────────
 function getApiKey(): string {
-  // 1. process.env (works if set before build)
-  const envKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
-  if (envKey && envKey !== "undefined") return envKey;
-
-  // 2. meta tag injected by layout (most reliable runtime approach)
+  const env = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+  if (env && env.length > 10 && env !== "undefined") return env;
   if (typeof document !== "undefined") {
     const meta = document.querySelector('meta[name="gmaps-key"]') as HTMLMetaElement | null;
-    if (meta?.content) return meta.content;
-  }
-
-  // 3. Already-loaded script tag src (if map page loaded it first)
-  if (typeof document !== "undefined") {
-    const existing = document.getElementById("artfolio-gmaps") as HTMLScriptElement | null;
-    if (existing?.src) {
-      const match = existing.src.match(/[?&]key=([^&]+)/);
-      if (match) return match[1];
+    if (meta?.content && meta.content.length > 10) return meta.content;
+    const script = document.getElementById("am-gmaps") as HTMLScriptElement | null;
+    if (script?.src) {
+      const m = script.src.match(/[?&]key=([^&]+)/);
+      if (m?.[1]) return m[1];
     }
   }
-
   return "";
 }
 
-// ── Shared singleton script loader ─────────────────────────────────
-function loadMapsScript(onReady: () => void) {
+function loadScript(cb: () => void) {
   if (typeof window === "undefined") return;
-
-  // Already loaded
-  if (window.__artfolioMapsLoaded && window.google?.maps?.places) {
-    onReady();
-    return;
-  }
-
-  // Queue callback
-  if (!window.__artfolioMapsCallbacks) window.__artfolioMapsCallbacks = [];
-  window.__artfolioMapsCallbacks.push(onReady);
-
-  // Script already injecting — just wait
-  if (document.getElementById("artfolio-gmaps")) return;
+  if (window.__amLoaded && window.google?.maps?.places) { cb(); return; }
+  if (!window.__amQueue) window.__amQueue = [];
+  window.__amQueue.push(cb);
+  if (document.getElementById("am-gmaps")) return;
 
   const key = getApiKey();
   if (!key) {
-    console.error("[PlacesAutocomplete] No Google Maps API key found. Set NEXT_PUBLIC_GOOGLE_MAPS_API_KEY in Vercel env vars.");
+    console.error("[Maps] No NEXT_PUBLIC_GOOGLE_MAPS_API_KEY set in Vercel env vars");
     return;
   }
 
-  window.__artfolioMapsReady = () => {
-    window.__artfolioMapsLoaded = true;
-    (window.__artfolioMapsCallbacks || []).forEach(cb => cb());
-    window.__artfolioMapsCallbacks = [];
+  window.__amInit = () => {
+    window.__amLoaded = true;
+    (window.__amQueue || []).forEach(f => f());
+    window.__amQueue = [];
   };
 
-  const script = document.createElement("script");
-  script.id    = "artfolio-gmaps";
-  script.src   = `https://maps.googleapis.com/maps/api/js?key=${key}&libraries=places&callback=__artfolioMapsReady&loading=async`;
-  script.async = true;
-  script.defer = true;
-  script.onerror = () => console.error("[PlacesAutocomplete] Failed to load Google Maps script. Check API key and referrer restrictions.");
-  document.head.appendChild(script);
+  const s = document.createElement("script");
+  s.id    = "am-gmaps";
+  s.src   = `https://maps.googleapis.com/maps/api/js?key=${key}&libraries=places&callback=__amInit&loading=async`;
+  s.async = true;
+  s.defer = true;
+  s.onerror = () => console.error("[Maps] Failed to load script — check API key and billing");
+  document.head.appendChild(s);
 }
 
+// ── Inject Google's dropdown styles scoped to #am-pac wrapper ─────
+const PAC_STYLE = `
+  .am-input-wrap .pac-container {
+    border: 2px solid #111110 !important;
+    box-shadow: 4px 4px 0 #111110 !important;
+    border-radius: 0 !important;
+    font-family: 'Darker Grotesque', system-ui, sans-serif !important;
+    margin-top: 2px !important;
+    z-index: 99999 !important;
+  }
+  .am-input-wrap .pac-item {
+    padding: 9px 14px !important;
+    font-size: 13px !important;
+    font-family: inherit !important;
+    border-top: 1px solid #F5F0E8 !important;
+    cursor: pointer !important;
+    color: #111110 !important;
+  }
+  .am-input-wrap .pac-item:first-child { border-top: none !important; }
+  .am-input-wrap .pac-item:hover,
+  .am-input-wrap .pac-item-selected {
+    background: #FFFBEA !important;
+  }
+  .am-input-wrap .pac-item-query {
+    font-size: 13px !important;
+    font-weight: 700 !important;
+    color: #111110 !important;
+    font-family: inherit !important;
+  }
+  .am-input-wrap .pac-matched { font-weight: 900 !important; }
+  .am-input-wrap .pac-icon { display: none !important; }
+  .pac-logo::after { display: none !important; }
+`;
+
 export default function PlacesAutocomplete({
-  value, onChange,
+  value,
+  onChange,
   placeholder = "Search address…",
-  label, required,
+  label,
+  required,
   biasLat = PRAGUE.lat,
   biasLng = PRAGUE.lng,
 }: Props) {
-  const inputRef    = useRef<HTMLInputElement>(null);
-  const dropdownRef = useRef<HTMLDivElement>(null);
-  const mapDivRef   = useRef<HTMLDivElement>(null);
-  const mapObjRef   = useRef<any>(null);
-  const markerRef   = useRef<any>(null);
-  const geocoderRef = useRef<any>(null);
-  const acSvcRef    = useRef<any>(null);
-  const sessionRef  = useRef<any>(null);
-  const debounce    = useRef<ReturnType<typeof setTimeout>>();
+  const inputRef   = useRef<HTMLInputElement>(null);
+  const acRef      = useRef<any>(null);   // google.maps.places.Autocomplete instance
+  const mapDivRef  = useRef<HTMLDivElement>(null);
+  const mapObjRef  = useRef<any>(null);
+  const markerRef  = useRef<any>(null);
+  const geocRef    = useRef<any>(null);
 
-  const [mapsReady,   setMapsReady]   = useState(false);
-  const [inputVal,    setInputVal]    = useState(value || "");
-  const [suggestions, setSuggestions] = useState<any[]>([]);
-  const [loading,     setLoading]     = useState(false);
-  const [open,        setOpen]        = useState(false);
-  const [showPicker,  setShowPicker]  = useState(false);
-  const [pickerAddr,  setPickerAddr]  = useState("");
-  const [pickerCoords, setPickerCoords] = useState<{ lat: number; lng: number } | null>(null);
-  const [pickerLoading, setPickerLoading] = useState(false);
-  const [keyMissing,  setKeyMissing]  = useState(false);
+  const [inputVal,   setInputVal]   = useState(value || "");
+  const [ready,      setReady]      = useState(false);
+  const [showMap,    setShowMap]    = useState(false);
+  const [mapAddr,    setMapAddr]    = useState("");
+  const [mapCoords,  setMapCoords]  = useState<{lat:number;lng:number}|null>(null);
+  const [mapLoading, setMapLoading] = useState(false);
+  const [noKey,      setNoKey]      = useState(false);
 
   // Sync external value
   useEffect(() => { setInputVal(value || ""); }, [value]);
 
-  // Load script on mount
+  // ── Load Maps + init Autocomplete widget on the input ─────────────
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    if (!inputRef.current) return;
 
-    // If already loaded, just flip state
-    if (window.__artfolioMapsLoaded && window.google?.maps?.places) {
-      setMapsReady(true);
-      return;
-    }
+    if (!getApiKey()) { setNoKey(true); return; }
 
-    const key = getApiKey();
-    if (!key) {
-      setKeyMissing(true);
-      return;
-    }
+    loadScript(() => {
+      if (!inputRef.current || acRef.current) return;
+      if (!window.google?.maps?.places?.Autocomplete) {
+        console.error("[Maps] Autocomplete class not available");
+        return;
+      }
 
-    loadMapsScript(() => setMapsReady(true));
-  }, []);
+      // Create the Google Autocomplete widget — attaches to the input directly
+      const ac = new window.google.maps.places.Autocomplete(inputRef.current, {
+        fields: ["formatted_address", "geometry", "place_id", "name"],
+        // No `types` restriction — finds everything (streets, cities, venues)
+        bounds: new window.google.maps.LatLngBounds(
+          new window.google.maps.LatLng(biasLat - 1.5, biasLng - 1.5),
+          new window.google.maps.LatLng(biasLat + 1.5, biasLng + 1.5)
+        ),
+        strictBounds: false,
+      });
 
-  // Init Places services
+      acRef.current  = ac;
+      geocRef.current = new window.google.maps.Geocoder();
+      setReady(true);
+
+      // When user picks a suggestion
+      ac.addListener("place_changed", () => {
+        const place = ac.getPlace();
+        if (!place?.geometry) {
+          // User typed something but didn't pick — keep raw text
+          const raw = inputRef.current?.value || "";
+          setInputVal(raw);
+          onChange(null, raw);
+          return;
+        }
+        const result: PlaceResult = {
+          name:    place.formatted_address || place.name || inputRef.current?.value || "",
+          lat:     place.geometry.location.lat(),
+          lng:     place.geometry.location.lng(),
+          placeId: place.place_id || "",
+        };
+        setInputVal(result.name);
+        onChange(result, result.name);
+      });
+    });
+
+    return () => {
+      // Cleanup: remove listener if component unmounts
+      if (acRef.current && window.google?.maps?.event) {
+        window.google.maps.event.clearInstanceListeners(acRef.current);
+      }
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Map picker init ───────────────────────────────────────────────
   useEffect(() => {
-    if (!mapsReady || !window.google?.maps?.places) return;
-    acSvcRef.current   = new window.google.maps.places.AutocompleteService();
-    sessionRef.current = new window.google.maps.places.AutocompleteSessionToken();
-    geocoderRef.current= new window.google.maps.Geocoder();
-  }, [mapsReady]);
+    if (!showMap || !ready || !mapDivRef.current || mapObjRef.current) return;
 
-  // Init map inside picker modal
-  useEffect(() => {
-    if (!showPicker || !mapsReady || !mapDivRef.current || mapObjRef.current) return;
-
-    const center = pickerCoords || { lat: biasLat, lng: biasLng };
+    const center = mapCoords || { lat: biasLat, lng: biasLng };
     const map = new window.google.maps.Map(mapDivRef.current, {
-      center, zoom: pickerCoords ? 16 : 14,
-      styles: MAP_STYLE,
-      disableDefaultUI: true,
-      clickableIcons: false,
+      center, zoom: mapCoords ? 16 : 13,
+      styles: MAP_STYLE, disableDefaultUI: true, clickableIcons: false,
     });
     mapObjRef.current = map;
 
     const pinSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="44" viewBox="0 0 32 44">
-      <path d="M16 2C9.37 2 4 7.37 4 14c0 9.5 12 28 12 28s12-18.5 12-28C28 7.37 22.63 2 16 2z" fill="#FF6B6B" stroke="#111110" stroke-width="2"/>
+      <path d="M16 2C9.4 2 4 7.4 4 14c0 9.5 12 28 12 28S28 23.5 28 14C28 7.4 22.6 2 16 2z"
+        fill="#FF6B6B" stroke="#111110" stroke-width="2"/>
       <circle cx="16" cy="14" r="5" fill="white"/>
     </svg>`;
 
@@ -191,228 +226,157 @@ export default function PlacesAutocomplete({
       },
     });
     markerRef.current = marker;
+    if (mapCoords) setMapAddr(inputVal);
 
-    if (pickerCoords) setPickerAddr(inputVal);
-
-    function updateFromLatLng(lat: number, lng: number) {
-      setPickerCoords({ lat, lng });
-      revGeocode(lat, lng);
+    function reverseGeocode(lat: number, lng: number) {
+      setMapCoords({ lat, lng });
+      if (!geocRef.current) return;
+      setMapLoading(true);
+      geocRef.current.geocode({ location: { lat, lng } }, (res: any[], status: string) => {
+        setMapLoading(false);
+        if (status === "OK" && res[0]) setMapAddr(res[0].formatted_address);
+      });
     }
 
     marker.addListener("dragend", () => {
-      const pos = marker.getPosition();
-      if (pos) updateFromLatLng(pos.lat(), pos.lng());
+      const p = marker.getPosition();
+      if (p) reverseGeocode(p.lat(), p.lng());
     });
-
     map.addListener("click", (e: any) => {
       if (!e.latLng) return;
       marker.setPosition(e.latLng);
-      updateFromLatLng(e.latLng.lat(), e.latLng.lng());
+      reverseGeocode(e.latLng.lat(), e.latLng.lng());
     });
-  }, [showPicker, mapsReady]);
+  }, [showMap, ready]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Reset map ref on close
   useEffect(() => {
-    if (!showPicker) { mapObjRef.current = null; markerRef.current = null; }
-  }, [showPicker]);
+    if (!showMap) { mapObjRef.current = null; markerRef.current = null; }
+  }, [showMap]);
 
-  // Close dropdown on outside click
-  useEffect(() => {
-    function handler(e: MouseEvent) {
-      if (!inputRef.current?.contains(e.target as Node) &&
-          !dropdownRef.current?.contains(e.target as Node)) {
-        setOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, []);
-
-  function revGeocode(lat: number, lng: number) {
-    if (!geocoderRef.current) return;
-    setPickerLoading(true);
-    geocoderRef.current.geocode({ location: { lat, lng } }, (res: any[], status: string) => {
-      setPickerLoading(false);
-      if (status === "OK" && res[0]) setPickerAddr(res[0].formatted_address);
-    });
-  }
-
-  function handleInput(e: React.ChangeEvent<HTMLInputElement>) {
-    const v = e.target.value;
-    setInputVal(v);
-    if (!v.trim()) { onChange(null, ""); setSuggestions([]); setOpen(false); return; }
-    clearTimeout(debounce.current);
-    debounce.current = setTimeout(() => fetchSuggestions(v), 220);
-  }
-
-  function fetchSuggestions(query: string) {
-    if (!acSvcRef.current || !mapsReady) return;
-    setLoading(true);
-    acSvcRef.current.getPlacePredictions(
-      {
-        input: query,
-        sessionToken: sessionRef.current,
-        location: new window.google.maps.LatLng(biasLat, biasLng),
-        radius: 150000,
-        // No type restriction — finds streets, buildings, cities
-      },
-      (results: any[] | null, status: string) => {
-        setLoading(false);
-        if (status === "OK" && results?.length) {
-          setSuggestions(results);
-          setOpen(true);
-        } else {
-          setSuggestions([]);
-          setOpen(false);
-        }
-      }
-    );
-  }
-
-  function pickSuggestion(pred: any) {
-    setOpen(false);
-    setSuggestions([]);
-    setLoading(true);
-    setInputVal(pred.description);
-
-    const dummy = document.createElement("div");
-    new window.google.maps.places.PlacesService(dummy).getDetails(
-      { placeId: pred.place_id, fields: ["geometry", "formatted_address"], sessionToken: sessionRef.current },
-      (place: any, status: string) => {
-        setLoading(false);
-        sessionRef.current = new window.google.maps.places.AutocompleteSessionToken();
-        if (status === "OK" && place?.geometry) {
-          const r: PlaceResult = {
-            name: place.formatted_address || pred.description,
-            lat: place.geometry.location.lat(),
-            lng: place.geometry.location.lng(),
-            placeId: pred.place_id,
-          };
-          setInputVal(r.name);
-          onChange(r, r.name);
-        }
-      }
-    );
-  }
-
-  function confirmPicker() {
-    if (!pickerCoords) return;
-    const r: PlaceResult = {
-      name: pickerAddr || `${pickerCoords.lat.toFixed(5)}, ${pickerCoords.lng.toFixed(5)}`,
-      lat: pickerCoords.lat, lng: pickerCoords.lng, placeId: "",
+  function confirmMap() {
+    if (!mapCoords) return;
+    const result: PlaceResult = {
+      name:    mapAddr || `${mapCoords.lat.toFixed(5)}, ${mapCoords.lng.toFixed(5)}`,
+      lat:     mapCoords.lat, lng: mapCoords.lng, placeId: "",
     };
-    setInputVal(r.name);
-    onChange(r, r.name);
-    setShowPicker(false);
+    setInputVal(result.name);
+    onChange(result, result.name);
+    setShowMap(false);
+  }
+
+  function clear() {
+    setInputVal("");
+    onChange(null, "");
+    if (inputRef.current) inputRef.current.value = "";
+    inputRef.current?.focus();
   }
 
   const hasVal = inputVal.trim().length > 0;
 
   return (
     <>
-      <div style={{ position: "relative" }}>
+      <style>{PAC_STYLE}{`@keyframes am-spin{to{transform:rotate(360deg)}}`}</style>
+
+      <div className="am-input-wrap" style={{ position: "relative" }}>
         {label && (
           <div style={{ fontSize: 10, fontWeight: 800, color: "#9B8F7A", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 6 }}>
-            {label}{required && " *"}
+            {label}{required && <span style={{ color: "#FF6B6B" }}> *</span>}
           </div>
         )}
 
-        {/* Input */}
+        {/* Input row */}
         <div
-          style={{ display: "flex", alignItems: "center", gap: 6, padding: "0 10px", border: "2px solid #E0D8CA", background: "#fff", height: 44, transition: "border-color 0.15s" }}
+          style={{
+            display: "flex", alignItems: "center", gap: 6,
+            padding: "0 10px",
+            border: "2px solid #E0D8CA",
+            background: "#fff",
+            height: 44,
+            transition: "border-color 0.15s",
+          }}
           onFocusCapture={e => (e.currentTarget.style.borderColor = "#FFD400")}
-          onBlurCapture={e => { if (!e.currentTarget.contains(e.relatedTarget as Node)) e.currentTarget.style.borderColor = "#E0D8CA"; }}
+          onBlurCapture={e => {
+            if (!e.currentTarget.contains(e.relatedTarget as Node))
+              e.currentTarget.style.borderColor = "#E0D8CA";
+          }}
         >
-          {loading
-            ? <Loader2 size={15} color="#9B8F7A" style={{ flexShrink: 0, animation: "spin 0.8s linear infinite" }} />
-            : <MapPin size={15} color={hasVal ? "#FF6B6B" : "#9B8F7A"} style={{ flexShrink: 0 }} />
-          }
+          <MapPin size={15} color={hasVal ? "#FF6B6B" : "#C0B8A8"} style={{ flexShrink: 0 }} />
+
           <input
             ref={inputRef}
-            value={inputVal}
-            onChange={handleInput}
-            onFocus={() => { if (suggestions.length > 0) setOpen(true); }}
-            placeholder={keyMissing ? "Maps API key not configured" : placeholder}
+            type="text"
+            defaultValue={inputVal}
+            onChange={e => {
+              setInputVal(e.target.value);
+              if (!e.target.value.trim()) onChange(null, "");
+            }}
+            placeholder={noKey ? "Maps API key not set" : placeholder}
             required={required}
-            disabled={keyMissing}
+            disabled={noKey}
             autoComplete="off"
-            style={{ flex: 1, border: "none", outline: "none", fontSize: 13, fontFamily: "inherit", background: "transparent", color: "#111110", minWidth: 0 }}
+            style={{
+              flex: 1, border: "none", outline: "none",
+              fontSize: 14, fontFamily: "inherit", fontWeight: 500,
+              background: "transparent", color: "#111110", minWidth: 0,
+            }}
           />
-          {hasVal && !keyMissing && (
-            <button type="button" onClick={() => { setInputVal(""); onChange(null, ""); setSuggestions([]); setOpen(false); inputRef.current?.focus(); }}
-              style={{ background: "none", border: "none", cursor: "pointer", color: "#d4cfc4", padding: 0, display: "flex", alignItems: "center" }}>
-              <X size={12} />
+
+          {hasVal && (
+            <button type="button" onClick={clear}
+              style={{ background: "none", border: "none", cursor: "pointer", color: "#C0B8A8", padding: 0, display: "flex", alignItems: "center" }}
+              onMouseEnter={e => (e.currentTarget.style.color = "#9B8F7A")}
+              onMouseLeave={e => (e.currentTarget.style.color = "#C0B8A8")}>
+              <X size={13} />
             </button>
           )}
-          {mapsReady && !keyMissing && (
-            <button type="button" onClick={() => { setPickerAddr(inputVal); setShowPicker(true); }}
-              title="Pick on map"
-              style={{ background: "none", border: "none", cursor: "pointer", color: "#9B8F7A", padding: "2px 3px", display: "flex", alignItems: "center", borderLeft: "1px solid #E0D8CA", marginLeft: 4, paddingLeft: 8 }}
-              onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = "#111110"}
-              onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = "#9B8F7A"}>
-              <Map size={14} />
-            </button>
+
+          {ready && (
+            <>
+              <div style={{ width: 1, height: 22, background: "#E0D8CA", flexShrink: 0, margin: "0 4px" }} />
+              <button type="button" onClick={() => { setMapAddr(inputVal); setShowMap(true); }}
+                title="Pick on map"
+                style={{ background: "none", border: "none", cursor: "pointer", color: "#9B8F7A", padding: "2px 0", display: "flex", alignItems: "center" }}
+                onMouseEnter={e => (e.currentTarget.style.color = "#111110")}
+                onMouseLeave={e => (e.currentTarget.style.color = "#9B8F7A")}>
+                <Map size={14} />
+              </button>
+            </>
           )}
         </div>
 
-        {/* Dropdown suggestions */}
-        {open && suggestions.length > 0 && (
-          <div ref={dropdownRef} style={{ position: "absolute", top: "calc(100% + 2px)", left: 0, right: 0, background: "#fff", border: "2px solid #111110", boxShadow: "4px 4px 0 #111110", zIndex: 9999, maxHeight: 320, overflowY: "auto" }}>
-            {suggestions.map((s, i) => {
-              const main = s.structured_formatting?.main_text || s.description.split(",")[0];
-              const sub  = s.structured_formatting?.secondary_text || s.description.split(",").slice(1).join(",").trim();
-              return (
-                <button key={s.place_id} type="button"
-                  onMouseDown={e => { e.preventDefault(); pickSuggestion(s); }}
-                  style={{ display: "flex", alignItems: "flex-start", gap: 10, width: "100%", padding: "10px 14px", border: "none", borderBottom: i < suggestions.length - 1 ? "1px solid #F5F0E8" : "none", background: "none", cursor: "pointer", textAlign: "left" }}
-                  onMouseEnter={e => (e.currentTarget.style.background = "#FFFBEA")}
-                  onMouseLeave={e => (e.currentTarget.style.background = "none")}>
-                  <MapPin size={13} color="#FF6B6B" style={{ flexShrink: 0, marginTop: 2 }} />
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: "#111110", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{main}</div>
-                    {sub && <div style={{ fontSize: 11, color: "#9B8F7A", marginTop: 1 }}>{sub}</div>}
-                  </div>
-                </button>
-              );
-            })}
-            <div style={{ padding: "5px 14px", borderTop: "1px solid #F5F0E8", display: "flex", justifyContent: "flex-end", gap: 4 }}>
-              <span style={{ fontSize: 9, color: "#d4cfc4", fontWeight: 600 }}>Powered by</span>
-              <span style={{ fontSize: 9, color: "#9B8F7A", fontWeight: 800 }}>Google</span>
-            </div>
-          </div>
-        )}
-
-        {keyMissing && (
-          <div style={{ fontSize: 10, color: "#FF6B6B", fontWeight: 700, marginTop: 4 }}>
+        {noKey && (
+          <div style={{ fontSize: 11, color: "#FF6B6B", fontWeight: 700, marginTop: 4 }}>
             ⚠ Set NEXT_PUBLIC_GOOGLE_MAPS_API_KEY in Vercel → Settings → Environment Variables
           </div>
         )}
       </div>
 
-      {/* Map picker modal */}
-      {showPicker && (
-        <div style={{ position: "fixed", inset: 0, zIndex: 99999, background: "rgba(0,0,0,0.75)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
-          onClick={e => { if (e.target === e.currentTarget) setShowPicker(false); }}>
-          <div style={{ background: "#fff", border: "2px solid #111110", boxShadow: "8px 8px 0 #111110", width: "100%", maxWidth: 700, display: "flex", flexDirection: "column", maxHeight: "90vh" }}>
-            <div style={{ padding: "14px 18px", borderBottom: "2px solid #111110", background: "#FFD400", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
+      {/* ── Map Picker Modal ── */}
+      {showMap && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 999999, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
+          onClick={e => { if (e.target === e.currentTarget) setShowMap(false); }}>
+          <div style={{ background: "#fff", border: "2.5px solid #111110", boxShadow: "8px 8px 0 #111110", width: "100%", maxWidth: 680, display: "flex", flexDirection: "column", maxHeight: "90vh" }}>
+
+            <div style={{ padding: "12px 18px", borderBottom: "2px solid #111110", background: "#FFD400", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <Map size={16} />
                 <span style={{ fontSize: 14, fontWeight: 900, color: "#111110" }}>Pick location on map</span>
               </div>
-              <button type="button" onClick={() => setShowPicker(false)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 18, fontWeight: 900, color: "#111110" }}>✕</button>
+              <button type="button" onClick={() => setShowMap(false)}
+                style={{ background: "none", border: "none", cursor: "pointer", fontSize: 20, fontWeight: 900, color: "#111110", lineHeight: 1 }}>✕</button>
             </div>
 
             <div style={{ fontSize: 11, fontWeight: 600, color: "#9B8F7A", padding: "8px 18px", borderBottom: "1px solid #E0D8CA", background: "#FAFAF8", flexShrink: 0 }}>
-              Click anywhere on the map to place the pin, or drag the pin to adjust
+              Click on the map to place a pin, or drag the pin to adjust
             </div>
 
-            <div style={{ position: "relative", flex: 1, minHeight: 400 }}>
-              <div ref={mapDivRef} style={{ width: "100%", height: "100%", minHeight: 400 }} />
-              <div style={{ position: "absolute", top: 12, right: 12, display: "flex", flexDirection: "column", gap: 4 }}>
+            <div style={{ position: "relative", flex: 1, minHeight: 380 }}>
+              <div ref={mapDivRef} style={{ width: "100%", height: "100%", minHeight: 380 }} />
+              <div style={{ position: "absolute", top: 10, right: 10, display: "flex", flexDirection: "column", gap: 4 }}>
                 {[
-                  { l: "+", f: () => mapObjRef.current?.setZoom((mapObjRef.current.getZoom() || 14) + 1) },
-                  { l: "−", f: () => mapObjRef.current?.setZoom((mapObjRef.current.getZoom() || 14) - 1) },
-                  { l: "⌖", f: () => { mapObjRef.current?.setCenter(PRAGUE); mapObjRef.current?.setZoom(13); } },
+                  { l: "+", f: () => mapObjRef.current?.setZoom((mapObjRef.current.getZoom() || 13) + 1) },
+                  { l: "−", f: () => mapObjRef.current?.setZoom((mapObjRef.current.getZoom() || 13) - 1) },
+                  { l: "⌖", f: () => { mapObjRef.current?.setCenter({ lat: biasLat, lng: biasLng }); mapObjRef.current?.setZoom(13); } },
                 ].map(b => (
                   <button key={b.l} type="button" onClick={b.f}
                     style={{ width: 32, height: 32, background: "#fff", border: "2px solid #111110", fontSize: 15, fontWeight: 900, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "2px 2px 0 #111110" }}>
@@ -422,25 +386,25 @@ export default function PlacesAutocomplete({
               </div>
             </div>
 
-            <div style={{ padding: "14px 18px", borderTop: "2px solid #111110", background: "#FAFAF8", flexShrink: 0, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+            <div style={{ padding: "12px 18px", borderTop: "2px solid #111110", background: "#FAFAF8", display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", flexShrink: 0 }}>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 9, fontWeight: 800, color: "#9B8F7A", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 2 }}>Selected location</div>
                 <div style={{ fontSize: 13, fontWeight: 700, color: "#111110", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {pickerLoading ? "Getting address…" : pickerAddr || "No location selected — click the map"}
+                  {mapLoading ? "Getting address…" : mapAddr || "Click the map to select a location"}
                 </div>
-                {pickerCoords && (
+                {mapCoords && (
                   <div style={{ fontSize: 10, color: "#9B8F7A", fontFamily: "monospace", marginTop: 2 }}>
-                    {pickerCoords.lat.toFixed(6)}, {pickerCoords.lng.toFixed(6)}
+                    {mapCoords.lat.toFixed(6)}, {mapCoords.lng.toFixed(6)}
                   </div>
                 )}
               </div>
               <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
-                <button type="button" onClick={() => setShowPicker(false)}
-                  style={{ padding: "9px 16px", border: "2px solid #111110", background: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+                <button type="button" onClick={() => setShowMap(false)}
+                  style={{ padding: "9px 16px", border: "2px solid #111110", background: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
                   Cancel
                 </button>
-                <button type="button" onClick={confirmPicker} disabled={!pickerCoords}
-                  style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 18px", border: "2px solid #111110", background: pickerCoords ? "#FFD400" : "#F5F0E8", fontSize: 12, fontWeight: 800, cursor: pickerCoords ? "pointer" : "not-allowed", boxShadow: pickerCoords ? "3px 3px 0 #111110" : "none", color: "#111110" }}>
+                <button type="button" onClick={confirmMap} disabled={!mapCoords}
+                  style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 18px", border: "2px solid #111110", background: mapCoords ? "#FFD400" : "#F5F0E8", fontSize: 12, fontWeight: 800, cursor: mapCoords ? "pointer" : "not-allowed", boxShadow: mapCoords ? "3px 3px 0 #111110" : "none", color: "#111110", fontFamily: "inherit" }}>
                   <Check size={13} /> Confirm location
                 </button>
               </div>
@@ -448,8 +412,6 @@ export default function PlacesAutocomplete({
           </div>
         </div>
       )}
-
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </>
   );
 }

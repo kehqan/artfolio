@@ -75,7 +75,7 @@ export default function HomePage() {
 
     if (awData?.length) {
       // Enrich with artist name/avatar
-      const userIds = [...new Set(awData.map(a => a.user_id).filter(Boolean))];
+      const userIds = Array.from(new Set(awData.map(a => a.user_id).filter(Boolean)));
       const { data: profiles } = await sb.from("profiles").select("id, full_name, avatar_url").in("id", userIds);
       const profMap: Record<string, any> = {};
       profiles?.forEach(p => { profMap[p.id] = p; });

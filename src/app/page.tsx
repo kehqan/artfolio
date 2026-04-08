@@ -834,7 +834,7 @@ export default function HomePage() {
           </div>
           <div className="nav-cta" style={{ marginLeft: "auto" }}>
             <a href="/login" className="btn-ghost-sm">Sign in</a>
-            <a href="/signup" className="btn-primary-sm">Get started →</a>
+            <a href="/register" className="btn-primary-sm">Get started →</a>
           </div>
         </div>
       </nav>
@@ -857,7 +857,7 @@ export default function HomePage() {
           </p>
 
           <div className="hero-actions animate-in delay-3">
-            <a href="/signup" className="btn-hero-primary">
+            <a href="/register" className="btn-hero-primary">
               Start for free →
             </a>
             <a href="#features" className="btn-hero-secondary">
@@ -997,7 +997,7 @@ export default function HomePage() {
               Join artists and venues already using Artomango.
             </p>
           </div>
-          <a href="/signup" className="btn-hero-dark">
+          <a href="/register" className="btn-hero-dark">
             🥭 Get started free →
           </a>
         </div>
@@ -1056,7 +1056,7 @@ export default function HomePage() {
             <div>
               <div className="footer-col-title">Account</div>
               <a href="/login" className="footer-link">Sign in</a>
-              <a href="/signup" className="footer-link">Get started</a>
+              <a href="/register" className="footer-link">Get started</a>
               <a href="/dashboard/profile" className="footer-link">Profile</a>
               <a href="/admin" className="footer-link">Admin</a>
             </div>

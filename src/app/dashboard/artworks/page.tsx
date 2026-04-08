@@ -460,12 +460,16 @@ export default function ArtworksPage() {
           {/* Controls row */}
           <div style={{ display:"flex", alignItems:"center", gap:10, flexWrap:"wrap" }}>
             {/* Search */}
-            <div style={{ display:"flex", alignItems:"center", gap:8, background:"#fff", border:"2px solid #E8E0D0", borderRadius:10, padding:"0 12px", height:38, flex:1, minWidth:160, maxWidth:280 }}
-              onFocusWithin={(e: any) => (e.currentTarget.style.borderColor = "#FFD400")}
-              onBlur={(e: any) => { if (!e.currentTarget.contains(e.relatedTarget)) e.currentTarget.style.borderColor = "#E8E0D0"; }}>
+            <div style={{ display:"flex", alignItems:"center", gap:8, background:"#fff", border:"2px solid #E8E0D0", borderRadius:10, padding:"0 12px", height:38, flex:1, minWidth:160, maxWidth:280 }}>
               <Search size={14} color="#9B8F7A"/>
-              <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search artworks…"
-                style={{ border:"none", outline:"none", fontSize:13, fontFamily:"inherit", background:"transparent", color:"#111110", fontWeight:500, width:"100%" }}/>
+              <input
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                placeholder="Search artworks…"
+                onFocus={e => (e.currentTarget.parentElement!.style.borderColor = "#FFD400")}
+                onBlur={e => (e.currentTarget.parentElement!.style.borderColor = "#E8E0D0")}
+                style={{ border:"none", outline:"none", fontSize:13, fontFamily:"inherit", background:"transparent", color:"#111110", fontWeight:500, width:"100%" }}
+              />
               {search && <button type="button" onClick={() => setSearch("")} style={{ background:"none", border:"none", cursor:"pointer", color:"#C0B8A8", padding:0, display:"flex" }}><X size={12}/></button>}
             </div>
 

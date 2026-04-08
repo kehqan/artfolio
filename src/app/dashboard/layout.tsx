@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -7,7 +7,8 @@ import {
   LayoutDashboard, ImageIcon, Globe, Users, BarChart3,
   CalendarDays, LogOut, Bell, Search, Plus, X,
   ChevronDown, Handshake, TrendingUp, CheckSquare,
-  MapPin, CalendarRange, Menu,
+  MapPin, CalendarRange, Menu, DollarSign, Sparkles,
+  BellOff, Check,
 } from "lucide-react";
 
 // ── Nav structure ──────────────────────────────────────────────────
@@ -57,38 +58,72 @@ const ALL_NAV_ITEMS = [
   ...NAV_SECTIONS.flatMap(s => s.items),
 ];
 
-const MOCK_NOTIFS = [
-  { id: 1, text: "New follower joined",       time: "2m ago", read: false, dot: "#4ECDC4" },
-  { id: 2, text: "Your artwork was saved",    time: "1h ago", read: false, dot: "#FFD400" },
-  { id: 3, text: "New collaboration request", time: "3h ago", read: true,  dot: "#FF6B6B" },
-];
+// ── Notification config ────────────────────────────────────────────
+type Notification = {
+  id: string; type: string; title: string; body?: string;
+  read: boolean; data?: any; created_at: string;
+};
+
+const NOTIF_ICON: Record<string, { icon: any; color: string; bg: string }> = {
+  follow:  { icon: Users,      color: "#4ECDC4", bg: "#F0FDF4" },
+  sale:    { icon: DollarSign,  color: "#16A34A", bg: "#DCFCE7" },
+  collab:  { icon: Handshake,   color: "#CA8A04", bg: "#FEF9C3" },
+  system:  { icon: Sparkles,    color: "#8B5CF6", bg: "#EDE9FE" },
+  artwork: { icon: ImageIcon,   color: "#FF6B6B", bg: "#FFE4E6" },
+};
+
+function timeAgo(date: string) {
+  const s = Math.floor((Date.now() - new Date(date).getTime()) / 1000);
+  if (s < 60) return "just now";
+  if (s < 3600) return `${Math.floor(s / 60)}m ago`;
+  if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
+  return `${Math.floor(s / 86400)}d ago`;
+}
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router   = useRouter();
 
-  const [profile, setProfile]   = useState<{ full_name?: string; role?: string; avatar_url?: string } | null>(null);
-  const [openMenu, setOpenMenu] = useState<string | null>(null);
+  const [profile, setProfile]       = useState<{ full_name?: string; role?: string; avatar_url?: string } | null>(null);
+  const [openMenu, setOpenMenu]     = useState<string | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [bellOpen, setBellOpen] = useState(false);
-  const [notifs, setNotifs]     = useState(MOCK_NOTIFS);
+  const [bellOpen, setBellOpen]     = useState(false);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [scrolled, setScrolled] = useState(false);
+  const [scrolled, setScrolled]     = useState(false);
+  const [userId, setUserId]         = useState<string | null>(null);
 
   const navRef    = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const bellRef   = useRef<HTMLDivElement>(null);
 
+  // ── Load profile + notifications ──────────────────────────────
   useEffect(() => {
     const supabase = createClient();
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (!user) return;
+      setUserId(user.id);
+
       supabase.from("profiles").select("full_name,role,avatar_url")
         .eq("id", user.id).single()
         .then(({ data }) => setProfile(data));
+
+      // Fetch real notifications
+      loadNotifications(user.id);
     });
   }, []);
+
+  async function loadNotifications(uid: string) {
+    const supabase = createClient();
+    const { data } = await supabase
+      .from("notifications")
+      .select("*")
+      .eq("user_id", uid)
+      .order("created_at", { ascending: false })
+      .limit(15);
+    setNotifications(data || []);
+  }
 
   // Sticky scroll detection
   useEffect(() => {
@@ -138,11 +173,25 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     router.push("/login");
   }
 
+  // ── Notification actions ──────────────────────────────────────
+  async function markNotifRead(id: string) {
+    const supabase = createClient();
+    await supabase.from("notifications").update({ read: true }).eq("id", id);
+    setNotifications(p => p.map(n => n.id === id ? { ...n, read: true } : n));
+  }
+
+  async function markAllNotifRead() {
+    if (!userId) return;
+    const supabase = createClient();
+    await supabase.from("notifications").update({ read: true }).eq("user_id", userId).eq("read", false);
+    setNotifications(p => p.map(n => ({ ...n, read: true })));
+  }
+
   const searchResults = searchQuery
     ? ALL_NAV_ITEMS.filter(i => i.label.toLowerCase().includes(searchQuery.toLowerCase()))
     : [];
 
-  const unread = notifs.filter(n => !n.read).length;
+  const unread = notifications.filter(n => !n.read).length;
 
   const initials = profile?.full_name
     ? profile.full_name.split(" ").map(w => w[0]).join("").slice(0,2).toUpperCase()
@@ -155,10 +204,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
         /* ── Pill nav ── */
         .am-nav-pill {
-          background: #fff;
+          background: rgba(255,255,255,0.92);
+          backdrop-filter: blur(16px);
+          -webkit-backdrop-filter: blur(16px);
           border: 2.5px solid #111110;
           border-radius: 9999px;
-          box-shadow: ${scrolled ? "4px 4px 0 #111110" : "4px 4px 0 #111110"};
+          box-shadow: 4px 4px 0 #111110;
           transition: box-shadow 0.2s, background 0.2s;
         }
 
@@ -175,11 +226,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           min-width: 220px;
           overflow: hidden;
           z-index: 200;
-          animation: dropIn 0.12s ease;
+          animation: dropIn 0.15s cubic-bezier(0.16,1,0.3,1);
         }
         @keyframes dropIn {
-          from { opacity: 0; transform: translateX(-50%) translateY(-6px); }
-          to   { opacity: 1; transform: translateX(-50%) translateY(0);    }
+          from { opacity: 0; transform: translateX(-50%) translateY(-8px) scale(0.97); }
+          to   { opacity: 1; transform: translateX(-50%) translateY(0) scale(1);    }
         }
 
         .am-dropdown-item {
@@ -188,7 +239,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           gap: 12px;
           padding: 11px 16px;
           cursor: pointer;
-          transition: background 0.1s;
+          transition: background 0.12s;
           text-decoration: none;
           border-bottom: 1px solid #F5F0E8;
         }
@@ -210,7 +261,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           font-weight: 700;
           color: #111110;
           cursor: pointer;
-          transition: background 0.12s;
+          transition: all 0.15s cubic-bezier(0.16,1,0.3,1);
           white-space: nowrap;
           position: relative;
         }
@@ -233,7 +284,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           font-weight: 800;
           cursor: pointer;
           text-decoration: none;
-          transition: all 0.12s;
+          transition: all 0.15s;
           white-space: nowrap;
           flex-shrink: 0;
         }
@@ -262,13 +313,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           align-items: center;
           justify-content: center;
           cursor: pointer;
-          transition: background 0.1s, box-shadow 0.1s;
+          transition: all 0.15s cubic-bezier(0.16,1,0.3,1);
           flex-shrink: 0;
           position: relative;
         }
         .am-icon-btn:hover {
           background: #F5F0E8;
           box-shadow: 2px 2px 0 #111110;
+          transform: translateY(-1px);
         }
         .am-icon-btn.active {
           background: #FFD400;
@@ -292,10 +344,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           cursor: pointer;
           flex-shrink: 0;
           text-decoration: none;
-          transition: box-shadow 0.1s;
+          transition: all 0.15s;
           overflow: hidden;
         }
-        .am-avatar:hover { box-shadow: 2px 2px 0 #111110; }
+        .am-avatar:hover { box-shadow: 2px 2px 0 #111110; transform: translateY(-1px); }
 
         /* Divider in pill */
         .am-divider {
@@ -317,7 +369,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           box-shadow: 6px 6px 0 #111110;
           overflow: hidden;
           z-index: 200;
-          animation: dropIn 0.12s ease;
+          animation: dropIn 0.15s cubic-bezier(0.16,1,0.3,1);
         }
 
         /* Bell panel */
@@ -325,15 +377,26 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           position: absolute;
           top: calc(100% + 10px);
           right: 0;
-          width: 300px;
+          width: 340px;
           background: #fff;
           border: 2px solid #111110;
           border-radius: 16px;
           box-shadow: 6px 6px 0 #111110;
           overflow: hidden;
           z-index: 200;
-          animation: dropIn 0.12s ease;
+          animation: dropIn 0.15s cubic-bezier(0.16,1,0.3,1);
         }
+        .am-bell-item {
+          display: flex;
+          align-items: flex-start;
+          gap: 10px;
+          padding: 12px 16px;
+          border-bottom: 1px solid #F5F0E8;
+          cursor: pointer;
+          transition: background 0.12s;
+        }
+        .am-bell-item:last-child { border-bottom: none; }
+        .am-bell-item:hover { background: #FFFBEA; }
 
         /* Mobile menu */
         .am-mobile-menu {
@@ -367,7 +430,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           padding: 28px 20px;
         }
 
-        /* Hover row */
+        /* Hover helpers */
         .dbs-hover:hover { background: #F5F0E8 !important; }
         .dbn-hover:hover { background: #FFFBEA !important; }
 
@@ -388,7 +451,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           {/* ══ PILL NAV ══ */}
           <div className="am-nav-pill" style={{ display: "flex", alignItems: "center", gap: 4, padding: "5px 6px 5px 10px", position: "relative" }}>
 
-            {/* Artomango logo */}
+            {/* Logo */}
             <Link href="/dashboard" style={{ display: "flex", alignItems: "center", textDecoration: "none", flexShrink: 0, fontSize: 24, lineHeight: 1, padding: "2px 2px" }}>
               🥭
             </Link>
@@ -403,7 +466,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
             <div className="am-divider" />
 
-            {/* Section dropdowns — hidden on mobile */}
+            {/* Section dropdowns */}
             <div className="am-nav-sections" style={{ display: "flex", alignItems: "center", gap: 2, flex: 1 }}>
               {NAV_SECTIONS.map(section => {
                 const active = isSectionActive(section);
@@ -417,10 +480,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     >
                       <SIcon size={14} />
                       {section.label}
-                      <ChevronDown size={12} style={{ transform: isOpen ? "rotate(180deg)" : "none", transition: "transform 0.15s" }} />
+                      <ChevronDown size={12} style={{ transform: isOpen ? "rotate(180deg)" : "none", transition: "transform 0.2s cubic-bezier(0.16,1,0.3,1)" }} />
                     </button>
 
-                    {/* Dropdown */}
                     {isOpen && (
                       <div className="am-dropdown">
                         {section.items.map(item => {
@@ -432,7 +494,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                                 <IIcon size={14} color={itemActive ? "#FFD400" : "#5C5346"} />
                               </div>
                               <div>
-                                <div style={{ fontSize: 13, fontWeight: 700, color: itemActive ? "#111110" : "#111110" }}>{item.label}</div>
+                                <div style={{ fontSize: 13, fontWeight: 700, color: "#111110" }}>{item.label}</div>
                                 <div style={{ fontSize: 11, color: itemActive ? "#5C5346" : "#9B8F7A", fontWeight: 500 }}>{item.desc}</div>
                               </div>
                             </Link>
@@ -445,7 +507,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               })}
             </div>
 
-            {/* Right side: search, bell, add, avatar */}
+            {/* Right side */}
             <div style={{ display: "flex", alignItems: "center", gap: 4, marginLeft: "auto" }}>
 
               {/* Mobile hamburger */}
@@ -507,7 +569,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 )}
               </div>
 
-              {/* Bell */}
+              {/* Bell — Real notifications */}
               <div ref={bellRef} style={{ position: "relative" }}>
                 <button
                   className={`am-icon-btn ${bellOpen ? "active" : ""}`}
@@ -515,33 +577,69 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   <Bell size={14} />
                   {unread > 0 && (
                     <span style={{ position: "absolute", top: -4, right: -4, width: 16, height: 16, borderRadius: "50%", background: "#FF6B6B", border: "2px solid #fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 8, fontWeight: 900, color: "#fff" }}>
-                      {unread}
+                      {unread > 9 ? "9+" : unread}
                     </span>
                   )}
                 </button>
                 {bellOpen && (
                   <div className="am-bell-panel">
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", borderBottom: "2px solid #111110", background: "#F5F0E8" }}>
-                      <span style={{ fontSize: 12, fontWeight: 800, color: "#111110" }}>Notifications</span>
-                      <button onClick={() => setNotifs(p => p.map(n => ({ ...n, read: true })))}
-                        style={{ fontSize: 10, fontWeight: 700, color: "#9B8F7A", background: "none", border: "none", cursor: "pointer" }}>
-                        Mark all read
-                      </button>
-                    </div>
-                    {notifs.map((n, i) => (
-                      <div key={n.id} className="dbn-hover"
-                        onClick={() => setNotifs(p => p.map(x => x.id === n.id ? { ...x, read: true } : x))}
-                        style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "11px 14px", borderBottom: i < notifs.length - 1 ? "1px solid #F5F0E8" : "none", background: n.read ? "#fff" : "#FFFBEA", cursor: "pointer" }}>
-                        <div style={{ width: 8, height: 8, borderRadius: "50%", background: n.read ? "#d4cfc4" : n.dot, flexShrink: 0, marginTop: 4 }} />
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: 12, fontWeight: n.read ? 500 : 700, color: "#111110", lineHeight: 1.4 }}>{n.text}</div>
-                          <div style={{ fontSize: 10, color: "#9B8F7A", marginTop: 2 }}>{n.time}</div>
-                        </div>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", borderBottom: "2px solid #111110", background: "#FAF7F3" }}>
+                      <span style={{ fontSize: 13, fontWeight: 800, color: "#111110" }}>Notifications</span>
+                      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                        {unread > 0 && (
+                          <button onClick={markAllNotifRead}
+                            style={{ fontSize: 11, fontWeight: 700, color: "#9B8F7A", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit" }}>
+                            Mark all read
+                          </button>
+                        )}
                       </div>
-                    ))}
+                    </div>
+
+                    <div style={{ maxHeight: 340, overflowY: "auto" }}>
+                      {notifications.length === 0 ? (
+                        <div style={{ padding: "32px 16px", textAlign: "center" }}>
+                          <BellOff size={24} color="#D4C9A8" style={{ marginBottom: 6 }} />
+                          <div style={{ fontSize: 13, fontWeight: 700, color: "#9B8F7A" }}>No notifications</div>
+                          <div style={{ fontSize: 11, color: "#C0B8A8", marginTop: 2 }}>Activity will appear here</div>
+                        </div>
+                      ) : (
+                        notifications.slice(0, 8).map((n) => {
+                          const cfg = NOTIF_ICON[n.type] || NOTIF_ICON.system;
+                          const Icon = cfg.icon;
+                          return (
+                            <div key={n.id} className="am-bell-item"
+                              onClick={() => { if (!n.read) markNotifRead(n.id); }}
+                              style={{ background: n.read ? "transparent" : "#FFFEF5" }}>
+                              <div style={{ width: 32, height: 32, borderRadius: 10, background: cfg.bg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                                <Icon size={14} color={cfg.color} />
+                              </div>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                                  <span style={{ fontSize: 12, fontWeight: n.read ? 600 : 800, color: "#111110" }}>{n.title}</span>
+                                  {!n.read && <div style={{ width: 5, height: 5, borderRadius: "50%", background: "#FF6B6B", flexShrink: 0 }} />}
+                                </div>
+                                {n.body && <div style={{ fontSize: 11, color: "#9B8F7A", marginTop: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{n.body}</div>}
+                                <div style={{ fontSize: 10, color: "#C0B8A8", marginTop: 3 }}>{timeAgo(n.created_at)}</div>
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+
+                    {/* Footer with link to dashboard */}
                     <div style={{ padding: "8px 14px", borderTop: "1px solid #E0D8CA" }}>
+                      <Link href="/dashboard" onClick={() => setBellOpen(false)}
+                        style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "8px", borderRadius: 8, background: "#FAFAF8", border: "1.5px solid #E0D8CA", cursor: "pointer", fontSize: 12, fontWeight: 700, color: "#9B8F7A", textDecoration: "none", transition: "all 0.12s" }}
+                        onMouseEnter={e => { const el = e.currentTarget; el.style.background = "#FFD400"; el.style.borderColor = "#111110"; el.style.color = "#111110"; }}
+                        onMouseLeave={e => { const el = e.currentTarget; el.style.background = "#FAFAF8"; el.style.borderColor = "#E0D8CA"; el.style.color = "#9B8F7A"; }}>
+                        View all on Dashboard
+                      </Link>
+                    </div>
+
+                    <div style={{ padding: "0 14px 10px" }}>
                       <button onClick={handleLogout}
-                        style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", border: "1.5px solid #E0D8CA", background: "#FAFAF8", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 600, color: "#9B8F7A" }}>
+                        style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", border: "1.5px solid #E0D8CA", background: "#FAFAF8", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 600, color: "#9B8F7A", fontFamily: "inherit" }}>
                         <LogOut size={13} /> Sign out
                       </button>
                     </div>
@@ -551,7 +649,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
               {/* Add artwork */}
               <Link href="/dashboard/artworks/new" style={{ textDecoration: "none" }} className="am-add-btn">
-                <div style={{ display: "flex", alignItems: "center", gap: 5, padding: "7px 14px", background: "#111110", color: "#FFD400", fontFamily: "'Darker Grotesque', sans-serif", fontSize: 13, fontWeight: 800, borderRadius: 9999, cursor: "pointer", whiteSpace: "nowrap", transition: "box-shadow 0.1s" }}
+                <div style={{ display: "flex", alignItems: "center", gap: 5, padding: "7px 14px", background: "#111110", color: "#FFD400", fontFamily: "'Darker Grotesque', sans-serif", fontSize: 13, fontWeight: 800, borderRadius: 9999, cursor: "pointer", whiteSpace: "nowrap", transition: "box-shadow 0.15s" }}
                   onMouseEnter={e => (e.currentTarget.style.boxShadow = "0 0 0 2px #FFD400")}
                   onMouseLeave={e => (e.currentTarget.style.boxShadow = "none")}>
                   <Plus size={13} strokeWidth={3} /> New
@@ -578,12 +676,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <div className="am-mobile-menu">
           <div className="am-mobile-overlay" onClick={() => setMobileOpen(false)} />
           <div className="am-mobile-panel" style={{ marginTop: 64 }}>
-            {/* Brand header */}
             <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 12px 12px", borderBottom: "1px solid #E0D8CA", marginBottom: 8 }}>
               <span style={{ fontSize: 22, lineHeight: 1 }}>🥭</span>
               <span style={{ fontSize: 16, fontWeight: 900, color: "#111110", letterSpacing: "-0.3px" }}>artomango</span>
             </div>
-            {/* Dashboard */}
             <Link href="/dashboard" style={{ textDecoration: "none" }}
               onClick={() => setMobileOpen(false)}>
               <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 12px", borderRadius: 10, background: isActive("/dashboard") ? "#FFD400" : "transparent", marginBottom: 4 }}>
@@ -619,9 +715,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 </div>
               </Link>
               <button onClick={handleLogout}
-                style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", background: "none", border: "none", cursor: "pointer", borderRadius: 10 }}>
+                style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", background: "none", border: "none", cursor: "pointer", borderRadius: 10, fontFamily: "inherit" }}>
                 <LogOut size={15} color="#9B8F7A" />
-                <span style={{ fontSize: 14, fontWeight: 600, color: "#9B8F7A", fontFamily: "inherit" }}>Sign out</span>
+                <span style={{ fontSize: 14, fontWeight: 600, color: "#9B8F7A" }}>Sign out</span>
               </button>
             </div>
           </div>

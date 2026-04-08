@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import PlacesAutocomplete, { PlaceResult } from "@/components/PlacesAutocomplete";
 
 type Role = "artist" | "venue";
 type Step = "role" | "art" | "account";
@@ -58,6 +59,7 @@ export default function RegisterPage() {
   const [styles,setStyles]       = useState<string[]>([]);
   const [years,setYears]         = useState("");
   const [city,setCity]           = useState("");
+  const [cityCoords,setCityCoords] = useState<{lat:number;lng:number}|null>(null);
   const [ig,setIg]               = useState("");
   const [bio,setBio]             = useState("");
 
@@ -66,6 +68,7 @@ export default function RegisterPage() {
   const [vType,setVType]         = useState("");
   const [vStyles,setVStyles]     = useState<string[]>([]);
   const [vCity,setVCity]         = useState("");
+  const [vCityCoords,setVCityCoords] = useState<{lat:number;lng:number}|null>(null);
   const [vIg,setVIg]             = useState("");
 
   // account
@@ -89,8 +92,8 @@ export default function RegisterPage() {
       if(e2){setErr(e2.message);setLoading(false);return;}
       if(data.user){
         const p:Record<string,unknown>={id:data.user.id,full_name:name,email,role,onboarding_done:true};
-        if(role==="artist"){p.mediums=mediums;p.style_tags=styles;p.years_active=years;p.location=city;p.instagram=ig;p.bio=bio;}
-        else{p.venue_name=vName;p.venue_type=vType;p.art_styles_sought=vStyles;p.location=vCity;p.instagram=vIg;}
+        if(role==="artist"){p.mediums=mediums;p.style_tags=styles;p.years_active=years;p.location=city;p.lat=cityCoords?.lat||null;p.lng=cityCoords?.lng||null;p.instagram=ig;p.bio=bio;}
+        else{p.venue_name=vName;p.venue_type=vType;p.art_styles_sought=vStyles;p.location=vCity;p.lat=vCityCoords?.lat||null;p.lng=vCityCoords?.lng||null;p.instagram=vIg;}
         await sb.from("profiles").upsert(p);
         router.push("/dashboard");
       }
@@ -255,7 +258,15 @@ export default function RegisterPage() {
                   </div>
                   <div>
                     <label style={S.label}>City / Location</label>
-                    <input style={S.inp} type="text" placeholder="e.g. Prague, Berlin, Tehran…" value={city} onChange={e=>setCity(e.target.value)}/>
+                    <PlacesAutocomplete
+                      value={city}
+                      placeholder="Search your city or studio…"
+                      onChange={(result, raw) => {
+                        setCity(raw);
+                        if (result) setCityCoords({ lat: result.lat, lng: result.lng });
+                        else setCityCoords(null);
+                      }}
+                    />
                   </div>
                   <div>
                     <label style={S.label}>Instagram handle</label>
@@ -287,7 +298,15 @@ export default function RegisterPage() {
                   </div>
                   <div>
                     <label style={S.label}>City / Location</label>
-                    <input style={S.inp} type="text" placeholder="e.g. Prague, Brno…" value={vCity} onChange={e=>setVCity(e.target.value)}/>
+                    <PlacesAutocomplete
+                      value={vCity}
+                      placeholder="Search your venue location…"
+                      onChange={(result, raw) => {
+                        setVCity(raw);
+                        if (result) setVCityCoords({ lat: result.lat, lng: result.lng });
+                        else setVCityCoords(null);
+                      }}
+                    />
                   </div>
                   <div>
                     <label style={S.label}>Instagram handle</label>

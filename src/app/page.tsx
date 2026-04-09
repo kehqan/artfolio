@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import CampaignCarousel from "@/components/CampaignCarousel";
 import {
   Search, MapPin, X, ChevronDown,
   Palette, Building2, Users, Grid3X3,
@@ -262,7 +263,6 @@ function FeatureVisual({ id, active }: { id: string; active: boolean }) {
       </div>
     );
 
-    // planner
     return (
       <div style={{ background:"#fff", borderRadius:16, border:"2px solid #E8E0D0", boxShadow:"4px 5px 0 #D4C9A8", overflow:"hidden", maxWidth:320, width:"100%" }}>
         <div style={{ padding:"12px 16px", borderBottom:"1px solid #F0EBE3", background:"#FAF7F3", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
@@ -306,7 +306,6 @@ export default function HomePage() {
   const [mousePos,       setMousePos]       = useState({ x: 0, y: 0 });
   const exploreRef = useRef<HTMLDivElement>(null);
 
-  // Scroll-triggered section reveals
   const whyReveal     = useReveal(0.1);
   const howReveal     = useReveal(0.15);
   const ctaReveal     = useReveal(0.2);
@@ -316,13 +315,11 @@ export default function HomePage() {
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20);
     window.addEventListener("scroll", onScroll, { passive: true });
-    // Trigger hero entrance
     requestAnimationFrame(() => setTimeout(() => setHeroLoaded(true), 100));
     loadExplore();
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  // Parallax mouse on hero
   useEffect(() => {
     const onMove = (e: MouseEvent) => {
       setMousePos({ x: (e.clientX / window.innerWidth - 0.5) * 2, y: (e.clientY / window.innerHeight - 0.5) * 2 });
@@ -385,7 +382,6 @@ export default function HomePage() {
         html{scroll-behavior:smooth}
         body{font-family:'Darker Grotesque',system-ui,sans-serif;background:#FFFBEA;color:#111110;overflow-x:hidden}
 
-        /* NAV */
         .nav{position:fixed;top:0;left:0;right:0;z-index:100;padding:12px 20px;transition:padding 0.3s cubic-bezier(0.16,1,0.3,1)}
         .nav.scrolled{padding:8px 20px}
         .nav-pill{max-width:1100px;margin:0 auto;display:flex;align-items:center;gap:4px;background:rgba(255,255,255,0.92);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:2.5px solid #111110;border-radius:9999px;padding:5px 6px 5px 10px;box-shadow:4px 4px 0 #111110;transition:box-shadow 0.3s,background 0.3s}
@@ -404,7 +400,6 @@ export default function HomePage() {
         .btn-pill{padding:7px 18px;font-size:13px;font-weight:800;color:#111110;background:#FFD400;border-radius:9999px;border:2px solid #111110;text-decoration:none;white-space:nowrap;transition:all 0.2s cubic-bezier(0.16,1,0.3,1);cursor:pointer;font-family:inherit}
         .btn-pill:hover{box-shadow:2px 2px 0 #111110;transform:translateY(-2px)}
 
-        /* HERO */
         .hero{min-height:100vh;display:grid;grid-template-columns:1fr 1fr;border-bottom:3px solid #111110}
         .hero-left{padding:80px 60px 80px 40px;border-right:3px solid #111110;display:flex;flex-direction:column;justify-content:center;position:relative;background:#FFD400;overflow:hidden}
         .hero-left::before{content:'';position:absolute;inset:0;background:radial-gradient(circle at 30% 80%,rgba(255,255,255,0.3) 0%,transparent 60%);pointer-events:none}
@@ -414,7 +409,7 @@ export default function HomePage() {
         .hero-loaded .hero-title{opacity:1;transform:translateY(0)}
         .hero-title .inv{display:inline-block;background:#111110;color:#FFD400;padding:2px 14px 6px;border-radius:12px;transition:transform 0.3s cubic-bezier(0.16,1,0.3,1)}
         .hero-title .inv:hover{transform:scale(1.03) rotate(-1deg)}
-        .hero-sub{font-size:18px;font-weight:600;color:#111110;line-height:1.5;max-width:380px;margin-bottom:40px;opacity:0.7;opacity:0;transform:translateY(20px);transition:opacity 0.6s 0.5s,transform 0.6s 0.5s cubic-bezier(0.16,1,0.3,1)}
+        .hero-sub{font-size:18px;font-weight:600;color:#111110;line-height:1.5;max-width:380px;margin-bottom:40px;opacity:0;transform:translateY(20px);transition:opacity 0.6s 0.5s,transform 0.6s 0.5s cubic-bezier(0.16,1,0.3,1)}
         .hero-loaded .hero-sub{opacity:0.7;transform:translateY(0)}
         .hero-ctas{display:flex;gap:12px;flex-wrap:wrap;opacity:0;transform:translateY(20px);transition:opacity 0.6s 0.65s,transform 0.6s 0.65s cubic-bezier(0.16,1,0.3,1)}
         .hero-loaded .hero-ctas{opacity:1;transform:translateY(0)}
@@ -437,7 +432,6 @@ export default function HomePage() {
         .hero-float-card{position:absolute;border-radius:12px;transition:transform 0.3s cubic-bezier(0.16,1,0.3,1);opacity:0;animation:heroCardIn 0.6s cubic-bezier(0.16,1,0.3,1) forwards}
         @keyframes heroCardIn{from{opacity:0;transform:translateY(20px) scale(0.9)}to{opacity:1;transform:translateY(0) scale(1)}}
 
-        /* TICKER */
         .ticker-wrap{background:#FFD400;border-top:3px solid #111110;border-bottom:3px solid #111110;padding:14px 0;overflow:hidden;white-space:nowrap}
         .ticker-track{display:inline-flex;gap:48px;animation:ticker 20s linear infinite}
         .ticker-wrap:hover .ticker-track{animation-play-state:paused}
@@ -445,7 +439,6 @@ export default function HomePage() {
         .ticker-item{font-size:15px;font-weight:800;color:#111110;letter-spacing:0.05em;text-transform:uppercase;display:inline-flex;align-items:center;gap:12px;flex-shrink:0;transition:opacity 0.2s}
         .ticker-dot{width:6px;height:6px;background:#111110;border-radius:50%;flex-shrink:0}
 
-        /* ── WHY ARTOMANGO — interactive features ── */
         .why{background:#FFFBEA;padding:80px 0;border-bottom:3px solid #111110}
         .why-inner{max-width:1100px;margin:0 auto;padding:0 24px}
         .why-header{margin-bottom:56px}
@@ -453,7 +446,6 @@ export default function HomePage() {
         .why-title{font-size:clamp(36px,5vw,60px);font-weight:900;color:#111110;letter-spacing:-2px;line-height:1}
         .why-sub{font-size:17px;font-weight:600;color:#9B8F7A;margin-top:12px;max-width:560px}
 
-        /* Feature tabs */
         .feat-nav{display:flex;gap:0;flex-wrap:wrap;border-bottom:2px solid #E8E0D0;margin-bottom:0}
         .feat-tab{display:flex;align-items:center;gap:8px;padding:12px 20px;background:none;border:none;border-bottom:3px solid transparent;margin-bottom:-2px;cursor:pointer;font-family:inherit;font-size:14px;font-weight:700;color:#9B8F7A;transition:all 0.25s cubic-bezier(0.16,1,0.3,1);white-space:nowrap;position:relative}
         .feat-tab:hover{color:#111110;border-bottom-color:#E8E0D0}
@@ -462,7 +454,6 @@ export default function HomePage() {
         .feat-tab:hover .feat-tab-emoji{transform:scale(1.2) rotate(-5deg)}
         .feat-tab.active .feat-tab-emoji{transform:scale(1.15)}
 
-        /* Feature panel */
         .feat-panel{display:grid;grid-template-columns:1fr 1fr;gap:0;border:2px solid #111110;border-top:none;border-radius:0 0 20px 20px;overflow:hidden;box-shadow:4px 6px 0 #D4C9A8;transition:box-shadow 0.3s}
         .feat-left{padding:52px 56px;display:flex;flex-direction:column;justify-content:center;transition:background 0.5s cubic-bezier(0.16,1,0.3,1)}
         .feat-pain{display:flex;align-items:flex-start;gap:10px;padding:10px 14px;background:rgba(0,0,0,0.06);border-radius:10px;margin-bottom:24px;font-size:13px;font-weight:600;color:inherit;opacity:0.65;font-style:italic;line-height:1.5}
@@ -474,11 +465,9 @@ export default function HomePage() {
         .feat-tag{display:inline-block;padding:5px 14px;border-radius:9999px;border:2px solid currentColor;font-size:11px;font-weight:800;letter-spacing:0.1em;text-transform:uppercase;margin-top:20px;opacity:0.8}
         .feat-right{display:flex;align-items:center;justify-content:center;padding:48px 40px;border-left:2px solid rgba(0,0,0,0.08);position:relative;overflow:hidden;min-height:440px}
 
-        /* Text transition in feat-left */
         .feat-text-enter{animation:featTextIn 0.5s cubic-bezier(0.16,1,0.3,1) forwards}
         @keyframes featTextIn{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
 
-        /* HOW IT WORKS */
         .how{background:#111110;padding:80px 40px;border-bottom:3px solid #111110}
         .how-inner{max-width:1100px;margin:0 auto}
         .how-eyebrow{display:inline-block;background:#1a1a1a;color:#FFD400;border:1px solid #333;padding:3px 14px;border-radius:9999px;font-size:10px;font-weight:800;letter-spacing:0.2em;text-transform:uppercase;margin-bottom:16px}
@@ -494,7 +483,6 @@ export default function HomePage() {
         .step-title{font-size:22px;font-weight:900;color:#fff;letter-spacing:-0.5px;margin-bottom:12px}
         .step-desc{font-size:14px;font-weight:500;color:#666;line-height:1.7}
 
-        /* CTA BAND */
         .cta-band{background:#FFD400;border-bottom:3px solid #111110;padding:80px 40px;overflow:hidden;position:relative}
         .cta-band::before{content:'';position:absolute;top:-60px;right:-60px;width:200px;height:200px;border-radius:50%;background:rgba(255,255,255,0.2);pointer-events:none}
         .cta-inner{max-width:1100px;margin:0 auto;display:grid;grid-template-columns:1fr auto;align-items:center;gap:40px}
@@ -506,7 +494,6 @@ export default function HomePage() {
         .btn-cta-dark:hover{box-shadow:8px 8px 0 rgba(0,0,0,0.3);transform:translate(-2px,-2px)}
         .btn-cta-dark:active{box-shadow:2px 2px 0 rgba(0,0,0,0.3);transform:translate(1px,1px)}
 
-        /* SOCIAL PROOF */
         .proof{background:#FFFBEA;padding:80px 40px;border-bottom:3px solid #111110}
         .proof-inner{max-width:1100px;margin:0 auto}
         .proof-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:0;border:2.5px solid #111110;border-radius:20px;box-shadow:6px 6px 0 #111110;margin-top:48px;overflow:hidden}
@@ -519,7 +506,6 @@ export default function HomePage() {
         .proof-avatar{width:36px;height:36px;border-radius:50%;background:#FFD400;border:2px solid #111110;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:900;color:#111110;flex-shrink:0;transition:transform 0.3s cubic-bezier(0.34,1.56,0.64,1)}
         .proof-card:hover .proof-avatar{transform:scale(1.1)}
 
-        /* EXPLORE */
         .explore-section{background:#F5F0E8;border-top:3px solid #E8E0D0;padding:80px 0}
         .explore-inner{max-width:1100px;margin:0 auto;padding:0 24px}
         .tabs{display:flex;background:#fff;border:2px solid #111110;border-radius:12px;overflow:hidden;width:fit-content;margin-bottom:24px}
@@ -547,7 +533,6 @@ export default function HomePage() {
         .skeleton{background:#E8E0D0;border-radius:18px;animation:shimmer 1.5s infinite}
         @keyframes shimmer{0%,100%{opacity:1}50%{opacity:0.6}}
 
-        /* FOOTER */
         .footer{background:#111110;padding:48px 40px 28px}
         .footer-inner{max-width:1100px;margin:0 auto}
         .footer-top{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:40px;padding-bottom:40px;border-bottom:1px solid #222;margin-bottom:28px}
@@ -560,7 +545,6 @@ export default function HomePage() {
         .footer-bottom{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px}
         .footer-copy{font-size:11px;font-weight:600;color:#333}
 
-        /* Reveal animations */
         .reveal-up{opacity:0;transform:translateY(40px);transition:opacity 0.7s cubic-bezier(0.16,1,0.3,1),transform 0.7s cubic-bezier(0.16,1,0.3,1)}
         .reveal-up.visible{opacity:1;transform:translateY(0)}
         .reveal-scale{opacity:0;transform:scale(0.95);transition:opacity 0.6s,transform 0.6s cubic-bezier(0.16,1,0.3,1)}
@@ -641,7 +625,6 @@ export default function HomePage() {
             <div className="hero-stat"><span className="hero-stat-num"><AnimCounter target={12}/></span><span className="hero-stat-label">Shows</span></div>
             <div className="hero-stat"><span className="hero-stat-num"><AnimCounter target={18} prefix="$" suffix="k"/></span><span className="hero-stat-label">Revenue</span></div>
           </div>
-          {/* Floating notification cards */}
           <div className="hero-float-card" style={{top:100,left:24,background:"#FFD400",border:"2px solid #111110",padding:"8px 14px",boxShadow:"3px 3px 0 #111110",animationDelay:"0.8s", transform: `translate(${mousePos.x*-12}px, ${mousePos.y*-8}px)` }}>
             <div style={{fontSize:10,fontWeight:800,textTransform:"uppercase",letterSpacing:"0.1em",color:"#111110"}}>New collab request</div>
             <div style={{fontSize:12,fontWeight:700,color:"#111110",marginTop:2}}>Galerie Nord · Prague</div>
@@ -664,7 +647,7 @@ export default function HomePage() {
         </div>
       </div>
 
-      {/* ── WHY ARTOMANGO — interactive features ── */}
+      {/* ── WHY ARTOMANGO ── */}
       <section id="why" className="why">
         <div className="why-inner" ref={whyReveal.ref}>
           <div className={`why-header reveal-up${whyReveal.visible?" visible":""}`}>
@@ -673,7 +656,6 @@ export default function HomePage() {
             <p className="why-sub">Everything you need to run your art practice like a professional — without the spreadsheets, the paper trails, or the missed connections.</p>
           </div>
 
-          {/* Feature tab nav */}
           <div className={`feat-nav reveal-up stagger-2${whyReveal.visible?" visible":""}`}>
             {FEATURES.map((f,i) => (
               <button key={f.id} className={`feat-tab${activeFeature===i?" active":""}`} onClick={() => switchFeature(i)}>
@@ -683,7 +665,6 @@ export default function HomePage() {
             ))}
           </div>
 
-          {/* Feature panel */}
           <div className={`feat-panel reveal-scale stagger-3${whyReveal.visible?" visible":""}`} style={{background:feat.color}}>
             <div className="feat-left" key={feat.id} style={{background:feat.color,color:feat.textColor}}>
               <div className="feat-pain feat-text-enter" key={`pain-${feat.id}`}>{feat.pain}</div>
@@ -700,357 +681,10 @@ export default function HomePage() {
           </div>
         </div>
       </section>
-"use client";
-import { useState, useEffect, useRef, useCallback } from "react";
-import { createClient } from "@/lib/supabase/client";
 
-// ─── Types ────────────────────────────────────────────────────────
-type Slide = {
-  id: string;
-  image_url: string;
-  phrase: string;        // e.g. "sleep", "travel", "exhibit"
-  order: number;
-  active: boolean;
-};
+      {/* ── CAMPAIGN CAROUSEL ── */}
+      <CampaignCarousel />
 
-// ─── Fallback slides (shown while loading / if table is empty) ────
-const FALLBACK_SLIDES: Omit<Slide, "id" | "order" | "active">[] = [
-  {
-    image_url: "https://images.unsplash.com/photo-1541961017774-22349e4a1262?w=1600&q=80",
-    phrase: "sleep",
-  },
-  {
-    image_url: "https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=1600&q=80",
-    phrase: "travel",
-  },
-  {
-    image_url: "https://images.unsplash.com/photo-1513364776144-60967b0f800f?w=1600&q=80",
-    phrase: "create",
-  },
-  {
-    image_url: "https://images.unsplash.com/photo-1491438590914-bc09fcaaf77a?w=1600&q=80",
-    phrase: "connect",
-  },
-];
-
-// ─── Component ────────────────────────────────────────────────────
-export default function CampaignCarousel() {
-  const [slides, setSlides] = useState<Slide[]>([]);
-  const [active, setActive] = useState(0);
-  const [loaded, setLoaded] = useState<Record<number, boolean>>({});
-  const [phraseVisible, setPhraseVisible] = useState(true);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const AUTO_MS = 5000;
-
-  // Load from Supabase
-  useEffect(() => {
-    (async () => {
-      const sb = createClient();
-      const { data } = await sb
-        .from("campaign_slides")
-        .select("*")
-        .eq("active", true)
-        .order("order", { ascending: true });
-      if (data && data.length > 0) setSlides(data);
-    })();
-  }, []);
-
-  const displaySlides: (Slide | (typeof FALLBACK_SLIDES)[0])[] =
-    slides.length > 0 ? slides : FALLBACK_SLIDES;
-
-  // Auto-advance
-  const goTo = useCallback(
-    (idx: number) => {
-      setPhraseVisible(false);
-      setTimeout(() => {
-        setActive(idx);
-        setPhraseVisible(true);
-      }, 300);
-    },
-    []
-  );
-
-  useEffect(() => {
-    timerRef.current = setTimeout(
-      () => goTo((active + 1) % displaySlides.length),
-      AUTO_MS
-    );
-    return () => { if (timerRef.current) clearTimeout(timerRef.current); };
-  }, [active, displaySlides.length, goTo]);
-
-  const slide = displaySlides[active];
-
-  return (
-    <>
-      <style>{`
-        .campaign-section {
-          position: relative;
-          width: 100%;
-          height: 100vh;
-          min-height: 600px;
-          max-height: 900px;
-          overflow: hidden;
-          border-bottom: 3px solid #111110;
-          background: #0a0a0a;
-          cursor: none;
-        }
-        /* ── Background image stack ── */
-        .campaign-bg {
-          position: absolute;
-          inset: 0;
-          z-index: 0;
-        }
-        .campaign-bg-img {
-          position: absolute;
-          inset: 0;
-          width: 100%;
-          height: 100%;
-          object-fit: cover;
-          object-position: center;
-          transition: opacity 0.9s cubic-bezier(0.16,1,0.3,1),
-                      transform 6s cubic-bezier(0.16,1,0.3,1);
-          transform: scale(1.04);
-          opacity: 0;
-          will-change: opacity, transform;
-        }
-        .campaign-bg-img.bg-active {
-          opacity: 1;
-          transform: scale(1);
-        }
-        /* ── Dark vignette — heavier on left ── */
-        .campaign-overlay {
-          position: absolute;
-          inset: 0;
-          z-index: 1;
-          background:
-            linear-gradient(
-              to right,
-              rgba(0,0,0,0.80) 0%,
-              rgba(0,0,0,0.45) 45%,
-              rgba(0,0,0,0.10) 70%,
-              rgba(0,0,0,0.05) 100%
-            ),
-            linear-gradient(
-              to top,
-              rgba(0,0,0,0.40) 0%,
-              transparent 40%
-            );
-        }
-        /* ── Content ── */
-        .campaign-content {
-          position: relative;
-          z-index: 2;
-          height: 100%;
-          display: flex;
-          flex-direction: column;
-          justify-content: center;
-          padding: 0 clamp(28px, 7vw, 100px);
-          max-width: 860px;
-        }
-        /* ── Eyebrow ── */
-        .campaign-eyebrow {
-          font-family: 'Darker Grotesque', system-ui, sans-serif;
-          font-size: 11px;
-          font-weight: 800;
-          letter-spacing: 0.22em;
-          text-transform: uppercase;
-          color: #FFD400;
-          margin-bottom: 28px;
-          opacity: 0.85;
-        }
-        /* ── Main headline ── */
-        .campaign-headline {
-          font-family: 'Darker Grotesque', system-ui, sans-serif;
-          font-size: clamp(48px, 7.5vw, 110px);
-          font-weight: 900;
-          letter-spacing: -3px;
-          line-height: 0.92;
-          color: #fff;
-          margin: 0;
-          user-select: none;
-        }
-        /* ── Quote‑mark row ── */
-        .campaign-quote-row {
-          display: flex;
-          align-items: center;
-          gap: clamp(12px, 2vw, 28px);
-          margin-top: clamp(4px, 1vw, 8px);
-        }
-        .campaign-quote-mark {
-          font-family: 'Darker Grotesque', system-ui, sans-serif;
-          font-size: clamp(60px, 10vw, 130px);
-          font-weight: 900;
-          line-height: 0.75;
-          color: #FFD400;
-          flex-shrink: 0;
-          display: inline-block;
-          user-select: none;
-        }
-        .campaign-quote-mark.open { transform: translateY(-4px); }
-        .campaign-quote-mark.close { transform: translateY(4px); }
-        /* ── Animated phrase ── */
-        .campaign-phrase-wrap {
-          flex: 1;
-          overflow: hidden;
-        }
-        .campaign-phrase {
-          font-family: 'Darker Grotesque', system-ui, sans-serif;
-          font-size: clamp(48px, 7.5vw, 110px);
-          font-weight: 900;
-          letter-spacing: -3px;
-          line-height: 0.92;
-          color: #fff;
-          display: block;
-          transition: opacity 0.25s ease, transform 0.3s cubic-bezier(0.16,1,0.3,1);
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          max-width: 100%;
-        }
-        .campaign-phrase.hidden {
-          opacity: 0;
-          transform: translateY(18px);
-        }
-        .campaign-phrase.visible {
-          opacity: 1;
-          transform: translateY(0);
-        }
-        /* ── Progress bar ── */
-        .campaign-progress {
-          position: absolute;
-          bottom: 0;
-          left: 0;
-          right: 0;
-          z-index: 3;
-          display: flex;
-          gap: 3px;
-          padding: 0 clamp(28px, 7vw, 100px) 32px;
-        }
-        .campaign-progress-bar {
-          flex: 1;
-          height: 2px;
-          background: rgba(255,255,255,0.2);
-          border-radius: 2px;
-          cursor: pointer;
-          position: relative;
-          overflow: hidden;
-          transition: height 0.2s;
-        }
-        .campaign-progress-bar:hover { height: 4px; }
-        .campaign-progress-fill {
-          position: absolute;
-          inset: 0;
-          background: #FFD400;
-          transform-origin: left;
-          transform: scaleX(0);
-          border-radius: 2px;
-        }
-        @keyframes fillBar {
-          from { transform: scaleX(0); }
-          to   { transform: scaleX(1); }
-        }
-        .campaign-progress-bar.active .campaign-progress-fill {
-          animation: fillBar 5s linear forwards;
-        }
-        .campaign-progress-bar.done .campaign-progress-fill {
-          transform: scaleX(1);
-        }
-        /* ── Custom cursor dot ── */
-        .campaign-cursor {
-          position: absolute;
-          width: 10px;
-          height: 10px;
-          background: #FFD400;
-          border-radius: 50%;
-          pointer-events: none;
-          z-index: 10;
-          transform: translate(-50%, -50%);
-          transition: transform 0.1s, width 0.3s, height 0.3s;
-          mix-blend-mode: normal;
-        }
-        /* ── Slide counter ── */
-        .campaign-counter {
-          position: absolute;
-          bottom: 48px;
-          right: clamp(28px, 7vw, 100px);
-          z-index: 3;
-          font-family: 'Darker Grotesque', system-ui, sans-serif;
-          font-size: 13px;
-          font-weight: 800;
-          color: rgba(255,255,255,0.4);
-          letter-spacing: 0.12em;
-          user-select: none;
-        }
-
-        @media (max-width: 700px) {
-          .campaign-headline { letter-spacing: -1.5px; }
-          .campaign-phrase   { letter-spacing: -1.5px; }
-          .campaign-progress { padding-bottom: 20px; }
-        }
-      `}</style>
-
-      <section className="campaign-section" id="campaign">
-        {/* ── Background images ── */}
-        <div className="campaign-bg">
-          {displaySlides.map((s, i) => (
-            <img
-              key={i}
-              src={"image_url" in s ? s.image_url : ""}
-              alt=""
-              className={`campaign-bg-img${active === i ? " bg-active" : ""}`}
-              onLoad={() => setLoaded(prev => ({ ...prev, [i]: true }))}
-              loading={i === 0 ? "eager" : "lazy"}
-            />
-          ))}
-        </div>
-
-        {/* ── Overlay ── */}
-        <div className="campaign-overlay" />
-
-        {/* ── Text content ── */}
-        <div className="campaign-content">
-          <p className="campaign-eyebrow">🥭 artomango</p>
-
-          <h2 className="campaign-headline">
-            Manage your art
-          </h2>
-
-          {/* Second line: while you " phrase " */}
-          <div className="campaign-headline" style={{ display: "flex", alignItems: "baseline", flexWrap: "wrap", gap: "0 0.28em" }}>
-            <span>while you</span>
-            <div className="campaign-quote-row">
-              <span className="campaign-quote-mark open">&ldquo;</span>
-              <div className="campaign-phrase-wrap">
-                <span className={`campaign-phrase ${phraseVisible ? "visible" : "hidden"}`}>
-                  {slide.phrase}
-                </span>
-              </div>
-              <span className="campaign-quote-mark close">&rdquo;</span>
-            </div>
-          </div>
-        </div>
-
-        {/* ── Counter ── */}
-        <div className="campaign-counter">
-          {String(active + 1).padStart(2, "0")} / {String(displaySlides.length).padStart(2, "0")}
-        </div>
-
-        {/* ── Progress bars ── */}
-        <div className="campaign-progress">
-          {displaySlides.map((_, i) => (
-            <div
-              key={i}
-              className={`campaign-progress-bar ${i === active ? "active" : i < active ? "done" : ""}`}
-              onClick={() => { if (timerRef.current) clearTimeout(timerRef.current); goTo(i); }}
-            >
-              <div className="campaign-progress-fill" />
-            </div>
-          ))}
-        </div>
-      </section>
-    </>
-  );
-}
       {/* ── HOW IT WORKS ── */}
       <section id="how" className="how" ref={howReveal.ref}>
         <div className="how-inner">
@@ -1124,7 +758,6 @@ export default function CampaignCarousel() {
           </div>
 
           <div className={`reveal-up stagger-2${exploreReveal.visible?" visible":""}`}>
-            {/* Tabs */}
             <div className="tabs">
               <button className={`tab-btn${exploreTab==="artworks"?" active":""}`} onClick={() => setExploreTab("artworks")}>
                 <Grid3X3 size={14}/> Artworks
@@ -1134,7 +767,6 @@ export default function CampaignCarousel() {
               </button>
             </div>
 
-            {/* Controls */}
             <div style={{display:"flex",gap:10,alignItems:"center",flexWrap:"wrap",marginBottom:28}}>
               <div className="search-wrap">
                 <Search size={14} color="#9B8F7A"/>
@@ -1150,7 +782,6 @@ export default function CampaignCarousel() {
             </div>
           </div>
 
-          {/* Artworks grid */}
           {exploreTab === "artworks" && (
             loadingExplore ? (
               <div className="art-grid">
@@ -1195,7 +826,6 @@ export default function CampaignCarousel() {
             )
           )}
 
-          {/* Artists grid */}
           {exploreTab === "artists" && (
             loadingExplore ? (
               <div className="artist-grid">

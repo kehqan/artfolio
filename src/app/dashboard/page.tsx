@@ -476,7 +476,7 @@ export default function DashboardPage() {
 
           <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
             {profile?.username && (
-              <Link href={`/profile/${profile.username}`} style={{ textDecoration: "none" }}>
+              <Link href={`/${profile.username}`} style={{ textDecoration: "none" }}>
                 <button style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 16px", border: "2px solid #E8E0D0", borderRadius: 12, background: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", transition: "all 0.15s", fontFamily: "inherit", color: "#111110" }}
                   onMouseEnter={e => { const el = e.currentTarget; el.style.borderColor = "#111110"; el.style.boxShadow = "2px 2px 0 #111110"; }}
                   onMouseLeave={e => { const el = e.currentTarget; el.style.borderColor = "#E8E0D0"; el.style.boxShadow = "none"; }}>

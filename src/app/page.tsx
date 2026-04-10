@@ -312,7 +312,6 @@ export default function HomePage() {
   const [medium,         setMedium]         = useState("All");
   const [loadingExplore, setLoadingExplore] = useState(true);
   const [heroLoaded,     setHeroLoaded]     = useState(false);
-  const [mousePos,       setMousePos]       = useState({ x:0, y:0 });
 
   const whyReveal     = useReveal(0.1);
   const howReveal     = useReveal(0.15);
@@ -326,12 +325,6 @@ export default function HomePage() {
     requestAnimationFrame(() => setTimeout(() => setHeroLoaded(true), 100));
     loadData();
     return () => window.removeEventListener("scroll", onScroll);
-  }, []);
-
-  useEffect(() => {
-    const onMove = (e: MouseEvent) => setMousePos({ x:(e.clientX/window.innerWidth-0.5)*2, y:(e.clientY/window.innerHeight-0.5)*2 });
-    window.addEventListener("mousemove", onMove, { passive:true });
-    return () => window.removeEventListener("mousemove", onMove);
   }, []);
 
   function switchFeature(i: number) {
@@ -430,36 +423,28 @@ export default function HomePage() {
         .btn-pill{padding:7px 18px;font-size:13px;font-weight:800;color:#111110;background:#FFD400;border-radius:9999px;border:2px solid #111110;text-decoration:none;white-space:nowrap;transition:all 0.2s cubic-bezier(0.16,1,0.3,1);cursor:pointer;font-family:inherit}
         .btn-pill:hover{box-shadow:2px 2px 0 #111110;transform:translateY(-2px)}
 
-        .hero{min-height:100vh;display:grid;grid-template-columns:1fr 1fr;border-bottom:3px solid #111110}
-        .hero-left{padding:80px 60px 80px 40px;border-right:3px solid #111110;display:flex;flex-direction:column;justify-content:center;position:relative;background:#FFD400;overflow:hidden}
-        .hero-left::before{content:'';position:absolute;inset:0;background:radial-gradient(circle at 30% 80%,rgba(255,255,255,0.3) 0%,transparent 60%);pointer-events:none}
-        .hero-eyebrow{display:inline-flex;align-items:center;gap:8px;background:#111110;color:#FFD400;padding:4px 14px;border-radius:9999px;font-size:11px;font-weight:800;letter-spacing:0.18em;text-transform:uppercase;margin-bottom:28px;width:fit-content;opacity:0;transform:translateY(20px);transition:opacity 0.6s 0.2s,transform 0.6s 0.2s cubic-bezier(0.16,1,0.3,1)}
+        .hero{min-height:100vh;display:grid;grid-template-columns:1fr 1.1fr;border-bottom:3px solid #111110;position:relative}
+        .hero-left{padding:100px 56px 80px 48px;display:flex;flex-direction:column;justify-content:center;position:relative;background:#FFD400;overflow:hidden;z-index:2}
+        .hero-left::after{content:'';position:absolute;top:0;right:-60px;bottom:0;width:120px;background:linear-gradient(to right,#FFD400,transparent);z-index:3;pointer-events:none}
+        .hero-left::before{content:'';position:absolute;inset:0;background:radial-gradient(circle at 20% 85%,rgba(255,255,255,0.22) 0%,transparent 55%);pointer-events:none}
+        .hero-eyebrow{display:inline-flex;align-items:center;gap:8px;background:#111110;color:#FFD400;padding:4px 14px;border-radius:9999px;font-size:11px;font-weight:800;letter-spacing:0.18em;text-transform:uppercase;margin-bottom:32px;width:fit-content;opacity:0;transform:translateY(20px);transition:opacity 0.6s 0.2s,transform 0.6s 0.2s cubic-bezier(0.16,1,0.3,1)}
         .hero-loaded .hero-eyebrow{opacity:1;transform:translateY(0)}
-        .hero-title{font-size:clamp(52px,7vw,88px);font-weight:900;letter-spacing:-3px;line-height:0.92;color:#111110;margin-bottom:28px;opacity:0;transform:translateY(30px);transition:opacity 0.7s 0.35s,transform 0.7s 0.35s cubic-bezier(0.16,1,0.3,1)}
+        .hero-title{font-size:clamp(52px,6.5vw,84px);font-weight:900;letter-spacing:-3px;line-height:0.91;color:#111110;margin-bottom:24px;opacity:0;transform:translateY(30px);transition:opacity 0.7s 0.35s,transform 0.7s 0.35s cubic-bezier(0.16,1,0.3,1)}
         .hero-loaded .hero-title{opacity:1;transform:translateY(0)}
-        .hero-title .inv{display:inline-block;background:#111110;color:#FFD400;padding:2px 14px 6px;border-radius:12px;transition:transform 0.3s cubic-bezier(0.16,1,0.3,1)}
-        .hero-title .inv:hover{transform:scale(1.03) rotate(-1deg)}
-        .hero-sub{font-size:18px;font-weight:600;color:#111110;line-height:1.5;max-width:380px;margin-bottom:40px;opacity:0;transform:translateY(20px);transition:opacity 0.6s 0.5s,transform 0.6s 0.5s cubic-bezier(0.16,1,0.3,1)}
-        .hero-loaded .hero-sub{opacity:0.7;transform:translateY(0)}
+        .hero-sub{font-size:17px;font-weight:600;color:rgba(17,17,16,0.6);line-height:1.55;max-width:340px;margin-bottom:44px;opacity:0;transform:translateY(20px);transition:opacity 0.6s 0.5s,transform 0.6s 0.5s cubic-bezier(0.16,1,0.3,1)}
+        .hero-loaded .hero-sub{opacity:1;transform:translateY(0)}
         .hero-ctas{display:flex;gap:12px;flex-wrap:wrap;opacity:0;transform:translateY(20px);transition:opacity 0.6s 0.65s,transform 0.6s 0.65s cubic-bezier(0.16,1,0.3,1)}
         .hero-loaded .hero-ctas{opacity:1;transform:translateY(0)}
-        .btn-hero-dark-rnd{display:inline-flex;align-items:center;gap:8px;padding:14px 28px;background:#111110;color:#FFD400;font-family:inherit;font-size:15px;font-weight:800;border:2.5px solid #111110;border-radius:14px;text-decoration:none;cursor:pointer;transition:all 0.25s cubic-bezier(0.16,1,0.3,1);box-shadow:4px 4px 0 rgba(0,0,0,0.2)}
-        .btn-hero-dark-rnd:hover{box-shadow:6px 6px 0 rgba(0,0,0,0.25);transform:translate(-2px,-2px)}
-        .btn-hero-ghost-rnd{display:inline-flex;align-items:center;gap:8px;padding:14px 28px;background:rgba(255,255,255,0.7);color:#111110;font-family:inherit;font-size:15px;font-weight:800;border:2.5px solid #111110;border-radius:14px;text-decoration:none;cursor:pointer;transition:all 0.25s cubic-bezier(0.16,1,0.3,1)}
-        .btn-hero-ghost-rnd:hover{background:#fff;transform:translateY(-2px);box-shadow:3px 3px 0 rgba(0,0,0,0.1)}
-        .hero-right{background:#111110;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 40px;position:relative;overflow:hidden}
-        .hero-right::before{content:'';position:absolute;inset:0;background:radial-gradient(circle at 70% 30%,rgba(255,212,0,0.08) 0%,transparent 50%);pointer-events:none}
-        .hero-mango{font-size:140px;line-height:1;display:block;animation:floatMango 3s ease-in-out infinite;filter:drop-shadow(0 20px 40px rgba(0,0,0,0.5));margin-bottom:32px;opacity:0;transition:opacity 0.8s 0.4s}
-        .hero-loaded .hero-mango{opacity:1}
-        @keyframes floatMango{0%,100%{transform:translateY(0) rotate(-3deg)}50%{transform:translateY(-16px) rotate(3deg)}}
-        .hero-stats{display:grid;grid-template-columns:1fr 1fr 1fr;border:2px solid #333;width:100%;max-width:340px;opacity:0;transform:translateY(20px);transition:opacity 0.6s 0.6s,transform 0.6s 0.6s cubic-bezier(0.16,1,0.3,1)}
-        .hero-loaded .hero-stats{opacity:1;transform:translateY(0)}
-        .hero-stat{padding:16px 12px;text-align:center;border-right:1px solid #333}
-        .hero-stat:last-child{border-right:none}
-        .hero-stat-num{font-size:28px;font-weight:900;color:#FFD400;letter-spacing:-1px;display:block}
-        .hero-stat-label{font-size:10px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:0.12em}
-        .hero-float-card{position:absolute;border-radius:12px;transition:transform 0.3s cubic-bezier(0.16,1,0.3,1);opacity:0;animation:heroCardIn 0.6s cubic-bezier(0.16,1,0.3,1) forwards}
-        @keyframes heroCardIn{from{opacity:0;transform:translateY(20px) scale(0.9)}to{opacity:1;transform:translateY(0) scale(1)}}
+        .btn-hero-dark-rnd{display:inline-flex;align-items:center;gap:8px;padding:14px 28px;background:#111110;color:#FFD400;font-family:inherit;font-size:15px;font-weight:800;border:2.5px solid #111110;border-radius:14px;text-decoration:none;cursor:pointer;transition:all 0.25s cubic-bezier(0.16,1,0.3,1);box-shadow:4px 4px 0 rgba(0,0,0,0.25)}
+        .btn-hero-dark-rnd:hover{box-shadow:6px 6px 0 rgba(0,0,0,0.3);transform:translate(-2px,-2px)}
+        .hero-right{position:relative;overflow:hidden;background:#FFFBEA}
+        .hero-artwork{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center top;display:block;opacity:0;transition:opacity 1.2s 0.3s cubic-bezier(0.16,1,0.3,1)}
+        .hero-loaded .hero-artwork{opacity:1}
+        .hero-artwork-fade-left{position:absolute;inset:0;background:linear-gradient(to right,#FFD400 0%,rgba(255,212,0,0.6) 16%,rgba(255,212,0,0) 40%);pointer-events:none;z-index:2}
+        .hero-artwork-fade-bottom{position:absolute;inset:0;background:linear-gradient(to top,#FFD400 0%,rgba(255,212,0,0.35) 10%,transparent 28%);pointer-events:none;z-index:2}
+        .hero-artwork-vignette{position:absolute;inset:0;background:radial-gradient(ellipse at 85% 15%,rgba(0,0,0,0.06) 0%,transparent 55%);pointer-events:none;z-index:2}
+        .hero-credit{position:absolute;bottom:28px;right:24px;z-index:4;opacity:0;transform:translateY(10px);transition:opacity 0.6s 1s,transform 0.6s 1s cubic-bezier(0.16,1,0.3,1)}
+        .hero-loaded .hero-credit{opacity:1;transform:translateY(0)}
 
         .ticker-wrap{background:#FFD400;border-top:3px solid #111110;border-bottom:3px solid #111110;padding:14px 0;overflow:hidden;white-space:nowrap}
         .ticker-track{display:inline-flex;gap:48px;animation:ticker 20s linear infinite}
@@ -601,9 +586,11 @@ export default function HomePage() {
 
         @media(max-width:900px){
           .hero{grid-template-columns:1fr}
-          .hero-right{min-height:280px;padding:40px 24px}
-          .hero-mango{font-size:80px}
-          .hero-left{padding:60px 24px;border-right:none;border-bottom:3px solid #111110}
+          .hero-right{min-height:50vw}
+          .hero-left{padding:80px 24px 60px;border-bottom:3px solid #111110}
+          .hero-left::after{display:none}
+          .hero-artwork-fade-left{background:linear-gradient(to bottom,#FFD400 0%,rgba(255,212,0,0) 25%)}
+          .hero-artwork-fade-bottom{background:linear-gradient(to top,#FFFBEA 0%,rgba(255,251,234,0.5) 14%,transparent 32%)}
           .feat-panel{grid-template-columns:1fr}
           .feat-right{display:none}
           .feat-left{padding:36px 28px}
@@ -644,33 +631,62 @@ export default function HomePage() {
       </nav>
 
       {/* ── HERO ── */}
-      <section className={`hero${heroLoaded?" hero-loaded":""}`} style={{paddingTop:80}}>
+      <section className={`hero${heroLoaded?" hero-loaded":""}`} style={{paddingTop:72}}>
+        {/* LEFT — text */}
         <div className="hero-left">
           <div className="hero-eyebrow">🥭 artomango · art platform</div>
-          <h1 className="hero-title">Your art.<br/><span className="inv">Managed.</span><br/>Exhibited.</h1>
-          <p className="hero-sub">The platform for artists and venues to manage work, discover collaborations, and grow in the art scene.</p>
+          <h1 className="hero-title">
+            Your art.<br/>
+            Your practice.<br/>
+            Your scene.
+          </h1>
+          <p className="hero-sub">
+            The platform for artists and venues to manage work, discover collaborations, and grow together.
+          </p>
           <div className="hero-ctas">
-            <a href="/register" className="btn-hero-dark-rnd">Start for free →</a>
-            <button className="btn-hero-ghost-rnd" onClick={() => document.getElementById("why")?.scrollIntoView({behavior:"smooth"})}>
-              See features <ChevronDown size={16}/>
-            </button>
+            <a href="/register" className="btn-hero-dark-rnd">
+              Join free →
+            </a>
           </div>
         </div>
+
+        {/* RIGHT — artwork dissolving into yellow */}
         <div className="hero-right">
-          <span className="hero-mango" style={{transform:`translate(${mousePos.x*8}px,${mousePos.y*6}px)`}}>🥭</span>
-          <div className="hero-stats">
-            <div className="hero-stat"><span className="hero-stat-num"><AnimCounter target={47}/></span><span className="hero-stat-label">Works</span></div>
-            <div className="hero-stat"><span className="hero-stat-num"><AnimCounter target={12}/></span><span className="hero-stat-label">Shows</span></div>
-            <div className="hero-stat"><span className="hero-stat-num"><AnimCounter target={18} prefix="$" suffix="k"/></span><span className="hero-stat-label">Revenue</span></div>
-          </div>
-          <div className="hero-float-card" style={{top:100,left:24,background:"#FFD400",border:"2px solid #111110",padding:"8px 14px",boxShadow:"3px 3px 0 #111110",animationDelay:"0.8s",transform:`translate(${mousePos.x*-12}px,${mousePos.y*-8}px)`}}>
-            <div style={{fontSize:10,fontWeight:800,textTransform:"uppercase",letterSpacing:"0.1em",color:"#111110"}}>New collab request</div>
-            <div style={{fontSize:12,fontWeight:700,color:"#111110",marginTop:2}}>Galerie Nord · Prague</div>
-          </div>
-          <div className="hero-float-card" style={{bottom:120,right:24,background:"#fff",border:"2px solid #333",padding:"8px 14px",boxShadow:"3px 3px 0 #333",animationDelay:"1.2s",transform:`translate(${mousePos.x*10}px,${mousePos.y*10}px)`}}>
-            <div style={{fontSize:10,fontWeight:800,textTransform:"uppercase",letterSpacing:"0.1em",color:"#9B8F7A"}}>Artwork sold</div>
-            <div style={{fontSize:13,fontWeight:900,color:"#111110",marginTop:2}}>$2,400 ✓</div>
-          </div>
+          {/* Real artwork from DB if available, fallback to curated Unsplash */}
+          <img
+            className="hero-artwork"
+            src={
+              artworks.find(a => Array.isArray(a.images) && a.images[0])?.images?.[0] ||
+              "https://images.unsplash.com/photo-1541961017774-22349e4a1262?w=900&q=80"
+            }
+            alt="Featured artwork"
+          />
+          {/* Gradient overlays for the dissolve */}
+          <div className="hero-artwork-fade-left"/>
+          <div className="hero-artwork-fade-bottom"/>
+          <div className="hero-artwork-vignette"/>
+
+          {/* Artist credit pill */}
+          {(() => {
+            const featured = artworks.find(a => Array.isArray(a.images) && a.images[0]);
+            if (!featured) return null;
+            return (
+              <div className="hero-credit">
+                <div style={{display:"flex",alignItems:"center",gap:8,padding:"6px 12px 6px 6px",background:"rgba(255,255,255,0.88)",backdropFilter:"blur(10px)",WebkitBackdropFilter:"blur(10px)",border:"1.5px solid rgba(255,255,255,0.6)",borderRadius:9999,boxShadow:"0 4px 20px rgba(0,0,0,0.12)"}}>
+                  <div style={{width:26,height:26,borderRadius:"50%",background:"#FFD400",overflow:"hidden",flexShrink:0,border:"1.5px solid #111110"}}>
+                    {featured.artist_avatar
+                      ? <img src={featured.artist_avatar} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
+                      : <div style={{width:"100%",height:"100%",display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,fontWeight:900,color:"#111110"}}>{(featured.artist_name||"A")[0]}</div>
+                    }
+                  </div>
+                  <div>
+                    <div style={{fontSize:10,fontWeight:800,color:"#111110",lineHeight:1.1}}>{featured.title}</div>
+                    <div style={{fontSize:9,fontWeight:600,color:"rgba(17,17,16,0.5)",lineHeight:1.1}}>{featured.artist_name}</div>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
         </div>
       </section>
 

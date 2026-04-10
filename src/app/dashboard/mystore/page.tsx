@@ -88,7 +88,7 @@ export default function MyStorePage() {
   const bannerInputRef = useRef<HTMLInputElement>(null);
 
   const storeUrl = username
-    ? `${typeof window !== "undefined" ? window.location.origin : "https://artfolio-tawny.vercel.app"}/store/${username}`
+    ? `${typeof window !== "undefined" ? window.location.origin : "https://artfolio-tawny.vercel.app"}/${username}`
     : null;
 
   const qrUrl = storeUrl

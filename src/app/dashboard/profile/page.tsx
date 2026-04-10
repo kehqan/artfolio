@@ -92,7 +92,7 @@ export default function ProfilePage() {
   const [referralCopied, setReferralCopied] = useState(false);
   const [inviteCopied, setInviteCopied]     = useState(false);
   const [referralCount, setReferralCount]   = useState(0);
-  const actionsRef = useRef<HTMLDivivElement>(null);
+  const actionsRef = useRef<HTMLDivElement>(null);
   const fileRef    = useRef<HTMLInputElement>(null);
 
   const sb = createClient();

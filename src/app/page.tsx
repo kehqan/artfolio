@@ -299,7 +299,6 @@ function HScroll({ children, gap=14 }: { children: React.ReactNode; gap?: number
 
 // ════════════════════════════════════════════════════════════════════
 export default function HomePage() {
-  const [scrolled,       setScrolled]       = useState(false);
   const [activeFeature,  setActiveFeature]  = useState(0);
   const [prevFeature,    setPrevFeature]    = useState(0);
   const [exploreTab,     setExploreTab]     = useState<ExploreTab>("artworks");
@@ -320,11 +319,8 @@ export default function HomePage() {
   const exploreReveal = useReveal(0.08);
 
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 20);
-    window.addEventListener("scroll", onScroll, { passive:true });
     requestAnimationFrame(() => setTimeout(() => setHeroLoaded(true), 100));
     loadData();
-    return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
   function switchFeature(i: number) {
@@ -403,12 +399,10 @@ export default function HomePage() {
         @import url('https://fonts.googleapis.com/css2?family=Darker+Grotesque:wght@400;500;600;700;800;900&display=swap');
         *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
         html{scroll-behavior:smooth}
-        body{font-family:'Darker Grotesque',system-ui,sans-serif;background:#FFFBEA;color:#111110;overflow-x:hidden}
+        body{font-family:'Darker Grotesque',system-ui,sans-serif;background:#FFD400;color:#111110;overflow-x:hidden}
 
-        .nav{position:fixed;top:0;left:0;right:0;z-index:100;padding:12px 20px;transition:padding 0.3s cubic-bezier(0.16,1,0.3,1)}
-        .nav.scrolled{padding:8px 20px}
-        .nav-pill{max-width:1100px;margin:0 auto;display:flex;align-items:center;gap:4px;background:rgba(255,255,255,0.92);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:2.5px solid #111110;border-radius:9999px;padding:5px 6px 5px 10px;box-shadow:4px 4px 0 #111110;transition:box-shadow 0.3s,background 0.3s}
-        .nav.scrolled .nav-pill{box-shadow:2px 2px 0 #111110;background:rgba(255,255,255,0.97)}
+        .nav{position:relative;top:0;left:0;right:0;z-index:100;padding:12px 20px;background:#FFD400}
+        .nav-pill{max-width:1100px;margin:0 auto;display:flex;align-items:center;gap:4px;background:rgba(255,212,0,0.7);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:2.5px solid #111110;border-radius:9999px;padding:5px 6px 5px 10px;box-shadow:4px 4px 0 #111110;transition:box-shadow 0.3s}
         .nav-pill:hover{box-shadow:6px 6px 0 #111110}
         .nav-logo{font-size:22px;line-height:1;text-decoration:none;flex-shrink:0;display:flex;align-items:center;gap:6px}
         .nav-logo-text{font-size:16px;font-weight:900;color:#111110;letter-spacing:-0.3px}
@@ -613,7 +607,7 @@ export default function HomePage() {
       `}</style>
 
       {/* ── NAV ── */}
-      <nav className={`nav${scrolled?" scrolled":""}`}>
+      <nav className="nav">
         <div className="nav-pill">
           <a href="/" className="nav-logo">🥭<span className="nav-logo-text">artomango</span></a>
           <div className="nav-div"/>
@@ -631,7 +625,7 @@ export default function HomePage() {
       </nav>
 
       {/* ── HERO ── */}
-      <section className={`hero${heroLoaded?" hero-loaded":""}`} style={{paddingTop:72}}>
+      <section className={`hero${heroLoaded?" hero-loaded":""}`}>
         {/* LEFT — text */}
         <div className="hero-left">
           <div className="hero-eyebrow">🥭 artomango · art platform</div>

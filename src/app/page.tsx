@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import CampaignCarousel from "@/components/CampaignCarousel";
@@ -8,6 +8,7 @@ import {
   Palette, Building2, Users, Grid3X3,
   Package, TrendingUp, Handshake, Globe, BarChart3, CalendarDays,
   ArrowRight, ImageIcon,
+  BookOpen, Laptop, GlassWater, Mic, Home, ShoppingBag, Sparkles, Clock,
 } from "lucide-react";
 
 // ── Types ──────────────────────────────────────────────────────────
@@ -15,7 +16,7 @@ type Artwork = {
   id: string; title: string; medium?: string; year?: number;
   price?: number; currency?: string; images?: string[];
   venue_location?: string; location?: string;
-  artist_name?: string; artist_avatar?: string;
+  artist_name?: string; artist_avatar?: string; artist_username?: string;
   user_id?: string;
 };
 type Artist = {
@@ -23,75 +24,92 @@ type Artist = {
   bio?: string; location?: string; avatar_url?: string;
   artwork_count?: number; cover_image?: string;
 };
+type Venue = {
+  id: string; full_name: string; username?: string;
+  bio?: string; location?: string; avatar_url?: string; cover_image?: string;
+};
+type Event = {
+  id: string; title: string; venue?: string; start_date?: string;
+  end_date?: string; event_type?: string; is_online?: boolean;
+  online_url?: string; cover_image?: string; location_name?: string;
+};
+type Resource = {
+  id: string; type: string; title: string; url?: string; description?: string;
+};
 type ExploreTab = "artworks" | "artists";
 
 const MEDIUMS = ["All","Oil","Photography","Sculpture","Digital","Printmaking","Mixed media"];
 
+// ── Event type config ──────────────────────────────────────────────
+const ET: Record<string,{label:string;icon:React.ReactNode;color:string;bg:string}> = {
+  exhibition:      { label:"Exhibition",      icon:<Palette size={12}/>,     color:"#8B5CF6", bg:"#EDE9FE" },
+  workshop:        { label:"Workshop",        icon:<BookOpen size={12}/>,    color:"#16A34A", bg:"#DCFCE7" },
+  online_workshop: { label:"Online Workshop", icon:<Laptop size={12}/>,      color:"#0EA5E9", bg:"#E0F2FE" },
+  drink_draw:      { label:"Drink & Draw",    icon:<GlassWater size={12}/>,  color:"#FF6B6B", bg:"#FFE4E6" },
+  artist_talk:     { label:"Artist Talk",     icon:<Mic size={12}/>,         color:"#CA8A04", bg:"#FEF9C3" },
+  open_studio:     { label:"Open Studio",     icon:<Home size={12}/>,        color:"#D97706", bg:"#FEF3C7" },
+  gathering:       { label:"Gathering",       icon:<Users size={12}/>,       color:"#4ECDC4", bg:"#F0FDF4" },
+  popup:           { label:"Pop-up",          icon:<ShoppingBag size={12}/>, color:"#EC4899", bg:"#FCE7F3" },
+  other:           { label:"Other",           icon:<Sparkles size={12}/>,    color:"#9B8F7A", bg:"#F5F0E8" },
+};
+function getET(t?: string) { return ET[t||"other"] || ET["other"]; }
+
+function fmtDate(d?: string|null) {
+  if (!d) return "";
+  return new Date(d).toLocaleDateString("en-US", { month:"short", day:"numeric" });
+}
+function isUpcoming(ev: Event) {
+  const ref = ev.end_date || ev.start_date;
+  if (!ref) return true;
+  return new Date(ref) >= new Date(new Date().setHours(0,0,0,0));
+}
+
 // ── Feature data ──────────────────────────────────────────────────
 const FEATURES = [
-  {
-    id: "studio", emoji: "🎨", label: "Studio", tag: "Art Inventory",
-    headline: "Every artwork.\nAlways tracked.",
-    sub: "Add a piece once — photo, title, medium, size, price, location, status. Never lose track of where a work is, who's holding it, or what it sold for.",
-    color: "#FFD400", textColor: "#111110",
-    visual: "inventory",
-    pain: "I track my works in a spreadsheet that's always out of date.",
-    gain: "One source of truth for your entire inventory, forever.",
-  },
-  {
-    id: "portfolio", emoji: "🌐", label: "Portfolio", tag: "Public Profile",
-    headline: "Your gallery,\nlive on the web.",
-    sub: "Your works become a public portfolio at artomango.com/you. Clean, fast, shareable — send it to galleries, collectors, or anyone.",
-    color: "#111110", textColor: "#FFD400",
-    visual: "portfolio",
-    pain: "I have no single place to send people to see my work.",
-    gain: "A permanent, beautiful online gallery you can share in one link.",
-  },
-  {
-    id: "collabs", emoji: "🤝", label: "Collabs", tag: "Discovery Pool",
-    headline: "Post. Match.\nCreate together.",
-    sub: "Artists post that they're looking for wall space. Venues post that they need artworks. The Discovery Pool connects both sides.",
-    color: "#4ECDC4", textColor: "#111110",
-    visual: "collabs",
-    pain: "Finding venues to exhibit is all word of mouth and cold emails.",
-    gain: "A live pool of artists and venues actively looking for each other.",
-  },
-  {
-    id: "business", emoji: "📊", label: "Business", tag: "Sales & CRM",
-    headline: "Know your numbers.\nGrow what matters.",
-    sub: "Log every sale, track commissions, manage collector relationships. See who bought what, when, for how much — and who to follow up with next.",
-    color: "#FFFBEA", textColor: "#111110",
-    visual: "business",
-    pain: "I have no idea how much I've made this year or who my best buyers are.",
-    gain: "A complete CRM and sales dashboard built for how artists actually sell.",
-  },
-  {
-    id: "scene", emoji: "🗺️", label: "Scene", tag: "Art Scene Map",
-    headline: "The art scene,\non one map.",
-    sub: "Events, collabs, venues — discover and connect with the local art world. See what's happening near you and who's involved.",
-    color: "#8B5CF6", textColor: "#fff",
-    visual: "map",
-    pain: "I find out about local shows and galleries through Instagram luck.",
-    gain: "The whole local scene — artists, venues, events — on one live map.",
-  },
-  {
-    id: "planner", emoji: "📅", label: "Planner", tag: "Exhibitions & Tasks",
-    headline: "Plan shows.\nManage everything.",
-    sub: "Create exhibitions, assign artworks, track venues and dates. Upcoming shows, past appearances, current displays — all in one timeline.",
-    color: "#FF6B6B", textColor: "#fff",
-    visual: "planner",
-    pain: "Show planning is chaos — tasks in Notes, dates in email, artwork list in WhatsApp.",
-    gain: "One place to plan, manage, and execute every exhibition.",
-  },
+  { id:"studio",    emoji:"🎨", label:"Studio",   tag:"Art Inventory",
+    headline:"Every artwork.\nAlways tracked.",
+    sub:"Add a piece once — photo, title, medium, size, price, location, status. Never lose track of where a work is, who's holding it, or what it sold for.",
+    color:"#FFD400", textColor:"#111110", visual:"inventory",
+    pain:"I track my works in a spreadsheet that's always out of date.",
+    gain:"One source of truth for your entire inventory, forever." },
+  { id:"portfolio", emoji:"🌐", label:"Portfolio", tag:"Public Profile",
+    headline:"Your gallery,\nlive on the web.",
+    sub:"Your works become a public portfolio at artomango.com/you. Clean, fast, shareable — send it to galleries, collectors, or anyone.",
+    color:"#111110", textColor:"#FFD400", visual:"portfolio",
+    pain:"I have no single place to send people to see my work.",
+    gain:"A permanent, beautiful online gallery you can share in one link." },
+  { id:"collabs",   emoji:"🤝", label:"Collabs",   tag:"Discovery Pool",
+    headline:"Post. Match.\nCreate together.",
+    sub:"Artists post that they're looking for wall space. Venues post that they need artworks. The Discovery Pool connects both sides.",
+    color:"#4ECDC4", textColor:"#111110", visual:"collabs",
+    pain:"Finding venues to exhibit is all word of mouth and cold emails.",
+    gain:"A live pool of artists and venues actively looking for each other." },
+  { id:"business",  emoji:"📊", label:"Business",  tag:"Sales & CRM",
+    headline:"Know your numbers.\nGrow what matters.",
+    sub:"Log every sale, track commissions, manage collector relationships. See who bought what, when, for how much — and who to follow up with next.",
+    color:"#FFFBEA", textColor:"#111110", visual:"business",
+    pain:"I have no idea how much I've made this year or who my best buyers are.",
+    gain:"A complete CRM and sales dashboard built for how artists actually sell." },
+  { id:"scene",     emoji:"🗺️", label:"Scene",     tag:"Art Scene Map",
+    headline:"The art scene,\non one map.",
+    sub:"Events, collabs, venues — discover and connect with the local art world. See what's happening near you and who's involved.",
+    color:"#8B5CF6", textColor:"#fff", visual:"map",
+    pain:"I find out about local shows and galleries through Instagram luck.",
+    gain:"The whole local scene — artists, venues, events — on one live map." },
+  { id:"planner",   emoji:"📅", label:"Planner",   tag:"Exhibitions & Tasks",
+    headline:"Plan shows.\nManage everything.",
+    sub:"Create exhibitions, assign artworks, track venues and dates. Upcoming shows, past appearances, current displays — all in one timeline.",
+    color:"#FF6B6B", textColor:"#fff", visual:"planner",
+    pain:"Show planning is chaos — tasks in Notes, dates in email, artwork list in WhatsApp.",
+    gain:"One place to plan, manage, and execute every exhibition." },
 ];
 
-// ── Scroll reveal hook ────────────────────────────────────────────
+// ── Scroll reveal hook ─────────────────────────────────────────────
 function useReveal(threshold = 0.15) {
   const ref = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState(false);
   useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
+    const el = ref.current; if (!el) return;
     const obs = new IntersectionObserver(([e]) => { if (e.isIntersecting) { setVisible(true); obs.disconnect(); } }, { threshold });
     obs.observe(el);
     return () => obs.disconnect();
@@ -99,14 +117,13 @@ function useReveal(threshold = 0.15) {
   return { ref, visible };
 }
 
-// ── Animated counter ──────────────────────────────────────────────
-function AnimCounter({ target, prefix = "", suffix = "", duration = 1800 }: { target: number; prefix?: string; suffix?: string; duration?: number }) {
+// ── Animated counter ───────────────────────────────────────────────
+function AnimCounter({ target, prefix="", suffix="", duration=1800 }: { target:number; prefix?:string; suffix?:string; duration?:number }) {
   const [val, setVal] = useState(0);
   const ref = useRef<HTMLSpanElement>(null);
   const started = useRef(false);
   useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
+    const el = ref.current; if (!el) return;
     const obs = new IntersectionObserver(([e]) => {
       if (e.isIntersecting && !started.current) {
         started.current = true;
@@ -127,171 +144,160 @@ function AnimCounter({ target, prefix = "", suffix = "", duration = 1800 }: { ta
   return <span ref={ref}>{prefix}{val.toLocaleString()}{suffix}</span>;
 }
 
-// ── Visual mockups per feature ────────────────────────────────────
+// ── FeatureVisual ─────────────────────────────────────────────────
 function FeatureVisual({ id, active }: { id: string; active: boolean }) {
-  const s: React.CSSProperties = { fontFamily: "'Darker Grotesque', system-ui, sans-serif" };
+  const s: React.CSSProperties = { fontFamily:"'Darker Grotesque',system-ui,sans-serif" };
   const wrapStyle: React.CSSProperties = {
-    ...s,
-    opacity: active ? 1 : 0,
-    transform: active ? "translateY(0) scale(1)" : "translateY(20px) scale(0.96)",
-    transition: "opacity 0.5s cubic-bezier(0.16,1,0.3,1), transform 0.5s cubic-bezier(0.16,1,0.3,1)",
-    position: active ? "relative" : "absolute",
-    width: "100%",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
+    ...s, opacity:active?1:0,
+    transform:active?"translateY(0) scale(1)":"translateY(20px) scale(0.96)",
+    transition:"opacity 0.5s cubic-bezier(0.16,1,0.3,1), transform 0.5s cubic-bezier(0.16,1,0.3,1)",
+    position:active?"relative":"absolute", width:"100%",
+    display:"flex", alignItems:"center", justifyContent:"center",
   };
-
   const content = (() => {
     if (id === "inventory") return (
-      <div style={{ background:"#fff", borderRadius:16, border:"2px solid #E8E0D0", boxShadow:"4px 5px 0 #D4C9A8", overflow:"hidden", maxWidth:340, width:"100%" }}>
-        <div style={{ padding:"12px 16px", borderBottom:"1px solid #F0EBE3", background:"#FAF7F3", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-          <span style={{ fontSize:12, fontWeight:800, color:"#111110" }}>Inventory · 47 works</span>
-          <span style={{ fontSize:11, color:"#9B8F7A", fontWeight:600 }}>$83,200 value</span>
+      <div style={{background:"#fff",borderRadius:16,border:"2px solid #E8E0D0",boxShadow:"4px 5px 0 #D4C9A8",overflow:"hidden",maxWidth:340,width:"100%"}}>
+        <div style={{padding:"12px 16px",borderBottom:"1px solid #F0EBE3",background:"#FAF7F3",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <span style={{fontSize:12,fontWeight:800,color:"#111110"}}>Inventory · 47 works</span>
+          <span style={{fontSize:11,color:"#9B8F7A",fontWeight:600}}>$83,200 value</span>
         </div>
         {[
-          { title:"Dissolving Tehran", medium:"Oil on Canvas", price:"$4,800", status:"Available", statusColor:"#16A34A", statusBg:"#DCFCE7", img:"https://images.unsplash.com/photo-1541961017774-22349e4a1262?w=80&q=60" },
-          { title:"Blue Migration", medium:"Oil on Linen", price:"$9,500", status:"Reserved", statusColor:"#D97706", statusBg:"#FEF9C3", img:"https://images.unsplash.com/photo-1578301978693-85fa9c0320b9?w=80&q=60" },
-          { title:"Platform 7, 04:22", medium:"Archival Print", price:"$1,200", status:"Available", statusColor:"#16A34A", statusBg:"#DCFCE7", img:"https://images.unsplash.com/photo-1474487548417-781cb71495f3?w=80&q=60" },
-          { title:"Root Form I", medium:"Cast Bronze", price:"$6,200", status:"Sold", statusColor:"#111110", statusBg:"#E5E5E5", img:"https://images.unsplash.com/photo-1558865869-c93f6f8482af?w=80&q=60" },
+          {title:"Dissolving Tehran",medium:"Oil on Canvas",price:"$4,800",status:"Available",statusColor:"#16A34A",statusBg:"#DCFCE7",img:"https://images.unsplash.com/photo-1541961017774-22349e4a1262?w=80&q=60"},
+          {title:"Blue Migration",medium:"Oil on Linen",price:"$9,500",status:"Reserved",statusColor:"#D97706",statusBg:"#FEF9C3",img:"https://images.unsplash.com/photo-1578301978693-85fa9c0320b9?w=80&q=60"},
+          {title:"Platform 7, 04:22",medium:"Archival Print",price:"$1,200",status:"Available",statusColor:"#16A34A",statusBg:"#DCFCE7",img:"https://images.unsplash.com/photo-1474487548417-781cb71495f3?w=80&q=60"},
+          {title:"Root Form I",medium:"Cast Bronze",price:"$6,200",status:"Sold",statusColor:"#111110",statusBg:"#E5E5E5",img:"https://images.unsplash.com/photo-1558865869-c93f6f8482af?w=80&q=60"},
         ].map((aw,i) => (
-          <div key={i} style={{ display:"flex", alignItems:"center", gap:10, padding:"10px 14px", borderBottom:"1px solid #F5F0E8", opacity: active ? 1 : 0, transform: active ? "translateX(0)" : "translateX(20px)", transition: `opacity 0.4s ${0.15+i*0.08}s, transform 0.4s ${0.15+i*0.08}s cubic-bezier(0.16,1,0.3,1)` }}>
-            <div style={{ width:40, height:32, borderRadius:8, overflow:"hidden", flexShrink:0, background:"#F5F0E8" }}>
-              <img src={aw.img} style={{ width:"100%", height:"100%", objectFit:"cover" }} alt=""/>
+          <div key={i} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 14px",borderBottom:"1px solid #F5F0E8",opacity:active?1:0,transform:active?"translateX(0)":"translateX(20px)",transition:`opacity 0.4s ${0.15+i*0.08}s, transform 0.4s ${0.15+i*0.08}s cubic-bezier(0.16,1,0.3,1)`}}>
+            <div style={{width:40,height:32,borderRadius:8,overflow:"hidden",flexShrink:0,background:"#F5F0E8"}}><img src={aw.img} style={{width:"100%",height:"100%",objectFit:"cover"}} alt=""/></div>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontSize:12,fontWeight:700,color:"#111110",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{aw.title}</div>
+              <div style={{fontSize:10,color:"#9B8F7A",fontWeight:600}}>{aw.medium}</div>
             </div>
-            <div style={{ flex:1, minWidth:0 }}>
-              <div style={{ fontSize:12, fontWeight:700, color:"#111110", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{aw.title}</div>
-              <div style={{ fontSize:10, color:"#9B8F7A", fontWeight:600 }}>{aw.medium}</div>
-            </div>
-            <div style={{ fontSize:12, fontWeight:900, color:"#111110", fontFamily:"monospace", flexShrink:0 }}>{aw.price}</div>
-            <div style={{ padding:"2px 8px", borderRadius:9999, background:aw.statusBg, color:aw.statusColor, fontSize:9, fontWeight:800, textTransform:"uppercase" as const, letterSpacing:"0.06em", flexShrink:0 }}>{aw.status}</div>
+            <div style={{fontSize:12,fontWeight:900,color:"#111110",fontFamily:"monospace",flexShrink:0}}>{aw.price}</div>
+            <div style={{padding:"2px 8px",borderRadius:9999,background:aw.statusBg,color:aw.statusColor,fontSize:9,fontWeight:800,textTransform:"uppercase" as const,letterSpacing:"0.06em",flexShrink:0}}>{aw.status}</div>
           </div>
         ))}
       </div>
     );
-
     if (id === "portfolio") return (
-      <div style={{ background:"#111110", borderRadius:16, border:"2px solid #111110", boxShadow:"4px 5px 0 #000", overflow:"hidden", maxWidth:300, width:"100%" }}>
-        <div style={{ padding:"10px 14px", borderBottom:"1px solid #222", display:"flex", alignItems:"center", gap:10 }}>
-          <div style={{ width:32, height:32, borderRadius:"50%", background:"#FFD400", border:"2px solid #333", display:"flex", alignItems:"center", justifyContent:"center", fontSize:13, fontWeight:900, color:"#111110" }}>N</div>
+      <div style={{background:"#111110",borderRadius:16,border:"2px solid #111110",boxShadow:"4px 5px 0 #000",overflow:"hidden",maxWidth:300,width:"100%"}}>
+        <div style={{padding:"10px 14px",borderBottom:"1px solid #222",display:"flex",alignItems:"center",gap:10}}>
+          <div style={{width:32,height:32,borderRadius:"50%",background:"#FFD400",border:"2px solid #333",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:900,color:"#111110"}}>N</div>
           <div>
-            <div style={{ fontSize:12, fontWeight:800, color:"#fff" }}>Neda Rahimi</div>
-            <div style={{ fontSize:9, color:"#555", fontWeight:600 }}>artomango.com/nedarahimi</div>
+            <div style={{fontSize:12,fontWeight:800,color:"#fff"}}>Neda Rahimi</div>
+            <div style={{fontSize:9,color:"#555",fontWeight:600}}>artomango.com/nedarahimi</div>
           </div>
         </div>
-        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:2, padding:2 }}>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:2,padding:2}}>
           {["photo-1541961017774-22349e4a1262","photo-1549490349-8643362247b5","photo-1578301978693-85fa9c0320b9","photo-1558865869-c93f6f8482af"].map((slug,i) => (
-            <div key={i} style={{ aspectRatio:"1", overflow:"hidden", borderRadius:4, opacity: active ? 1 : 0, transform: active ? "scale(1)" : "scale(0.8)", transition: `opacity 0.4s ${0.1+i*0.1}s, transform 0.4s ${0.1+i*0.1}s cubic-bezier(0.34,1.56,0.64,1)` }}>
-              <img src={`https://images.unsplash.com/${slug}?w=120&q=60`} style={{ width:"100%", height:"100%", objectFit:"cover" }} alt=""/>
+            <div key={i} style={{aspectRatio:"1",overflow:"hidden",borderRadius:4,opacity:active?1:0,transform:active?"scale(1)":"scale(0.8)",transition:`opacity 0.4s ${0.1+i*0.1}s, transform 0.4s ${0.1+i*0.1}s cubic-bezier(0.34,1.56,0.64,1)`}}>
+              <img src={`https://images.unsplash.com/${slug}?w=120&q=60`} style={{width:"100%",height:"100%",objectFit:"cover"}} alt=""/>
             </div>
           ))}
         </div>
-        <div style={{ padding:"10px 14px", borderTop:"1px solid #222", display:"flex", justifyContent:"space-between" }}>
+        <div style={{padding:"10px 14px",borderTop:"1px solid #222",display:"flex",justifyContent:"space-between"}}>
           {[{n:"23",l:"Works"},{n:"284",l:"Followers"},{n:"$18k",l:"Revenue"}].map(s=>(
-            <div key={s.l} style={{ textAlign:"center" }}>
-              <div style={{ fontSize:14, fontWeight:900, color:"#FFD400" }}>{s.n}</div>
-              <div style={{ fontSize:9, color:"#555", fontWeight:700, textTransform:"uppercase" as const, letterSpacing:"0.1em" }}>{s.l}</div>
+            <div key={s.l} style={{textAlign:"center"}}>
+              <div style={{fontSize:14,fontWeight:900,color:"#FFD400"}}>{s.n}</div>
+              <div style={{fontSize:9,color:"#555",fontWeight:700,textTransform:"uppercase" as const,letterSpacing:"0.1em"}}>{s.l}</div>
             </div>
           ))}
         </div>
       </div>
     );
-
     if (id === "collabs") return (
-      <div style={{ display:"flex", flexDirection:"column", gap:10, maxWidth:320, width:"100%" }}>
+      <div style={{display:"flex",flexDirection:"column",gap:10,maxWidth:320,width:"100%"}}>
         {[
-          { type: "artist", label: "Artist seeking venue", title: "Oil painter looking for gallery space", tags: ["Oil","Realism","Large format"], budget: "$500–$2k", bg: "#fff", border: "#E8E0D0", shadow: "3px 4px 0 #D4C9A8", tagBg: "#DCFCE7", tagColor: "#16A34A", btnBg: "#FFD400" },
-          { type: "venue", label: "Venue seeking art", title: "Café wall — abstract prints welcome", tags: ["Abstract","Digital","Any medium"], budget: "up to $800", bg: "#111110", border: "#111110", shadow: "3px 4px 0 #000", tagBg: "#222", tagColor: "#4ECDC4", btnBg: "#4ECDC4" },
-        ].map((card, ci) => (
-          <div key={ci} style={{ background: card.bg, borderRadius:14, border:`2px solid ${card.border}`, padding:"14px 16px", boxShadow: card.shadow, opacity: active ? 1 : 0, transform: active ? "translateY(0)" : "translateY(16px)", transition: `opacity 0.4s ${ci*0.15}s, transform 0.5s ${ci*0.15}s cubic-bezier(0.16,1,0.3,1)` }}>
-            <div style={{ display:"inline-flex", alignItems:"center", gap:5, padding:"2px 9px", borderRadius:9999, background: card.tagBg, color: card.tagColor, fontSize:9, fontWeight:800, textTransform:"uppercase" as const, letterSpacing:"0.1em", marginBottom:8 }}>{card.label}</div>
-            <div style={{ fontSize:13, fontWeight:800, color: card.bg === "#111110" ? "#fff" : "#111110", marginBottom:6 }}>{card.title}</div>
-            <div style={{ display:"flex", gap:5, flexWrap:"wrap" as const, marginBottom:10 }}>
-              {card.tags.map(t=><span key={t} style={{ padding:"3px 9px", borderRadius:9999, background: card.bg === "#111110" ? "#222" : "#F5F0E8", color: card.bg === "#111110" ? "#888" : "#9B8F7A", fontSize:10, fontWeight:700 }}>{t}</span>)}
-            </div>
-            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-              <span style={{ fontSize:10, color: card.bg === "#111110" ? "#555" : "#9B8F7A", fontWeight:600, fontFamily:"monospace" }}>Budget: {card.budget}</span>
-              <div style={{ padding:"5px 12px", borderRadius:9999, background: card.btnBg, border:"1.5px solid #111110", fontSize:11, fontWeight:800, color:"#111110", cursor:"pointer" }}>Respond →</div>
+          {type:"artist",label:"Artist seeking venue",title:"Oil painter looking for gallery space",tags:["Oil","Realism","Large format"],budget:"$500–$2k",bg:"#fff",border:"#E8E0D0",shadow:"3px 4px 0 #D4C9A8",tagBg:"#DCFCE7",tagColor:"#16A34A",btnBg:"#FFD400"},
+          {type:"venue",label:"Venue seeking art",title:"Café wall — abstract prints welcome",tags:["Abstract","Digital","Any medium"],budget:"up to $800",bg:"#111110",border:"#111110",shadow:"3px 4px 0 #000",tagBg:"#222",tagColor:"#4ECDC4",btnBg:"#4ECDC4"},
+        ].map((card,ci) => (
+          <div key={ci} style={{background:card.bg,borderRadius:14,border:`2px solid ${card.border}`,padding:"14px 16px",boxShadow:card.shadow,opacity:active?1:0,transform:active?"translateY(0)":"translateY(16px)",transition:`opacity 0.4s ${ci*0.15}s, transform 0.5s ${ci*0.15}s cubic-bezier(0.16,1,0.3,1)`}}>
+            <div style={{display:"inline-flex",alignItems:"center",gap:5,padding:"2px 9px",borderRadius:9999,background:card.tagBg,color:card.tagColor,fontSize:9,fontWeight:800,textTransform:"uppercase" as const,letterSpacing:"0.1em",marginBottom:8}}>{card.label}</div>
+            <div style={{fontSize:13,fontWeight:800,color:card.bg==="#111110"?"#fff":"#111110",marginBottom:6}}>{card.title}</div>
+            <div style={{display:"flex",gap:5,flexWrap:"wrap" as const,marginBottom:10}}>{card.tags.map(t=><span key={t} style={{padding:"3px 9px",borderRadius:9999,background:card.bg==="#111110"?"#222":"#F5F0E8",color:card.bg==="#111110"?"#888":"#9B8F7A",fontSize:10,fontWeight:700}}>{t}</span>)}</div>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <span style={{fontSize:10,color:card.bg==="#111110"?"#555":"#9B8F7A",fontWeight:600,fontFamily:"monospace"}}>Budget: {card.budget}</span>
+              <div style={{padding:"5px 12px",borderRadius:9999,background:card.btnBg,border:"1.5px solid #111110",fontSize:11,fontWeight:800,color:"#111110",cursor:"pointer"}}>Respond →</div>
             </div>
           </div>
         ))}
       </div>
     );
-
     if (id === "business") return (
-      <div style={{ background:"#fff", borderRadius:16, border:"2px solid #E8E0D0", boxShadow:"4px 5px 0 #D4C9A8", overflow:"hidden", maxWidth:320, width:"100%" }}>
-        <div style={{ padding:"12px 16px", borderBottom:"1px solid #F0EBE3", background:"#FAF7F3" }}>
-          <div style={{ fontSize:12, fontWeight:800, color:"#111110" }}>Sales · 2026</div>
-        </div>
-        <div style={{ padding:"12px 16px", display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:8, borderBottom:"1px solid #F0EBE3" }}>
+      <div style={{background:"#fff",borderRadius:16,border:"2px solid #E8E0D0",boxShadow:"4px 5px 0 #D4C9A8",overflow:"hidden",maxWidth:320,width:"100%"}}>
+        <div style={{padding:"12px 16px",borderBottom:"1px solid #F0EBE3",background:"#FAF7F3"}}><div style={{fontSize:12,fontWeight:800,color:"#111110"}}>Sales · 2026</div></div>
+        <div style={{padding:"12px 16px",display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,borderBottom:"1px solid #F0EBE3"}}>
           {[{n:"$18k",l:"Revenue"},{n:"$15k",l:"Net"},{n:"12",l:"Sales"}].map((s,i)=>(
-            <div key={s.l} style={{ textAlign:"center", padding:"8px 4px", background:"#FAF7F3", borderRadius:10, opacity: active ? 1 : 0, transform: active ? "translateY(0)" : "translateY(10px)", transition: `opacity 0.3s ${0.1+i*0.1}s, transform 0.3s ${0.1+i*0.1}s` }}>
-              <div style={{ fontSize:18, fontWeight:900, color:"#111110", letterSpacing:"-0.5px" }}>{s.n}</div>
-              <div style={{ fontSize:9, color:"#9B8F7A", fontWeight:700, textTransform:"uppercase" as const, letterSpacing:"0.08em" }}>{s.l}</div>
+            <div key={s.l} style={{textAlign:"center",padding:"8px 4px",background:"#FAF7F3",borderRadius:10,opacity:active?1:0,transform:active?"translateY(0)":"translateY(10px)",transition:`opacity 0.3s ${0.1+i*0.1}s, transform 0.3s ${0.1+i*0.1}s`}}>
+              <div style={{fontSize:18,fontWeight:900,color:"#111110",letterSpacing:"-0.5px"}}>{s.n}</div>
+              <div style={{fontSize:9,color:"#9B8F7A",fontWeight:700,textTransform:"uppercase" as const,letterSpacing:"0.08em"}}>{s.l}</div>
             </div>
           ))}
         </div>
-        <div style={{ padding:"8px 0" }}>
-          {[
-            { name:"Dariush M.", amount:"$3,200", status:"Paid", color:"#16A34A", bg:"#DCFCE7" },
-            { name:"Azadeh Gallery", amount:"$5,800", status:"Pending", color:"#D97706", bg:"#FEF9C3" },
-            { name:"Leila Shirazi", amount:"$1,400", status:"Paid", color:"#16A34A", bg:"#DCFCE7" },
-          ].map((row,i)=>(
-            <div key={i} style={{ display:"flex", alignItems:"center", gap:10, padding:"8px 16px", borderBottom:"1px solid #F5F0E8", opacity: active ? 1 : 0, transform: active ? "translateX(0)" : "translateX(16px)", transition: `opacity 0.35s ${0.2+i*0.08}s, transform 0.35s ${0.2+i*0.08}s` }}>
-              <div style={{ flex:1, fontSize:12, fontWeight:700, color:"#111110" }}>{row.name}</div>
-              <div style={{ fontSize:12, fontWeight:800, color:"#111110", fontFamily:"monospace" }}>{row.amount}</div>
-              <div style={{ padding:"2px 8px", borderRadius:9999, background:row.bg, color:row.color, fontSize:9, fontWeight:800, textTransform:"uppercase" as const }}>{row.status}</div>
+        <div style={{padding:"8px 0"}}>
+          {[{name:"Dariush M.",amount:"$3,200",status:"Paid",color:"#16A34A",bg:"#DCFCE7"},{name:"Azadeh Gallery",amount:"$5,800",status:"Pending",color:"#D97706",bg:"#FEF9C3"},{name:"Leila Shirazi",amount:"$1,400",status:"Paid",color:"#16A34A",bg:"#DCFCE7"}].map((row,i)=>(
+            <div key={i} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 16px",borderBottom:"1px solid #F5F0E8",opacity:active?1:0,transform:active?"translateX(0)":"translateX(16px)",transition:`opacity 0.35s ${0.2+i*0.08}s, transform 0.35s ${0.2+i*0.08}s`}}>
+              <div style={{flex:1,fontSize:12,fontWeight:700,color:"#111110"}}>{row.name}</div>
+              <div style={{fontSize:12,fontWeight:800,color:"#111110",fontFamily:"monospace"}}>{row.amount}</div>
+              <div style={{padding:"2px 8px",borderRadius:9999,background:row.bg,color:row.color,fontSize:9,fontWeight:800,textTransform:"uppercase" as const}}>{row.status}</div>
             </div>
           ))}
         </div>
       </div>
     );
-
     if (id === "map") return (
-      <div style={{ background:"#F5F0E8", borderRadius:16, border:"2px solid #E8E0D0", boxShadow:"4px 5px 0 #D4C9A8", overflow:"hidden", maxWidth:320, width:"100%", height:240, position:"relative" }}>
-        <div style={{ position:"absolute", inset:0, background:"linear-gradient(135deg,#E8E0CC,#D4C9A8)", opacity:0.6 }}/>
+      <div style={{background:"#F5F0E8",borderRadius:16,border:"2px solid #E8E0D0",boxShadow:"4px 5px 0 #D4C9A8",overflow:"hidden",maxWidth:320,width:"100%",height:240,position:"relative"}}>
+        <div style={{position:"absolute",inset:0,background:"linear-gradient(135deg,#E8E0CC,#D4C9A8)",opacity:0.6}}/>
         {[{t:40,l:80,label:"Gallery A",delay:0.1},{t:100,l:160,label:"Studio Nord",delay:0.2},{t:60,l:220,label:"Café Wien",delay:0.3},{t:140,l:60,label:"Pop-up",delay:0.35}].map((p,i)=>(
-          <div key={i} style={{ position:"absolute", top:p.t, left:p.l, zIndex:2, opacity: active ? 1 : 0, transform: active ? "translateY(0) scale(1)" : "translateY(-10px) scale(0)", transition: `opacity 0.3s ${p.delay}s, transform 0.4s ${p.delay}s cubic-bezier(0.34,1.56,0.64,1)` }}>
-            <div style={{ width:10, height:10, borderRadius:"50%", background:i===0?"#FFD400":"#8B5CF6", border:"2px solid #111110", boxShadow:"1px 2px 0 #111110" }}/>
-            <div style={{ position:"absolute", top:-18, left:12, background:"#fff", border:"1.5px solid #111110", borderRadius:6, padding:"2px 7px", fontSize:9, fontWeight:800, color:"#111110", whiteSpace:"nowrap" as const, boxShadow:"1px 2px 0 #111110" }}>{p.label}</div>
+          <div key={i} style={{position:"absolute",top:p.t,left:p.l,zIndex:2,opacity:active?1:0,transform:active?"translateY(0) scale(1)":"translateY(-10px) scale(0)",transition:`opacity 0.3s ${p.delay}s, transform 0.4s ${p.delay}s cubic-bezier(0.34,1.56,0.64,1)`}}>
+            <div style={{width:10,height:10,borderRadius:"50%",background:i===0?"#FFD400":"#8B5CF6",border:"2px solid #111110",boxShadow:"1px 2px 0 #111110"}}/>
+            <div style={{position:"absolute",top:-18,left:12,background:"#fff",border:"1.5px solid #111110",borderRadius:6,padding:"2px 7px",fontSize:9,fontWeight:800,color:"#111110",whiteSpace:"nowrap" as const,boxShadow:"1px 2px 0 #111110"}}>{p.label}</div>
           </div>
         ))}
-        <div style={{ position:"absolute", bottom:12, left:12, right:12, background:"rgba(255,255,255,0.95)", borderRadius:10, padding:"8px 12px", backdropFilter:"blur(4px)", border:"1.5px solid #E8E0D0", opacity: active ? 1 : 0, transform: active ? "translateY(0)" : "translateY(12px)", transition: "opacity 0.4s 0.35s, transform 0.4s 0.35s" }}>
-          <div style={{ fontSize:11, fontWeight:800, color:"#111110", marginBottom:2 }}>4 venues near you</div>
-          <div style={{ fontSize:10, color:"#9B8F7A", fontWeight:600 }}>2 open for collab · 1 upcoming show</div>
+        <div style={{position:"absolute",bottom:12,left:12,right:12,background:"rgba(255,255,255,0.95)",borderRadius:10,padding:"8px 12px",backdropFilter:"blur(4px)",border:"1.5px solid #E8E0D0",opacity:active?1:0,transform:active?"translateY(0)":"translateY(12px)",transition:"opacity 0.4s 0.35s, transform 0.4s 0.35s"}}>
+          <div style={{fontSize:11,fontWeight:800,color:"#111110",marginBottom:2}}>4 venues near you</div>
+          <div style={{fontSize:10,color:"#9B8F7A",fontWeight:600}}>2 open for collab · 1 upcoming show</div>
         </div>
       </div>
     );
-
     return (
-      <div style={{ background:"#fff", borderRadius:16, border:"2px solid #E8E0D0", boxShadow:"4px 5px 0 #D4C9A8", overflow:"hidden", maxWidth:320, width:"100%" }}>
-        <div style={{ padding:"12px 16px", borderBottom:"1px solid #F0EBE3", background:"#FAF7F3", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-          <span style={{ fontSize:12, fontWeight:800, color:"#111110" }}>Exhibitions</span>
-          <div style={{ padding:"3px 10px", borderRadius:9999, background:"#FFD400", border:"1.5px solid #111110", fontSize:10, fontWeight:800 }}>+ New show</div>
+      <div style={{background:"#fff",borderRadius:16,border:"2px solid #E8E0D0",boxShadow:"4px 5px 0 #D4C9A8",overflow:"hidden",maxWidth:320,width:"100%"}}>
+        <div style={{padding:"12px 16px",borderBottom:"1px solid #F0EBE3",background:"#FAF7F3",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <span style={{fontSize:12,fontWeight:800,color:"#111110"}}>Exhibitions</span>
+          <div style={{padding:"3px 10px",borderRadius:9999,background:"#FFD400",border:"1.5px solid #111110",fontSize:10,fontWeight:800}}>+ New show</div>
         </div>
         {[
-          { title:"Forms & Shadows", venue:"Azad Gallery · Tehran", status:"Current", statusColor:"#FF6B6B", dates:"1 Jun – 30 Jun 2026", works:8 },
-          { title:"Winter Group Show", venue:"Studio Norte · Barcelona", status:"Planning", statusColor:"#8B5CF6", dates:"Dec 2026", works:4 },
+          {title:"Forms & Shadows",venue:"Azad Gallery · Tehran",status:"Current",statusColor:"#FF6B6B",dates:"1 Jun – 30 Jun 2026",works:8},
+          {title:"Winter Group Show",venue:"Studio Norte · Barcelona",status:"Planning",statusColor:"#8B5CF6",dates:"Dec 2026",works:4},
         ].map((ex,i)=>(
-          <div key={i} style={{ padding:"12px 16px", borderBottom:"1px solid #F5F0E8", opacity: active ? 1 : 0, transform: active ? "translateY(0)" : "translateY(12px)", transition: `opacity 0.4s ${0.1+i*0.12}s, transform 0.4s ${0.1+i*0.12}s` }}>
-            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:4 }}>
-              <div style={{ fontSize:13, fontWeight:800, color:"#111110" }}>{ex.title}</div>
-              <div style={{ padding:"2px 8px", borderRadius:9999, background:ex.statusColor+"22", color:ex.statusColor, fontSize:9, fontWeight:800, textTransform:"uppercase" as const, flexShrink:0, marginLeft:8 }}>{ex.status}</div>
+          <div key={i} style={{padding:"12px 16px",borderBottom:"1px solid #F5F0E8",opacity:active?1:0,transform:active?"translateY(0)":"translateY(12px)",transition:`opacity 0.4s ${0.1+i*0.12}s, transform 0.4s ${0.1+i*0.12}s`}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:4}}>
+              <div style={{fontSize:13,fontWeight:800,color:"#111110"}}>{ex.title}</div>
+              <div style={{padding:"2px 8px",borderRadius:9999,background:ex.statusColor+"22",color:ex.statusColor,fontSize:9,fontWeight:800,textTransform:"uppercase" as const,flexShrink:0,marginLeft:8}}>{ex.status}</div>
             </div>
-            <div style={{ fontSize:11, color:"#9B8F7A", fontWeight:600, marginBottom:6 }}>{ex.venue}</div>
-            <div style={{ display:"flex", gap:12 }}>
-              <span style={{ fontSize:10, color:"#9B8F7A", fontWeight:700 }}>📅 {ex.dates}</span>
-              <span style={{ fontSize:10, color:"#9B8F7A", fontWeight:700 }}>🖼 {ex.works} artworks</span>
+            <div style={{fontSize:11,color:"#9B8F7A",fontWeight:600,marginBottom:6}}>{ex.venue}</div>
+            <div style={{display:"flex",gap:12}}>
+              <span style={{fontSize:10,color:"#9B8F7A",fontWeight:700}}>📅 {ex.dates}</span>
+              <span style={{fontSize:10,color:"#9B8F7A",fontWeight:700}}>🖼 {ex.works} artworks</span>
             </div>
           </div>
         ))}
       </div>
     );
   })();
-
   return <div style={wrapStyle}>{content}</div>;
 }
 
+// ── Horizontal scroll wrapper ─────────────────────────────────────
+function HScroll({ children, gap=14 }: { children: React.ReactNode; gap?: number }) {
+  return (
+    <div style={{ display:"flex", gap, overflowX:"auto", paddingBottom:4, scrollbarWidth:"none", WebkitOverflowScrolling:"touch" } as React.CSSProperties}>
+      {children}
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════════
 export default function HomePage() {
   const [scrolled,       setScrolled]       = useState(false);
   const [activeFeature,  setActiveFeature]  = useState(0);
@@ -299,12 +305,14 @@ export default function HomePage() {
   const [exploreTab,     setExploreTab]     = useState<ExploreTab>("artworks");
   const [artworks,       setArtworks]       = useState<Artwork[]>([]);
   const [artists,        setArtists]        = useState<Artist[]>([]);
+  const [venues,         setVenues]         = useState<Venue[]>([]);
+  const [events,         setEvents]         = useState<Event[]>([]);
+  const [resources,      setResources]      = useState<Resource[]>([]);
   const [search,         setSearch]         = useState("");
   const [medium,         setMedium]         = useState("All");
   const [loadingExplore, setLoadingExplore] = useState(true);
   const [heroLoaded,     setHeroLoaded]     = useState(false);
-  const [mousePos,       setMousePos]       = useState({ x: 0, y: 0 });
-  const exploreRef = useRef<HTMLDivElement>(null);
+  const [mousePos,       setMousePos]       = useState({ x:0, y:0 });
 
   const whyReveal     = useReveal(0.1);
   const howReveal     = useReveal(0.15);
@@ -314,17 +322,15 @@ export default function HomePage() {
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20);
-    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("scroll", onScroll, { passive:true });
     requestAnimationFrame(() => setTimeout(() => setHeroLoaded(true), 100));
-    loadExplore();
+    loadData();
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
   useEffect(() => {
-    const onMove = (e: MouseEvent) => {
-      setMousePos({ x: (e.clientX / window.innerWidth - 0.5) * 2, y: (e.clientY / window.innerHeight - 0.5) * 2 });
-    };
-    window.addEventListener("mousemove", onMove, { passive: true });
+    const onMove = (e: MouseEvent) => setMousePos({ x:(e.clientX/window.innerWidth-0.5)*2, y:(e.clientY/window.innerHeight-0.5)*2 });
+    window.addEventListener("mousemove", onMove, { passive:true });
     return () => window.removeEventListener("mousemove", onMove);
   }, []);
 
@@ -334,21 +340,25 @@ export default function HomePage() {
     setActiveFeature(i);
   }
 
-  async function loadExplore() {
+  async function loadData() {
     const sb = createClient();
+
+    // Artworks
     const { data: awData } = await sb.from("artworks")
-      .select("id, title, medium, year, price, currency, images, venue_location, location, user_id")
-      .in("status", ["available","Available"]).not("images","is",null)
-      .order("created_at", { ascending:false }).limit(36);
+      .select("id,title,medium,year,price,currency,images,venue_location,location,user_id")
+      .in("status",["available","Available"]).not("images","is",null)
+      .order("created_at",{ascending:false}).limit(36);
     if (awData?.length) {
       const userIds = Array.from(new Set(awData.map(a => a.user_id).filter(Boolean)));
-      const { data: profs } = await sb.from("profiles").select("id, full_name, avatar_url").in("id", userIds);
+      const { data: profs } = await sb.from("profiles").select("id,full_name,avatar_url,username").in("id",userIds);
       const pm: Record<string,any> = {};
       profs?.forEach(p => { pm[p.id] = p; });
-      setArtworks(awData.map(a => ({ ...a, artist_name: pm[a.user_id!]?.full_name || "Artist", artist_avatar: pm[a.user_id!]?.avatar_url || null })));
+      setArtworks(awData.map(a => ({ ...a, artist_name:pm[a.user_id!]?.full_name||"Artist", artist_avatar:pm[a.user_id!]?.avatar_url||null, artist_username:pm[a.user_id!]?.username||null })));
     }
+
+    // Artists
     const { data: artistData } = await sb.from("profiles")
-      .select("id, full_name, username, role, bio, location, avatar_url")
+      .select("id,full_name,username,role,bio,location,avatar_url")
       .not("full_name","is",null).neq("full_name","").limit(30);
     if (artistData?.length) {
       const enriched = await Promise.all(artistData.map(async p => {
@@ -356,23 +366,43 @@ export default function HomePage() {
           sb.from("artworks").select("*",{count:"exact",head:true}).eq("user_id",p.id),
           sb.from("artworks").select("images").eq("user_id",p.id).not("images","is",null).limit(1).maybeSingle(),
         ]);
-        return { ...p, artwork_count: count||0, cover_image: cover?.images?.[0]||null };
+        return { ...p, artwork_count:count||0, cover_image:cover?.images?.[0]||null };
       }));
       setArtists(enriched);
     }
+
+    // Venues
+    const { data: venueData } = await sb.from("profiles")
+      .select("id,full_name,username,bio,location,avatar_url")
+      .eq("role","gallery").not("full_name","is",null).limit(16);
+    setVenues(venueData||[]);
+
+    // Events (public, upcoming)
+    const { data: evData } = await sb.from("exhibitions")
+      .select("id,title,venue,start_date,end_date,event_type,is_online,online_url,cover_image,location_name")
+      .eq("is_public",true).order("start_date",{ascending:true}).limit(20);
+    setEvents((evData||[]).filter(isUpcoming));
+
+    // Resources
+    const { data: resData } = await sb.from("education_resources")
+      .select("id,type,title,url,description").order("created_at",{ascending:false}).limit(12);
+    setResources(resData||[]);
+
     setLoadingExplore(false);
   }
 
-  const filteredArtworks = artworks.filter(a => {
-    const q = search.toLowerCase();
-    return (!search || a.title.toLowerCase().includes(q) || (a.medium||"").toLowerCase().includes(q) || (a.artist_name||"").toLowerCase().includes(q))
-      && (medium === "All" || (a.medium||"").toLowerCase().includes(medium.toLowerCase()));
-  });
-  const filteredArtists = artists.filter(a =>
-    !search || (a.full_name||"").toLowerCase().includes(search.toLowerCase())
+  const q = search.toLowerCase();
+  const filteredArtworks = artworks.filter(a =>
+    (!search || a.title.toLowerCase().includes(q) || (a.medium||"").toLowerCase().includes(q) || (a.artist_name||"").toLowerCase().includes(q))
+    && (medium==="All" || (a.medium||"").toLowerCase().includes(medium.toLowerCase()))
   );
+  const filteredArtists = artists.filter(a => !search || (a.full_name||"").toLowerCase().includes(q));
+  const filteredVenues  = venues.filter(v => !search || (v.full_name||"").toLowerCase().includes(q) || (v.location||"").toLowerCase().includes(q));
+  const filteredEvents  = events.filter(e => !search || e.title.toLowerCase().includes(q) || (e.venue||"").toLowerCase().includes(q));
+
   const initials = (n: string) => (n||"A").split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase();
   const feat = FEATURES[activeFeature];
+  const workshops = filteredEvents.filter(e => e.event_type==="workshop" || e.event_type==="online_workshop");
 
   return (
     <>
@@ -415,7 +445,6 @@ export default function HomePage() {
         .hero-loaded .hero-ctas{opacity:1;transform:translateY(0)}
         .btn-hero-dark-rnd{display:inline-flex;align-items:center;gap:8px;padding:14px 28px;background:#111110;color:#FFD400;font-family:inherit;font-size:15px;font-weight:800;border:2.5px solid #111110;border-radius:14px;text-decoration:none;cursor:pointer;transition:all 0.25s cubic-bezier(0.16,1,0.3,1);box-shadow:4px 4px 0 rgba(0,0,0,0.2)}
         .btn-hero-dark-rnd:hover{box-shadow:6px 6px 0 rgba(0,0,0,0.25);transform:translate(-2px,-2px)}
-        .btn-hero-dark-rnd:active{box-shadow:1px 1px 0 rgba(0,0,0,0.2);transform:translate(1px,1px)}
         .btn-hero-ghost-rnd{display:inline-flex;align-items:center;gap:8px;padding:14px 28px;background:rgba(255,255,255,0.7);color:#111110;font-family:inherit;font-size:15px;font-weight:800;border:2.5px solid #111110;border-radius:14px;text-decoration:none;cursor:pointer;transition:all 0.25s cubic-bezier(0.16,1,0.3,1)}
         .btn-hero-ghost-rnd:hover{background:#fff;transform:translateY(-2px);box-shadow:3px 3px 0 rgba(0,0,0,0.1)}
         .hero-right{background:#111110;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 40px;position:relative;overflow:hidden}
@@ -436,7 +465,7 @@ export default function HomePage() {
         .ticker-track{display:inline-flex;gap:48px;animation:ticker 20s linear infinite}
         .ticker-wrap:hover .ticker-track{animation-play-state:paused}
         @keyframes ticker{from{transform:translateX(0)}to{transform:translateX(-50%)}}
-        .ticker-item{font-size:15px;font-weight:800;color:#111110;letter-spacing:0.05em;text-transform:uppercase;display:inline-flex;align-items:center;gap:12px;flex-shrink:0;transition:opacity 0.2s}
+        .ticker-item{font-size:15px;font-weight:800;color:#111110;letter-spacing:0.05em;text-transform:uppercase;display:inline-flex;align-items:center;gap:12px;flex-shrink:0}
         .ticker-dot{width:6px;height:6px;background:#111110;border-radius:50%;flex-shrink:0}
 
         .why{background:#FFFBEA;padding:80px 0;border-bottom:3px solid #111110}
@@ -453,7 +482,6 @@ export default function HomePage() {
         .feat-tab-emoji{font-size:18px;transition:transform 0.3s cubic-bezier(0.34,1.56,0.64,1)}
         .feat-tab:hover .feat-tab-emoji{transform:scale(1.2) rotate(-5deg)}
         .feat-tab.active .feat-tab-emoji{transform:scale(1.15)}
-
         .feat-panel{display:grid;grid-template-columns:1fr 1fr;gap:0;border:2px solid #111110;border-top:none;border-radius:0 0 20px 20px;overflow:hidden;box-shadow:4px 6px 0 #D4C9A8;transition:box-shadow 0.3s}
         .feat-left{padding:52px 56px;display:flex;flex-direction:column;justify-content:center;transition:background 0.5s cubic-bezier(0.16,1,0.3,1)}
         .feat-pain{display:flex;align-items:flex-start;gap:10px;padding:10px 14px;background:rgba(0,0,0,0.06);border-radius:10px;margin-bottom:24px;font-size:13px;font-weight:600;color:inherit;opacity:0.65;font-style:italic;line-height:1.5}
@@ -464,7 +492,6 @@ export default function HomePage() {
         .feat-gain::before{content:"✓";font-weight:900;font-size:14px;flex-shrink:0;margin-top:1px}
         .feat-tag{display:inline-block;padding:5px 14px;border-radius:9999px;border:2px solid currentColor;font-size:11px;font-weight:800;letter-spacing:0.1em;text-transform:uppercase;margin-top:20px;opacity:0.8}
         .feat-right{display:flex;align-items:center;justify-content:center;padding:48px 40px;border-left:2px solid rgba(0,0,0,0.08);position:relative;overflow:hidden;min-height:440px}
-
         .feat-text-enter{animation:featTextIn 0.5s cubic-bezier(0.16,1,0.3,1) forwards}
         @keyframes featTextIn{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
 
@@ -492,7 +519,6 @@ export default function HomePage() {
         .cta-visible .strikethrough::after{width:100%}
         .btn-cta-dark{display:inline-flex;align-items:center;gap:10px;padding:18px 36px;background:#111110;color:#FFD400;font-family:inherit;font-size:16px;font-weight:800;border:none;border-radius:14px;text-decoration:none;cursor:pointer;transition:all 0.25s cubic-bezier(0.16,1,0.3,1);box-shadow:6px 6px 0 rgba(0,0,0,0.3);white-space:nowrap;flex-shrink:0}
         .btn-cta-dark:hover{box-shadow:8px 8px 0 rgba(0,0,0,0.3);transform:translate(-2px,-2px)}
-        .btn-cta-dark:active{box-shadow:2px 2px 0 rgba(0,0,0,0.3);transform:translate(1px,1px)}
 
         .proof{background:#FFFBEA;padding:80px 40px;border-bottom:3px solid #111110}
         .proof-inner{max-width:1100px;margin:0 auto}
@@ -506,7 +532,8 @@ export default function HomePage() {
         .proof-avatar{width:36px;height:36px;border-radius:50%;background:#FFD400;border:2px solid #111110;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:900;color:#111110;flex-shrink:0;transition:transform 0.3s cubic-bezier(0.34,1.56,0.64,1)}
         .proof-card:hover .proof-avatar{transform:scale(1.1)}
 
-        .explore-section{background:#F5F0E8;border-top:3px solid #E8E0D0;padding:80px 0}
+        /* ── EXPLORE SECTION ── */
+        .explore-section{background:#F5F0E8;border-top:3px solid #111110;padding:80px 0 100px}
         .explore-inner{max-width:1100px;margin:0 auto;padding:0 24px}
         .tabs{display:flex;background:#fff;border:2px solid #111110;border-radius:12px;overflow:hidden;width:fit-content;margin-bottom:24px}
         .tab-btn{display:flex;align-items:center;gap:6px;padding:9px 20px;border:none;border-right:1px solid #E8E0D0;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;transition:all 0.2s cubic-bezier(0.16,1,0.3,1)}
@@ -514,7 +541,7 @@ export default function HomePage() {
         .tab-btn.active{background:#111110;color:#FFD400}
         .tab-btn:not(.active){background:#fff;color:#9B8F7A}
         .tab-btn:not(.active):hover{background:#FAF7F3;color:#111110}
-        .search-wrap{display:flex;align-items:center;gap:8px;background:#fff;border:2px solid #E8E0D0;border-radius:10px;padding:0 12px;height:40px;flex:1;min-width:200px;max-width:340px;transition:border-color 0.2s,box-shadow 0.2s}
+        .search-wrap{display:flex;align-items:center;gap:8px;background:#fff;border:2px solid #E8E0D0;border-radius:10px;padding:0 12px;height:40px;flex:1;min-width:200px;max-width:380px;transition:border-color 0.2s,box-shadow 0.2s}
         .search-wrap:focus-within{border-color:#FFD400;box-shadow:0 0 0 3px rgba(255,212,0,0.15)}
         .search-inp{flex:1;border:none;outline:none;font-size:13px;font-family:inherit;font-weight:500;color:#111110;background:transparent}
         .medium-pill{padding:6px 14px;border-radius:9999px;border:2px solid #E8E0D0;background:#fff;font-family:inherit;font-size:12px;font-weight:700;color:#9B8F7A;cursor:pointer;transition:all 0.2s cubic-bezier(0.16,1,0.3,1);white-space:nowrap}
@@ -527,11 +554,26 @@ export default function HomePage() {
         .art-thumb img{width:100%;height:100%;object-fit:cover;transition:transform 0.5s cubic-bezier(0.16,1,0.3,1)}
         .art-card:hover .art-thumb img{transform:scale(1.06)}
         .art-body{padding:12px 14px 10px}
-        .artist-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:16px}
-        .artist-card{background:#fff;border-radius:18px;border:2px solid #E8E0D0;overflow:hidden;box-shadow:3px 4px 0 #D4C9A8;cursor:pointer;transition:all 0.3s cubic-bezier(0.16,1,0.3,1)}
-        .artist-card:hover{box-shadow:6px 8px 0 #111110;transform:translate(-2px,-3px);border-color:#111110}
         .skeleton{background:#E8E0D0;border-radius:18px;animation:shimmer 1.5s infinite}
         @keyframes shimmer{0%,100%{opacity:1}50%{opacity:0.6}}
+
+        /* ── ARTIST / VENUE / EVENT H-SCROLL CARDS ── */
+        .h-card-artist{width:190px;flex-shrink:0;background:#fff;border:2.5px solid #E8E0D0;border-radius:16px;overflow:hidden;cursor:pointer;transition:all 0.25s cubic-bezier(0.16,1,0.3,1);text-decoration:none;display:block}
+        .h-card-artist:hover{border-color:#111110;box-shadow:4px 5px 0 #111110;transform:translate(-1px,-2px)}
+        .h-card-venue{width:230px;flex-shrink:0;background:#fff;border:2.5px solid #E8E0D0;border-radius:16px;overflow:hidden;cursor:pointer;transition:all 0.25s cubic-bezier(0.16,1,0.3,1);text-decoration:none;display:block}
+        .h-card-venue:hover{border-color:#111110;box-shadow:4px 5px 0 #111110;transform:translate(-1px,-2px)}
+        .h-card-event{width:250px;flex-shrink:0;background:#fff;border:2.5px solid #E8E0D0;border-radius:16px;overflow:hidden;transition:all 0.25s cubic-bezier(0.16,1,0.3,1)}
+        .h-card-event:hover{border-color:#111110;box-shadow:4px 5px 0 #111110;transform:translate(-1px,-2px)}
+
+        .ex-sep{height:2px;background:#E0D8CA;margin:40px 0;border-radius:1px}
+        .ex-subhead{font-size:11px;font-weight:800;color:#9B8F7A;text-transform:uppercase;letter-spacing:0.16em;display:flex;align-items:center;gap:8px;margin-bottom:14px}
+        .ex-subhead::after{content:'';flex:1;height:1.5px;background:#E0D8CA}
+
+        /* Education band */
+        .edu-band{background:#111110;border-radius:22px;border:2.5px solid #111110;padding:32px 28px;margin-top:40px;box-shadow:6px 6px 0 #FFD400}
+
+        *::-webkit-scrollbar{display:none}
+        *{scrollbar-width:none}
 
         .footer{background:#111110;padding:48px 40px 28px}
         .footer-inner{max-width:1100px;margin:0 auto}
@@ -554,7 +596,6 @@ export default function HomePage() {
         .stagger-3{transition-delay:0.15s!important}
         .stagger-4{transition-delay:0.2s!important}
         .stagger-5{transition-delay:0.25s!important}
-
         @keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
         .fade-up{animation:fadeUp 0.35s ease forwards}
 
@@ -580,6 +621,7 @@ export default function HomePage() {
         @media(max-width:600px){
           .footer-top{grid-template-columns:1fr}
           .art-grid{grid-template-columns:1fr 1fr}
+          .edu-band{padding:22px 18px}
         }
       `}</style>
 
@@ -605,11 +647,7 @@ export default function HomePage() {
       <section className={`hero${heroLoaded?" hero-loaded":""}`} style={{paddingTop:80}}>
         <div className="hero-left">
           <div className="hero-eyebrow">🥭 artomango · art platform</div>
-          <h1 className="hero-title">
-            Your art.<br/>
-            <span className="inv">Managed.</span><br/>
-            Exhibited.
-          </h1>
+          <h1 className="hero-title">Your art.<br/><span className="inv">Managed.</span><br/>Exhibited.</h1>
           <p className="hero-sub">The platform for artists and venues to manage work, discover collaborations, and grow in the art scene.</p>
           <div className="hero-ctas">
             <a href="/register" className="btn-hero-dark-rnd">Start for free →</a>
@@ -619,17 +657,17 @@ export default function HomePage() {
           </div>
         </div>
         <div className="hero-right">
-          <span className="hero-mango" style={{ transform: `translate(${mousePos.x*8}px, ${mousePos.y*6}px)` }}>🥭</span>
+          <span className="hero-mango" style={{transform:`translate(${mousePos.x*8}px,${mousePos.y*6}px)`}}>🥭</span>
           <div className="hero-stats">
             <div className="hero-stat"><span className="hero-stat-num"><AnimCounter target={47}/></span><span className="hero-stat-label">Works</span></div>
             <div className="hero-stat"><span className="hero-stat-num"><AnimCounter target={12}/></span><span className="hero-stat-label">Shows</span></div>
             <div className="hero-stat"><span className="hero-stat-num"><AnimCounter target={18} prefix="$" suffix="k"/></span><span className="hero-stat-label">Revenue</span></div>
           </div>
-          <div className="hero-float-card" style={{top:100,left:24,background:"#FFD400",border:"2px solid #111110",padding:"8px 14px",boxShadow:"3px 3px 0 #111110",animationDelay:"0.8s", transform: `translate(${mousePos.x*-12}px, ${mousePos.y*-8}px)` }}>
+          <div className="hero-float-card" style={{top:100,left:24,background:"#FFD400",border:"2px solid #111110",padding:"8px 14px",boxShadow:"3px 3px 0 #111110",animationDelay:"0.8s",transform:`translate(${mousePos.x*-12}px,${mousePos.y*-8}px)`}}>
             <div style={{fontSize:10,fontWeight:800,textTransform:"uppercase",letterSpacing:"0.1em",color:"#111110"}}>New collab request</div>
             <div style={{fontSize:12,fontWeight:700,color:"#111110",marginTop:2}}>Galerie Nord · Prague</div>
           </div>
-          <div className="hero-float-card" style={{bottom:120,right:24,background:"#fff",border:"2px solid #333",padding:"8px 14px",boxShadow:"3px 3px 0 #333",animationDelay:"1.2s", transform: `translate(${mousePos.x*10}px, ${mousePos.y*10}px)` }}>
+          <div className="hero-float-card" style={{bottom:120,right:24,background:"#fff",border:"2px solid #333",padding:"8px 14px",boxShadow:"3px 3px 0 #333",animationDelay:"1.2s",transform:`translate(${mousePos.x*10}px,${mousePos.y*10}px)`}}>
             <div style={{fontSize:10,fontWeight:800,textTransform:"uppercase",letterSpacing:"0.1em",color:"#9B8F7A"}}>Artwork sold</div>
             <div style={{fontSize:13,fontWeight:900,color:"#111110",marginTop:2}}>$2,400 ✓</div>
           </div>
@@ -655,16 +693,13 @@ export default function HomePage() {
             <h2 className="why-title">Built for every player<br/>in the art scene.</h2>
             <p className="why-sub">Everything you need to run your art practice like a professional — without the spreadsheets, the paper trails, or the missed connections.</p>
           </div>
-
           <div className={`feat-nav reveal-up stagger-2${whyReveal.visible?" visible":""}`}>
             {FEATURES.map((f,i) => (
               <button key={f.id} className={`feat-tab${activeFeature===i?" active":""}`} onClick={() => switchFeature(i)}>
-                <span className="feat-tab-emoji">{f.emoji}</span>
-                {f.label}
+                <span className="feat-tab-emoji">{f.emoji}</span>{f.label}
               </button>
             ))}
           </div>
-
           <div className={`feat-panel reveal-scale stagger-3${whyReveal.visible?" visible":""}`} style={{background:feat.color}}>
             <div className="feat-left" key={feat.id} style={{background:feat.color,color:feat.textColor}}>
               <div className="feat-pain feat-text-enter" key={`pain-${feat.id}`}>{feat.pain}</div>
@@ -674,16 +709,14 @@ export default function HomePage() {
               <span className="feat-tag feat-text-enter" key={`tag-${feat.id}`} style={{animationDelay:"0.2s"}}>{feat.tag}</span>
             </div>
             <div className="feat-right" style={{background:feat.textColor==="#111110"?"rgba(0,0,0,0.04)":"rgba(255,255,255,0.06)"}}>
-              {FEATURES.map((f,i) => (
-                <FeatureVisual key={f.id} id={f.visual} active={activeFeature === i} />
-              ))}
+              {FEATURES.map((f,i) => <FeatureVisual key={f.id} id={f.visual} active={activeFeature===i}/>)}
             </div>
           </div>
         </div>
       </section>
 
       {/* ── CAMPAIGN CAROUSEL ── */}
-      <CampaignCarousel />
+      <CampaignCarousel/>
 
       {/* ── HOW IT WORKS ── */}
       <section id="how" className="how" ref={howReveal.ref}>
@@ -748,30 +781,25 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ── EXPLORE SECTION ── */}
+      {/* ════════════════════════════════════════════
+          EXPLORE SECTION (rich version)
+      ════════════════════════════════════════════ */}
       <section id="explore" className="explore-section" ref={exploreReveal.ref}>
         <div className="explore-inner">
+
+          {/* Header */}
           <div className={`reveal-up${exploreReveal.visible?" visible":""}`} style={{marginBottom:32}}>
-            <div className="section-eyebrow" style={{background:"#111110",color:"#FFD400"}}>Browse the platform</div>
+            <div className="section-eyebrow" style={{background:"#111110",color:"#FFD400"}}>Discover</div>
             <h2 style={{fontSize:"clamp(28px,4vw,44px)",fontWeight:900,color:"#111110",letterSpacing:"-1.5px",marginBottom:6}}>Explore the scene</h2>
-            <p style={{fontSize:15,fontWeight:600,color:"#9B8F7A"}}>Discover artworks and connect with artists and venues</p>
+            <p style={{fontSize:15,fontWeight:600,color:"#9B8F7A"}}>Artworks, artists, venues, events — all in one place</p>
           </div>
 
-          <div className={`reveal-up stagger-2${exploreReveal.visible?" visible":""}`}>
-            <div className="tabs">
-              <button className={`tab-btn${exploreTab==="artworks"?" active":""}`} onClick={() => setExploreTab("artworks")}>
-                <Grid3X3 size={14}/> Artworks
-              </button>
-              <button className={`tab-btn${exploreTab==="artists"?" active":""}`} onClick={() => setExploreTab("artists")}>
-                <Users size={14}/> Artists & Venues
-              </button>
-            </div>
-
-            <div style={{display:"flex",gap:10,alignItems:"center",flexWrap:"wrap",marginBottom:28}}>
+          {/* Search + tab switcher */}
+          <div className={`reveal-up stagger-2${exploreReveal.visible?" visible":""}`} style={{marginBottom:28}}>
+            <div style={{display:"flex",gap:10,alignItems:"center",flexWrap:"wrap",marginBottom:16}}>
               <div className="search-wrap">
                 <Search size={14} color="#9B8F7A"/>
-                <input className="search-inp" value={search} onChange={e => setSearch(e.target.value)}
-                  placeholder={exploreTab==="artworks"?"Search artworks…":"Search artists or venues…"}/>
+                <input className="search-inp" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search everything…"/>
                 {search && <button onClick={() => setSearch("")} style={{background:"none",border:"none",cursor:"pointer",color:"#C0B8A8",padding:0,display:"flex"}}><X size={12}/></button>}
               </div>
               {exploreTab === "artworks" && (
@@ -780,95 +808,248 @@ export default function HomePage() {
                 </div>
               )}
             </div>
+            <div className="tabs">
+              {[
+                {key:"artworks",icon:<Palette size={14}/>,label:"Artworks"},
+                {key:"artists", icon:<Users size={14}/>,  label:"Artists & Venues"},
+              ].map(t => (
+                <button key={t.key} className={`tab-btn${exploreTab===t.key?" active":""}`} onClick={() => setExploreTab(t.key as ExploreTab)}>
+                  {t.icon}{t.label}
+                </button>
+              ))}
+            </div>
           </div>
 
+          {/* ── ARTWORKS TAB ── */}
           {exploreTab === "artworks" && (
-            loadingExplore ? (
-              <div className="art-grid">
-                {[...Array(8)].map((_,i) => <div key={i} className="skeleton" style={{aspectRatio:"3/4",animationDelay:`${i*0.06}s`}}/>)}
-              </div>
-            ) : (
-              <div className="art-grid">
-                {filteredArtworks.map((aw,i) => {
-                  const img = Array.isArray(aw.images) ? aw.images[0] : null;
-                  return (
-                    <Link key={aw.id} href={`/dashboard/artworks/${aw.id}`} className="art-card fade-up" style={{animationDelay:`${Math.min(i,12)*0.04}s`}}>
-                      <div className="art-thumb">
-                        {img
-                          ? <img src={img} alt={aw.title} loading="lazy"/>
-                          : <div style={{width:"100%",height:"100%",display:"flex",alignItems:"center",justifyContent:"center"}}><ImageIcon size={28} color="#D4C9A8"/></div>
-                        }
-                        {(aw.venue_location||aw.location) && (
-                          <div style={{position:"absolute",bottom:8,left:8,background:"rgba(255,255,255,0.92)",borderRadius:9999,padding:"3px 9px",display:"flex",alignItems:"center",gap:4,fontSize:10,fontWeight:700,color:"#111110",backdropFilter:"blur(4px)"}}>
-                            <MapPin size={9} color="#FF6B6B"/>{(aw.venue_location||aw.location||"").split(",")[0]}
-                          </div>
-                        )}
-                      </div>
-                      <div className="art-body">
-                        <div style={{fontSize:14,fontWeight:800,color:"#111110",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",letterSpacing:"-0.2px",marginBottom:2}}>{aw.title}</div>
-                        <div style={{fontSize:12,color:"#9B8F7A",fontWeight:600,marginBottom:8,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{[aw.medium,aw.year].filter(Boolean).join(" · ")||"—"}</div>
-                        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-                          <div style={{fontSize:16,fontWeight:900,color:aw.price?"#111110":"#D4C9A8",fontFamily:"monospace",letterSpacing:"-0.5px"}}>
-                            {aw.price?`$${Number(aw.price).toLocaleString()}`:"Inquiry"}
-                          </div>
-                          <div style={{display:"flex",alignItems:"center",gap:5}}>
-                            <div style={{width:20,height:20,borderRadius:"50%",background:"#FFD400",border:"1.5px solid #E8E0D0",display:"flex",alignItems:"center",justifyContent:"center",fontSize:8,fontWeight:900,color:"#111110",overflow:"hidden",flexShrink:0}}>
-                              {aw.artist_avatar?<img src={aw.artist_avatar} style={{width:"100%",height:"100%",objectFit:"cover"}} alt=""/>:initials(aw.artist_name||"A")}
+            <>
+              {loadingExplore ? (
+                <div className="art-grid">
+                  {[...Array(8)].map((_,i) => <div key={i} className="skeleton" style={{aspectRatio:"3/4",animationDelay:`${i*0.06}s`}}/>)}
+                </div>
+              ) : (
+                <div className="art-grid">
+                  {filteredArtworks.map((aw,i) => {
+                    const img = Array.isArray(aw.images) ? aw.images[0] : null;
+                    return (
+                      <Link key={aw.id} href={aw.artist_username ? `/${aw.artist_username}` : `/dashboard/artworks/${aw.id}`} className="art-card fade-up" style={{animationDelay:`${Math.min(i,12)*0.04}s`}}>
+                        <div className="art-thumb">
+                          {img
+                            ? <img src={img} alt={aw.title} loading="lazy"/>
+                            : <div style={{width:"100%",height:"100%",display:"flex",alignItems:"center",justifyContent:"center"}}><ImageIcon size={28} color="#D4C9A8"/></div>
+                          }
+                          {(aw.venue_location||aw.location) && (
+                            <div style={{position:"absolute",bottom:8,left:8,background:"rgba(255,255,255,0.92)",borderRadius:9999,padding:"3px 9px",display:"flex",alignItems:"center",gap:4,fontSize:10,fontWeight:700,color:"#111110",backdropFilter:"blur(4px)"}}>
+                              <MapPin size={9} color="#FF6B6B"/>{((aw.venue_location||aw.location||"")).split(",")[0]}
                             </div>
-                            <span style={{fontSize:11,fontWeight:600,color:"#9B8F7A",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:80}}>{aw.artist_name}</span>
+                          )}
+                        </div>
+                        <div className="art-body">
+                          <div style={{fontSize:14,fontWeight:800,color:"#111110",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",letterSpacing:"-0.2px",marginBottom:2}}>{aw.title}</div>
+                          <div style={{fontSize:12,color:"#9B8F7A",fontWeight:600,marginBottom:8,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{[aw.medium,aw.year].filter(Boolean).join(" · ")||"—"}</div>
+                          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+                            <div style={{fontSize:16,fontWeight:900,color:aw.price?"#111110":"#D4C9A8",fontFamily:"monospace",letterSpacing:"-0.5px"}}>
+                              {aw.price?`$${Number(aw.price).toLocaleString()}`:"Inquiry"}
+                            </div>
+                            <div style={{display:"flex",alignItems:"center",gap:5}}>
+                              <div style={{width:20,height:20,borderRadius:"50%",background:"#FFD400",border:"1.5px solid #E8E0D0",display:"flex",alignItems:"center",justifyContent:"center",fontSize:8,fontWeight:900,color:"#111110",overflow:"hidden",flexShrink:0}}>
+                                {aw.artist_avatar?<img src={aw.artist_avatar} style={{width:"100%",height:"100%",objectFit:"cover"}} alt=""/>:initials(aw.artist_name||"A")}
+                              </div>
+                              <span style={{fontSize:11,fontWeight:600,color:"#9B8F7A",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:80}}>{aw.artist_name}</span>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    </Link>
-                  );
-                })}
-              </div>
-            )
+                      </Link>
+                    );
+                  })}
+                </div>
+              )}
+            </>
           )}
 
+          {/* ── ARTISTS & VENUES TAB ── */}
           {exploreTab === "artists" && (
-            loadingExplore ? (
-              <div className="artist-grid">
-                {[...Array(6)].map((_,i) => <div key={i} className="skeleton" style={{height:220,animationDelay:`${i*0.06}s`}}/>)}
-              </div>
-            ) : (
-              <div className="artist-grid">
-                {filteredArtists.map((artist,i) => (
-                  <div key={artist.id} className="artist-card fade-up" style={{animationDelay:`${Math.min(i,12)*0.04}s`}}>
-                    <div style={{height:80,overflow:"hidden",background:"#FAF7F3",position:"relative"}}>
+            <>
+              {/* Artists row */}
+              <div className="ex-subhead">👤 Artists ({filteredArtists.length})</div>
+              <HScroll>
+                {filteredArtists.map(artist => (
+                  <Link key={artist.id} href={artist.username?`/${artist.username}`:"/explore"} className="h-card-artist">
+                    <div style={{height:70,background:artist.cover_image?"#FAF7F3":"linear-gradient(135deg,#FFD40033,#F5F0E8)",overflow:"hidden"}}>
                       {artist.cover_image
-                        ? <img src={artist.cover_image} alt="" style={{width:"100%",height:"100%",objectFit:"cover",transition:"transform 0.5s cubic-bezier(0.16,1,0.3,1)"}} loading="lazy"/>
-                        : <div style={{width:"100%",height:"100%",background:"linear-gradient(135deg,#FFD40033,#F5F0E8)",display:"flex",alignItems:"center",justifyContent:"center"}}>
-                            {artist.role==="artist"?<Palette size={24} color="#C0B8A8"/>:<Building2 size={24} color="#C0B8A8"/>}
-                          </div>
+                        ? <img src={artist.cover_image} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}} loading="lazy"/>
+                        : <div style={{width:"100%",height:"100%",display:"flex",alignItems:"center",justifyContent:"center"}}><Palette size={22} color="#C0B8A8"/></div>
                       }
                     </div>
-                    <div style={{padding:"12px 16px 16px"}}>
-                      <div style={{marginTop:-20,marginBottom:10}}>
-                        <div style={{width:44,height:44,borderRadius:"50%",border:"3px solid #fff",background:"#FFD400",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,fontWeight:900,color:"#111110",overflow:"hidden",boxShadow:"2px 2px 0 #E8E0D0",transition:"transform 0.3s cubic-bezier(0.34,1.56,0.64,1)"}}>
-                          {artist.avatar_url?<img src={artist.avatar_url} style={{width:"100%",height:"100%",objectFit:"cover"}} alt=""/>:initials(artist.full_name||"A")}
+                    <div style={{padding:"0 12px 12px"}}>
+                      <div style={{marginTop:-18,marginBottom:6}}>
+                        <div style={{width:36,height:36,borderRadius:10,border:"3px solid #fff",background:"#FFD400",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:900,color:"#111110",overflow:"hidden",boxShadow:"2px 2px 0 #E8E0D0"}}>
+                          {artist.avatar_url?<img src={artist.avatar_url} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}} loading="lazy"/>:initials(artist.full_name||"A")}
                         </div>
                       </div>
-                      <div style={{fontSize:15,fontWeight:800,color:"#111110",letterSpacing:"-0.2px",marginBottom:2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{artist.full_name||"Artist"}</div>
-                      <div style={{display:"inline-block",fontSize:10,fontWeight:800,textTransform:"uppercase" as const,letterSpacing:"0.12em",padding:"2px 8px",borderRadius:9999,background:"#FAF7F3",color:"#9B8F7A",marginBottom:6}}>{artist.role||"artist"}</div>
-                      <div style={{fontSize:12,color:"#9B8F7A",fontWeight:500,lineHeight:1.5,overflow:"hidden",textOverflow:"ellipsis",display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical" as any,marginBottom:10,minHeight:36}}>{artist.bio||"No bio yet."}</div>
-                      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",paddingTop:10,borderTop:"1px solid #F5F0E8"}}>
-                        <div>
-                          <div style={{fontSize:12,fontWeight:700,color:"#9B8F7A"}}>{artist.artwork_count} work{artist.artwork_count!==1?"s":""}</div>
-                          {artist.location && <div style={{display:"flex",alignItems:"center",gap:3,fontSize:11,color:"#9B8F7A",fontWeight:600}}><MapPin size={10} color="#FF6B6B"/><span style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:90}}>{artist.location}</span></div>}
-                        </div>
-                        <Link href={`/${artist.username||artist.id}`} style={{display:"inline-flex",alignItems:"center",gap:5,padding:"6px 12px",borderRadius:8,border:"1.5px solid #E8E0D0",background:"#FAF7F3",fontSize:12,fontWeight:700,color:"#111110",textDecoration:"none",transition:"all 0.2s cubic-bezier(0.16,1,0.3,1)"}}
-                          onMouseEnter={e=>{(e.currentTarget as HTMLElement).style.background="#FFD400";(e.currentTarget as HTMLElement).style.borderColor="#111110";(e.currentTarget as HTMLElement).style.transform="translateY(-1px)";}}
-                          onMouseLeave={e=>{(e.currentTarget as HTMLElement).style.background="#FAF7F3";(e.currentTarget as HTMLElement).style.borderColor="#E8E0D0";(e.currentTarget as HTMLElement).style.transform="";}}>
-                          View <ArrowRight size={12}/>
-                        </Link>
+                      <div style={{fontSize:13,fontWeight:800,color:"#111110",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",marginBottom:2}}>{artist.full_name}</div>
+                      {artist.location && <div style={{display:"flex",alignItems:"center",gap:3,fontSize:10,color:"#9B8F7A",fontWeight:600,marginBottom:3}}><MapPin size={9} color="#FF6B6B"/>{artist.location}</div>}
+                      <div style={{fontSize:10,fontWeight:700,color:"#9B8F7A"}}>{artist.artwork_count} works</div>
+                    </div>
+                  </Link>
+                ))}
+                {filteredArtists.length===0 && <div style={{padding:"32px 24px",color:"#9B8F7A",fontSize:13,fontWeight:600}}>No artists found</div>}
+              </HScroll>
+
+              <div className="ex-sep"/>
+
+              {/* Venues row */}
+              <div className="ex-subhead">🏛️ Venues ({filteredVenues.length})</div>
+              <HScroll>
+                {filteredVenues.map(venue => (
+                  <Link key={venue.id} href={venue.username?`/${venue.username}`:"/explore"} className="h-card-venue">
+                    <div style={{height:90,background:"#FAF7F3",overflow:"hidden",position:"relative"}}>
+                      {venue.cover_image
+                        ? <img src={venue.cover_image} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}} loading="lazy"/>
+                        : <div style={{width:"100%",height:"100%",display:"flex",alignItems:"center",justifyContent:"center",background:"linear-gradient(135deg,#4ECDC433,#F5F0E8)"}}><Building2 size={28} color="#C0B8A8"/></div>
+                      }
+                    </div>
+                    <div style={{padding:"12px 14px"}}>
+                      <div style={{fontSize:14,fontWeight:800,color:"#111110",marginBottom:3,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{venue.full_name}</div>
+                      {venue.location && <div style={{display:"flex",alignItems:"center",gap:4,fontSize:11,color:"#9B8F7A",fontWeight:600,marginBottom:4}}><MapPin size={10} color="#FF6B6B"/>{venue.location}</div>}
+                      {venue.bio && <div style={{fontSize:11,color:"#9B8F7A",fontWeight:500,lineHeight:1.4,overflow:"hidden",display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical" as any}}>{venue.bio}</div>}
+                    </div>
+                  </Link>
+                ))}
+                {filteredVenues.length===0 && <div style={{padding:"32px 24px",color:"#9B8F7A",fontSize:13,fontWeight:600}}>No venues found</div>}
+              </HScroll>
+            </>
+          )}
+
+          {/* ── EVENTS (always visible) ── */}
+          {filteredEvents.length > 0 && (
+            <>
+              <div className="ex-sep"/>
+              <div className="ex-subhead">📅 Upcoming Events ({filteredEvents.length})</div>
+              <HScroll>
+                {filteredEvents.map(ev => {
+                  const etc = getET(ev.event_type);
+                  return (
+                    <div key={ev.id} className="h-card-event">
+                      <div style={{padding:"8px 12px",background:etc.bg,borderBottom:`1px solid ${etc.color}22`,display:"flex",alignItems:"center",gap:6}}>
+                        <span style={{color:etc.color}}>{etc.icon}</span>
+                        <span style={{fontSize:9,fontWeight:900,color:etc.color,textTransform:"uppercase",letterSpacing:"0.12em"}}>{etc.label}</span>
+                        {ev.is_online && <span style={{marginLeft:"auto",fontSize:9,fontWeight:700,color:"#0EA5E9",background:"#E0F2FE",padding:"1px 6px",borderRadius:4}}>Online</span>}
+                      </div>
+                      <div style={{height:100,background:"#FAF7F3",overflow:"hidden",display:"flex",alignItems:"center",justifyContent:"center",fontSize:36}}>
+                        {ev.cover_image
+                          ? <img src={ev.cover_image} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
+                          : "🗓️"
+                        }
+                      </div>
+                      <div style={{padding:"12px 14px"}}>
+                        <div style={{fontSize:14,fontWeight:800,color:"#111110",marginBottom:6,lineHeight:1.25}}>{ev.title}</div>
+                        {ev.start_date && (
+                          <div style={{display:"flex",alignItems:"center",gap:5,fontSize:11,color:"#9B8F7A",fontWeight:600,marginBottom:3}}>
+                            <Clock size={10} color="#9B8F7A"/>{fmtDate(ev.start_date)}{ev.end_date&&ev.end_date!==ev.start_date?` — ${fmtDate(ev.end_date)}`:""}
+                          </div>
+                        )}
+                        {(ev.venue||ev.location_name) && !ev.is_online && (
+                          <div style={{display:"flex",alignItems:"center",gap:5,fontSize:11,color:"#9B8F7A",fontWeight:600}}>
+                            <MapPin size={10} color="#FF6B6B"/>{ev.venue||ev.location_name}
+                          </div>
+                        )}
+                        {ev.is_online && ev.online_url && (
+                          <a href={ev.online_url} target="_blank" rel="noopener noreferrer" style={{display:"inline-flex",alignItems:"center",gap:4,fontSize:11,fontWeight:700,color:"#0EA5E9",textDecoration:"none",marginTop:4}}>
+                            <Globe size={10}/> Join online →
+                          </a>
+                        )}
                       </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-            )
+                  );
+                })}
+              </HScroll>
+            </>
           )}
+
+          {/* ── EDUCATION BAND ── */}
+          {(workshops.length > 0 || resources.length > 0) && (
+            <div className="edu-band">
+              <div style={{marginBottom:20}}>
+                <div style={{fontSize:11,fontWeight:800,color:"rgba(255,212,0,.5)",textTransform:"uppercase",letterSpacing:"0.18em",marginBottom:5}}>📚 Education Hub</div>
+                <h3 style={{fontSize:"clamp(20px,3vw,28px)",fontWeight:900,color:"#FFD400",letterSpacing:"-0.8px",margin:0}}>Learn & grow with the community</h3>
+              </div>
+              {workshops.length > 0 && (
+                <div style={{marginBottom:20}}>
+                  <div style={{fontSize:10,fontWeight:800,color:"rgba(255,255,255,.25)",textTransform:"uppercase",letterSpacing:"0.14em",marginBottom:12}}>🎓 Workshops</div>
+                  <HScroll gap={10}>
+                    {workshops.map(ev => {
+                      const etc = getET(ev.event_type);
+                      return (
+                        <div key={ev.id} style={{width:220,flexShrink:0,background:"rgba(255,255,255,.07)",border:"1.5px solid rgba(255,255,255,.1)",borderRadius:14,padding:"14px 16px"}}>
+                          <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:8}}>
+                            <span style={{color:etc.color}}>{etc.icon}</span>
+                            <span style={{fontSize:9,fontWeight:800,color:etc.color,textTransform:"uppercase"}}>{etc.label}</span>
+                            {ev.is_online && <span style={{fontSize:9,fontWeight:700,color:"#0EA5E9",background:"rgba(14,165,233,.15)",padding:"1px 5px",borderRadius:4,marginLeft:"auto"}}>Online</span>}
+                          </div>
+                          <div style={{fontSize:14,fontWeight:800,color:"#fff",marginBottom:4,lineHeight:1.2}}>{ev.title}</div>
+                          {ev.start_date && <div style={{fontSize:11,color:"rgba(255,255,255,.35)",fontWeight:600}}>{fmtDate(ev.start_date)}</div>}
+                          {ev.is_online && ev.online_url && (
+                            <a href={ev.online_url} target="_blank" rel="noopener noreferrer" style={{display:"inline-flex",alignItems:"center",gap:4,marginTop:8,fontSize:11,fontWeight:700,color:"#FFD400",textDecoration:"none"}}>
+                              Join <ArrowRight size={10}/>
+                            </a>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </HScroll>
+                </div>
+              )}
+              {resources.length > 0 && (
+                <div>
+                  <div style={{fontSize:10,fontWeight:800,color:"rgba(255,255,255,.25)",textTransform:"uppercase",letterSpacing:"0.14em",marginBottom:12}}>📖 Resources</div>
+                  <HScroll gap={10}>
+                    {resources.map(res => {
+                      const ytId = res.type==="video" && res.url ? res.url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&?\s]+)/)?.[1] : null;
+                      const resColors: Record<string,string> = {video:"#FF0000",article:"#0EA5E9",post:"#8B5CF6"};
+                      const resColor = resColors[res.type] || "#9B8F7A";
+                      return (
+                        <a key={res.id} href={res.url||"#"} target="_blank" rel="noopener noreferrer"
+                          style={{width:200,flexShrink:0,background:"rgba(255,255,255,.06)",border:"1.5px solid rgba(255,255,255,.1)",borderRadius:14,display:"block",textDecoration:"none",overflow:"hidden",transition:"all .15s"}}>
+                          {ytId && (
+                            <div style={{position:"relative"}}>
+                              <img src={`https://img.youtube.com/vi/${ytId}/mqdefault.jpg`} alt="" style={{width:"100%",aspectRatio:"16/9",objectFit:"cover",display:"block"}} loading="lazy"/>
+                              <div style={{position:"absolute",inset:0,background:"rgba(0,0,0,.35)",display:"flex",alignItems:"center",justifyContent:"center"}}>
+                                <div style={{width:30,height:30,borderRadius:"50%",background:"rgba(255,0,0,.9)",display:"flex",alignItems:"center",justifyContent:"center"}}>
+                                  <span style={{color:"#fff",fontSize:11,marginLeft:2}}>▶</span>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                          <div style={{padding:"10px 12px"}}>
+                            <div style={{fontSize:9,fontWeight:800,color:resColor,textTransform:"uppercase",letterSpacing:"0.12em",marginBottom:4}}>{res.type}</div>
+                            <div style={{fontSize:12,fontWeight:800,color:"#fff",lineHeight:1.3,display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical" as any,overflow:"hidden"}}>{res.title}</div>
+                          </div>
+                        </a>
+                      );
+                    })}
+                  </HScroll>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Join CTA */}
+          <div style={{marginTop:40,background:"#111110",border:"2.5px solid #111110",borderRadius:20,padding:"36px 32px",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:20,boxShadow:"5px 5px 0 #FFD400"}}>
+            <div>
+              <div style={{fontSize:11,fontWeight:800,color:"rgba(255,212,0,.5)",textTransform:"uppercase",letterSpacing:"0.16em",marginBottom:6}}>🥭 Join the scene</div>
+              <h3 style={{fontSize:"clamp(22px,3vw,34px)",fontWeight:900,color:"#FFD400",letterSpacing:"-1px",margin:0,lineHeight:1}}>Ready to manage &amp; exhibit?</h3>
+              <p style={{fontSize:14,color:"rgba(255,255,255,.35)",fontWeight:600,marginTop:8}}>Artists and venues growing together on Artomango.</p>
+            </div>
+            <div style={{display:"flex",gap:10,flexShrink:0}}>
+              <a href="/register" style={{display:"inline-flex",alignItems:"center",gap:6,padding:"12px 24px",background:"#FFD400",border:"2.5px solid #FFD400",borderRadius:12,fontSize:14,fontWeight:800,color:"#111110",textDecoration:"none",transition:"all .2s"}}>
+                Create free account <ArrowRight size={14}/>
+              </a>
+              <a href="/login" style={{display:"inline-flex",alignItems:"center",gap:6,padding:"12px 20px",background:"transparent",border:"2px solid rgba(255,255,255,.15)",borderRadius:12,fontSize:14,fontWeight:700,color:"rgba(255,255,255,.5)",textDecoration:"none"}}>
+                Sign in
+              </a>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -912,3 +1093,5 @@ export default function HomePage() {
     </>
   );
 }
+
+import React from "react";

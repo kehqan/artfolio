@@ -28,7 +28,7 @@ const NAV_SECTIONS = [
     label: "Scene",
     icon: CalendarRange,
     items: [
-      { href: "/dashboard/exhibitions", label: "Events",  icon: CalendarRange, desc: "Shows & exhibitions"      },
+      { href: "/dashboard/exhibitions", label: "Events & Education", icon: CalendarRange, desc: "Events, workshops & resources"      },
       { href: "/dashboard/pool",        label: "Collabs", icon: Handshake,     desc: "Collaboration requests"   },
       { href: "/dashboard/map",         label: "Map",     icon: MapPin,        desc: "Prague art scene map"     },
     ],

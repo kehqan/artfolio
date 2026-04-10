@@ -137,7 +137,7 @@ export default function ExplorePage() {
       .order("created_at", { ascending: false }).limit(24);
 
     if (awData?.length) {
-      const uids = [...new Set(awData.map(a => a.user_id).filter(Boolean))];
+      const uids = Array.from(new Set(awData.map(a => a.user_id).filter(Boolean)));
       const { data: profs } = await sb.from("profiles").select("id,full_name,username,avatar_url").in("id", uids);
       const pm: Record<string, any> = {};
       profs?.forEach(p => { pm[p.id] = p; });

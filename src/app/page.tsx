@@ -857,7 +857,7 @@ export default function HomePage() {
                           <div style={{fontSize:12,fontWeight:700,color:"#9B8F7A"}}>{artist.artwork_count} work{artist.artwork_count!==1?"s":""}</div>
                           {artist.location && <div style={{display:"flex",alignItems:"center",gap:3,fontSize:11,color:"#9B8F7A",fontWeight:600}}><MapPin size={10} color="#FF6B6B"/><span style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:90}}>{artist.location}</span></div>}
                         </div>
-                        <Link href={`/portfolio/${artist.username||artist.id}`} style={{display:"inline-flex",alignItems:"center",gap:5,padding:"6px 12px",borderRadius:8,border:"1.5px solid #E8E0D0",background:"#FAF7F3",fontSize:12,fontWeight:700,color:"#111110",textDecoration:"none",transition:"all 0.2s cubic-bezier(0.16,1,0.3,1)"}}
+                        <Link href={`/${artist.username||artist.id}`} style={{display:"inline-flex",alignItems:"center",gap:5,padding:"6px 12px",borderRadius:8,border:"1.5px solid #E8E0D0",background:"#FAF7F3",fontSize:12,fontWeight:700,color:"#111110",textDecoration:"none",transition:"all 0.2s cubic-bezier(0.16,1,0.3,1)"}}
                           onMouseEnter={e=>{(e.currentTarget as HTMLElement).style.background="#FFD400";(e.currentTarget as HTMLElement).style.borderColor="#111110";(e.currentTarget as HTMLElement).style.transform="translateY(-1px)";}}
                           onMouseLeave={e=>{(e.currentTarget as HTMLElement).style.background="#FAF7F3";(e.currentTarget as HTMLElement).style.borderColor="#E8E0D0";(e.currentTarget as HTMLElement).style.transform="";}}>
                           View <ArrowRight size={12}/>

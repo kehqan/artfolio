@@ -150,9 +150,6 @@ export default function AdminPage() {
   const [saved, setSaved]           = useState(false);
   const [newSlideUrl, setNewSlideUrl] = useState("");
   const [addingSlide, setAddingSlide] = useState(false);
-  const [heroUploading, setHeroUploading] = useState(false);
-  const [heroUploadErr, setHeroUploadErr] = useState("");
-  const heroFileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const stored = sessionStorage.getItem("artomango_admin");
@@ -202,21 +199,7 @@ export default function AdminPage() {
     setSaving(false); setSaved(true); setTimeout(() => setSaved(false), 2000);
   }
 
-  async function uploadHeroImage(file: File) {
-    setHeroUploading(true);
-    setHeroUploadErr("");
-    try {
-      const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
-      const path = `hero/hero-banner-${Date.now()}.${ext}`;
-      const { error: upErr } = await sb.storage.from("artworks").upload(path, file, { upsert: true, contentType: file.type });
-      if (upErr) throw upErr;
-      const { data: { publicUrl } } = sb.storage.from("artworks").getPublicUrl(path);
-      setHero(p => ({ ...p, image_url: publicUrl }));
-    } catch (e: any) {
-      setHeroUploadErr(e?.message || "Upload failed. Check your Supabase storage bucket permissions.");
-    }
-    setHeroUploading(false);
-  }
+  async function updateUser(u: Profile) {
     await sb.from("profiles").update({ full_name: u.full_name, role: u.role, bio: u.bio, location: u.location, username: u.username }).eq("id", u.id);
     setUsers(p => p.map(x => x.id === u.id ? u : x)); setEditUser(null);
   }
@@ -598,66 +581,10 @@ export default function AdminPage() {
               <div style={{ position:"absolute", top:8, right:8, background:"rgba(0,0,0,0.5)", color:"#FFD400", fontSize:9, fontWeight:800, padding:"2px 8px", borderRadius:9999, textTransform:"uppercase" as const }}>Preview</div>
             </div>
             <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:14 }}>
-              {/* ── Image upload ── */}
               <div style={{ gridColumn:"1/-1" }}>
-                <label style={lbl}>Hero image</label>
-                {/* Drop zone / current image */}
-                <div
-                  onClick={() => heroFileRef.current?.click()}
-                  onDragOver={e => { e.preventDefault(); (e.currentTarget as HTMLElement).style.borderColor = "#FFD400"; }}
-                  onDragLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = "#E8E0D0"; }}
-                  onDrop={e => {
-                    e.preventDefault();
-                    (e.currentTarget as HTMLElement).style.borderColor = "#E8E0D0";
-                    const file = e.dataTransfer.files[0];
-                    if (file && file.type.startsWith("image/")) uploadHeroImage(file);
-                  }}
-                  style={{ position:"relative", width:"100%", aspectRatio:"16/7", border:"2.5px dashed #E8E0D0", borderRadius:14, overflow:"hidden", cursor:"pointer", background:"#FAF7F3", transition:"border-color .15s", display:"flex", alignItems:"center", justifyContent:"center" }}>
-                  {hero.image_url
-                    ? <img src={hero.image_url} alt="" style={{ position:"absolute", inset:0, width:"100%", height:"100%", objectFit:"cover" }}/>
-                    : null
-                  }
-                  {/* Overlay */}
-                  <div style={{ position:"relative", zIndex:2, display:"flex", flexDirection:"column", alignItems:"center", gap:8, padding:16, background:hero.image_url?"rgba(0,0,0,0.45)":"transparent", borderRadius:10, backdropFilter:hero.image_url?"blur(2px)":"none" }}>
-                    {heroUploading
-                      ? <>
-                          <div style={{ width:32, height:32, border:"3px solid #FFD400", borderTopColor:"transparent", borderRadius:"50%", animation:"spin .7s linear infinite" }}/>
-                          <span style={{ fontSize:12, fontWeight:700, color:hero.image_url?"#fff":"#9B8F7A" }}>Uploading…</span>
-                        </>
-                      : <>
-                          <div style={{ width:44, height:44, borderRadius:12, background:hero.image_url?"rgba(255,212,0,0.9)":"#FFD400", border:"2px solid #111110", display:"flex", alignItems:"center", justifyContent:"center", boxShadow:"2px 2px 0 #111110" }}>
-                            <ImageIcon size={20} color="#111110"/>
-                          </div>
-                          <span style={{ fontSize:13, fontWeight:800, color:hero.image_url?"#fff":"#111110" }}>
-                            {hero.image_url ? "Click or drag to replace" : "Click or drag to upload"}
-                          </span>
-                          <span style={{ fontSize:11, fontWeight:600, color:hero.image_url?"rgba(255,255,255,0.6)":"#9B8F7A" }}>JPG, PNG, WEBP — any size</span>
-                        </>
-                    }
-                  </div>
-                </div>
-                {/* Hidden file input */}
-                <input
-                  ref={heroFileRef}
-                  type="file"
-                  accept="image/*"
-                  style={{ display:"none" }}
-                  onChange={e => { const f = e.target.files?.[0]; if (f) uploadHeroImage(f); e.target.value = ""; }}
-                />
-                {/* Error message */}
-                {heroUploadErr && (
-                  <div style={{ marginTop:8, padding:"8px 12px", background:"#FEF2F2", border:"1.5px solid #FCA5A5", borderRadius:8, fontSize:12, fontWeight:700, color:"#EF4444" }}>
-                    {heroUploadErr}
-                  </div>
-                )}
-                {/* OR paste URL manually */}
-                <div style={{ marginTop:10, display:"flex", alignItems:"center", gap:8 }}>
-                  <div style={{ flex:1, height:1, background:"#E8E0D0" }}/>
-                  <span style={{ fontSize:10, fontWeight:800, color:"#C0B8A8", textTransform:"uppercase" as const, letterSpacing:"0.1em" }}>or paste URL</span>
-                  <div style={{ flex:1, height:1, background:"#E8E0D0" }}/>
-                </div>
-                <input style={{ ...inp, marginTop:8 }} value={hero.image_url||""} onChange={e => setHero(p => ({ ...p, image_url: e.target.value }))} placeholder="https://images.unsplash.com/…"/>
-                <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+                <label style={lbl}>Hero image URL</label>
+                <input style={inp} value={hero.image_url||""} onChange={e => setHero(p => ({ ...p, image_url: e.target.value }))} placeholder="https://images.unsplash.com/…"/>
+                <div style={{ fontSize:11, color:"#9B8F7A", fontWeight:600, marginTop:4 }}>Portrait or square images work best.</div>
               </div>
               <div><label style={lbl}>Headline — line 1</label><input style={inp} value={hero.headline_line1||""} onChange={e => setHero(p => ({ ...p, headline_line1: e.target.value }))} placeholder="Your art."/></div>
               <div><label style={lbl}>Headline — line 2</label><input style={inp} value={hero.headline_line2||""} onChange={e => setHero(p => ({ ...p, headline_line2: e.target.value }))} placeholder="Your practice."/></div>

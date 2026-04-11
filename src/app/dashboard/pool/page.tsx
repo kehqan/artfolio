@@ -26,7 +26,7 @@ type PoolRequest = {
   title: string;
   description?: string;
   request_type: string;
-  poster_role: "artist" | "venue";
+  poster_type: "artist" | "venue";
   cover_image?: string;
   location?: string;
   deadline?: string;
@@ -102,7 +102,7 @@ function RequestModal({ req, onClose, currentUserId }: {
   const ts = typeStyle(req.request_type);
   const allTypes = [...ARTIST_TYPES, ...VENUE_TYPES];
   const typeInfo = allTypes.find(t => t.key === req.request_type);
-  const isVenue = req.poster_role === "venue";
+  const isVenue = req.poster_type === "venue";
   const isOwn = currentUserId === req.user_id;
 
   return (
@@ -247,7 +247,6 @@ function NewRequestModal({ userRole, userId, onClose, onCreated }: {
     setError("");
     const { error: insertErr } = await sb.from("pool_requests").insert({
       user_id: userId,
-      poster_role: isVenue ? "venue" : "artist",
       poster_type: isVenue ? "venue" : "artist",
       request_type: form.request_type,
       title: form.title.trim(),
@@ -446,7 +445,7 @@ function PoolCard({ req, onClick }: { req: PoolRequest; onClick: () => void }) {
   const ts = typeStyle(req.request_type);
   const allTypes = [...ARTIST_TYPES, ...VENUE_TYPES];
   const typeInfo = allTypes.find(t => t.key === req.request_type);
-  const isVenue = req.poster_role === "venue";
+  const isVenue = req.poster_type === "venue";
   const initials = (req.profiles?.full_name || "?")[0];
 
   return (
@@ -574,7 +573,7 @@ export default function PoolPage() {
   const uniqueTypes = Array.from(new Map(allTypes.map(t => [t.key, t])).values());
 
   const filtered = requests.filter(r => {
-    if (filterRole !== "all" && r.poster_role !== filterRole) return false;
+    if (filterRole !== "all" && r.poster_type !== filterRole) return false;
     if (filterType !== "all" && r.request_type !== filterType) return false;
     if (filterStatus !== "all" && r.status !== filterStatus) return false;
     if (search && !r.title.toLowerCase().includes(search.toLowerCase()) && !r.description?.toLowerCase().includes(search.toLowerCase())) return false;
@@ -780,7 +779,7 @@ export default function PoolPage() {
           <pre style={{ fontSize: 11, color: "#888", lineHeight: 1.8, overflow: "auto" }}>{`create table if not exists pool_requests (
   id uuid default gen_random_uuid() primary key,
   user_id uuid references auth.users(id) on delete cascade not null,
-  poster_role text not null check (poster_role in ('artist','venue')),
+  poster_type text not null check (poster_type in ('artist','venue')),
   request_type text not null,
   title text not null,
   description text,

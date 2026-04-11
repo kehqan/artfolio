@@ -248,6 +248,7 @@ function NewRequestModal({ userRole, userId, onClose, onCreated }: {
     const { error: insertErr } = await sb.from("pool_requests").insert({
       user_id: userId,
       poster_role: isVenue ? "venue" : "artist",
+      poster_type: isVenue ? "venue" : "artist",
       request_type: form.request_type,
       title: form.title.trim(),
       description: form.description.trim() || null,

@@ -401,51 +401,90 @@ export default function HomePage() {
         html{scroll-behavior:smooth}
         body{font-family:'Darker Grotesque',system-ui,sans-serif;background:#FFD400;color:#111110;overflow-x:hidden}
 
-        .nav{position:relative;top:0;left:0;right:0;z-index:100;padding:12px 20px;background:#FFD400}
-        .nav-pill{max-width:1100px;margin:0 auto;display:flex;align-items:center;gap:4px;background:rgba(255,212,0,0.7);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:2.5px solid #111110;border-radius:9999px;padding:5px 6px 5px 10px;box-shadow:4px 4px 0 #111110;transition:box-shadow 0.3s}
-        .nav-pill:hover{box-shadow:6px 6px 0 #111110}
-        .nav-logo{font-size:22px;line-height:1;text-decoration:none;flex-shrink:0;display:flex;align-items:center;gap:6px}
-        .nav-logo-text{font-size:16px;font-weight:900;color:#111110;letter-spacing:-0.3px}
+        .nav{position:relative;top:0;left:0;right:0;z-index:100;padding:0 28px;background:#111110;border-bottom:3px solid #111110}
+        .nav-pill{max-width:1200px;margin:0 auto;display:flex;align-items:center;gap:4px;padding:10px 0;height:56px}
+        .nav-pill:hover{opacity:1}
+        .nav-logo{font-size:22px;line-height:1;text-decoration:none;flex-shrink:0;display:flex;align-items:center;gap:8px}
+        .nav-logo-text{font-size:16px;font-weight:900;color:#FFD400;letter-spacing:-0.3px}
         .nav-links{display:flex;align-items:center;flex:1;justify-content:center}
-        .nav-link{padding:7px 14px;font-size:14px;font-weight:700;color:#111110;text-decoration:none;border-radius:9999px;transition:background 0.15s,transform 0.15s;white-space:nowrap;position:relative}
-        .nav-link:hover{background:#F5F0E8;transform:translateY(-1px)}
+        .nav-link{padding:7px 14px;font-size:14px;font-weight:700;color:rgba(255,255,255,0.65);text-decoration:none;border-radius:9999px;transition:color 0.15s,background 0.15s;white-space:nowrap;position:relative}
+        .nav-link:hover{color:#FFD400;background:rgba(255,212,0,0.08)}
         .nav-link::after{content:'';position:absolute;bottom:4px;left:50%;width:0;height:2px;background:#FFD400;transition:width 0.2s,left 0.2s;border-radius:1px}
         .nav-link:hover::after{width:60%;left:20%}
-        .nav-div{width:1px;height:22px;background:#E0D8CA;margin:0 4px;flex-shrink:0}
-        .btn-ghost{padding:7px 14px;font-size:13px;font-weight:700;color:#111110;text-decoration:none;border-radius:9999px;border:2px solid transparent;transition:all 0.2s;font-family:inherit;background:none;cursor:pointer;white-space:nowrap}
-        .btn-ghost:hover{background:#F5F0E8;transform:translateY(-1px)}
-        .btn-pill{padding:7px 18px;font-size:13px;font-weight:800;color:#111110;background:#FFD400;border-radius:9999px;border:2px solid #111110;text-decoration:none;white-space:nowrap;transition:all 0.2s cubic-bezier(0.16,1,0.3,1);cursor:pointer;font-family:inherit}
-        .btn-pill:hover{box-shadow:2px 2px 0 #111110;transform:translateY(-2px)}
+        .nav-div{width:1px;height:22px;background:rgba(255,255,255,0.15);margin:0 4px;flex-shrink:0}
+        .btn-ghost{padding:7px 14px;font-size:13px;font-weight:700;color:rgba(255,255,255,0.65);text-decoration:none;border-radius:9999px;border:2px solid transparent;transition:all 0.2s;font-family:inherit;background:none;cursor:pointer;white-space:nowrap}
+        .btn-ghost:hover{color:#fff;border-color:rgba(255,255,255,0.2)}
+        .btn-pill{padding:7px 18px;font-size:13px;font-weight:800;color:#111110;background:#FFD400;border-radius:9999px;border:2px solid #FFD400;text-decoration:none;white-space:nowrap;transition:all 0.2s cubic-bezier(0.16,1,0.3,1);cursor:pointer;font-family:inherit}
+        .btn-pill:hover{box-shadow:0 0 0 3px rgba(255,212,0,0.3);transform:translateY(-1px)}
 
-        .hero{min-height:100vh;display:grid;grid-template-columns:1fr 1.1fr;border-bottom:3px solid #111110;position:relative}
-        .hero-left{padding:100px 56px 80px 48px;display:flex;flex-direction:column;justify-content:center;position:relative;background:#FFD400;overflow:hidden;z-index:2}
-        .hero-left::after{content:'';position:absolute;top:0;right:-60px;bottom:0;width:120px;background:linear-gradient(to right,#FFD400,transparent);z-index:3;pointer-events:none}
-        .hero-left::before{content:'';position:absolute;inset:0;background:radial-gradient(circle at 20% 85%,rgba(255,255,255,0.22) 0%,transparent 55%);pointer-events:none}
-        .hero-eyebrow{display:inline-flex;align-items:center;gap:8px;background:#111110;color:#FFD400;padding:4px 14px;border-radius:9999px;font-size:11px;font-weight:800;letter-spacing:0.18em;text-transform:uppercase;margin-bottom:32px;width:fit-content;opacity:0;transform:translateY(20px);transition:opacity 0.6s 0.2s,transform 0.6s 0.2s cubic-bezier(0.16,1,0.3,1)}
+        /* ── NEO-BRUTALIST HERO ── */
+        .hero{background:#FFD400;padding:56px 48px 60px;border-bottom:3px solid #111110;position:relative;overflow:hidden;min-height:calc(100vh - 59px)}
+        .hero-inner{max-width:1200px;margin:0 auto;display:grid;grid-template-columns:1fr 1fr;gap:48px;align-items:center;position:relative;z-index:2}
+
+        /* Decorative shapes */
+        .hero-shape-1{position:absolute;top:-20px;right:80px;width:90px;height:90px;background:#111110;border:3px solid #111110;transform:rotate(12deg);opacity:0;transition:opacity 0.5s 0.8s}
+        .hero-loaded .hero-shape-1{opacity:1}
+        .hero-shape-2{position:absolute;bottom:40px;left:60px;width:60px;height:60px;border-radius:50%;background:#fff;border:3px solid #111110;opacity:0;transition:opacity 0.5s 1s}
+        .hero-loaded .hero-shape-2{opacity:1}
+        .hero-shape-3{position:absolute;top:30px;left:200px;width:18px;height:18px;background:#111110;border-radius:50%;opacity:0;transition:opacity 0.5s 0.9s}
+        .hero-loaded .hero-shape-3{opacity:0.35}
+
+        /* Left — text */
+        .hero-eyebrow{display:inline-block;background:#111110;color:#FFD400;padding:5px 14px;border-radius:0;font-size:11px;font-weight:800;letter-spacing:0.22em;text-transform:uppercase;margin-bottom:28px;width:fit-content;border:2px solid #111110;opacity:0;transform:translateY(16px);transition:opacity 0.5s 0.15s,transform 0.5s 0.15s cubic-bezier(0.16,1,0.3,1)}
         .hero-loaded .hero-eyebrow{opacity:1;transform:translateY(0)}
-        .hero-title{font-size:clamp(52px,6.5vw,84px);font-weight:900;letter-spacing:-3px;line-height:0.91;color:#111110;margin-bottom:24px;opacity:0;transform:translateY(30px);transition:opacity 0.7s 0.35s,transform 0.7s 0.35s cubic-bezier(0.16,1,0.3,1)}
-        .hero-loaded .hero-title{opacity:1;transform:translateY(0)}
-        .hero-sub{font-size:17px;font-weight:600;color:rgba(17,17,16,0.6);line-height:1.55;max-width:340px;margin-bottom:44px;opacity:0;transform:translateY(20px);transition:opacity 0.6s 0.5s,transform 0.6s 0.5s cubic-bezier(0.16,1,0.3,1)}
-        .hero-loaded .hero-sub{opacity:1;transform:translateY(0)}
-        .hero-ctas{display:flex;gap:12px;flex-wrap:wrap;opacity:0;transform:translateY(20px);transition:opacity 0.6s 0.65s,transform 0.6s 0.65s cubic-bezier(0.16,1,0.3,1)}
-        .hero-loaded .hero-ctas{opacity:1;transform:translateY(0)}
-        .btn-hero-dark-rnd{display:inline-flex;align-items:center;gap:8px;padding:14px 28px;background:#111110;color:#FFD400;font-family:inherit;font-size:15px;font-weight:800;border:2.5px solid #111110;border-radius:14px;text-decoration:none;cursor:pointer;transition:all 0.25s cubic-bezier(0.16,1,0.3,1);box-shadow:4px 4px 0 rgba(0,0,0,0.25)}
-        .btn-hero-dark-rnd:hover{box-shadow:6px 6px 0 rgba(0,0,0,0.3);transform:translate(-2px,-2px)}
-        .hero-right{position:relative;overflow:hidden;background:#FFFBEA}
-        .hero-artwork{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center top;display:block;opacity:0;transition:opacity 1.2s 0.3s cubic-bezier(0.16,1,0.3,1)}
-        .hero-loaded .hero-artwork{opacity:1}
-        .hero-artwork-fade-left{position:absolute;inset:0;background:linear-gradient(to right,#FFD400 0%,rgba(255,212,0,0.6) 16%,rgba(255,212,0,0) 40%);pointer-events:none;z-index:2}
-        .hero-artwork-fade-bottom{position:absolute;inset:0;background:linear-gradient(to top,#FFD400 0%,rgba(255,212,0,0.35) 10%,transparent 28%);pointer-events:none;z-index:2}
-        .hero-artwork-vignette{position:absolute;inset:0;background:radial-gradient(ellipse at 85% 15%,rgba(0,0,0,0.06) 0%,transparent 55%);pointer-events:none;z-index:2}
-        .hero-credit{position:absolute;bottom:28px;right:24px;z-index:4;opacity:0;transform:translateY(10px);transition:opacity 0.6s 1s,transform 0.6s 1s cubic-bezier(0.16,1,0.3,1)}
-        .hero-loaded .hero-credit{opacity:1;transform:translateY(0)}
 
-        .ticker-wrap{background:#FFD400;border-top:3px solid #111110;border-bottom:3px solid #111110;padding:14px 0;overflow:hidden;white-space:nowrap}
+        .hero-title{font-size:clamp(60px,7.5vw,110px);font-weight:900;letter-spacing:-4px;line-height:0.88;color:#111110;margin-bottom:8px;opacity:0;transform:translateY(24px);transition:opacity 0.6s 0.28s,transform 0.6s 0.28s cubic-bezier(0.16,1,0.3,1)}
+        .hero-loaded .hero-title{opacity:1;transform:translateY(0)}
+        .hero-title-line2{display:block;font-size:clamp(36px,4.5vw,64px);font-weight:900;letter-spacing:-2px;line-height:1.05;color:#111110;margin-bottom:24px;opacity:0;transform:translateY(20px);transition:opacity 0.6s 0.38s,transform 0.6s 0.38s cubic-bezier(0.16,1,0.3,1)}
+        .hero-loaded .hero-title-line2{opacity:1;transform:translateY(0)}
+
+        .hero-sub{font-size:16px;font-weight:600;color:rgba(17,17,16,0.55);line-height:1.6;max-width:360px;margin-bottom:40px;opacity:0;transform:translateY(16px);transition:opacity 0.5s 0.5s,transform 0.5s 0.5s cubic-bezier(0.16,1,0.3,1)}
+        .hero-loaded .hero-sub{opacity:1;transform:translateY(0)}
+
+        .hero-ctas{display:flex;gap:12px;flex-wrap:wrap;opacity:0;transform:translateY(14px);transition:opacity 0.5s 0.62s,transform 0.5s 0.62s cubic-bezier(0.16,1,0.3,1)}
+        .hero-loaded .hero-ctas{opacity:1;transform:translateY(0)}
+        .btn-hero-primary{display:inline-flex;align-items:center;gap:8px;padding:15px 32px;background:#111110;color:#FFD400;font-family:inherit;font-size:16px;font-weight:800;border:3px solid #111110;text-decoration:none;cursor:pointer;transition:all 0.18s cubic-bezier(0.16,1,0.3,1);box-shadow:5px 5px 0 rgba(0,0,0,0.35);letter-spacing:-0.2px}
+        .btn-hero-primary:hover{box-shadow:8px 8px 0 rgba(0,0,0,0.4);transform:translate(-2px,-2px)}
+        .btn-hero-primary:active{box-shadow:2px 2px 0 rgba(0,0,0,0.3);transform:translate(1px,1px)}
+
+        /* Stats row */
+        .hero-stats{display:flex;gap:0;margin-top:48px;border:3px solid #111110;width:fit-content;opacity:0;transform:translateY(14px);transition:opacity 0.5s 0.75s,transform 0.5s 0.75s cubic-bezier(0.16,1,0.3,1)}
+        .hero-loaded .hero-stats{opacity:1;transform:translateY(0)}
+        .hero-stat{padding:14px 28px;border-right:3px solid #111110;background:#111110}
+        .hero-stat:last-child{border-right:none}
+        .hero-stat-num{font-size:32px;font-weight:900;color:#FFD400;letter-spacing:-1.5px;line-height:1;display:block}
+        .hero-stat-label{font-size:9px;font-weight:800;color:rgba(255,212,0,0.5);text-transform:uppercase;letter-spacing:0.18em;margin-top:3px;display:block}
+
+        /* Right — framed image */
+        .hero-right{position:relative;display:flex;align-items:center;justify-content:flex-end;opacity:0;transform:translateY(20px);transition:opacity 0.7s 0.4s,transform 0.7s 0.4s cubic-bezier(0.16,1,0.3,1)}
+        .hero-loaded .hero-right{opacity:1;transform:translateY(0)}
+
+        /* Outer offset frame (the blue-border effect from the reference) */
+        .hero-frame-outer{position:absolute;top:16px;left:16px;right:-16px;bottom:-16px;border:3px solid #111110;background:#111110;border-radius:0;z-index:0}
+        /* Main image frame */
+        .hero-frame{position:relative;z-index:1;border:3px solid #111110;overflow:hidden;width:100%;aspect-ratio:4/3;background:#E0D8CA}
+        .hero-artwork{width:100%;height:100%;object-fit:cover;display:block;transition:transform 0.6s cubic-bezier(0.16,1,0.3,1)}
+        .hero-frame:hover .hero-artwork{transform:scale(1.03)}
+
+        /* Corner label sticker */
+        .hero-sticker{position:absolute;bottom:-14px;right:-14px;z-index:3;background:#FFD400;border:3px solid #111110;padding:8px 14px;transform:rotate(-3deg);box-shadow:3px 3px 0 #111110}
+        .hero-sticker-text{font-size:10px;font-weight:900;color:#111110;text-transform:uppercase;letter-spacing:0.14em;line-height:1.2;text-align:center}
+
+        /* Mobile hero */
+        @media(max-width:860px){
+          .hero{padding:36px 24px 48px}
+          .hero-inner{grid-template-columns:1fr;gap:32px}
+          .hero-title{font-size:clamp(52px,12vw,80px)}
+          .hero-right{justify-content:center}
+          .hero-shape-1,.hero-shape-2,.hero-shape-3{display:none}
+        }
+
+        .ticker-wrap{background:#111110;border-bottom:3px solid #111110;padding:14px 0;overflow:hidden;white-space:nowrap}
         .ticker-track{display:inline-flex;gap:48px;animation:ticker 20s linear infinite}
         .ticker-wrap:hover .ticker-track{animation-play-state:paused}
         @keyframes ticker{from{transform:translateX(0)}to{transform:translateX(-50%)}}
-        .ticker-item{font-size:15px;font-weight:800;color:#111110;letter-spacing:0.05em;text-transform:uppercase;display:inline-flex;align-items:center;gap:12px;flex-shrink:0}
-        .ticker-dot{width:6px;height:6px;background:#111110;border-radius:50%;flex-shrink:0}
+        .ticker-item{font-size:15px;font-weight:800;color:#FFD400;letter-spacing:0.05em;text-transform:uppercase;display:inline-flex;align-items:center;gap:12px;flex-shrink:0}
+        .ticker-dot{width:5px;height:5px;background:#FFD400;border-radius:50%;flex-shrink:0;opacity:0.4}
 
         .why{background:#FFFBEA;padding:80px 0;border-bottom:3px solid #111110}
         .why-inner{max-width:1100px;margin:0 auto;padding:0 24px}
@@ -579,12 +618,7 @@ export default function HomePage() {
         .fade-up{animation:fadeUp 0.35s ease forwards}
 
         @media(max-width:900px){
-          .hero{grid-template-columns:1fr}
-          .hero-right{min-height:50vw}
-          .hero-left{padding:80px 24px 60px;border-bottom:3px solid #111110}
-          .hero-left::after{display:none}
-          .hero-artwork-fade-left{background:linear-gradient(to bottom,#FFD400 0%,rgba(255,212,0,0) 25%)}
-          .hero-artwork-fade-bottom{background:linear-gradient(to top,#FFFBEA 0%,rgba(255,251,234,0.5) 14%,transparent 32%)}
+          .hero-inner{grid-template-columns:1fr}
           .feat-panel{grid-template-columns:1fr}
           .feat-right{display:none}
           .feat-left{padding:36px 28px}
@@ -626,61 +660,58 @@ export default function HomePage() {
 
       {/* ── HERO ── */}
       <section className={`hero${heroLoaded?" hero-loaded":""}`}>
-        {/* LEFT — text */}
-        <div className="hero-left">
-          <div className="hero-eyebrow">🥭 artomango · art platform</div>
-          <h1 className="hero-title">
-            Your art.<br/>
-            Your practice.<br/>
-            Your scene.
-          </h1>
-          <p className="hero-sub">
-            The platform for artists and venues to manage work, discover collaborations, and grow together.
-          </p>
-          <div className="hero-ctas">
-            <a href="/register" className="btn-hero-dark-rnd">
-              Join free →
-            </a>
-          </div>
-        </div>
+        {/* Decorative shapes */}
+        <div className="hero-shape-1"/>
+        <div className="hero-shape-2"/>
+        <div className="hero-shape-3"/>
 
-        {/* RIGHT — artwork dissolving into yellow */}
-        <div className="hero-right">
-          {/* Real artwork from DB if available, fallback to curated Unsplash */}
-          <img
-            className="hero-artwork"
-            src={
-              artworks.find(a => Array.isArray(a.images) && a.images[0])?.images?.[0] ||
-              "https://images.unsplash.com/photo-1541961017774-22349e4a1262?w=900&q=80"
-            }
-            alt="Featured artwork"
-          />
-          {/* Gradient overlays for the dissolve */}
-          <div className="hero-artwork-fade-left"/>
-          <div className="hero-artwork-fade-bottom"/>
-          <div className="hero-artwork-vignette"/>
-
-          {/* Artist credit pill */}
-          {(() => {
-            const featured = artworks.find(a => Array.isArray(a.images) && a.images[0]);
-            if (!featured) return null;
-            return (
-              <div className="hero-credit">
-                <div style={{display:"flex",alignItems:"center",gap:8,padding:"6px 12px 6px 6px",background:"rgba(255,255,255,0.88)",backdropFilter:"blur(10px)",WebkitBackdropFilter:"blur(10px)",border:"1.5px solid rgba(255,255,255,0.6)",borderRadius:9999,boxShadow:"0 4px 20px rgba(0,0,0,0.12)"}}>
-                  <div style={{width:26,height:26,borderRadius:"50%",background:"#FFD400",overflow:"hidden",flexShrink:0,border:"1.5px solid #111110"}}>
-                    {featured.artist_avatar
-                      ? <img src={featured.artist_avatar} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
-                      : <div style={{width:"100%",height:"100%",display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,fontWeight:900,color:"#111110"}}>{(featured.artist_name||"A")[0]}</div>
-                    }
-                  </div>
-                  <div>
-                    <div style={{fontSize:10,fontWeight:800,color:"#111110",lineHeight:1.1}}>{featured.title}</div>
-                    <div style={{fontSize:9,fontWeight:600,color:"rgba(17,17,16,0.5)",lineHeight:1.1}}>{featured.artist_name}</div>
-                  </div>
+        <div className="hero-inner">
+          {/* LEFT — text */}
+          <div>
+            <div className="hero-eyebrow">🥭 artomango · art platform</div>
+            <h1 className="hero-title">ARTOMANGO</h1>
+            <span className="hero-title-line2">Manage. Exhibit.<br/>Collaborate.</span>
+            <p className="hero-sub">
+              The platform for artists and venues to manage work, discover collaborations, and grow in the art scene.
+            </p>
+            <div className="hero-ctas">
+              <a href="/register" className="btn-hero-primary">START FOR FREE →</a>
+            </div>
+            {/* Stats */}
+            <div className="hero-stats">
+              {[
+                { n: "5K+",  l: "Artworks" },
+                { n: "1K+",  l: "Artists" },
+                { n: "200+", l: "Venues" },
+              ].map(s => (
+                <div key={s.l} className="hero-stat">
+                  <span className="hero-stat-num">{s.n}</span>
+                  <span className="hero-stat-label">{s.l}</span>
                 </div>
-              </div>
-            );
-          })()}
+              ))}
+            </div>
+          </div>
+
+          {/* RIGHT — framed artwork image */}
+          <div className="hero-right">
+            {/* Offset shadow frame */}
+            <div className="hero-frame-outer"/>
+            {/* Main bordered frame */}
+            <div className="hero-frame">
+              <img
+                className="hero-artwork"
+                src={
+                  artworks.find(a => Array.isArray(a.images) && a.images[0])?.images?.[0] ||
+                  "https://images.unsplash.com/photo-1536924940846-227afb31e2a5?w=900&q=80"
+                }
+                alt="Featured artwork"
+              />
+            </div>
+            {/* Corner sticker */}
+            <div className="hero-sticker">
+              <div className="hero-sticker-text">New<br/>Era</div>
+            </div>
+          </div>
         </div>
       </section>
 

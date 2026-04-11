@@ -1,533 +1,812 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import {
-  Plus, Building2, Palette, X, ChevronDown, ChevronUp,
-  MessageCircle, Search, Filter, Calendar, DollarSign,
-  Clock, CheckCircle, Circle, Handshake, MapPin,
+  X, Plus, ImageIcon, ChevronDown, MapPin,
+  Calendar, Handshake, Eye, Building2, Palette,
+  ArrowUpRight, Clock, Search, SlidersHorizontal,
+  Sparkles, Upload, Check,
 } from "lucide-react";
-import PlacesAutocomplete from "@/components/PlacesAutocomplete";
 
-// ── Types ──────────────────────────────────────────────────────────
-type Collab = {
-  id: string; title: string; description?: string; status: string;
-  partner_name?: string; partner_email?: string; type?: string;
-  deadline?: string; created_at: string; user_id: string;
-  location_name?: string; lat?: number; lng?: number;
+// ─────────────────────────────────────────────
+// Types
+// ─────────────────────────────────────────────
+type Profile = {
+  id: string;
+  full_name: string;
+  username: string;
+  role?: string;
+  avatar_url?: string;
+  location?: string;
 };
 
 type PoolRequest = {
-  id: string; poster_type: "artist" | "venue"; title: string;
-  description?: string; art_styles?: string[];
-  budget_min?: number; budget_max?: number;
-  venue_city?: string; location_name?: string;
-  lat?: number; lng?: number;
-  contact_email?: string; contact_note?: string; deadline?: string;
-  status: string; created_at: string; user_id: string;
-  profile_name?: string; profile_avatar?: string;
+  id: string;
+  user_id: string;
+  title: string;
+  description?: string;
+  request_type: string;
+  poster_role: "artist" | "venue";
+  cover_image?: string;
+  location?: string;
+  deadline?: string;
+  status: string;
+  created_at: string;
+  profiles?: {
+    full_name: string;
+    username: string;
+    avatar_url?: string;
+    role?: string;
+    location?: string;
+  };
 };
 
-type ActiveTab = "pool" | "mine";
+// ─────────────────────────────────────────────
+// Request type configs
+// ─────────────────────────────────────────────
+const ARTIST_TYPES = [
+  { key: "showcase",    label: "Looking to Showcase",   emoji: "🖼️",  desc: "Find a venue to exhibit your work" },
+  { key: "lend",        label: "Lending Artwork",        emoji: "🤝",  desc: "Lend pieces to another artist or institution" },
+  { key: "collab",      label: "Seeking Collaboration",  emoji: "✨",  desc: "Partner with another artist on a project" },
+  { key: "residency",   label: "Looking for Residency",  emoji: "🏠",  desc: "Find a studio or residency program" },
+  { key: "commission",  label: "Open for Commission",    emoji: "🎨",  desc: "Available for commissioned work" },
+];
 
-const ART_STYLES = ["Abstract","Realism","Photography","Sculpture","Digital","Illustration","Ceramics","Textile","Printmaking","Mixed Media","Oil","Watercolor","Minimalist","Contemporary"];
-const COLLAB_TYPES = ["Exhibition","Commission","Co-creation","Mentorship","Studio Share","Event","Other"];
+const VENUE_TYPES = [
+  { key: "gathering",   label: "Hosting a Gathering",    emoji: "🎪",  desc: "Looking for artists for an event or show" },
+  { key: "selection",   label: "Selecting Artists",      emoji: "🔍",  desc: "Curating a collection or exhibition" },
+  { key: "buying",      label: "Looking to Buy",         emoji: "💰",  desc: "Interested in acquiring artworks" },
+  { key: "residency",   label: "Offering Residency",     emoji: "🏛️",  desc: "Studio or residency space available" },
+  { key: "collab",      label: "Venue Collaboration",    emoji: "🤝",  desc: "Partner with another venue or institution" },
+];
 
-// ── Main Component ─────────────────────────────────────────────────
-export default function CollabPoolPage() {
-  const [activeTab, setActiveTab]     = useState<ActiveTab>("pool");
-  const [userId, setUserId]           = useState<string | null>(null);
-  const [poolRequests, setPoolRequests] = useState<PoolRequest[]>([]);
-  const [myCollabs, setMyCollabs]     = useState<Collab[]>([]);
-  const [loading, setLoading]         = useState(true);
-  const [search, setSearch]           = useState("");
-  const [typeFilter, setTypeFilter]   = useState<"all" | "artist" | "venue">("all");
-  const [expandedId, setExpandedId]   = useState<string | null>(null);
-  const [showForm, setShowForm]       = useState(false);
-  const [formMode, setFormMode]       = useState<"pool" | "collab">("pool");
-  const [saving, setSaving]           = useState(false);
-  const [respondingId, setRespondingId] = useState<string | null>(null);
-  const [responseMsg, setResponseMsg] = useState("");
-  const [poolLocationCoords, setPoolLocationCoords]     = useState<{ lat: number; lng: number } | null>(null);
-  const [collabLocationCoords, setCollabLocationCoords] = useState<{ lat: number; lng: number } | null>(null);
+const TYPE_STYLE: Record<string, { bg: string; color: string; border: string }> = {
+  showcase:   { bg: "#EDE9FE", color: "#7C3AED", border: "#C4B5FD" },
+  lend:       { bg: "#DCFCE7", color: "#16A34A", border: "#86EFAC" },
+  collab:     { bg: "#FEF9C3", color: "#CA8A04", border: "#FDE047" },
+  residency:  { bg: "#DBEAFE", color: "#1D4ED8", border: "#93C5FD" },
+  commission: { bg: "#FFE4E6", color: "#BE123C", border: "#FCA5A5" },
+  gathering:  { bg: "#FFD400", color: "#111110", border: "#111110" },
+  selection:  { bg: "#F0FDF4", color: "#166534", border: "#86EFAC" },
+  buying:     { bg: "#111110", color: "#FFD400", border: "#333" },
+  open:       { bg: "#DCFCE7", color: "#16A34A", border: "#86EFAC" },
+  closed:     { bg: "#F5F0E8", color: "#9B8F7A", border: "#E8E0D0" },
+};
 
-  // Pool form
-  const [poolForm, setPoolForm] = useState({
-    poster_type: "artist" as "artist" | "venue",
-    title: "", description: "", art_styles: [] as string[],
-    budget_min: "", budget_max: "", venue_city: "", location_name: "",
-    contact_email: "", contact_note: "", deadline: "",
+function typeStyle(key: string) {
+  return TYPE_STYLE[key] || { bg: "#F5F0E8", color: "#9B8F7A", border: "#E8E0D0" };
+}
+
+function fmtDate(d: string) {
+  return new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
+function timeAgo(d: string) {
+  const diff = Date.now() - new Date(d).getTime();
+  const days = Math.floor(diff / 86400000);
+  if (days === 0) return "Today";
+  if (days === 1) return "Yesterday";
+  if (days < 7) return `${days}d ago`;
+  if (days < 30) return `${Math.floor(days / 7)}w ago`;
+  return `${Math.floor(days / 30)}mo ago`;
+}
+
+// ─────────────────────────────────────────────
+// Request Detail Modal
+// ─────────────────────────────────────────────
+function RequestModal({ req, onClose, currentUserId }: {
+  req: PoolRequest;
+  onClose: () => void;
+  currentUserId?: string;
+}) {
+  const ts = typeStyle(req.request_type);
+  const allTypes = [...ARTIST_TYPES, ...VENUE_TYPES];
+  const typeInfo = allTypes.find(t => t.key === req.request_type);
+  const isVenue = req.poster_role === "venue";
+  const isOwn = currentUserId === req.user_id;
+
+  return (
+    <div
+      style={{ position: "fixed", inset: 0, zIndex: 9000, background: "rgba(17,17,16,0.75)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}
+      onClick={onClose}
+    >
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{ background: "#FFFBEA", border: "2.5px solid #111110", borderRadius: 24, boxShadow: "8px 8px 0 #111110", width: "100%", maxWidth: 680, maxHeight: "92vh", overflowY: "auto", position: "relative" }}
+      >
+        {/* Cover image or gradient header */}
+        <div style={{ position: "relative", height: 200, borderRadius: "22px 22px 0 0", overflow: "hidden", background: req.cover_image ? "#111" : isVenue ? "#111110" : "#FFD400", flexShrink: 0 }}>
+          {req.cover_image
+            ? <img src={req.cover_image} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", opacity: 0.85 }} />
+            : (
+              <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 80, opacity: 0.15 }}>
+                {isVenue ? "🏛️" : "🎨"}
+              </div>
+            )
+          }
+          {/* gradient overlay */}
+          <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to bottom, transparent 40%, rgba(17,17,16,0.7) 100%)" }} />
+          {/* type badge */}
+          <div style={{ position: "absolute", top: 14, left: 14, display: "flex", alignItems: "center", gap: 6, padding: "5px 12px", borderRadius: 9999, background: ts.bg, border: `2px solid ${ts.border}`, fontSize: 11, fontWeight: 800, color: ts.color, textTransform: "uppercase", letterSpacing: "0.1em" }}>
+            {typeInfo?.emoji} {typeInfo?.label || req.request_type}
+          </div>
+          {/* role badge */}
+          <div style={{ position: "absolute", top: 14, right: 52, padding: "4px 10px", borderRadius: 9999, background: isVenue ? "#E0F2FE" : "#FFD400", border: "2px solid #111110", fontSize: 10, fontWeight: 800, color: isVenue ? "#0C4A6E" : "#111110", textTransform: "uppercase" }}>
+            {isVenue ? "🏛️ Venue" : "🎨 Artist"}
+          </div>
+          {/* close */}
+          <button onClick={onClose} style={{ position: "absolute", top: 14, right: 14, width: 32, height: 32, borderRadius: 10, background: "#111110", border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
+            <X size={15} color="#FFD400" />
+          </button>
+        </div>
+
+        <div style={{ padding: "24px 28px 32px" }}>
+          {/* Author */}
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 18 }}>
+            <div style={{ width: 40, height: 40, borderRadius: 12, border: "2.5px solid #111110", overflow: "hidden", background: "#FFD400", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 900, color: "#111110", flexShrink: 0 }}>
+              {req.profiles?.avatar_url
+                ? <img src={req.profiles.avatar_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                : (req.profiles?.full_name || "?")[0]
+              }
+            </div>
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 800, color: "#111110" }}>{req.profiles?.full_name}</div>
+              <div style={{ fontSize: 11, fontWeight: 600, color: "#9B8F7A" }}>
+                @{req.profiles?.username}
+                {req.profiles?.location && ` · ${req.profiles.location}`}
+              </div>
+            </div>
+            <div style={{ marginLeft: "auto", fontSize: 11, fontWeight: 700, color: "#9B8F7A", display: "flex", alignItems: "center", gap: 4 }}>
+              <Clock size={11} /> {timeAgo(req.created_at)}
+            </div>
+          </div>
+
+          {/* Title */}
+          <h2 style={{ fontSize: 26, fontWeight: 900, color: "#111110", letterSpacing: "-0.7px", lineHeight: 1.1, marginBottom: 14 }}>{req.title}</h2>
+
+          {/* Description */}
+          {req.description && (
+            <p style={{ fontSize: 14, color: "#5C5346", lineHeight: 1.75, fontWeight: 500, marginBottom: 20 }}>{req.description}</p>
+          )}
+
+          {/* Meta row */}
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 24 }}>
+            {req.location && (
+              <div style={{ display: "flex", alignItems: "center", gap: 5, padding: "5px 12px", background: "#F5F0E8", borderRadius: 9999, fontSize: 12, fontWeight: 700, color: "#5C5346", border: "1.5px solid #E8E0D0" }}>
+                <MapPin size={11} color="#FF6B6B" /> {req.location}
+              </div>
+            )}
+            {req.deadline && (
+              <div style={{ display: "flex", alignItems: "center", gap: 5, padding: "5px 12px", background: "#F5F0E8", borderRadius: 9999, fontSize: 12, fontWeight: 700, color: "#5C5346", border: "1.5px solid #E8E0D0" }}>
+                <Calendar size={11} color="#9B8F7A" /> Deadline: {fmtDate(req.deadline)}
+              </div>
+            )}
+            <div style={{ padding: "5px 12px", background: req.status === "open" ? "#DCFCE7" : "#F5F0E8", borderRadius: 9999, fontSize: 12, fontWeight: 700, color: req.status === "open" ? "#16A34A" : "#9B8F7A", border: `1.5px solid ${req.status === "open" ? "#86EFAC" : "#E8E0D0"}` }}>
+              {req.status === "open" ? "✓ Open" : "Closed"}
+            </div>
+          </div>
+
+          {/* CTA */}
+          {!isOwn && (
+            <div style={{ display: "flex", gap: 10 }}>
+              <a href={req.profiles?.username ? `/${req.profiles.username}` : "#"} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none", flex: 1 }}>
+                <button style={{ width: "100%", padding: "13px", background: "#FFD400", border: "2.5px solid #111110", borderRadius: 14, fontSize: 14, fontWeight: 800, cursor: "pointer", fontFamily: "inherit", boxShadow: "3px 3px 0 #111110", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, color: "#111110" }}>
+                  <ArrowUpRight size={16} /> View Profile & Connect
+                </button>
+              </a>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
+// New Request Modal
+// ─────────────────────────────────────────────
+function NewRequestModal({ userRole, userId, onClose, onCreated }: {
+  userRole: string;
+  userId: string;
+  onClose: () => void;
+  onCreated: () => void;
+}) {
+  const sb = createClient();
+  const isVenue = userRole === "gallery" || userRole === "venue";
+  const TYPES = isVenue ? VENUE_TYPES : ARTIST_TYPES;
+
+  const [step, setStep] = useState<"type" | "details">("type");
+  const [form, setForm] = useState({
+    request_type: "",
+    title: "",
+    description: "",
+    cover_image: "",
+    location: "",
+    deadline: "",
   });
+  const [uploading, setUploading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const fileRef = useRef<HTMLInputElement>(null);
 
-  // Collab form
-  const [collabForm, setCollabForm] = useState({
-    title: "", description: "", type: "Co-creation",
-    partner_name: "", partner_email: "", deadline: "", status: "Open",
-    location_name: "",
-  });
-
-  useEffect(() => { load(); }, []);
-
-  async function load() {
-    const supabase = createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) setUserId(user.id);
-
-    const [{ data: reqs }, { data: collabs }] = await Promise.all([
-      supabase.from("pool_requests").select("*").eq("status", "open").order("created_at", { ascending: false }),
-      supabase.from("collaborations").select("*").order("created_at", { ascending: false }),
-    ]);
-
-    if (reqs) {
-      const { data: profiles } = await supabase.from("profiles").select("id, full_name, avatar_url").limit(500);
-      const pm: Record<string, { name: string; avatar?: string }> = {};
-      for (const p of profiles || []) pm[p.id] = { name: p.full_name, avatar: p.avatar_url };
-      setPoolRequests(reqs.map(r => ({ ...r, profile_name: pm[r.user_id]?.name, profile_avatar: pm[r.user_id]?.avatar })));
+  async function uploadCover(file: File) {
+    setUploading(true);
+    const ext = file.name.split(".").pop();
+    const path = `pool/${userId}-${Date.now()}.${ext}`;
+    const { error: upErr } = await sb.storage.from("artworks").upload(path, file, { upsert: true, contentType: file.type });
+    if (!upErr) {
+      const { data: { publicUrl } } = sb.storage.from("artworks").getPublicUrl(path);
+      setForm(p => ({ ...p, cover_image: publicUrl }));
     }
+    setUploading(false);
+  }
 
-    setMyCollabs(collabs || []);
+  async function handleSubmit() {
+    if (!form.title.trim()) { setError("Please add a title"); return; }
+    setSaving(true);
+    setError("");
+    const { error: insertErr } = await sb.from("pool_requests").insert({
+      user_id: userId,
+      poster_role: isVenue ? "venue" : "artist",
+      request_type: form.request_type,
+      title: form.title.trim(),
+      description: form.description.trim() || null,
+      cover_image: form.cover_image || null,
+      location: form.location.trim() || null,
+      deadline: form.deadline || null,
+      status: "open",
+    });
+    setSaving(false);
+    if (insertErr) { setError(insertErr.message); return; }
+    onCreated();
+    onClose();
+  }
+
+  const selectedType = TYPES.find(t => t.key === form.request_type);
+
+  return (
+    <div
+      style={{ position: "fixed", inset: 0, zIndex: 9000, background: "rgba(17,17,16,0.8)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}
+      onClick={onClose}
+    >
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{ background: "#FFFBEA", border: "2.5px solid #111110", borderRadius: 24, boxShadow: "8px 8px 0 #111110", width: "100%", maxWidth: 560, maxHeight: "92vh", overflowY: "auto" }}
+      >
+        {/* Header */}
+        <div style={{ padding: "22px 24px 18px", borderBottom: "2px solid #E8E0D0", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div>
+            <div style={{ fontSize: 10, fontWeight: 800, color: "#9B8F7A", textTransform: "uppercase", letterSpacing: "0.14em", marginBottom: 3 }}>
+              {isVenue ? "🏛️ Venue Request" : "🎨 Artist Request"}
+            </div>
+            <h2 style={{ fontSize: 20, fontWeight: 900, color: "#111110", letterSpacing: "-0.4px" }}>
+              {step === "type" ? "What are you looking for?" : "Add the details"}
+            </h2>
+          </div>
+          <button onClick={onClose} style={{ width: 34, height: 34, borderRadius: 10, background: "#111110", border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
+            <X size={15} color="#FFD400" />
+          </button>
+        </div>
+
+        <div style={{ padding: "22px 24px 28px" }}>
+
+          {/* STEP 1: Pick type */}
+          {step === "type" && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {TYPES.map(t => {
+                const ts = typeStyle(t.key);
+                const selected = form.request_type === t.key;
+                return (
+                  <button
+                    key={t.key}
+                    onClick={() => setForm(p => ({ ...p, request_type: t.key }))}
+                    style={{ display: "flex", alignItems: "center", gap: 14, padding: "14px 16px", border: `2.5px solid ${selected ? "#111110" : "#E8E0D0"}`, borderRadius: 16, background: selected ? "#FFFBEA" : "#fff", cursor: "pointer", fontFamily: "inherit", textAlign: "left", transition: "all .15s", boxShadow: selected ? "3px 3px 0 #111110" : "none" }}
+                  >
+                    <div style={{ width: 40, height: 40, borderRadius: 12, background: ts.bg, border: `2px solid ${selected ? "#111110" : ts.border}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, flexShrink: 0 }}>
+                      {t.emoji}
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 14, fontWeight: 800, color: "#111110", marginBottom: 2 }}>{t.label}</div>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: "#9B8F7A" }}>{t.desc}</div>
+                    </div>
+                    {selected && <div style={{ width: 22, height: 22, borderRadius: "50%", background: "#FFD400", border: "2px solid #111110", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Check size={12} strokeWidth={3} /></div>}
+                  </button>
+                );
+              })}
+
+              <button
+                onClick={() => { if (form.request_type) setStep("details"); }}
+                disabled={!form.request_type}
+                style={{ marginTop: 8, padding: "13px", background: form.request_type ? "#FFD400" : "#F5F0E8", border: "2.5px solid #111110", borderRadius: 14, fontSize: 14, fontWeight: 800, cursor: form.request_type ? "pointer" : "not-allowed", fontFamily: "inherit", color: "#111110", boxShadow: form.request_type ? "3px 3px 0 #111110" : "none", transition: "all .15s" }}
+              >
+                Continue →
+              </button>
+            </div>
+          )}
+
+          {/* STEP 2: Details */}
+          {step === "details" && (
+            <div>
+              {/* Selected type indicator */}
+              {selectedType && (
+                <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", background: "#fff", border: "2px solid #E8E0D0", borderRadius: 12, marginBottom: 20 }}>
+                  <span style={{ fontSize: 20 }}>{selectedType.emoji}</span>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 13, fontWeight: 800, color: "#111110" }}>{selectedType.label}</div>
+                    <div style={{ fontSize: 11, color: "#9B8F7A", fontWeight: 600 }}>{selectedType.desc}</div>
+                  </div>
+                  <button onClick={() => setStep("type")} style={{ fontSize: 11, fontWeight: 700, color: "#9B8F7A", background: "none", border: "none", cursor: "pointer" }}>Change</button>
+                </div>
+              )}
+
+              {/* Cover image */}
+              <div style={{ marginBottom: 18 }}>
+                <label style={{ display: "block", fontSize: 10, fontWeight: 800, color: "#9B8F7A", textTransform: "uppercase", letterSpacing: "0.14em", marginBottom: 8 }}>Cover Image <span style={{ fontWeight: 600, color: "#C0B8A8" }}>(optional)</span></label>
+                {form.cover_image ? (
+                  <div style={{ position: "relative", height: 140, borderRadius: 14, overflow: "hidden", border: "2px solid #111110" }}>
+                    <img src={form.cover_image} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                    <button onClick={() => setForm(p => ({ ...p, cover_image: "" }))} style={{ position: "absolute", top: 8, right: 8, width: 28, height: 28, borderRadius: 8, background: "#111110", border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
+                      <X size={13} color="#FFD400" />
+                    </button>
+                  </div>
+                ) : (
+                  <div
+                    onClick={() => fileRef.current?.click()}
+                    style={{ height: 100, border: "2.5px dashed #D4C9A8", borderRadius: 14, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 6, cursor: "pointer", background: "#FAF7F3", transition: "all .15s" }}
+                    onMouseEnter={e => (e.currentTarget.style.borderColor = "#FFD400")}
+                    onMouseLeave={e => (e.currentTarget.style.borderColor = "#D4C9A8")}
+                  >
+                    {uploading ? <div style={{ width: 20, height: 20, border: "2.5px solid #FFD400", borderTopColor: "transparent", borderRadius: "50%", animation: "spin .7s linear infinite" }} /> : <Upload size={20} color="#C0B8A8" />}
+                    <span style={{ fontSize: 12, fontWeight: 700, color: "#9B8F7A" }}>{uploading ? "Uploading…" : "Click to upload"}</span>
+                  </div>
+                )}
+                <input ref={fileRef} type="file" accept="image/*" hidden onChange={e => { const f = e.target.files?.[0]; if (f) uploadCover(f); e.target.value = ""; }} />
+              </div>
+
+              {/* Title */}
+              <div style={{ marginBottom: 16 }}>
+                <label style={{ display: "block", fontSize: 10, fontWeight: 800, color: "#9B8F7A", textTransform: "uppercase", letterSpacing: "0.14em", marginBottom: 7 }}>Title *</label>
+                <input
+                  value={form.title}
+                  onChange={e => setForm(p => ({ ...p, title: e.target.value }))}
+                  placeholder={selectedType ? `e.g. ${selectedType.label} — describe your need` : "Add a clear title…"}
+                  style={{ width: "100%", padding: "11px 14px", border: "2px solid #E8E0D0", borderRadius: 12, fontSize: 14, fontWeight: 600, color: "#111110", fontFamily: "inherit", background: "#fff", outline: "none", transition: "border-color .15s" }}
+                  onFocus={e => (e.target.style.borderColor = "#FFD400")}
+                  onBlur={e => (e.target.style.borderColor = "#E8E0D0")}
+                  maxLength={120}
+                />
+              </div>
+
+              {/* Description */}
+              <div style={{ marginBottom: 16 }}>
+                <label style={{ display: "block", fontSize: 10, fontWeight: 800, color: "#9B8F7A", textTransform: "uppercase", letterSpacing: "0.14em", marginBottom: 7 }}>Details <span style={{ fontWeight: 600, color: "#C0B8A8" }}>(optional)</span></label>
+                <textarea
+                  value={form.description}
+                  onChange={e => setForm(p => ({ ...p, description: e.target.value }))}
+                  placeholder="Share context — what are you looking for, what can you offer, timeline, style…"
+                  rows={4}
+                  style={{ width: "100%", padding: "11px 14px", border: "2px solid #E8E0D0", borderRadius: 12, fontSize: 13, fontWeight: 500, color: "#111110", fontFamily: "inherit", background: "#fff", outline: "none", resize: "vertical", transition: "border-color .15s" }}
+                  onFocus={e => (e.target.style.borderColor = "#FFD400")}
+                  onBlur={e => (e.target.style.borderColor = "#E8E0D0")}
+                />
+              </div>
+
+              {/* Location + Deadline row */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 20 }}>
+                <div>
+                  <label style={{ display: "block", fontSize: 10, fontWeight: 800, color: "#9B8F7A", textTransform: "uppercase", letterSpacing: "0.14em", marginBottom: 7 }}>Location <span style={{ fontWeight: 600, color: "#C0B8A8" }}>(opt.)</span></label>
+                  <input
+                    value={form.location}
+                    onChange={e => setForm(p => ({ ...p, location: e.target.value }))}
+                    placeholder="City, Country"
+                    style={{ width: "100%", padding: "10px 12px", border: "2px solid #E8E0D0", borderRadius: 12, fontSize: 13, fontWeight: 600, color: "#111110", fontFamily: "inherit", background: "#fff", outline: "none" }}
+                    onFocus={e => (e.target.style.borderColor = "#FFD400")}
+                    onBlur={e => (e.target.style.borderColor = "#E8E0D0")}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: "block", fontSize: 10, fontWeight: 800, color: "#9B8F7A", textTransform: "uppercase", letterSpacing: "0.14em", marginBottom: 7 }}>Deadline <span style={{ fontWeight: 600, color: "#C0B8A8" }}>(opt.)</span></label>
+                  <input
+                    type="date"
+                    value={form.deadline}
+                    onChange={e => setForm(p => ({ ...p, deadline: e.target.value }))}
+                    style={{ width: "100%", padding: "10px 12px", border: "2px solid #E8E0D0", borderRadius: 12, fontSize: 13, fontWeight: 600, color: "#111110", fontFamily: "inherit", background: "#fff", outline: "none" }}
+                    onFocus={e => (e.target.style.borderColor = "#FFD400")}
+                    onBlur={e => (e.target.style.borderColor = "#E8E0D0")}
+                  />
+                </div>
+              </div>
+
+              {error && <div style={{ fontSize: 13, fontWeight: 700, color: "#EF4444", marginBottom: 14 }}>⚠ {error}</div>}
+
+              <div style={{ display: "flex", gap: 10 }}>
+                <button onClick={() => setStep("type")} style={{ padding: "12px 20px", border: "2px solid #E8E0D0", borderRadius: 12, background: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", color: "#111110" }}>← Back</button>
+                <button
+                  onClick={handleSubmit}
+                  disabled={saving || !form.title.trim()}
+                  style={{ flex: 1, padding: "12px", background: saving || !form.title.trim() ? "#F5F0E8" : "#FFD400", border: "2.5px solid #111110", borderRadius: 12, fontSize: 14, fontWeight: 800, cursor: saving || !form.title.trim() ? "not-allowed" : "pointer", fontFamily: "inherit", color: "#111110", boxShadow: saving || !form.title.trim() ? "none" : "3px 3px 0 #111110" }}
+                >
+                  {saving ? "Posting…" : "Post to Pool ✓"}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
+// Pool Request Card
+// ─────────────────────────────────────────────
+function PoolCard({ req, onClick }: { req: PoolRequest; onClick: () => void }) {
+  const ts = typeStyle(req.request_type);
+  const allTypes = [...ARTIST_TYPES, ...VENUE_TYPES];
+  const typeInfo = allTypes.find(t => t.key === req.request_type);
+  const isVenue = req.poster_role === "venue";
+  const initials = (req.profiles?.full_name || "?")[0];
+
+  return (
+    <div
+      onClick={onClick}
+      style={{ background: "#fff", border: "2.5px solid #E8E0D0", borderRadius: 20, overflow: "hidden", cursor: "pointer", transition: "all .25s cubic-bezier(.16,1,.3,1)", position: "relative" }}
+      onMouseEnter={e => {
+        (e.currentTarget as HTMLElement).style.borderColor = "#111110";
+        (e.currentTarget as HTMLElement).style.boxShadow = "5px 6px 0 #111110";
+        (e.currentTarget as HTMLElement).style.transform = "translate(-2px,-3px)";
+      }}
+      onMouseLeave={e => {
+        (e.currentTarget as HTMLElement).style.borderColor = "#E8E0D0";
+        (e.currentTarget as HTMLElement).style.boxShadow = "none";
+        (e.currentTarget as HTMLElement).style.transform = "none";
+      }}
+    >
+      {/* Image / header area */}
+      <div style={{ height: 140, position: "relative", overflow: "hidden", background: req.cover_image ? "#111" : isVenue ? "#111110" : "#FFD400", flexShrink: 0 }}>
+        {req.cover_image
+          ? <img src={req.cover_image} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", transition: "transform .5s cubic-bezier(.16,1,.3,1)" }} />
+          : <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 52, opacity: 0.18 }}>
+              {isVenue ? "🏛️" : "🎨"}
+            </div>
+        }
+        <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to bottom, transparent 30%, rgba(17,17,16,0.55) 100%)" }} />
+
+        {/* Type chip */}
+        <div style={{ position: "absolute", top: 10, left: 10, display: "flex", alignItems: "center", gap: 4, padding: "3px 9px", borderRadius: 9999, background: ts.bg, border: `1.5px solid ${ts.border}`, fontSize: 9, fontWeight: 800, color: ts.color, textTransform: "uppercase", letterSpacing: "0.1em" }}>
+          {typeInfo?.emoji} {typeInfo?.label || req.request_type}
+        </div>
+
+        {/* Role badge top-right */}
+        <div style={{ position: "absolute", top: 10, right: 10, padding: "3px 9px", borderRadius: 9999, background: isVenue ? "#E0F2FE" : "#FFD400", border: "1.5px solid #111110", fontSize: 9, fontWeight: 800, color: isVenue ? "#0C4A6E" : "#111110", textTransform: "uppercase" }}>
+          {isVenue ? "Venue" : "Artist"}
+        </div>
+
+        {/* Author avatar bottom-left */}
+        <div style={{ position: "absolute", bottom: 10, left: 10, display: "flex", alignItems: "center", gap: 7 }}>
+          <div style={{ width: 30, height: 30, borderRadius: 9, border: "2px solid #fff", overflow: "hidden", background: "#FFD400", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 900, color: "#111110", flexShrink: 0 }}>
+            {req.profiles?.avatar_url
+              ? <img src={req.profiles.avatar_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+              : initials
+            }
+          </div>
+          <span style={{ fontSize: 11, fontWeight: 700, color: "#fff", textShadow: "0 1px 4px rgba(0,0,0,0.5)" }}>
+            {req.profiles?.full_name}
+          </span>
+        </div>
+      </div>
+
+      {/* Body */}
+      <div style={{ padding: "14px 16px 16px" }}>
+        <div style={{ fontSize: 15, fontWeight: 800, color: "#111110", letterSpacing: "-0.3px", marginBottom: 6, lineHeight: 1.3, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as any }}>
+          {req.title}
+        </div>
+        {req.description && (
+          <p style={{ fontSize: 12, color: "#9B8F7A", lineHeight: 1.55, fontWeight: 500, marginBottom: 12, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as any }}>
+            {req.description}
+          </p>
+        )}
+
+        {/* Footer row */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: req.description ? 0 : 8 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            {req.location && (
+              <span style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 11, fontWeight: 700, color: "#9B8F7A" }}>
+                <MapPin size={10} color="#FF6B6B" /> {req.location}
+              </span>
+            )}
+          </div>
+          <span style={{ fontSize: 10, fontWeight: 700, color: "#C0B8A8" }}>{timeAgo(req.created_at)}</span>
+        </div>
+
+        {/* Open/closed status dot */}
+        <div style={{ position: "absolute", bottom: 16, right: 14, width: 8, height: 8, borderRadius: "50%", background: req.status === "open" ? "#16A34A" : "#C0B8A8", border: "1.5px solid #fff" }} />
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
+// Main Page
+// ─────────────────────────────────────────────
+export default function PoolPage() {
+  const sb = createClient();
+
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [requests, setRequests] = useState<PoolRequest[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showNew, setShowNew] = useState(false);
+  const [selected, setSelected] = useState<PoolRequest | null>(null);
+
+  // Filters
+  const [filterRole, setFilterRole] = useState<"all" | "artist" | "venue">("all");
+  const [filterType, setFilterType] = useState("all");
+  const [filterStatus, setFilterStatus] = useState<"all" | "open" | "closed">("open");
+  const [search, setSearch] = useState("");
+  const [showFilters, setShowFilters] = useState(false);
+
+  useEffect(() => {
+    loadUser();
+    loadRequests();
+  }, []);
+
+  async function loadUser() {
+    const { data: { user } } = await sb.auth.getUser();
+    if (!user) return;
+    const { data } = await sb.from("profiles").select("id, full_name, username, role, avatar_url, location").eq("id", user.id).single();
+    if (data) setProfile(data);
+  }
+
+  async function loadRequests() {
+    setLoading(true);
+    const { data } = await sb
+      .from("pool_requests")
+      .select("*, profiles(full_name, username, avatar_url, role, location)")
+      .order("created_at", { ascending: false })
+      .limit(80);
+    setRequests((data as PoolRequest[]) || []);
     setLoading(false);
   }
 
-  // Pool submit
-  async function handlePoolSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!userId) return;
-    setSaving(true);
-    const supabase = createClient();
-    await supabase.from("pool_requests").insert({
-      user_id: userId,
-      poster_type: poolForm.poster_type,
-      title: poolForm.title,
-      description: poolForm.description || null,
-      art_styles: poolForm.art_styles,
-      budget_min: poolForm.budget_min ? Number(poolForm.budget_min) : null,
-      budget_max: poolForm.budget_max ? Number(poolForm.budget_max) : null,
-      venue_city:    poolForm.location_name || poolForm.venue_city || null,
-      location_name: poolForm.location_name || poolForm.venue_city || null,
-      lat:           poolLocationCoords?.lat  || null,
-      lng:           poolLocationCoords?.lng  || null,
-      contact_email: poolForm.contact_email || null,
-      contact_note: poolForm.contact_note || null,
-      deadline: poolForm.deadline || null,
-    });
-    setShowForm(false);
-    setSaving(false);
-    load();
-  }
+  const allTypes = [...ARTIST_TYPES, ...VENUE_TYPES];
+  const uniqueTypes = Array.from(new Map(allTypes.map(t => [t.key, t])).values());
 
-  // Collab submit
-  async function handleCollabSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!userId) return;
-    setSaving(true);
-    const supabase = createClient();
-    await supabase.from("collaborations").insert({
-      user_id: userId,
-      title:         collabForm.title,
-      description:   collabForm.description || null,
-      type:          collabForm.type,
-      partner_name:  collabForm.partner_name || null,
-      partner_email: collabForm.partner_email || null,
-      deadline:      collabForm.deadline || null,
-      status:        collabForm.status,
-      location_name: collabForm.location_name || null,
-      lat:           collabLocationCoords?.lat || null,
-      lng:           collabLocationCoords?.lng || null,
-    });
-    setShowForm(false);
-    setSaving(false);
-    load();
-  }
-
-  async function sendResponse(requestId: string) {
-    if (!userId || !responseMsg.trim()) return;
-    const supabase = createClient();
-    await supabase.from("pool_responses").upsert({ request_id: requestId, user_id: userId, message: responseMsg });
-    setResponseMsg(""); setRespondingId(null);
-    alert("Your interest has been sent!");
-  }
-
-  function toggleStyle(s: string) {
-    setPoolForm(p => ({ ...p, art_styles: p.art_styles.includes(s) ? p.art_styles.filter(x => x !== s) : [...p.art_styles, s] }));
-  }
-
-  const filteredPool = poolRequests.filter(r => {
-    const matchType = typeFilter === "all" || r.poster_type === typeFilter;
-    const matchSearch = !search || r.title?.toLowerCase().includes(search.toLowerCase()) || r.description?.toLowerCase().includes(search.toLowerCase());
-    return matchType && matchSearch;
+  const filtered = requests.filter(r => {
+    if (filterRole !== "all" && r.poster_role !== filterRole) return false;
+    if (filterType !== "all" && r.request_type !== filterType) return false;
+    if (filterStatus !== "all" && r.status !== filterStatus) return false;
+    if (search && !r.title.toLowerCase().includes(search.toLowerCase()) && !r.description?.toLowerCase().includes(search.toLowerCase())) return false;
+    return true;
   });
 
-  const groupedCollabs = {
-    open: myCollabs.filter(c => c.status?.toLowerCase() === "open"),
-    "in progress": myCollabs.filter(c => c.status?.toLowerCase() === "in progress"),
-    completed: myCollabs.filter(c => c.status?.toLowerCase() === "completed"),
-  };
-
-  const setCollabField = (k: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
-    setCollabForm(p => ({ ...p, [k]: e.target.value }));
+  const myRequests = requests.filter(r => r.user_id === profile?.id);
+  const isVenueUser = profile?.role === "gallery" || profile?.role === "venue";
 
   return (
-    <div>
-      {/* Header */}
-      <div className="flex items-start justify-between mb-6">
-        <div>
-          <h1 className="page-title">Collabs & Discovery Pool</h1>
-          <p className="page-subtitle">Find partners, post opportunities, track collaborations</p>
-        </div>
-        <div className="flex gap-2">
-          <button onClick={() => { setFormMode("pool"); setShowForm(true); }} className="btn-secondary text-sm">
-            <Building2 className="w-4 h-4" /> Post to Pool
-          </button>
-          <button onClick={() => { setFormMode("collab"); setShowForm(true); }} className="btn-primary">
-            <Plus className="w-4 h-4" /> New Collab
-          </button>
-        </div>
-      </div>
+    <>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Darker+Grotesque:wght@400;500;600;700;800;900&display=swap');
+        *,*::before,*::after{box-sizing:border-box}
+        body{font-family:'Darker Grotesque',system-ui,sans-serif}
 
-      {/* Stats */}
-      <div className="grid grid-cols-3 gap-4 mb-6">
-        {[
-          { label: "Open Requests", value: poolRequests.length, color: "bg-[#FFD400]" },
-          { label: "My Collabs",    value: myCollabs.length,    color: "bg-[#4ECDC4]" },
-          { label: "In Progress",   value: groupedCollabs["in progress"].length, color: "bg-[#FF6B6B]" },
-        ].map(s => (
-          <div key={s.label} style={{ background:"#fff", border:"2px solid #111110", borderRadius:8, padding:"16px 18px", boxShadow:"3px 3px 0 #111110" }}>
-            <div style={{ fontSize:26, fontWeight:900, color:"#111110" }}>{s.value}</div>
-            <div style={{ fontSize:11, color:"#9B8F7A", fontWeight:700, textTransform:"uppercase", letterSpacing:"0.06em" }}>{s.label}</div>
-          </div>
-        ))}
-      </div>
+        .pool-card-img:hover img { transform: scale(1.05); }
 
-      {/* Tabs */}
-      <div style={{ display:"flex", alignItems:"center", gap:0, borderBottom:"2px solid #111110", marginBottom:20 }}>
-        {([["pool","Discovery Pool"],["mine","My Collaborations"]] as const).map(([id, label]) => (
-          <button key={id} onClick={() => setActiveTab(id)}
-            style={{ padding:"10px 20px", border:"none", borderBottom: activeTab === id ? "3px solid #FFD400" : "none", background: activeTab === id ? "#FFD400" : "transparent", fontSize:13, fontWeight:700, color:"#111110", cursor:"pointer", marginBottom: activeTab === id ? -2 : 0 }}>
-            {label}
-          </button>
-        ))}
-      </div>
+        .filter-chip{
+          display:inline-flex;align-items:center;gap:5px;
+          padding:6px 14px;border-radius:9999px;border:2px solid #E8E0D0;
+          background:#fff;font-size:12px;font-weight:700;color:#9B8F7A;
+          cursor:pointer;transition:all .15s;white-space:nowrap;font-family:inherit;
+        }
+        .filter-chip:hover{border-color:#111110;color:#111110}
+        .filter-chip.active{background:#111110;border-color:#111110;color:#FFD400}
+        .filter-chip.artist-active{background:#FFD400;border-color:#111110;color:#111110}
+        .filter-chip.venue-active{background:#E0F2FE;border-color:#0C4A6E;color:#0C4A6E}
 
-      {/* ── DISCOVERY POOL TAB ── */}
-      {activeTab === "pool" && (
-        <div>
-          <div className="flex items-center gap-3 mb-5 flex-wrap">
-            <div className="relative flex-1 min-w-48 max-w-sm">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
-              <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search requests..." className="input pl-9" />
+        .search-wrap{
+          display:flex;align-items:center;gap:8px;
+          background:#fff;border:2px solid #E8E0D0;borderRadius:12px;
+          padding:0 14px;height:40px;flex:1;min-width:0;max-width:320px;
+          transition:border-color .15s;
+        }
+        .search-wrap:focus-within{border-color:#FFD400;box-shadow:0 0 0 3px rgba(255,212,0,.15)}
+        .search-wrap input{flex:1;border:none;outline:none;font-size:13px;font-family:inherit;font-weight:600;color:#111110;background:transparent}
+
+        .pool-grid{
+          display:grid;
+          grid-template-columns:repeat(auto-fill,minmax(280px,1fr));
+          gap:18px;
+        }
+
+        @keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+        .fu{animation:fadeUp .35s cubic-bezier(.16,1,.3,1) both}
+        @keyframes spin{to{transform:rotate(360deg)}}
+      `}</style>
+
+      {/* ── Page body ── */}
+      <div style={{ maxWidth: 1200, margin: "0 auto" }}>
+
+        {/* ── TOP HEADER ── */}
+        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 28, gap: 16, flexWrap: "wrap" }}>
+          <div>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
+              <div style={{ width: 36, height: 36, borderRadius: 12, background: "#FFD400", border: "2.5px solid #111110", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "2px 2px 0 #111110" }}>
+                <Sparkles size={18} color="#111110" />
+              </div>
+              <h1 style={{ fontSize: 28, fontWeight: 900, color: "#111110", letterSpacing: "-0.8px", margin: 0 }}>The Pool</h1>
             </div>
-            <div className="flex border-2 border-black overflow-hidden">
-              {([["all","All"],["venue","Venues"],["artist","Artists"]] as const).map(([k,l]) => (
-                <button key={k} onClick={() => setTypeFilter(k)}
-                  style={{ padding:"7px 14px", fontSize:12, fontWeight:700, cursor:"pointer", background: typeFilter === k ? "#111110" : "#fff", color: typeFilter === k ? "#FFD400" : "#111110", border:"none", borderRight: k !== "artist" ? "1px solid #111110" : "none" }}>
-                  {l}
-                </button>
-              ))}
-            </div>
+            <p style={{ fontSize: 14, fontWeight: 600, color: "#9B8F7A", margin: 0 }}>
+              Open requests from artists and venues — find your next collab, showcase, or acquisition
+            </p>
           </div>
 
-          {loading ? (
-            <div className="card p-12 text-center text-stone-400">Loading…</div>
-          ) : filteredPool.length === 0 ? (
-            <div className="card p-16 text-center">
-              <Filter className="w-8 h-8 text-stone-300 mx-auto mb-3" />
-              <h3 className="heading-sm mb-2">No requests yet</h3>
-              <p className="body-lg mb-5">Be the first to post what you're looking for</p>
-              <button onClick={() => { setFormMode("pool"); setShowForm(true); }} className="btn-primary">
-                <Plus className="w-4 h-4" /> Post a Request
-              </button>
+          {/* New request CTA */}
+          {profile && (
+            <button
+              onClick={() => setShowNew(true)}
+              style={{ display: "flex", alignItems: "center", gap: 8, padding: "11px 20px", background: "#FFD400", border: "2.5px solid #111110", borderRadius: 14, fontSize: 14, fontWeight: 800, cursor: "pointer", fontFamily: "inherit", color: "#111110", boxShadow: "3px 3px 0 #111110", transition: "all .15s", flexShrink: 0 }}
+              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.boxShadow = "5px 5px 0 #111110"; (e.currentTarget as HTMLElement).style.transform = "translate(-1px,-1px)"; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.boxShadow = "3px 3px 0 #111110"; (e.currentTarget as HTMLElement).style.transform = "none"; }}
+            >
+              <Plus size={16} />
+              Post a Request
+            </button>
+          )}
+        </div>
+
+        {/* ── MY REQUESTS (if any) ── */}
+        {myRequests.length > 0 && (
+          <div style={{ marginBottom: 32 }}>
+            <div style={{ fontSize: 10, fontWeight: 800, color: "#9B8F7A", textTransform: "uppercase", letterSpacing: "0.16em", marginBottom: 14, display: "flex", alignItems: "center", gap: 8 }}>
+              Your requests
+              <div style={{ flex: 1, height: 1, background: "#E8E0D0" }} />
             </div>
-          ) : (
-            <div className="space-y-3">
-              {filteredPool.map(r => (
-                <div key={r.id} className="card overflow-hidden">
-                  <div className="p-5">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex items-start gap-3 flex-1 min-w-0">
-                        <div className={`shrink-0 w-10 h-10 rounded-xl flex items-center justify-center ${r.poster_type === "venue" ? "bg-sky-50" : "bg-emerald-50"}`}>
-                          {r.poster_type === "venue" ? <Building2 className="w-5 h-5 text-sky-600" /> : <Palette className="w-5 h-5 text-emerald-600" />}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-2 flex-wrap mb-1">
-                            <span className={`badge text-[10px] ${r.poster_type === "venue" ? "badge-storage" : "badge-available"}`}>
-                              {r.poster_type === "venue" ? "Venue seeking artwork" : "Artist seeking venue"}
-                            </span>
-                            {r.deadline && <span className="text-xs text-stone-400">Until {new Date(r.deadline).toLocaleDateString("en-US",{month:"short",day:"numeric"})}</span>}
-                          </div>
-                          <h3 className="font-semibold text-stone-900 leading-snug">{r.title}</h3>
-                        </div>
-                      </div>
-                      <button onClick={() => setExpandedId(expandedId === r.id ? null : r.id)} className="shrink-0 p-1.5 hover:bg-stone-100 rounded-lg text-stone-400">
-                        {expandedId === r.id ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                      </button>
+            <div style={{ display: "flex", gap: 14, overflowX: "auto", paddingBottom: 4 }}>
+              {myRequests.map(r => {
+                const ts = typeStyle(r.request_type);
+                const allT = [...ARTIST_TYPES, ...VENUE_TYPES];
+                const ti = allT.find(t => t.key === r.request_type);
+                return (
+                  <div key={r.id} onClick={() => setSelected(r)} style={{ flexShrink: 0, width: 240, background: "#fff", border: "2px solid #E8E0D0", borderRadius: 16, padding: "14px 16px", cursor: "pointer", transition: "all .15s" }}
+                    onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = "#FFD400"; (e.currentTarget as HTMLElement).style.boxShadow = "3px 3px 0 #FFD400"; }}
+                    onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = "#E8E0D0"; (e.currentTarget as HTMLElement).style.boxShadow = "none"; }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 8 }}>
+                      <span style={{ padding: "2px 8px", borderRadius: 9999, background: ts.bg, color: ts.color, fontSize: 9, fontWeight: 800, textTransform: "uppercase" }}>{ti?.emoji} {ti?.label || r.request_type}</span>
+                      <span style={{ marginLeft: "auto", width: 7, height: 7, borderRadius: "50%", background: r.status === "open" ? "#16A34A" : "#C0B8A8", flexShrink: 0 }} />
                     </div>
-                    <div className="flex items-center gap-2 mt-3 flex-wrap">
-                      {r.art_styles?.slice(0,4).map(s => (
-                        <span key={s} className="px-2 py-0.5 bg-stone-100 text-stone-600 text-xs rounded-full">{s}</span>
-                      ))}
-                      {(r.budget_min || r.budget_max) && (
-                        <span className="text-xs text-stone-500 font-mono">${r.budget_min?.toLocaleString() || "0"} – ${r.budget_max?.toLocaleString() || "?"}</span>
-                      )}
-                      {(r.venue_city||r.location_name) && (
-                        <span className="text-xs text-stone-500 flex items-center gap-1">
-                          <MapPin size={10}/> {r.location_name||r.venue_city}
-                        </span>
-                      )}
-                    </div>
+                    <div style={{ fontSize: 13, fontWeight: 800, color: "#111110", lineHeight: 1.3, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as any }}>{r.title}</div>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: "#C0B8A8", marginTop: 6 }}>{timeAgo(r.created_at)}</div>
                   </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
-                  {expandedId === r.id && (
-                    <div className="border-t border-stone-100 p-5 bg-stone-50">
-                      {r.description && <p className="text-sm text-stone-600 mb-4 leading-relaxed">{r.description}</p>}
-                      {r.profile_name && (
-                        <div className="flex items-center gap-2 mb-4">
-                          {r.profile_avatar ? <img src={r.profile_avatar} alt="" className="w-7 h-7 rounded-full object-cover" />
-                            : <div className="w-7 h-7 rounded-full bg-stone-200 flex items-center justify-center text-xs font-bold text-stone-500">{r.profile_name[0]}</div>}
-                          <span className="text-sm text-stone-600">Posted by <span className="font-medium text-stone-900">{r.profile_name}</span></span>
-                        </div>
-                      )}
-                      {r.contact_note && (
-                        <div className="p-3 bg-white rounded-xl border border-stone-200 text-sm text-stone-600 mb-4">
-                          <span className="font-medium text-stone-800">Note: </span>{r.contact_note}
-                        </div>
-                      )}
-                      <div className="flex items-center gap-3">
-                        {userId !== r.user_id && (
-                          <button onClick={() => { setRespondingId(r.id); setResponseMsg(""); }} className="btn-primary">
-                            <MessageCircle className="w-4 h-4" /> I'm interested
-                          </button>
-                        )}
-                        {r.contact_email && <a href={`mailto:${r.contact_email}`} className="btn-secondary text-sm">Email directly</a>}
-                        <span className="text-xs text-stone-400 ml-auto">{new Date(r.created_at).toLocaleDateString()}</span>
-                      </div>
-                    </div>
-                  )}
+        {/* ── FILTERS ── */}
+        <div style={{ marginBottom: 22 }}>
+          {/* Search + filter toggle row */}
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12, flexWrap: "wrap" }}>
+            <div className="search-wrap">
+              <Search size={13} color="#C0B8A8" />
+              <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search requests…" />
+            </div>
+            <button onClick={() => setShowFilters(p => !p)} className={`filter-chip${showFilters ? " active" : ""}`}>
+              <SlidersHorizontal size={12} /> Filters {showFilters ? "▲" : "▼"}
+            </button>
+            <div style={{ marginLeft: "auto", fontSize: 12, fontWeight: 700, color: "#9B8F7A" }}>
+              {filtered.length} requests
+            </div>
+          </div>
+
+          {/* Expanded filters */}
+          {showFilters && (
+            <div className="fu" style={{ background: "#fff", border: "2px solid #E8E0D0", borderRadius: 16, padding: "16px 18px", display: "flex", flexDirection: "column", gap: 14 }}>
+              {/* Role filter */}
+              <div>
+                <div style={{ fontSize: 10, fontWeight: 800, color: "#9B8F7A", textTransform: "uppercase", letterSpacing: "0.14em", marginBottom: 8 }}>Posted by</div>
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                  {[["all", "All"], ["artist", "🎨 Artists"], ["venue", "🏛️ Venues"]].map(([v, l]) => (
+                    <button key={v} onClick={() => setFilterRole(v as any)} className={`filter-chip${filterRole === v ? (v === "artist" ? " artist-active" : v === "venue" ? " venue-active" : " active") : ""}`}>{l}</button>
+                  ))}
                 </div>
+              </div>
+              {/* Type filter */}
+              <div>
+                <div style={{ fontSize: 10, fontWeight: 800, color: "#9B8F7A", textTransform: "uppercase", letterSpacing: "0.14em", marginBottom: 8 }}>Request type</div>
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                  <button onClick={() => setFilterType("all")} className={`filter-chip${filterType === "all" ? " active" : ""}`}>All types</button>
+                  {uniqueTypes.map(t => (
+                    <button key={t.key} onClick={() => setFilterType(t.key)} className={`filter-chip${filterType === t.key ? " active" : ""}`}>{t.emoji} {t.label}</button>
+                  ))}
+                </div>
+              </div>
+              {/* Status filter */}
+              <div>
+                <div style={{ fontSize: 10, fontWeight: 800, color: "#9B8F7A", textTransform: "uppercase", letterSpacing: "0.14em", marginBottom: 8 }}>Status</div>
+                <div style={{ display: "flex", gap: 6 }}>
+                  {[["all", "All"], ["open", "✓ Open"], ["closed", "Closed"]].map(([v, l]) => (
+                    <button key={v} onClick={() => setFilterStatus(v as any)} className={`filter-chip${filterStatus === v ? " active" : ""}`}>{l}</button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Quick role pills when filters closed */}
+          {!showFilters && (
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              {[["all", "All"], ["artist", "🎨 Artists"], ["venue", "🏛️ Venues"]].map(([v, l]) => (
+                <button key={v} onClick={() => setFilterRole(v as any)} className={`filter-chip${filterRole === v ? (v === "artist" ? " artist-active" : v === "venue" ? " venue-active" : " active") : ""}`}>{l}</button>
               ))}
             </div>
           )}
         </div>
-      )}
 
-      {/* ── MY COLLABORATIONS TAB ── */}
-      {activeTab === "mine" && (
-        <div>
-          {loading ? (
-            <div className="card p-12 text-center text-stone-400">Loading…</div>
-          ) : myCollabs.length === 0 ? (
-            <div className="card p-16 text-center">
-              <Handshake className="w-10 h-10 text-stone-300 mx-auto mb-3" />
-              <h3 className="heading-sm mb-2">No collaborations yet</h3>
-              <p className="body-lg mb-5">Track your partnerships and joint projects</p>
-              <button onClick={() => { setFormMode("collab"); setShowForm(true); }} className="btn-primary">
-                <Plus className="w-4 h-4" /> New Collaboration
-              </button>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-              {(["open","in progress","completed"] as const).map(status => (
-                <div key={status}>
-                  <div className="flex items-center gap-2 mb-3 px-1">
-                    {status === "open" ? <Circle className="w-4 h-4 text-emerald-500" />
-                      : status === "in progress" ? <Clock className="w-4 h-4 text-sky-500" />
-                      : <CheckCircle className="w-4 h-4 text-stone-400" />}
-                    <h3 className="text-sm font-semibold text-stone-700 capitalize">{status}</h3>
-                    <span className="ml-auto text-xs text-stone-400 bg-stone-100 px-2 py-0.5 rounded-full">{groupedCollabs[status].length}</span>
-                  </div>
-                  <div className="space-y-3">
-                    {groupedCollabs[status].map(c => (
-                      <div key={c.id} className="card p-4">
-                        <div className="flex items-start justify-between gap-2 mb-1">
-                          <h4 className="text-sm font-semibold text-stone-900">{c.title}</h4>
-                          {c.type && <span className="badge badge-nfs text-[10px]">{c.type}</span>}
-                        </div>
-                        {c.description && <p className="text-xs text-stone-500 line-clamp-2 mb-2">{c.description}</p>}
-                        {c.partner_name && <p className="text-xs text-stone-600">With: <span className="font-medium">{c.partner_name}</span></p>}
-                        {c.deadline && <p className="text-xs text-stone-400 mt-1">Due: {new Date(c.deadline).toLocaleDateString()}</p>}
-                      </div>
-                    ))}
-                    {groupedCollabs[status].length === 0 && (
-                      <div className="border-2 border-dashed border-stone-200 rounded-xl p-6 text-center text-xs text-stone-400">
-                        No {status} collaborations
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ── RESPOND MODAL ── */}
-      {respondingId && (
-        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="heading-sm">Express Interest</h2>
-              <button onClick={() => setRespondingId(null)} className="p-1.5 hover:bg-stone-100 rounded-lg"><X className="w-5 h-5" /></button>
-            </div>
-            <p className="text-sm text-stone-500 mb-3">Send a message — they'll receive your profile info.</p>
-            <textarea rows={4} className="textarea mb-4" value={responseMsg} onChange={e => setResponseMsg(e.target.value)} placeholder="Hi, I'd love to connect about this opportunity…" />
-            <div className="flex gap-3">
-              <button onClick={() => setRespondingId(null)} className="btn-secondary flex-1 justify-center">Cancel</button>
-              <button onClick={() => sendResponse(respondingId)} disabled={!responseMsg.trim()} className="btn-primary flex-1 justify-center">Send</button>
-            </div>
+        {/* ── REQUESTS GRID ── */}
+        {loading ? (
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "80px 0", flexDirection: "column", gap: 14 }}>
+            <div style={{ width: 36, height: 36, border: "3px solid #FFD400", borderTopColor: "transparent", borderRadius: "50%", animation: "spin .7s linear infinite" }} />
+            <span style={{ fontSize: 13, fontWeight: 700, color: "#9B8F7A" }}>Loading pool…</span>
           </div>
-        </div>
-      )}
-
-      {/* ── POST FORM MODAL ── */}
-      {showForm && (
-        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-5">
-              <h2 className="heading-sm">{formMode === "pool" ? "Post to Discovery Pool" : "New Collaboration"}</h2>
-              <button onClick={() => setShowForm(false)} className="p-1.5 hover:bg-stone-100 rounded-lg"><X className="w-5 h-5" /></button>
+        ) : filtered.length === 0 ? (
+          <div style={{ padding: "64px 24px", textAlign: "center", background: "#fff", border: "2.5px dashed #E0D8CA", borderRadius: 20 }}>
+            <div style={{ fontSize: 48, marginBottom: 14 }}>🌊</div>
+            <div style={{ fontSize: 18, fontWeight: 900, color: "#111110", marginBottom: 6 }}>The pool is quiet</div>
+            <div style={{ fontSize: 14, fontWeight: 600, color: "#9B8F7A", marginBottom: 24 }}>
+              {search || filterRole !== "all" || filterType !== "all" ? "No requests match your filters." : "Be the first to post a request!"}
             </div>
-
-            {formMode === "pool" ? (
-              <form onSubmit={handlePoolSubmit} className="space-y-4">
-                <div>
-                  <label className="label">I am a… *</label>
-                  <div className="grid grid-cols-2 gap-3">
-                    {([["artist","Artist","Looking for a venue"],["venue","Venue","Looking for artworks"]] as const).map(([k,l,sub]) => (
-                      <button key={k} type="button" onClick={() => setPoolForm(p => ({ ...p, poster_type: k }))}
-                        className={`p-4 rounded-xl border-2 text-left ${poolForm.poster_type === k ? "border-stone-900 bg-stone-50" : "border-stone-200"}`}>
-                        <div className="flex items-center gap-2 mb-1">
-                          {k === "artist" ? <Palette className="w-4 h-4" /> : <Building2 className="w-4 h-4" />}
-                          <span className="font-semibold text-sm">{l}</span>
-                        </div>
-                        <p className="text-xs text-stone-500">{sub}</p>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <div>
-                  <label className="label">Request title *</label>
-                  <input required className="input" value={poolForm.title} onChange={e => setPoolForm(p => ({...p,title:e.target.value}))}
-                    placeholder={poolForm.poster_type === "artist" ? "Oil painter seeking gallery space" : "Looking for abstract art for café walls"} />
-                </div>
-                <div>
-                  <label className="label">Description</label>
-                  <textarea rows={3} className="textarea" value={poolForm.description} onChange={e => setPoolForm(p => ({...p,description:e.target.value}))} placeholder="Describe your needs…" />
-                </div>
-                <div>
-                  <label className="label">Art styles</label>
-                  <div className="flex flex-wrap gap-2">
-                    {ART_STYLES.map(s => (
-                      <button key={s} type="button" onClick={() => toggleStyle(s)}
-                        className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${poolForm.art_styles.includes(s) ? "bg-emerald-500 text-white border-emerald-500" : "bg-white text-stone-600 border-stone-200 hover:border-stone-400"}`}>
-                        {s}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="label">Budget min (USD)</label>
-                    <input type="number" className="input" value={poolForm.budget_min} onChange={e => setPoolForm(p => ({...p,budget_min:e.target.value}))} placeholder="0" />
-                  </div>
-                  <div>
-                    <label className="label">Budget max (USD)</label>
-                    <input type="number" className="input" value={poolForm.budget_max} onChange={e => setPoolForm(p => ({...p,budget_max:e.target.value}))} placeholder="5000" />
-                  </div>
-                </div>
-                {/* Location with autocomplete */}
-                <PlacesAutocomplete
-                  label="Location / city"
-                  value={poolForm.location_name || poolForm.venue_city}
-                  placeholder="Search city or venue…"
-                  onChange={(result, raw) => {
-                    setPoolForm(p => ({ ...p, location_name: raw, venue_city: raw }));
-                    if (result) setPoolLocationCoords({ lat: result.lat, lng: result.lng });
-                    else setPoolLocationCoords(null);
-                  }}
-                />
-                {poolLocationCoords && (
-                  <div style={{ fontSize:11, color:"#4ECDC4", fontWeight:700, display:"flex", alignItems:"center", gap:6 }}>
-                    <MapPin size={11}/> Location saved — will appear on the Prague map
-                  </div>
-                )}
-                <div>
-                  <label className="label">Deadline</label>
-                  <input type="date" className="input" value={poolForm.deadline} onChange={e => setPoolForm(p => ({...p,deadline:e.target.value}))} />
-                </div>
-                <div>
-                  <label className="label">Contact email (optional)</label>
-                  <input type="email" className="input" value={poolForm.contact_email} onChange={e => setPoolForm(p => ({...p,contact_email:e.target.value}))} placeholder="your@email.com" />
-                </div>
-                <div>
-                  <label className="label">Note for responders</label>
-                  <textarea rows={2} className="textarea" value={poolForm.contact_note} onChange={e => setPoolForm(p => ({...p,contact_note:e.target.value}))} placeholder="Any extra info…" />
-                </div>
-                <div className="flex gap-3 pt-2">
-                  <button type="button" onClick={() => setShowForm(false)} className="btn-secondary flex-1 justify-center">Cancel</button>
-                  <button type="submit" disabled={saving} className="btn-primary flex-1 justify-center">{saving ? "Posting…" : "Post Request"}</button>
-                </div>
-              </form>
-            ) : (
-              <form onSubmit={handleCollabSubmit} className="space-y-4">
-                <div>
-                  <label className="label">Title *</label>
-                  <input required className="input" value={collabForm.title} onChange={setCollabField("title")} placeholder="e.g. Joint mural project" />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="label">Type</label>
-                    <select className="select" value={collabForm.type} onChange={setCollabField("type")}>
-                      {COLLAB_TYPES.map(t => <option key={t}>{t}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="label">Status</label>
-                    <select className="select" value={collabForm.status} onChange={setCollabField("status")}>
-                      <option>Open</option><option>In Progress</option><option>Completed</option><option>Cancelled</option>
-                    </select>
-                  </div>
-                </div>
-                <div>
-                  <label className="label">Description</label>
-                  <textarea rows={3} className="textarea" value={collabForm.description} onChange={setCollabField("description")} placeholder="What is this collaboration about?" />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="label">Partner Name</label>
-                    <input className="input" value={collabForm.partner_name} onChange={setCollabField("partner_name")} placeholder="Collaborator name" />
-                  </div>
-                  <div>
-                    <label className="label">Partner Email</label>
-                    <input type="email" className="input" value={collabForm.partner_email} onChange={setCollabField("partner_email")} placeholder="email@example.com" />
-                  </div>
-                </div>
-                <div>
-                  <label className="label">Deadline</label>
-                  <input type="date" className="input" value={collabForm.deadline} onChange={setCollabField("deadline")} />
-                </div>
-                <PlacesAutocomplete
-                  label="Location (optional)"
-                  value={collabForm.location_name}
-                  placeholder="Where will this collab happen?"
-                  onChange={(result, raw) => {
-                    setCollabForm(p => ({ ...p, location_name: raw }));
-                    if (result) setCollabLocationCoords({ lat: result.lat, lng: result.lng });
-                    else setCollabLocationCoords(null);
-                  }}
-                />
-                {collabLocationCoords && (
-                  <div style={{ fontSize:11, color:"#4ECDC4", fontWeight:700, display:"flex", alignItems:"center", gap:6 }}>
-                    <MapPin size={11}/> Location saved — will appear on the Prague map
-                  </div>
-                )}
-                <div className="flex gap-3 pt-2">
-                  <button type="button" onClick={() => setShowForm(false)} className="btn-secondary flex-1 justify-center">Cancel</button>
-                  <button type="submit" disabled={saving} className="btn-primary flex-1 justify-center">{saving ? "Saving…" : "Create"}</button>
-                </div>
-              </form>
+            {profile && (
+              <button onClick={() => setShowNew(true)} style={{ padding: "11px 24px", background: "#FFD400", border: "2.5px solid #111110", borderRadius: 14, fontSize: 14, fontWeight: 800, cursor: "pointer", fontFamily: "inherit", color: "#111110", boxShadow: "3px 3px 0 #111110" }}>
+                + Post a Request
+              </button>
             )}
           </div>
+        ) : (
+          <div className="pool-grid">
+            {filtered.map((r, i) => (
+              <div key={r.id} className="fu" style={{ animationDelay: `${Math.min(i * 0.03, 0.3)}s` }}>
+                <PoolCard req={r} onClick={() => setSelected(r)} />
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* ── SQL reminder ── */}
+        <div style={{ marginTop: 48, background: "#111110", borderRadius: 14, padding: "14px 18px" }}>
+          <div style={{ fontSize: 10, fontWeight: 800, color: "#FFD400", textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 8 }}>Run once in Supabase SQL editor</div>
+          <pre style={{ fontSize: 11, color: "#888", lineHeight: 1.8, overflow: "auto" }}>{`create table if not exists pool_requests (
+  id uuid default gen_random_uuid() primary key,
+  user_id uuid references auth.users(id) on delete cascade not null,
+  poster_role text not null check (poster_role in ('artist','venue')),
+  request_type text not null,
+  title text not null,
+  description text,
+  cover_image text,
+  location text,
+  deadline date,
+  status text default 'open' check (status in ('open','closed')),
+  created_at timestamptz default now()
+);
+alter table pool_requests enable row level security;
+create policy "Anyone can view open requests" on pool_requests for select using (true);
+create policy "Users manage own requests" on pool_requests for all using (auth.uid() = user_id);`}</pre>
         </div>
+      </div>
+
+      {/* ── MODALS ── */}
+      {selected && (
+        <RequestModal req={selected} onClose={() => setSelected(null)} currentUserId={profile?.id} />
       )}
-    </div>
+      {showNew && profile && (
+        <NewRequestModal
+          userRole={profile.role || "artist"}
+          userId={profile.id}
+          onClose={() => setShowNew(false)}
+          onCreated={loadRequests}
+        />
+      )}
+    </>
   );
 }

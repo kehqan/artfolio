@@ -560,12 +560,26 @@ export default function PoolPage() {
 
   async function loadRequests() {
     setLoading(true);
-    const { data } = await sb
+    const { data: reqs, error } = await sb
       .from("pool_requests")
-      .select("*, profiles(full_name, username, avatar_url, role, location)")
+      .select("id, user_id, title, description, request_type, poster_type, poster_role, cover_image, location, deadline, status, created_at")
       .order("created_at", { ascending: false })
       .limit(80);
-    setRequests((data as PoolRequest[]) || []);
+    if (error) { console.error("Pool fetch error:", error); setLoading(false); return; }
+    if (!reqs || reqs.length === 0) { setRequests([]); setLoading(false); return; }
+    const userIds = Array.from(new Set(reqs.map((r: any) => r.user_id)));
+    const { data: profs } = await sb
+      .from("profiles")
+      .select("id, full_name, username, avatar_url, role, location")
+      .in("id", userIds);
+    const profMap: Record<string, any> = {};
+    (profs || []).forEach((p: any) => { profMap[p.id] = p; });
+    const merged = reqs.map((r: any) => ({
+      ...r,
+      poster_role: r.poster_role || r.poster_type || "artist",
+      profiles: profMap[r.user_id] || null,
+    }));
+    setRequests(merged as PoolRequest[]);
     setLoading(false);
   }
 

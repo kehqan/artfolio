@@ -16,6 +16,15 @@ export default function LoginPage() {
 
   useEffect(() => { setTimeout(() => setMounted(true), 60); }, []);
 
+  useEffect(() => {
+    document.documentElement.style.overflow = "";
+    document.body.style.overflow = "";
+    return () => {
+      document.documentElement.style.overflow = "";
+      document.body.style.overflow = "";
+    };
+  }, []);
+
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true); setError("");
@@ -32,7 +41,6 @@ export default function LoginPage() {
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
         html, body {
           font-family: 'Darker Grotesque', system-ui, sans-serif;
-          height: 100%; overflow: hidden;
         }
 
         /* ── Layout ── */

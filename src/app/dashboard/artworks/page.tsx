@@ -1,4 +1,5 @@
 "use client";
+import { Monitor } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -364,6 +365,14 @@ export default function ArtworksPage() {
               <Megaphone size={10}/> Promote
             </div>
           </Link>
+          <Link href={`/artworks/${aw.id}/passport`} target="_blank" onClick={e => e.stopPropagation()} style={{ textDecoration:"none" }}>
+      <div style={{ display:"inline-flex", alignItems:"center", gap:4, padding:"4px 10px", borderRadius:9999, border:"1.5px solid #111110", fontSize:11, fontWeight:700, color:"#111110", background:"#FFD400", transition:"all 0.12s" }}
+        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.boxShadow="2px 2px 0 #111110"; (e.currentTarget as HTMLElement).style.transform="translate(-1px,-1px)"; }}
+        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.boxShadow="none"; (e.currentTarget as HTMLElement).style.transform=""; }}>
+        <Monitor size={10}/> Passport
+      </div>
+    </Link>
+  </div>
 
           {/* 3-dot menu */}
           <div style={{ position:"relative" }} onClick={e => e.stopPropagation()}>

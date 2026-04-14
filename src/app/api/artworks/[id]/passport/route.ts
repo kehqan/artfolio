@@ -1,7 +1,4 @@
 // src/app/api/artworks/[id]/passport/route.ts
-// This re-exports the same logic as /api/upload/artworks/[id]/passport/route.ts
-// Fixes the mismatch between the passport page fetch URL and the actual route location.
-
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 

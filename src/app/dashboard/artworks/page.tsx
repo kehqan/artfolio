@@ -724,6 +724,7 @@ export default function ArtworksPage() {
                                   { label:"Edit",         icon:Edit2,        fn:() => { router.push(`/dashboard/artworks/${aw.id}/edit`); setRowMenu(null); } },
                                   { label:"Promote",      icon:Megaphone,    fn:() => { router.push(`/dashboard/artworks/${aw.id}/promotion`); setRowMenu(null); } },
                                   { label:"Duplicate",    icon:Copy,         fn:() => duplicateArtwork(aw.id) },
+                                  { label:"Passport",     icon:Copy,        fn:() => { router.push(`/dashboard/artworks/${aw.id}/passport`); setRowMenu(null); } },
                                   { label:"Delete",       icon:Trash2,       fn:() => deleteArtwork(aw.id), danger:true },
                                 ].map(item => (
                                   <button key={item.label} type="button" onClick={item.fn}

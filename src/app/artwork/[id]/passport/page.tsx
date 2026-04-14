@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
+import { createClient } from "@/lib/supabase/client";
 import {
   Shield, CheckCircle2, Clock, MapPin, ExternalLink,
   Copy, Check, ChevronDown, Eye, ArrowLeft, Star,
@@ -26,7 +27,7 @@ type Artwork = {
   authentication_notes?: string;
   venue_location?: string; location_name?: string;
   created_at: string; updated_at?: string;
-  artist?: Artist;
+  user_id: string;
 };
 type ProvenanceEntry = {
   id: string; event_type: string; owner_name?: string;
@@ -37,13 +38,6 @@ type Exhibition = {
   id: string; title: string; venue?: string; gallery_name?: string;
   start_date?: string; end_date?: string; status: string;
   description?: string; cover_image?: string;
-};
-type PassportData = {
-  artwork: Artwork;
-  provenance: ProvenanceEntry[];
-  exhibitions: Exhibition[];
-  authLog: any[];
-  viewCount: number;
 };
 
 // ── Config ─────────────────────────────────────────────────────────
@@ -113,11 +107,15 @@ export default function ArtworkPassportPage() {
   const params = useParams<{ id: string }>();
   const artworkId = params?.id;
 
-  const [data, setData]       = useState<PassportData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError]     = useState("");
-  const [copied, setCopied]   = useState(false);
-  const [showQR, setShowQR]   = useState(false);
+  const [artwork, setArtwork]         = useState<Artwork | null>(null);
+  const [artist, setArtist]           = useState<Artist | null>(null);
+  const [provenance, setProvenance]   = useState<ProvenanceEntry[]>([]);
+  const [exhibitions, setExhibitions] = useState<Exhibition[]>([]);
+  const [viewCount, setViewCount]     = useState(0);
+  const [loading, setLoading]         = useState(true);
+  const [error, setError]             = useState("");
+  const [copied, setCopied]           = useState(false);
+  const [showQR, setShowQR]           = useState(false);
 
   const coverRef     = useParallax(0.25);
   const identityR    = useReveal(0.1);
@@ -128,15 +126,51 @@ export default function ArtworkPassportPage() {
 
   useEffect(() => {
     if (!artworkId) return;
-    fetch(`/api/artworks/${artworkId}/passport`)
-      .then(r => r.json())
-      .then(d => {
-        if (d.error) setError(d.error);
-        else setData(d);
-        setLoading(false);
-      })
-      .catch(() => { setError("Failed to load"); setLoading(false); });
+    loadPassport();
   }, [artworkId]);
+
+  async function loadPassport() {
+    const sb = createClient();
+
+    // 1. Fetch artwork
+    const { data: aw, error: awErr } = await sb
+      .from("artworks").select("*").eq("id", artworkId).single();
+    if (awErr || !aw) { setError("Artwork not found"); setLoading(false); return; }
+    setArtwork(aw);
+
+    // 2. Fetch artist profile
+    const { data: prof } = await sb
+      .from("profiles")
+      .select("id, full_name, username, role, bio, location, avatar_url, website, instagram")
+      .eq("id", aw.user_id).single();
+    setArtist(prof);
+
+    // 3. Fetch provenance
+    const { data: prov } = await sb
+      .from("provenance_entries").select("*")
+      .eq("artwork_id", artworkId).order("date", { ascending: true });
+    setProvenance(prov || []);
+
+    // 4. Fetch exhibitions via junction
+    const { data: exLinks } = await sb
+      .from("exhibition_artworks").select("exhibition_id").eq("artwork_id", artworkId);
+    if (exLinks?.length) {
+      const exIds = exLinks.map((l: any) => l.exhibition_id);
+      const { data: exData } = await sb
+        .from("exhibitions")
+        .select("id, title, venue, gallery_name, start_date, end_date, status, description, cover_image")
+        .in("id", exIds).order("start_date", { ascending: false });
+      setExhibitions(exData || []);
+    }
+
+    // 5. View count + record view
+    const { count } = await sb
+      .from("passport_views").select("*", { count: "exact", head: true }).eq("artwork_id", artworkId);
+    setViewCount(count || 0);
+    sb.from("passport_views").insert({ artwork_id: artworkId }).then(() => {});
+
+    setLoading(false);
+  }
 
   function copyUrl() {
     navigator.clipboard.writeText(window.location.href);
@@ -162,7 +196,7 @@ export default function ArtworkPassportPage() {
     </div>
   );
 
-  if (error || !data) return (
+  if (error || !artwork) return (
     <div style={S.loadWrap}>
       <style>{GLOBAL_CSS}</style>
       <div style={S.loadInner}>
@@ -176,8 +210,6 @@ export default function ArtworkPassportPage() {
     </div>
   );
 
-  const { artwork, provenance, exhibitions, viewCount } = data;
-  const artist = artwork.artist;
   const authCfg = AUTH_STATUS_CFG[artwork.authentication_status || "pending"];
   const dims = [artwork.width_cm, artwork.height_cm, artwork.depth_cm].filter(Boolean);
   const mainImg = Array.isArray(artwork.images) ? artwork.images[0] : null;

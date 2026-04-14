@@ -4,10 +4,9 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import {
-  Shield, CheckCircle2, Clock, MapPin, ExternalLink,
-  Copy, Check, ChevronDown, Eye, ArrowLeft, Star,
-  Award, Fingerprint, History, CalendarDays, Building2,
-  QrCode, Share2, X, ImageIcon,
+  Shield, CheckCircle2, MapPin, Award, Fingerprint,
+  CalendarDays, Building2, QrCode, Share2, X, ImageIcon,
+  ChevronLeft, ChevronRight, Check,
 } from "lucide-react";
 
 // ── Types ──────────────────────────────────────────────────────────
@@ -41,14 +40,14 @@ type Exhibition = {
 };
 
 // ── Config ─────────────────────────────────────────────────────────
-const AUTH_STATUS_CFG: Record<string, { label: string; color: string; bg: string; icon: string }> = {
-  original:        { label: "Original Work",    color: "#16A34A", bg: "#DCFCE7", icon: "✦" },
-  limited_edition: { label: "Limited Edition",  color: "#CA8A04", bg: "#FEF9C3", icon: "◈" },
-  reproduction:    { label: "Reproduction",     color: "#9B8F7A", bg: "#F5F0E8", icon: "◇" },
-  pending:         { label: "Pending Review",   color: "#9B8F7A", bg: "#F5F0E8", icon: "○" },
+const AUTH_CFG: Record<string, { label: string; color: string; bg: string; icon: string }> = {
+  original:        { label: "Original Work",   color: "#16A34A", bg: "#DCFCE7", icon: "✦" },
+  limited_edition: { label: "Limited Edition", color: "#CA8A04", bg: "#FEF9C3", icon: "◈" },
+  reproduction:    { label: "Reproduction",    color: "#9B8F7A", bg: "#F5F0E8", icon: "◇" },
+  pending:         { label: "Pending Review",  color: "#9B8F7A", bg: "#F5F0E8", icon: "○" },
 };
 
-const EVENT_TYPE_CFG: Record<string, { label: string; icon: string; color: string }> = {
+const EVT_CFG: Record<string, { label: string; icon: string; color: string }> = {
   created:     { label: "Created",     icon: "✦", color: "#FFD400" },
   sold:        { label: "Sold",        icon: "◆", color: "#16A34A" },
   transferred: { label: "Transferred", icon: "→", color: "#0EA5E9" },
@@ -68,8 +67,8 @@ function fmtDateShort(d?: string | null) {
   return new Date(d).toLocaleDateString("en-US", { month: "short", year: "numeric" });
 }
 
-// ── Scroll reveal hook ─────────────────────────────────────────────
-function useReveal(threshold = 0.12) {
+// ── Reveal hook ────────────────────────────────────────────────────
+function useReveal(threshold = 0.1) {
   const ref = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState(false);
   useEffect(() => {
@@ -81,48 +80,318 @@ function useReveal(threshold = 0.12) {
     );
     obs.observe(el);
     return () => obs.disconnect();
-  }, [threshold]);
+  }, []);
   return { ref, visible };
 }
 
-// ── Parallax image hook ────────────────────────────────────────────
-function useParallax(factor = 0.3) {
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    function onScroll() {
-      if (!ref.current) return;
-      const rect = ref.current.getBoundingClientRect();
-      const offset = (rect.top / window.innerHeight) * factor * 100;
-      const img = ref.current.querySelector("img") as HTMLImageElement | null;
-      if (img) img.style.transform = `translateY(${offset}px) scale(1.1)`;
-    }
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
-  }, [factor]);
-  return ref;
+// ══════════════════════════════════════════════════════════════════
+// 3D PASSPORT BOOK COMPONENT
+// ══════════════════════════════════════════════════════════════════
+function PassportBook({
+  artwork, artist, provenance, exhibitions,
+}: {
+  artwork: Artwork; artist: Artist | null;
+  provenance: ProvenanceEntry[]; exhibitions: Exhibition[];
+}) {
+  const [page, setPage] = useState(0);
+  const [flipping, setFlipping] = useState(false);
+  const [flipDir, setFlipDir] = useState<"next" | "prev">("next");
+  const mainImg = artwork.images?.[0];
+  const isVerified = artwork.authentication_status && artwork.authentication_status !== "pending";
+  const authCfg = AUTH_CFG[artwork.authentication_status || "pending"];
+  const dims = [artwork.width_cm, artwork.height_cm, artwork.depth_cm].filter(Boolean);
+
+  // Build pages
+  const pages = [
+    "cover",
+    "identity",
+    "authentication",
+    "provenance",
+    ...(exhibitions.length ? ["exhibitions"] : []),
+  ];
+  const totalPages = pages.length;
+
+  function goTo(dir: "next" | "prev") {
+    const next = dir === "next" ? page + 1 : page - 1;
+    if (next < 0 || next >= totalPages || flipping) return;
+    setFlipDir(dir);
+    setFlipping(true);
+    setTimeout(() => {
+      setPage(next);
+      setFlipping(false);
+    }, 350);
+  }
+
+  return (
+    <div className="pb-scene">
+      {/* Book container */}
+      <div className={`pb-book ${flipping ? `pb-flipping-${flipDir}` : ""}`}>
+        {/* Left cover (always dark) */}
+        <div className="pb-cover-left">
+          <div className="pb-cover-spine">
+            <span className="pb-spine-text">ARTOMANGO PASSPORT</span>
+          </div>
+        </div>
+
+        {/* Right page content */}
+        <div className="pb-page-right">
+          {/* PAGE: COVER */}
+          {pages[page] === "cover" && (
+            <div className="pb-page-content pb-page-cover-content">
+              <div className="pb-page-cover-img">
+                {mainImg
+                  ? <img src={mainImg} alt={artwork.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                  : <div className="pb-no-img"><ImageIcon size={48} color="#D4C9A8" /></div>
+                }
+                {isVerified && (
+                  <div className="pb-cover-verified-badge">
+                    <CheckCircle2 size={12} /> Verified
+                  </div>
+                )}
+              </div>
+              <div className="pb-page-cover-info">
+                <div className="pb-page-tag">🥭 Artomango</div>
+                <div className="pb-page-cover-title">{artwork.title}</div>
+                {artist && <div className="pb-page-cover-artist">by {artist.full_name}</div>}
+                <div className="pb-page-cover-meta">
+                  {[artwork.year, artwork.medium].filter(Boolean).join(" · ")}
+                </div>
+                <div className="pb-cert-pill">
+                  <Fingerprint size={10} />
+                  {artwork.certificate_id || "No Certificate Yet"}
+                </div>
+              </div>
+              <div className="pb-page-number">1 / {totalPages}</div>
+            </div>
+          )}
+
+          {/* PAGE: IDENTITY */}
+          {pages[page] === "identity" && (
+            <div className="pb-page-content">
+              <div className="pb-page-header">
+                <Award size={13} />
+                <span>Identity</span>
+              </div>
+              <div className="pb-id-thumb">
+                {mainImg
+                  ? <img src={mainImg} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                  : <div className="pb-no-img"><ImageIcon size={28} color="#D4C9A8" /></div>
+                }
+              </div>
+              <div className="pb-id-fields">
+                {[
+                  { label: "Title",      value: artwork.title },
+                  { label: "Artist",     value: artist?.full_name },
+                  { label: "Year",       value: artwork.year?.toString() },
+                  { label: "Medium",     value: artwork.medium },
+                  { label: "Dimensions", value: dims.length ? dims.join(" × ") + " cm" : null },
+                  { label: "Status",     value: artwork.status },
+                  { label: "Framed",     value: artwork.framed ? "Yes" : null },
+                  { label: "Editions",   value: artwork.editions ? `${artwork.editions}` : null },
+                ].filter(f => f.value).map(f => (
+                  <div key={f.label} className="pb-id-field">
+                    <div className="pb-id-label">{f.label}</div>
+                    <div className="pb-id-value">{f.value}</div>
+                  </div>
+                ))}
+              </div>
+              {/* MRZ strip */}
+              <div className="pb-mrz">
+                <div>P&lt;ART&lt;{(artwork.title || "").toUpperCase().replace(/\s/g, "<").slice(0, 28)}</div>
+                <div>{(artwork.certificate_id || "AM000000000XXXXX").slice(0, 20)}&lt;&lt;{artwork.year || "0000"}</div>
+              </div>
+              <div className="pb-page-number">2 / {totalPages}</div>
+            </div>
+          )}
+
+          {/* PAGE: AUTHENTICATION */}
+          {pages[page] === "authentication" && (
+            <div className="pb-page-content">
+              <div className="pb-page-header">
+                <Shield size={13} />
+                <span>Authentication</span>
+              </div>
+
+              {/* Big seal */}
+              <div className={`pb-seal ${isVerified ? "pb-seal-verified" : ""}`}>
+                <div className="pb-seal-ring1" />
+                <div className="pb-seal-ring2" />
+                <div className="pb-seal-inner">
+                  <div style={{ fontSize: 28, marginBottom: 4 }}>
+                    {isVerified ? "✦" : "○"}
+                  </div>
+                  <div className="pb-seal-status" style={{ color: authCfg.color }}>
+                    {authCfg.label}
+                  </div>
+                </div>
+              </div>
+
+              {/* Auth details */}
+              <div className="pb-auth-details">
+                {[
+                  { label: "Status",          value: authCfg.label },
+                  { label: "Authenticated by", value: artwork.authenticated_by },
+                  { label: "Date",            value: fmtDate(artwork.authentication_date) },
+                  { label: "Certificate ID",  value: artwork.certificate_id },
+                ].filter(f => f.value).map(f => (
+                  <div key={f.label} className="pb-auth-row">
+                    <div className="pb-auth-lbl">{f.label}</div>
+                    <div className="pb-auth-val">{f.value}</div>
+                  </div>
+                ))}
+                {artwork.authentication_notes && (
+                  <div className="pb-auth-notes">
+                    <div className="pb-auth-lbl">Notes</div>
+                    <div style={{ fontSize: 11, color: "#5C5346", lineHeight: 1.5, marginTop: 3 }}>
+                      {artwork.authentication_notes}
+                    </div>
+                  </div>
+                )}
+              </div>
+              <div className="pb-page-number">3 / {totalPages}</div>
+            </div>
+          )}
+
+          {/* PAGE: PROVENANCE */}
+          {pages[page] === "provenance" && (
+            <div className="pb-page-content">
+              <div className="pb-page-header">
+                <Fingerprint size={13} />
+                <span>Provenance</span>
+              </div>
+
+              {provenance.length === 0 ? (
+                <div className="pb-empty-state">
+                  No provenance entries yet
+                </div>
+              ) : (
+                <div className="pb-timeline">
+                  {provenance.map((p, i) => {
+                    const cfg = EVT_CFG[p.event_type] || { label: p.event_type, icon: "·", color: "#9B8F7A" };
+                    return (
+                      <div key={p.id} className="pb-timeline-item">
+                        <div className="pb-timeline-dot" style={{ color: cfg.color, borderColor: cfg.color }}>
+                          {cfg.icon}
+                        </div>
+                        <div className="pb-timeline-content">
+                          <div className="pb-timeline-type" style={{ color: cfg.color }}>{cfg.label}</div>
+                          {p.date && <div className="pb-timeline-date">{fmtDate(p.date)}</div>}
+                          {p.owner_name && !p.is_anonymous && (
+                            <div className="pb-timeline-owner">{p.owner_name}</div>
+                          )}
+                          {p.location && (
+                            <div className="pb-timeline-loc">
+                              <MapPin size={9} /> {p.location}
+                            </div>
+                          )}
+                          {p.notes && <div className="pb-timeline-notes">{p.notes}</div>}
+                        </div>
+                        {i < provenance.length - 1 && <div className="pb-timeline-line" />}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+              <div className="pb-page-number">{pages.indexOf("provenance") + 1} / {totalPages}</div>
+            </div>
+          )}
+
+          {/* PAGE: EXHIBITIONS */}
+          {pages[page] === "exhibitions" && (
+            <div className="pb-page-content">
+              <div className="pb-page-header">
+                <Building2 size={13} />
+                <span>Exhibitions</span>
+              </div>
+              <div className="pb-exhibitions">
+                {exhibitions.map(ex => (
+                  <div key={ex.id} className="pb-ex-card">
+                    {ex.cover_image && (
+                      <div className="pb-ex-img">
+                        <img src={ex.cover_image} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                      </div>
+                    )}
+                    <div className="pb-ex-info">
+                      <div className="pb-ex-title">{ex.title}</div>
+                      {(ex.gallery_name || ex.venue) && (
+                        <div className="pb-ex-venue">
+                          <Building2 size={9} /> {ex.gallery_name || ex.venue}
+                        </div>
+                      )}
+                      {ex.start_date && (
+                        <div className="pb-ex-dates">
+                          <CalendarDays size={9} /> {fmtDateShort(ex.start_date)}
+                          {ex.end_date ? ` — ${fmtDateShort(ex.end_date)}` : ""}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="pb-page-number">{totalPages} / {totalPages}</div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Navigation */}
+      <div className="pb-nav">
+        <button
+          className="pb-nav-btn"
+          onClick={() => goTo("prev")}
+          disabled={page === 0 || flipping}
+        >
+          <ChevronLeft size={18} />
+        </button>
+        <div className="pb-dots">
+          {pages.map((_, i) => (
+            <div
+              key={i}
+              className={`pb-dot ${i === page ? "active" : ""}`}
+              onClick={() => {
+                if (i !== page && !flipping) {
+                  setFlipDir(i > page ? "next" : "prev");
+                  setFlipping(true);
+                  setTimeout(() => { setPage(i); setFlipping(false); }, 350);
+                }
+              }}
+            />
+          ))}
+        </div>
+        <button
+          className="pb-nav-btn"
+          onClick={() => goTo("next")}
+          disabled={page === totalPages - 1 || flipping}
+        >
+          <ChevronRight size={18} />
+        </button>
+      </div>
+      <div className="pb-hint">Click arrows or dots to flip pages</div>
+    </div>
+  );
 }
 
-// ════════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════════
+// MAIN PAGE
+// ══════════════════════════════════════════════════════════════════
 export default function ArtworkPassportPage() {
   const params = useParams<{ id: string }>();
   const artworkId = params?.id;
 
-  const [artwork, setArtwork]         = useState<Artwork | null>(null);
-  const [artist, setArtist]           = useState<Artist | null>(null);
-  const [provenance, setProvenance]   = useState<ProvenanceEntry[]>([]);
+  const [artwork, setArtwork]       = useState<Artwork | null>(null);
+  const [artist, setArtist]         = useState<Artist | null>(null);
+  const [provenance, setProvenance] = useState<ProvenanceEntry[]>([]);
   const [exhibitions, setExhibitions] = useState<Exhibition[]>([]);
-  const [viewCount, setViewCount]     = useState(0);
-  const [loading, setLoading]         = useState(true);
-  const [error, setError]             = useState("");
-  const [copied, setCopied]           = useState(false);
-  const [showQR, setShowQR]           = useState(false);
+  const [viewCount, setViewCount]   = useState(0);
+  const [loading, setLoading]       = useState(true);
+  const [error, setError]           = useState("");
+  const [copied, setCopied]         = useState(false);
+  const [showQR, setShowQR]         = useState(false);
 
-  const coverRef     = useParallax(0.25);
-  const identityR    = useReveal(0.1);
-  const authR        = useReveal(0.1);
-  const provenanceR  = useReveal(0.08);
-  const exhibitionsR = useReveal(0.1);
-  const verifyR      = useReveal(0.15);
+  const heroR    = useReveal(0.05);
+  const bookR    = useReveal(0.05);
+  const detailsR = useReveal(0.08);
+  const verifyR  = useReveal(0.1);
 
   useEffect(() => {
     if (!artworkId) return;
@@ -130,28 +399,30 @@ export default function ArtworkPassportPage() {
   }, [artworkId]);
 
   async function loadPassport() {
+    setLoading(true);
+    setError("");
     const sb = createClient();
 
-    // 1. Fetch artwork
+    // 1. Artwork
     const { data: aw, error: awErr } = await sb
       .from("artworks").select("*").eq("id", artworkId).single();
     if (awErr || !aw) { setError("Artwork not found"); setLoading(false); return; }
     setArtwork(aw);
 
-    // 2. Fetch artist profile
+    // 2. Artist
     const { data: prof } = await sb
       .from("profiles")
       .select("id, full_name, username, role, bio, location, avatar_url, website, instagram")
       .eq("id", aw.user_id).single();
     setArtist(prof);
 
-    // 3. Fetch provenance
+    // 3. Provenance
     const { data: prov } = await sb
       .from("provenance_entries").select("*")
       .eq("artwork_id", artworkId).order("date", { ascending: true });
     setProvenance(prov || []);
 
-    // 4. Fetch exhibitions via junction
+    // 4. Exhibitions
     const { data: exLinks } = await sb
       .from("exhibition_artworks").select("exhibition_id").eq("artwork_id", artworkId);
     if (exLinks?.length) {
@@ -178,466 +449,207 @@ export default function ArtworkPassportPage() {
     setTimeout(() => setCopied(false), 2500);
   }
 
-  const pageUrl = typeof window !== "undefined" ? window.location.href : "";
-  const qrUrl = pageUrl
-    ? `https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=${encodeURIComponent(pageUrl)}&bgcolor=FFFBEA&color=111110&margin=20`
-    : "";
+  const mainImg = artwork?.images?.[0];
+  const isVerified = artwork?.authentication_status && artwork.authentication_status !== "pending";
+  const authCfg = AUTH_CFG[artwork?.authentication_status || "pending"];
+  const qrUrl = artwork?.certificate_id && typeof window !== "undefined"
+    ? `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(window.location.href)}&bgcolor=FFFBEA&color=111110&margin=16`
+    : null;
 
-  if (loading) return (
-    <div style={S.loadWrap}>
-      <style>{GLOBAL_CSS}</style>
-      <div style={S.loadInner}>
-        <div style={{ fontSize: 56, marginBottom: 16, animation: "passFloat 3s ease-in-out infinite" }}>🥭</div>
-        <div style={{ fontSize: 14, fontWeight: 700, color: "#9B8F7A", letterSpacing: "0.2em", textTransform: "uppercase" }}>Loading passport…</div>
-        <div style={{ width: 120, height: 2, background: "#E8E0D0", marginTop: 16, borderRadius: 1, overflow: "hidden" }}>
-          <div style={{ width: "60%", height: "100%", background: "#FFD400", animation: "passLoad 1.5s ease-in-out infinite" }} />
+  // ── Loading ──────────────────────────────────────────────────────
+  if (loading) {
+    return (
+      <>
+        <style>{GLOBAL_CSS}</style>
+        <div className="pp-loading">
+          <div className="pp-loading-passport">
+            <div className="pp-loading-shine" />
+            <div style={{ fontSize: 32, marginBottom: 12 }}>🥭</div>
+            <div className="pp-loading-title">Loading Passport…</div>
+            <div className="pp-loading-bar"><div className="pp-loading-fill" /></div>
+          </div>
         </div>
-      </div>
-    </div>
-  );
+      </>
+    );
+  }
 
-  if (error || !artwork) return (
-    <div style={S.loadWrap}>
-      <style>{GLOBAL_CSS}</style>
-      <div style={S.loadInner}>
-        <div style={{ fontSize: 56, marginBottom: 16 }}>📄</div>
-        <div style={{ fontSize: 18, fontWeight: 900, color: "#111110", marginBottom: 6 }}>Passport not found</div>
-        <div style={{ fontSize: 13, color: "#9B8F7A", marginBottom: 28 }}>{error || "This artwork doesn't exist."}</div>
-        <Link href="/" style={{ textDecoration: "none" }}>
-          <button style={{ padding: "10px 24px", background: "#FFD400", border: "2.5px solid #111110", borderRadius: 12, fontSize: 14, fontWeight: 800, cursor: "pointer", fontFamily: "inherit", boxShadow: "3px 3px 0 #111110" }}>← Go Home</button>
-        </Link>
-      </div>
-    </div>
-  );
-
-  const authCfg = AUTH_STATUS_CFG[artwork.authentication_status || "pending"];
-  const dims = [artwork.width_cm, artwork.height_cm, artwork.depth_cm].filter(Boolean);
-  const mainImg = Array.isArray(artwork.images) ? artwork.images[0] : null;
+  if (error || !artwork) {
+    return (
+      <>
+        <style>{GLOBAL_CSS}</style>
+        <div className="pp-loading">
+          <div style={{ textAlign: "center" }}>
+            <div style={{ fontSize: 48, marginBottom: 16 }}>🥭</div>
+            <div style={{ fontSize: 24, fontWeight: 900, color: "#111110", marginBottom: 8 }}>Passport not found</div>
+            <div style={{ fontSize: 14, color: "#9B8F7A" }}>{error || "This artwork passport doesn't exist."}</div>
+            <Link href="/" style={{ display: "inline-block", marginTop: 24, padding: "10px 24px", background: "#111110", color: "#FFD400", borderRadius: 10, fontSize: 14, fontWeight: 800, textDecoration: "none" }}>
+              ← Back to Artomango
+            </Link>
+          </div>
+        </div>
+      </>
+    );
+  }
 
   return (
     <>
       <style>{GLOBAL_CSS}</style>
 
-      {/* ══════════════════════════════════════════════════════════════
-          FIXED NAV
-      ══════════════════════════════════════════════════════════════ */}
-      <nav className="pp-nav">
-        <div className="pp-nav-inner">
-          <Link href="/" style={{ display: "flex", alignItems: "center", gap: 6, textDecoration: "none" }}>
-            <span style={{ fontSize: 18 }}>🥭</span>
-            <span style={{ fontSize: 13, fontWeight: 900, color: "#111110" }}>artomango</span>
-          </Link>
-          <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-            <div className="pp-nav-badge">
-              <Fingerprint size={11} />
-              Digital Passport
-            </div>
-          </div>
-          <div style={{ display: "flex", gap: 6, marginLeft: "auto" }}>
-            <button onClick={() => setShowQR(p => !p)} className="pp-icon-btn">
-              <QrCode size={14} />
-            </button>
-            <button onClick={copyUrl} className="pp-icon-btn">
-              {copied ? <Check size={14} color="#16A34A" /> : <Copy size={14} />}
-            </button>
-            {artist?.username && (
-              <Link href={`/${artist.username}`} style={{ textDecoration: "none" }}>
-                <button className="pp-nav-cta">View Artist →</button>
-              </Link>
-            )}
-          </div>
-        </div>
-      </nav>
-
-      {/* ══════════════════════════════════════════════════════════════
-          SECTION 1: COVER — Full-width cinematic hero
-      ══════════════════════════════════════════════════════════════ */}
-      <section className="pp-cover" ref={coverRef}>
-        {mainImg ? (
-          <img src={mainImg} alt={artwork.title} className="pp-cover-img" />
-        ) : (
-          <div className="pp-cover-fallback">
-            <ImageIcon size={80} color="#D4C9A8" />
+      {/* ── HERO SECTION ─────────────────────────────────────────── */}
+      <section className="pp-hero" ref={heroR.ref}>
+        {/* Background artwork image */}
+        {mainImg && (
+          <div className="pp-hero-bg">
+            <img src={mainImg} alt="" />
+            <div className="pp-hero-bg-overlay" />
           </div>
         )}
-        <div className="pp-cover-overlay" />
-        <div className="pp-cover-grain" />
 
-        {/* Content overlay */}
-        <div className="pp-cover-content">
-          {/* Verified badge */}
-          {artwork.authentication_status && artwork.authentication_status !== "pending" && (
-            <div className="pp-verified-badge pp-fade-up pp-d1">
-              <Shield size={12} />
-              Verified Artwork
-            </div>
-          )}
-
-          <h1 className="pp-cover-title pp-fade-up pp-d2">{artwork.title}</h1>
-
-          {artist && (
-            <div className="pp-cover-artist pp-fade-up pp-d3">
-              <div className="pp-cover-avatar">
-                {artist.avatar_url
-                  ? <img src={artist.avatar_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                  : (artist.full_name || "A")[0]
-                }
+        <div className={`pp-hero-content pp-reveal${heroR.visible ? " visible" : ""}`}>
+          {/* Top bar */}
+          <div className="pp-hero-topbar">
+            <Link href="/" className="pp-back-btn">
+              <span>🥭</span> Artomango
+            </Link>
+            {isVerified && (
+              <div className="pp-hero-badge">
+                <CheckCircle2 size={12} />
+                Verified Artwork
               </div>
-              <div>
-                <div style={{ fontSize: 16, fontWeight: 800, color: "#fff" }}>{artist.full_name}</div>
-                {artist.location && (
-                  <div style={{ fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.5)", display: "flex", alignItems: "center", gap: 4 }}>
-                    <MapPin size={10} /> {artist.location}
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          <div className="pp-cover-meta pp-fade-up pp-d4">
-            {artwork.year && <span>{artwork.year}</span>}
-            {artwork.medium && <><span className="pp-meta-dot">·</span><span>{artwork.medium}</span></>}
+            )}
           </div>
 
-          {/* Certificate ID watermark */}
-          <div className="pp-cover-cert-id pp-fade-up pp-d5">
-            {artwork.certificate_id || "—"}
-          </div>
-        </div>
-
-        {/* Scroll hint */}
-        <div className="pp-scroll-hint">
-          <ChevronDown size={18} />
-        </div>
-      </section>
-
-      {/* ══════════════════════════════════════════════════════════════
-          SECTION 2: IDENTITY — Passport-style identity card
-      ══════════════════════════════════════════════════════════════ */}
-      <section className="pp-section pp-section-identity" ref={identityR.ref}>
-        <div className={`pp-container pp-reveal${identityR.visible ? " visible" : ""}`}>
-
-          <div className="pp-section-label">
-            <Award size={14} />
-            <span>Artwork Identity</span>
-            <div className="pp-section-line" />
-          </div>
-
-          <div className="pp-identity-grid">
-            {/* Left: passport card */}
-            <div className="pp-passport-card">
-              {/* Passport header bar */}
-              <div className="pp-passport-header">
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <span style={{ fontSize: 18 }}>🥭</span>
-                  <div>
-                    <div style={{ fontSize: 8, fontWeight: 700, color: "rgba(255,212,0,0.5)", letterSpacing: "0.3em", textTransform: "uppercase" }}>Artomango</div>
-                    <div style={{ fontSize: 12, fontWeight: 900, color: "#FFD400", letterSpacing: "0.08em" }}>ARTWORK PASSPORT</div>
-                  </div>
-                </div>
-                <div className="pp-passport-cert-id">
-                  {artwork.certificate_id || "—"}
-                </div>
-              </div>
-
-              {/* Passport body */}
-              <div className="pp-passport-body">
-                {/* Thumbnail */}
-                <div className="pp-passport-thumb">
-                  {mainImg
-                    ? <img src={mainImg} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                    : <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", background: "#FAF7F3" }}><ImageIcon size={32} color="#D4C9A8" /></div>
+          {/* Title block */}
+          <div className="pp-hero-text">
+            <h1 className="pp-hero-title">{artwork.title}</h1>
+            {artist && (
+              <div className="pp-hero-artist">
+                <div className="pp-hero-avatar">
+                  {artist.avatar_url
+                    ? <img src={artist.avatar_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                    : (artist.full_name || "A")[0]
                   }
-                  {/* Verification seal overlay */}
-                  {artwork.authentication_status !== "pending" && (
-                    <div className="pp-passport-seal">
-                      <CheckCircle2 size={10} />
+                </div>
+                <div>
+                  <div style={{ fontSize: 16, fontWeight: 800, color: "#fff" }}>{artist.full_name}</div>
+                  {artist.location && (
+                    <div style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", display: "flex", alignItems: "center", gap: 4 }}>
+                      <MapPin size={10} /> {artist.location}
                     </div>
                   )}
                 </div>
-
-                {/* Fields */}
-                <div className="pp-passport-fields">
-                  {[
-                    { label: "Title",      value: artwork.title },
-                    { label: "Artist",     value: artist?.full_name },
-                    { label: "Year",       value: artwork.year },
-                    { label: "Medium",     value: artwork.medium },
-                    { label: "Dimensions", value: dims.length ? dims.join(" × ") + " cm" : null },
-                    { label: "Framed",     value: artwork.framed ? "Yes" : null },
-                    { label: "Editions",   value: artwork.editions ? `${artwork.editions} edition${artwork.editions > 1 ? "s" : ""}` : null },
-                    { label: "Status",     value: artwork.status },
-                  ].filter(f => f.value).map((f, i) => (
-                    <div key={f.label} className="pp-passport-field" style={{ animationDelay: `${0.1 + i * 0.04}s` }}>
-                      <div className="pp-field-label">{f.label}</div>
-                      <div className="pp-field-value">{f.value}</div>
-                    </div>
-                  ))}
-                </div>
               </div>
-
-              {/* Passport footer with MRZ-style code */}
-              <div className="pp-passport-mrz">
-                <span>P&lt;ARTOMANGO&lt;{(artwork.title || "").toUpperCase().replace(/\s/g, "&lt;").slice(0, 30)}</span>
-                <span>{artwork.certificate_id || "AM-00000000-XXXXX"}&lt;&lt;&lt;&lt;{artwork.year || "0000"}</span>
-              </div>
+            )}
+            <div className="pp-hero-meta">
+              {artwork.year && <span>{artwork.year}</span>}
+              {artwork.medium && <><span className="pp-meta-dot">·</span><span>{artwork.medium}</span></>}
+              <span className="pp-meta-dot">·</span>
+              <span style={{ color: authCfg.color }}>{authCfg.icon} {authCfg.label}</span>
             </div>
+          </div>
 
-            {/* Right: description + stats */}
-            <div className="pp-identity-right">
-              {artwork.description && (
-                <div className="pp-identity-desc">
-                  <div className="pp-desc-label">About This Work</div>
-                  <p className="pp-desc-text">{artwork.description}</p>
-                </div>
-              )}
+          {/* Scroll hint */}
+          <div className="pp-scroll-hint">scroll to explore</div>
+        </div>
+      </section>
 
-              <div className="pp-identity-stats">
+      {/* ── 3D PASSPORT BOOK SECTION ─────────────────────────────── */}
+      <section className="pp-book-section" ref={bookR.ref}>
+        <div className={`pp-container pp-reveal${bookR.visible ? " visible" : ""}`}>
+          <div className="pp-section-eyebrow">
+            <Fingerprint size={14} />
+            <span>Digital Artwork Passport</span>
+            <div className="pp-eyebrow-line" />
+          </div>
+          <p className="pp-book-subtitle">
+            Flip through the pages to explore the full history and authentication of this artwork.
+          </p>
+          <PassportBook
+            artwork={artwork}
+            artist={artist}
+            provenance={provenance}
+            exhibitions={exhibitions}
+          />
+        </div>
+      </section>
+
+      {/* ── DETAILS SECTION ──────────────────────────────────────── */}
+      {artwork.description && (
+        <section className="pp-details-section" ref={detailsR.ref}>
+          <div className={`pp-container pp-reveal${detailsR.visible ? " visible" : ""}`}>
+            <div className="pp-section-eyebrow">
+              <Award size={14} />
+              <span>About this Work</span>
+              <div className="pp-eyebrow-line" />
+            </div>
+            <div className="pp-details-grid">
+              <div className="pp-details-desc">
+                <p>{artwork.description}</p>
+              </div>
+              <div className="pp-details-stats">
                 {[
-                  { label: "Provenance Entries", value: provenance.length, icon: "📜" },
-                  { label: "Exhibitions", value: exhibitions.length, icon: "🏛️" },
-                  { label: "Passport Views", value: viewCount, icon: "👁" },
+                  { icon: "📜", label: "Provenance entries", value: provenance.length },
+                  { icon: "🏛️", label: "Exhibitions", value: exhibitions.length },
+                  { icon: "👁", label: "Passport views", value: viewCount },
                 ].map(s => (
-                  <div key={s.label} className="pp-stat-card">
-                    <div className="pp-stat-emoji">{s.icon}</div>
+                  <div key={s.label} className="pp-stat">
+                    <div className="pp-stat-icon">{s.icon}</div>
                     <div className="pp-stat-num">{s.value}</div>
-                    <div className="pp-stat-label">{s.label}</div>
+                    <div className="pp-stat-lbl">{s.label}</div>
                   </div>
                 ))}
               </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ══════════════════════════════════════════════════════════════
-          SECTION 3: AUTHENTICATION — Seal & status
-      ══════════════════════════════════════════════════════════════ */}
-      <section className="pp-section pp-section-auth" ref={authR.ref}>
-        <div className={`pp-container pp-reveal${authR.visible ? " visible" : ""}`}>
-
-          <div className="pp-section-label">
-            <Shield size={14} />
-            <span>Authentication</span>
-            <div className="pp-section-line" />
-          </div>
-
-          <div className="pp-auth-grid">
-            {/* Seal */}
-            <div className="pp-auth-seal-wrap">
-              <div className={`pp-auth-seal ${artwork.authentication_status !== "pending" ? "verified" : ""}`}>
-                <div className="pp-seal-ring pp-seal-ring-1" />
-                <div className="pp-seal-ring pp-seal-ring-2" />
-                <div className="pp-seal-inner">
-                  <div className="pp-seal-icon">{authCfg.icon}</div>
-                  <div className="pp-seal-status">{authCfg.label}</div>
-                  {artwork.authentication_status !== "pending" && (
-                    <div className="pp-seal-check"><CheckCircle2 size={14} /></div>
-                  )}
-                </div>
-                <div className="pp-seal-text-ring">
-                  {"ARTOMANGO · CERTIFICATE OF AUTHENTICITY · ".split("").map((c, i) => (
-                    <span key={i} style={{ transform: `rotate(${i * 8.5}deg)`, transformOrigin: "0 80px" }}>{c}</span>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {/* Details */}
-            <div className="pp-auth-details">
-              <div className="pp-auth-status-badge" style={{ background: authCfg.bg, color: authCfg.color, borderColor: authCfg.color }}>
-                <span className="pp-auth-status-icon">{authCfg.icon}</span>
-                {authCfg.label}
-              </div>
-
-              <div className="pp-auth-fields">
-                {[
-                  { label: "Authenticated By", value: artwork.authenticated_by, icon: <Award size={14} /> },
-                  { label: "Authentication Date", value: fmtDate(artwork.authentication_date), icon: <CalendarDays size={14} /> },
-                  { label: "Certificate ID", value: artwork.certificate_id, icon: <Fingerprint size={14} />, mono: true },
-                ].filter(f => f.value).map(f => (
-                  <div key={f.label} className="pp-auth-field">
-                    <div className="pp-auth-field-icon">{f.icon}</div>
-                    <div>
-                      <div className="pp-auth-field-label">{f.label}</div>
-                      <div className={`pp-auth-field-value${f.mono ? " mono" : ""}`}>{f.value}</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {artwork.authentication_notes && (
-                <div className="pp-auth-notes">
-                  <div className="pp-auth-notes-label">Notes</div>
-                  <p className="pp-auth-notes-text">{artwork.authentication_notes}</p>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ══════════════════════════════════════════════════════════════
-          SECTION 4: PROVENANCE TIMELINE
-      ══════════════════════════════════════════════════════════════ */}
-      <section className="pp-section pp-section-provenance" ref={provenanceR.ref}>
-        <div className={`pp-container pp-reveal${provenanceR.visible ? " visible" : ""}`}>
-
-          <div className="pp-section-label">
-            <History size={14} />
-            <span>Provenance History</span>
-            <div className="pp-section-line" />
-          </div>
-
-          {provenance.length === 0 ? (
-            <div className="pp-empty">
-              <div style={{ fontSize: 36, marginBottom: 10 }}>📜</div>
-              <div style={{ fontSize: 15, fontWeight: 800, color: "#111110" }}>No provenance recorded yet</div>
-              <div style={{ fontSize: 13, color: "#9B8F7A", marginTop: 4 }}>The history of this artwork will appear here as entries are added.</div>
-            </div>
-          ) : (
-            <div className="pp-timeline">
-              <div className="pp-timeline-line" />
-              {provenance.map((entry, i) => {
-                const cfg = EVENT_TYPE_CFG[entry.event_type] || EVENT_TYPE_CFG.created;
-                return (
-                  <div
-                    key={entry.id}
-                    className="pp-timeline-entry"
-                    style={{ animationDelay: `${i * 0.08}s` }}
-                  >
-                    {/* Dot */}
-                    <div className="pp-timeline-dot" style={{ background: cfg.color, borderColor: cfg.color }}>
-                      <span className="pp-timeline-dot-icon">{cfg.icon}</span>
-                    </div>
-
-                    {/* Card */}
-                    <div className="pp-timeline-card">
-                      <div className="pp-timeline-card-header">
-                        <span className="pp-timeline-type" style={{ background: cfg.color + "18", color: cfg.color, borderColor: cfg.color + "40" }}>
-                          {cfg.label}
-                        </span>
-                        {entry.date && (
-                          <span className="pp-timeline-date">{fmtDate(entry.date)}</span>
-                        )}
-                      </div>
-                      <div className="pp-timeline-card-body">
-                        {entry.owner_name && !entry.is_anonymous && (
-                          <div className="pp-timeline-owner">{entry.owner_name}</div>
-                        )}
-                        {entry.is_anonymous && (
-                          <div className="pp-timeline-owner" style={{ fontStyle: "italic", color: "#9B8F7A" }}>Private collection</div>
-                        )}
-                        {entry.location && (
-                          <div className="pp-timeline-location">
-                            <MapPin size={11} /> {entry.location}
-                          </div>
-                        )}
-                        {entry.notes && (
-                          <div className="pp-timeline-notes">{entry.notes}</div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      </section>
-
-      {/* ══════════════════════════════════════════════════════════════
-          SECTION 5: EXHIBITIONS
-      ══════════════════════════════════════════════════════════════ */}
-      {exhibitions.length > 0 && (
-        <section className="pp-section pp-section-exhibitions" ref={exhibitionsR.ref}>
-          <div className={`pp-container pp-reveal${exhibitionsR.visible ? " visible" : ""}`}>
-
-            <div className="pp-section-label">
-              <Building2 size={14} />
-              <span>Exhibition History</span>
-              <div className="pp-section-line" />
-            </div>
-
-            <div className="pp-exhibition-grid">
-              {exhibitions.map((ex, i) => (
-                <div key={ex.id} className="pp-exhibition-card" style={{ animationDelay: `${i * 0.06}s` }}>
-                  {/* Cover */}
-                  <div className="pp-ex-cover">
-                    {ex.cover_image
-                      ? <img src={ex.cover_image} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                      : <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", background: "#FAF7F3", fontSize: 28 }}>🏛️</div>
-                    }
-                  </div>
-                  <div className="pp-ex-body">
-                    <div className="pp-ex-title">{ex.title}</div>
-                    {(ex.venue || ex.gallery_name) && (
-                      <div className="pp-ex-venue">
-                        <Building2 size={11} /> {ex.gallery_name || ex.venue}
-                      </div>
-                    )}
-                    {(ex.start_date || ex.end_date) && (
-                      <div className="pp-ex-dates">
-                        <CalendarDays size={11} />
-                        {fmtDateShort(ex.start_date)}{ex.end_date ? ` — ${fmtDateShort(ex.end_date)}` : ""}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ))}
             </div>
           </div>
         </section>
       )}
 
-      {/* ══════════════════════════════════════════════════════════════
-          SECTION 6: VERIFICATION & SHARING
-      ══════════════════════════════════════════════════════════════ */}
-      <section className="pp-section pp-section-verify" ref={verifyR.ref}>
+      {/* ── VERIFY SECTION ───────────────────────────────────────── */}
+      <section className="pp-verify-section" ref={verifyR.ref}>
         <div className={`pp-container pp-reveal${verifyR.visible ? " visible" : ""}`}>
-
           <div className="pp-verify-card">
             <div className="pp-verify-left">
-              <div className="pp-verify-eyebrow">
-                <Fingerprint size={14} />
-                Verification
+              <div className="pp-section-eyebrow" style={{ marginBottom: 16 }}>
+                <Shield size={14} />
+                <span>Verification</span>
               </div>
-              <h3 className="pp-verify-title">
-                Verify this<br />artwork.
-              </h3>
+              <h3 className="pp-verify-title">Verify this<br />artwork.</h3>
               <p className="pp-verify-sub">
-                This digital passport serves as the certificate of authenticity for this artwork. Share this page or use the QR code to verify provenance.
+                This digital passport serves as the certificate of authenticity. Share this page or scan the QR code to verify provenance.
               </p>
-
-              <div className="pp-verify-cert-row">
-                <div className="pp-verify-cert-label">Certificate ID</div>
-                <div className="pp-verify-cert-value">{artwork.certificate_id || "—"}</div>
+              <div className="pp-cert-row">
+                <div className="pp-cert-label">Certificate ID</div>
+                <div className="pp-cert-value">{artwork.certificate_id || "—"}</div>
               </div>
-
               <div className="pp-verify-actions">
-                <button onClick={copyUrl} className="pp-verify-btn primary">
+                <button onClick={copyUrl} className="pp-btn-primary">
                   {copied ? <><Check size={14} /> Copied!</> : <><Share2 size={14} /> Share Passport</>}
                 </button>
-                <button onClick={() => setShowQR(p => !p)} className="pp-verify-btn secondary">
-                  <QrCode size={14} /> {showQR ? "Hide" : "Show"} QR Code
-                </button>
+                {artwork.certificate_id && (
+                  <button onClick={() => setShowQR(p => !p)} className="pp-btn-secondary">
+                    <QrCode size={14} /> {showQR ? "Hide QR" : "Show QR"}
+                  </button>
+                )}
               </div>
-
               {showQR && qrUrl && (
-                <div className="pp-verify-qr">
-                  <img src={qrUrl} alt="Passport QR Code" style={{ width: 160, height: 160, display: "block" }} />
-                  <div className="pp-verify-qr-hint">Scan to verify</div>
+                <div className="pp-qr-inline">
+                  <img src={qrUrl} alt="QR" style={{ width: 160, height: 160, borderRadius: 12, border: "2px solid #E8E0D0" }} />
                 </div>
               )}
             </div>
-
             <div className="pp-verify-right">
-              <div className="pp-verify-stamp">
+              <div className={`pp-verify-stamp ${isVerified ? "verified" : ""}`}>
                 <div className="pp-stamp-ring" />
-                <div className="pp-stamp-inner">
-                  <div style={{ fontSize: 28, marginBottom: 4 }}>🥭</div>
-                  <div style={{ fontSize: 8, fontWeight: 800, color: "#FFD400", letterSpacing: "0.3em", textTransform: "uppercase" }}>Artomango</div>
-                  <div style={{ fontSize: 10, fontWeight: 700, color: "rgba(255,212,0,0.5)", letterSpacing: "0.15em", marginTop: 2 }}>CERTIFIED</div>
+                <div style={{ textAlign: "center" }}>
+                  <div style={{ fontSize: 36, marginBottom: 6 }}>
+                    {isVerified ? "✦" : "○"}
+                  </div>
+                  <div style={{ fontSize: 11, fontWeight: 900, color: isVerified ? "#FFD400" : "#9B8F7A", letterSpacing: "0.12em", textTransform: "uppercase" }}>
+                    {authCfg.label}
+                  </div>
+                  <div style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", marginTop: 4, letterSpacing: "0.2em" }}>
+                    ARTOMANGO
+                  </div>
                 </div>
               </div>
             </div>
@@ -645,32 +657,31 @@ export default function ArtworkPassportPage() {
         </div>
       </section>
 
-      {/* ══════════════════════════════════════════════════════════════
-          FOOTER
-      ══════════════════════════════════════════════════════════════ */}
+      {/* ── FOOTER ───────────────────────────────────────────────── */}
       <footer className="pp-footer">
         <div className="pp-footer-inner">
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span style={{ fontSize: 16 }}>🥭</span>
-            <span style={{ fontSize: 13, fontWeight: 800, color: "#FFD400" }}>artomango</span>
-            <span style={{ fontSize: 12, fontWeight: 600, color: "#444" }}>· Digital Artwork Passport</span>
+            <span style={{ fontSize: 20 }}>🥭</span>
+            <span style={{ fontSize: 13, fontWeight: 800, color: "#FFD400" }}>Artomango</span>
           </div>
-          <div style={{ fontSize: 11, color: "#444", fontWeight: 600 }}>
-            Certificate: {artwork.certificate_id} · Generated {fmtDate(new Date().toISOString())}
+          <div style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", fontWeight: 600 }}>
+            Artwork Passport · Certificate of Authenticity
           </div>
         </div>
       </footer>
 
-      {/* QR overlay */}
-      {showQR && (
+      {/* ── QR MODAL ─────────────────────────────────────────────── */}
+      {showQR && qrUrl && (
         <div className="pp-qr-overlay" onClick={() => setShowQR(false)}>
           <div className="pp-qr-modal" onClick={e => e.stopPropagation()}>
-            <button onClick={() => setShowQR(false)} style={{ position: "absolute", top: 12, right: 12, background: "none", border: "none", cursor: "pointer", color: "#9B8F7A" }}><X size={18} /></button>
-            <div style={{ fontSize: 36, marginBottom: 14 }}>🥭</div>
-            <div style={{ fontSize: 16, fontWeight: 900, color: "#111110", marginBottom: 4 }}>Scan to Verify</div>
-            <div style={{ fontSize: 12, color: "#9B8F7A", fontWeight: 600, marginBottom: 20 }}>{artwork.title} by {artist?.full_name}</div>
-            {qrUrl && <img src={qrUrl} alt="QR" style={{ width: 200, height: 200, border: "2.5px solid #111110", borderRadius: 12 }} />}
-            <div style={{ fontSize: 11, color: "#C0B8A8", fontWeight: 700, marginTop: 12, fontFamily: "monospace" }}>{artwork.certificate_id}</div>
+            <button onClick={() => setShowQR(false)} className="pp-qr-close"><X size={16} /></button>
+            <div style={{ fontSize: 20, marginBottom: 8 }}>🥭</div>
+            <div style={{ fontSize: 16, fontWeight: 900, color: "#111110", marginBottom: 4 }}>Scan to verify</div>
+            <div style={{ fontSize: 12, color: "#9B8F7A", marginBottom: 20 }}>{artwork.title}</div>
+            <img src={qrUrl} alt="QR" style={{ width: 200, height: 200, border: "2.5px solid #111110", borderRadius: 12 }} />
+            <div style={{ fontSize: 10, color: "#C0B8A8", fontFamily: "monospace", marginTop: 12, letterSpacing: "0.15em" }}>
+              {artwork.certificate_id}
+            </div>
           </div>
         </div>
       )}
@@ -678,448 +689,459 @@ export default function ArtworkPassportPage() {
   );
 }
 
-// ── Inline style constants (non-CSS) ─────────────────────────────
-const S = {
-  loadWrap: { minHeight: "100vh", background: "#FFFBEA", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Darker Grotesque', system-ui, sans-serif" } as React.CSSProperties,
-  loadInner: { textAlign: "center" } as React.CSSProperties,
-};
-
 // ══════════════════════════════════════════════════════════════════
-// CSS — The entire premium passport styling
+// CSS
 // ══════════════════════════════════════════════════════════════════
 const GLOBAL_CSS = `
   @import url('https://fonts.googleapis.com/css2?family=Darker+Grotesque:wght@400;500;600;700;800;900&display=swap');
-  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,400&display=swap');
 
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   html { font-family: 'Darker Grotesque', system-ui, sans-serif; scroll-behavior: smooth; }
   body { background: #FFFBEA; color: #111110; overflow-x: hidden; }
 
-  /* ── Animations ─────────────────────────────────────────────── */
-  @keyframes passFloat { 0%,100%{transform:translateY(0) rotate(-3deg)} 50%{transform:translateY(-12px) rotate(3deg)} }
-  @keyframes passLoad { 0%{transform:translateX(-100%)} 100%{transform:translateX(200%)} }
-  @keyframes fadeUp { from{opacity:0;transform:translateY(24px)} to{opacity:1;transform:none} }
-  @keyframes sealPulse { 0%,100%{box-shadow:0 0 0 0 rgba(22,163,106,0.15)} 50%{box-shadow:0 0 0 16px rgba(22,163,106,0)} }
-  @keyframes sealSpin { to{transform:rotate(360deg)} }
-  @keyframes stampIn { from{opacity:0;transform:scale(0.5) rotate(-20deg)} to{opacity:1;transform:scale(1) rotate(0deg)} }
-  @keyframes grainAnim { 0%,100%{transform:translate(0,0)} 10%{transform:translate(-5%,-10%)} 30%{transform:translate(3%,-15%)} 50%{transform:translate(12%,9%)} 70%{transform:translate(9%,4%)} 90%{transform:translate(-1%,7%)} }
-  @keyframes scrollBob { 0%,100%{transform:translateY(0);opacity:0.6} 50%{transform:translateY(6px);opacity:1} }
+  /* ── ANIMATIONS ─────────────────────────────────────────────── */
+  @keyframes fadeUp { from { opacity:0; transform:translateY(28px); } to { opacity:1; transform:none; } }
+  @keyframes loadBar { from { transform:translateX(-100%); } to { transform:translateX(100%); } }
+  @keyframes sealPulse { 0%,100%{box-shadow:0 0 0 0 rgba(22,163,106,.2)} 50%{box-shadow:0 0 0 18px rgba(22,163,106,0)} }
+  @keyframes pageFlipNext { 0%{transform:perspective(1200px) rotateY(0deg)} 100%{transform:perspective(1200px) rotateY(-25deg)} }
+  @keyframes pageFlipPrev { 0%{transform:perspective(1200px) rotateY(-25deg)} 100%{transform:perspective(1200px) rotateY(0deg)} }
+  @keyframes stampSpin { to{transform:rotate(360deg)} }
+  @keyframes scrollBob { 0%,100%{opacity:.4;transform:translateX(-50%) translateY(0)} 50%{opacity:.8;transform:translateX(-50%) translateY(6px)} }
 
-  .pp-fade-up { animation: fadeUp 0.7s cubic-bezier(0.16,1,0.3,1) both; }
-  .pp-d1 { animation-delay: 0.2s; }
-  .pp-d2 { animation-delay: 0.35s; }
-  .pp-d3 { animation-delay: 0.5s; }
-  .pp-d4 { animation-delay: 0.65s; }
-  .pp-d5 { animation-delay: 0.8s; }
-
-  .pp-reveal { opacity: 0; transform: translateY(32px); transition: opacity 0.8s cubic-bezier(0.16,1,0.3,1), transform 0.8s cubic-bezier(0.16,1,0.3,1); }
+  .pp-reveal { opacity: 0; transform: translateY(32px); transition: opacity .7s ease, transform .7s cubic-bezier(.16,1,.3,1); }
   .pp-reveal.visible { opacity: 1; transform: none; }
 
-  /* ── NAV ─────────────────────────────────────────────────────── */
-  .pp-nav {
-    position: fixed; top: 0; left: 0; right: 0; z-index: 100;
-    background: rgba(255,251,234,0.88);
-    backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
-    border-bottom: 2px solid #111110;
-  }
-  .pp-nav-inner {
-    max-width: 1100px; margin: 0 auto; padding: 0 24px; height: 52px;
-    display: flex; align-items: center; gap: 12;
-  }
-  .pp-nav-badge {
-    display: flex; align-items: center; gap: 5;
-    background: #111110; color: #FFD400;
-    padding: 4px 12px; border-radius: 9999px;
-    font-size: 10px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase;
-  }
-  .pp-icon-btn {
-    width: 34px; height: 34px; border-radius: 9999px;
-    border: 2px solid #E8E0D0; background: #fff;
+  /* ── LOADING ─────────────────────────────────────────────────── */
+  .pp-loading {
+    min-height: 100vh; background: #FFFBEA;
     display: flex; align-items: center; justify-content: center;
-    cursor: pointer; color: #111110; transition: all 0.15s;
+    font-family: 'Darker Grotesque', system-ui, sans-serif;
   }
-  .pp-icon-btn:hover { border-color: #111110; box-shadow: 2px 2px 0 #111110; transform: translateY(-1px); }
-  .pp-nav-cta {
-    padding: 7px 16px; background: #FFD400; border: 2px solid #111110;
-    border-radius: 9999px; font-family: inherit; font-size: 12px;
-    font-weight: 800; color: #111110; cursor: pointer; transition: all 0.15s;
+  .pp-loading-passport {
+    background: #fff; border: 2.5px solid #111110; border-radius: 20px;
+    padding: 48px 56px; text-align: center; position: relative; overflow: hidden;
+    box-shadow: 8px 8px 0 #D4C9A8;
   }
-  .pp-nav-cta:hover { box-shadow: 2px 2px 0 #111110; transform: translateY(-1px); }
+  .pp-loading-shine {
+    position: absolute; top: 0; left: 0; right: 0; height: 3px;
+    background: linear-gradient(90deg, transparent, #FFD400, transparent);
+    animation: loadBar 1.6s ease-in-out infinite;
+  }
+  .pp-loading-title { font-size: 18px; font-weight: 900; color: #111110; margin-bottom: 20px; }
+  .pp-loading-bar { height: 4px; background: #E8E0D0; border-radius: 99px; overflow: hidden; }
+  .pp-loading-fill { height: 100%; width: 40%; background: #FFD400; border-radius: 99px; animation: loadBar 1.2s ease-in-out infinite; }
 
-  /* ── COVER ───────────────────────────────────────────────────── */
-  .pp-cover {
-    position: relative; width: 100%; height: 100vh; min-height: 600px;
-    overflow: hidden; border-bottom: 3px solid #111110;
+  /* ── HERO ────────────────────────────────────────────────────── */
+  .pp-hero {
+    position: relative; min-height: 90vh;
+    display: flex; align-items: flex-end;
+    background: #111110; overflow: hidden;
   }
-  .pp-cover-img {
-    position: absolute; inset: 0; width: 100%; height: 120%;
-    object-fit: cover; object-position: center;
-    will-change: transform;
+  .pp-hero-bg {
+    position: absolute; inset: 0; z-index: 0;
   }
-  .pp-cover-fallback {
-    position: absolute; inset: 0; background: #F5F0E8;
-    display: flex; align-items: center; justify-content: center;
+  .pp-hero-bg img {
+    width: 100%; height: 100%; object-fit: cover;
+    transform: scale(1.06); filter: brightness(0.55) saturate(0.8);
+    transition: transform 0.1s;
   }
-  .pp-cover-overlay {
+  .pp-hero-bg-overlay {
     position: absolute; inset: 0;
-    background: linear-gradient(
-      to bottom,
-      rgba(0,0,0,0.15) 0%,
-      rgba(0,0,0,0.02) 40%,
-      rgba(0,0,0,0.55) 80%,
-      rgba(0,0,0,0.8) 100%
-    );
+    background: linear-gradient(to bottom, rgba(0,0,0,.1) 0%, rgba(0,0,0,.0) 40%, rgba(0,0,0,.6) 75%, rgba(0,0,0,.9) 100%);
   }
-  .pp-cover-grain {
-    position: absolute; inset: -50%; z-index: 1;
-    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-    opacity: 0.03;
-    animation: grainAnim 8s steps(10) infinite;
-    pointer-events: none;
+  .pp-hero-content {
+    position: relative; z-index: 2; width: 100%;
+    padding: 0 48px 80px; max-width: 1200px; margin: 0 auto;
   }
-  .pp-cover-content {
-    position: absolute; bottom: 0; left: 0; right: 0; z-index: 2;
-    padding: 0 48px 64px;
-    max-width: 1100px; margin: 0 auto;
+  .pp-hero-topbar {
+    position: absolute; top: -56vh; left: 0; right: 0;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0;
   }
-  .pp-verified-badge {
-    display: inline-flex; align-items: center; gap: 6;
+  .pp-back-btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 13px; font-weight: 800; color: rgba(255,255,255,.6);
+    text-decoration: none; padding: 6px 14px; border-radius: 9999px;
+    border: 1px solid rgba(255,255,255,.15); backdrop-filter: blur(8px);
+    transition: color .2s, border-color .2s;
+  }
+  .pp-back-btn:hover { color: #FFD400; border-color: rgba(255,212,0,.3); }
+  .pp-hero-badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 11px; font-weight: 800; color: #4ADE80;
     padding: 5px 14px; border-radius: 9999px;
-    background: rgba(22,163,106,0.2); border: 1.5px solid rgba(22,163,106,0.4);
-    color: #4ADE80; font-size: 11px; font-weight: 800;
-    letter-spacing: 0.12em; text-transform: uppercase;
-    backdrop-filter: blur(8px); margin-bottom: 16px;
+    background: rgba(22,163,106,.15); border: 1.5px solid rgba(22,163,106,.35);
+    backdrop-filter: blur(8px); letter-spacing: .12em; text-transform: uppercase;
   }
-  .pp-cover-title {
+  .pp-hero-text { padding-top: 48px; }
+  .pp-hero-title {
     font-family: 'Playfair Display', Georgia, serif;
-    font-size: clamp(42px, 7vw, 80px); font-weight: 900;
-    color: #fff; letter-spacing: -2px; line-height: 0.92;
-    margin-bottom: 20px;
-    text-shadow: 0 2px 40px rgba(0,0,0,0.3);
+    font-size: clamp(40px, 7vw, 80px); font-weight: 900; color: #fff;
+    letter-spacing: -2px; line-height: .92; margin-bottom: 20px;
+    text-shadow: 0 2px 40px rgba(0,0,0,.3);
   }
-  .pp-cover-artist {
-    display: flex; align-items: center; gap: 12; margin-bottom: 16;
-  }
-  .pp-cover-avatar {
+  .pp-hero-artist { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+  .pp-hero-avatar {
     width: 40px; height: 40px; border-radius: 12px;
-    border: 2px solid rgba(255,255,255,0.3); overflow: hidden;
+    border: 2px solid rgba(255,255,255,.3); overflow: hidden;
     background: #FFD400; display: flex; align-items: center; justify-content: center;
     font-size: 16px; font-weight: 900; color: #111110; flex-shrink: 0;
   }
-  .pp-cover-meta {
-    font-size: 15px; font-weight: 600; color: rgba(255,255,255,0.45); letter-spacing: 0.05em;
-  }
-  .pp-meta-dot { margin: 0 8px; opacity: 0.4; }
-  .pp-cover-cert-id {
-    font-family: monospace; font-size: 11px; font-weight: 700;
-    color: rgba(255,255,255,0.18); letter-spacing: 0.3em;
-    text-transform: uppercase; margin-top: 20px;
-  }
+  .pp-hero-meta { font-size: 14px; font-weight: 600; color: rgba(255,255,255,.45); }
+  .pp-meta-dot { margin: 0 8px; opacity: .4; }
   .pp-scroll-hint {
-    position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 2;
-    color: rgba(255,255,255,0.35); animation: scrollBob 2s ease-in-out infinite;
+    position: absolute; bottom: 24px; left: 50%; transform: translateX(-50%);
+    font-size: 10px; font-weight: 800; letter-spacing: .2em; text-transform: uppercase;
+    color: rgba(255,255,255,.3); animation: scrollBob 2s ease-in-out infinite;
   }
 
-  /* ── SECTIONS ────────────────────────────────────────────────── */
-  .pp-section { padding: 80px 0; border-bottom: 2px solid #E8E0D0; }
-  .pp-container { max-width: 1100px; margin: 0 auto; padding: 0 24px; }
-  .pp-section-label {
+  /* ── CONTAINERS & SECTIONS ───────────────────────────────────── */
+  .pp-container { max-width: 900px; margin: 0 auto; padding: 0 24px; }
+  .pp-section-eyebrow {
     display: flex; align-items: center; gap: 8px;
     font-size: 11px; font-weight: 800; color: #9B8F7A;
-    text-transform: uppercase; letter-spacing: 0.18em; margin-bottom: 32px;
+    text-transform: uppercase; letter-spacing: .18em; margin-bottom: 12px;
   }
-  .pp-section-line { flex: 1; height: 1.5px; background: #E8E0D0; }
+  .pp-eyebrow-line { flex: 1; height: 1.5px; background: #E8E0D0; }
 
-  /* ── IDENTITY ────────────────────────────────────────────────── */
-  .pp-section-identity { background: #FFFBEA; }
-  .pp-identity-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; align-items: start; }
-  .pp-passport-card {
-    background: #fff; border: 2.5px solid #111110;
-    border-radius: 20px; overflow: hidden;
-    box-shadow: 6px 8px 0 #D4C9A8;
-    transition: box-shadow 0.3s, transform 0.3s;
+  /* ── BOOK SECTION ────────────────────────────────────────────── */
+  .pp-book-section { padding: 80px 0; background: #FFFBEA; }
+  .pp-book-subtitle { font-size: 15px; color: #9B8F7A; font-weight: 600; margin-bottom: 48px; }
+
+  /* ── 3D PASSPORT BOOK ────────────────────────────────────────── */
+  .pb-scene {
+    display: flex; flex-direction: column; align-items: center; gap: 24px;
+    perspective: 1200px;
   }
-  .pp-passport-card:hover { box-shadow: 8px 10px 0 #111110; transform: translate(-1px,-2px); }
-  .pp-passport-header {
-    background: #111110; padding: 16px 20px;
-    display: flex; align-items: center; justify-content: space-between;
-    border-bottom: 2px solid #333;
+  .pb-book {
+    display: flex; position: relative;
+    width: 640px; height: 420px;
+    filter: drop-shadow(0 24px 48px rgba(0,0,0,.22));
+    transition: transform .35s cubic-bezier(.16,1,.3,1);
   }
-  .pp-passport-cert-id {
-    font-family: monospace; font-size: 10px; font-weight: 800;
-    color: #FFD400; letter-spacing: 0.15em; background: #1a1a1a;
-    padding: 3px 10px; border-radius: 6px; border: 1px solid #333;
-  }
-  .pp-passport-body {
-    display: grid; grid-template-columns: 140px 1fr; gap: 20px;
-    padding: 24px 20px;
-  }
-  .pp-passport-thumb {
-    width: 140px; height: 180px; border-radius: 12px;
-    border: 2px solid #111110; overflow: hidden;
-    box-shadow: 3px 3px 0 #111110; position: relative;
-    background: #FAF7F3;
-  }
-  .pp-passport-seal {
-    position: absolute; bottom: 6px; right: 6px;
-    width: 22px; height: 22px; border-radius: 50%;
-    background: #16A34A; border: 2px solid #fff;
+  .pb-book:hover { transform: translateY(-4px) rotateX(2deg); }
+  .pb-flipping-next { animation: pageFlipNext .35s cubic-bezier(.4,0,.2,1) forwards; }
+  .pb-flipping-prev { animation: pageFlipPrev .35s cubic-bezier(.4,0,.2,1) forwards; }
+
+  /* Left (cover) side */
+  .pb-cover-left {
+    width: 52px; min-width: 52px; height: 100%; background: #111110;
+    border-radius: 12px 0 0 12px; position: relative; overflow: hidden;
+    border-right: 3px solid #1a1a1a;
     display: flex; align-items: center; justify-content: center;
-    color: #fff; box-shadow: 0 2px 6px rgba(0,0,0,0.2);
   }
-  .pp-passport-fields { display: flex; flex-direction: column; gap: 0; }
-  .pp-passport-field {
-    display: flex; flex-direction: column; gap: 1px;
-    padding: 7px 0; border-bottom: 1px solid #F5F0E8;
+  .pb-cover-left::before {
+    content: '';
+    position: absolute; inset: 0;
+    background: repeating-linear-gradient(
+      to bottom, transparent, transparent 18px,
+      rgba(255,212,0,.06) 18px, rgba(255,212,0,.06) 19px
+    );
   }
-  .pp-passport-field:last-child { border-bottom: none; }
-  .pp-field-label {
-    font-size: 8px; font-weight: 800; color: #9B8F7A;
-    text-transform: uppercase; letter-spacing: 0.16em;
+  .pb-cover-spine { writing-mode: vertical-rl; text-orientation: mixed; transform: rotate(180deg); }
+  .pb-spine-text {
+    font-size: 8px; font-weight: 900; color: #FFD400;
+    letter-spacing: .25em; text-transform: uppercase; opacity: .7;
   }
-  .pp-field-value {
-    font-size: 14px; font-weight: 700; color: #111110; letter-spacing: -0.2px;
-  }
-  .pp-passport-mrz {
-    background: #FAF7F3; border-top: 2px dashed #E8E0D0;
-    padding: 10px 16px; font-family: monospace;
-    font-size: 9px; font-weight: 600; color: #C0B8A8;
-    letter-spacing: 0.08em; line-height: 1.6;
-    display: flex; flex-direction: column;
-    overflow: hidden; word-break: break-all;
-  }
-  .pp-identity-right { display: flex; flex-direction: column; gap: 24px; }
-  .pp-identity-desc {
-    background: #fff; border: 2px solid #E8E0D0; border-radius: 16px;
-    padding: 24px; box-shadow: 3px 3px 0 #E0D8CA;
-  }
-  .pp-desc-label {
-    font-family: 'Playfair Display', serif;
-    font-size: 18px; font-weight: 700; color: #111110;
-    margin-bottom: 12px; font-style: italic;
-  }
-  .pp-desc-text { font-size: 14px; color: #5C5346; line-height: 1.8; font-weight: 500; }
-  .pp-identity-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
-  .pp-stat-card {
-    background: #fff; border: 2px solid #E8E0D0; border-radius: 14px;
-    padding: 18px 14px; text-align: center;
-    box-shadow: 2px 3px 0 #E0D8CA; transition: all 0.2s;
-  }
-  .pp-stat-card:hover { box-shadow: 4px 5px 0 #111110; transform: translate(-1px,-1px); border-color: #111110; }
-  .pp-stat-emoji { font-size: 22px; margin-bottom: 6px; }
-  .pp-stat-num { font-size: 28px; font-weight: 900; color: #111110; letter-spacing: -1px; }
-  .pp-stat-label { font-size: 10px; font-weight: 700; color: #9B8F7A; text-transform: uppercase; letter-spacing: 0.12em; margin-top: 2px; }
 
-  /* ── AUTHENTICATION ──────────────────────────────────────────── */
-  .pp-section-auth { background: #F5F0E8; }
-  .pp-auth-grid { display: grid; grid-template-columns: 260px 1fr; gap: 48px; align-items: center; }
-  .pp-auth-seal-wrap { display: flex; align-items: center; justify-content: center; }
-  .pp-auth-seal {
-    width: 200px; height: 200px; border-radius: 50%;
-    background: #fff; border: 3px solid #E8E0D0;
-    position: relative; display: flex; align-items: center; justify-content: center;
-    box-shadow: 0 4px 24px rgba(0,0,0,0.06);
-    transition: all 0.5s cubic-bezier(0.16,1,0.3,1);
+  /* Right (page) side */
+  .pb-page-right {
+    flex: 1; height: 100%; background: #FFFBEA;
+    border-radius: 0 12px 12px 0; overflow: hidden;
+    border: 2.5px solid #111110; border-left: none;
+    position: relative;
+    background-image: repeating-linear-gradient(
+      to bottom, transparent, transparent 27px,
+      #E8E0D0 27px, #E8E0D0 28px
+    );
   }
-  .pp-auth-seal.verified {
+  .pb-page-right::before {
+    content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px;
+    background: linear-gradient(to right, rgba(0,0,0,.08), transparent);
+  }
+
+  .pb-page-content {
+    position: absolute; inset: 0; padding: 24px 28px 40px;
+    overflow-y: auto; scrollbar-width: thin;
+    scrollbar-color: #E8E0D0 transparent;
+  }
+
+  /* Cover page */
+  .pb-page-cover-content { padding: 0; display: flex; flex-direction: column; }
+  .pb-page-cover-img {
+    height: 220px; background: #F5F0E8; position: relative; overflow: hidden;
+    flex-shrink: 0;
+  }
+  .pb-page-cover-img::after {
+    content: ''; position: absolute; inset: 0;
+    background: linear-gradient(to bottom, transparent 50%, rgba(0,0,0,.4) 100%);
+  }
+  .pb-cover-verified-badge {
+    position: absolute; top: 12px; right: 12px; z-index: 2;
+    display: flex; align-items: center; gap: 4px;
+    background: rgba(22,163,74,.9); color: #fff;
+    font-size: 10px; font-weight: 800; padding: 4px 10px; border-radius: 99px;
+    letter-spacing: .08em;
+  }
+  .pb-no-img {
+    width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;
+    background: #F5F0E8;
+  }
+  .pb-page-cover-info { padding: 16px 20px 20px; flex: 1; }
+  .pb-page-tag {
+    font-size: 9px; font-weight: 800; color: rgba(255,212,0,.7);
+    letter-spacing: .25em; text-transform: uppercase; margin-bottom: 6px;
+  }
+  .pb-page-cover-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 22px; font-weight: 900; color: #111110;
+    letter-spacing: -.5px; line-height: 1.1; margin-bottom: 6px;
+  }
+  .pb-page-cover-artist { font-size: 13px; font-weight: 700; color: #5C5346; margin-bottom: 4px; }
+  .pb-page-cover-meta { font-size: 11px; font-weight: 600; color: #9B8F7A; margin-bottom: 12px; }
+  .pb-cert-pill {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: 9px; font-weight: 800; color: #9B8F7A;
+    background: #F5F0E8; border: 1px solid #E8E0D0; border-radius: 99px;
+    padding: 3px 10px; font-family: monospace; letter-spacing: .1em;
+  }
+
+  /* Page header */
+  .pb-page-header {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 9px; font-weight: 900; color: #9B8F7A;
+    text-transform: uppercase; letter-spacing: .2em;
+    margin-bottom: 16px; padding-bottom: 10px;
+    border-bottom: 1.5px solid #E8E0D0;
+  }
+
+  /* Identity page */
+  .pb-id-thumb {
+    width: 90px; height: 110px; float: left; margin: 0 16px 8px 0;
+    border: 2px solid #111110; border-radius: 8px; overflow: hidden;
+    box-shadow: 3px 3px 0 #111110; background: #F5F0E8; flex-shrink: 0;
+  }
+  .pb-id-fields { overflow: hidden; }
+  .pb-id-field {
+    display: flex; flex-direction: column; padding: 4px 0;
+    border-bottom: 1px solid #F5F0E8;
+  }
+  .pb-id-label {
+    font-size: 7px; font-weight: 800; color: #C0B8A8;
+    text-transform: uppercase; letter-spacing: .16em;
+  }
+  .pb-id-value { font-size: 12px; font-weight: 700; color: #111110; }
+  .pb-mrz {
+    clear: both; margin-top: 14px; background: #F5F0E8; border-radius: 6px;
+    padding: 8px 10px; font-family: monospace; font-size: 8px; font-weight: 600;
+    color: #C0B8A8; letter-spacing: .05em; line-height: 1.7;
+    word-break: break-all; border-top: 1.5px dashed #E8E0D0;
+  }
+
+  /* Auth page */
+  .pb-seal {
+    width: 140px; height: 140px; border-radius: 50%;
+    border: 2.5px solid #E8E0D0; margin: 0 auto 20px;
+    display: flex; align-items: center; justify-content: center;
+    position: relative; background: #fff;
+    box-shadow: 0 4px 24px rgba(0,0,0,.06);
+    transition: all .4s;
+  }
+  .pb-seal-verified {
     border-color: #16A34A;
     animation: sealPulse 3s ease-in-out infinite;
   }
-  .pp-seal-ring { position: absolute; border-radius: 50%; border: 1.5px dashed; }
-  .pp-seal-ring-1 { inset: 8px; border-color: rgba(0,0,0,0.06); }
-  .pp-seal-ring-2 { inset: 16px; border-color: rgba(0,0,0,0.04); }
-  .pp-seal-inner { text-align: center; z-index: 2; }
-  .pp-seal-icon { font-size: 32px; font-weight: 900; color: #111110; margin-bottom: 4px; }
-  .pp-seal-status { font-size: 11px; font-weight: 800; color: #9B8F7A; text-transform: uppercase; letter-spacing: 0.14em; }
-  .pp-seal-check { color: #16A34A; margin-top: 6px; }
-  .pp-seal-text-ring {
-    position: absolute; inset: 0; animation: sealSpin 30s linear infinite;
+  .pb-seal-ring1 { position: absolute; inset: 8px; border-radius: 50%; border: 1px dashed #E8E0D0; }
+  .pb-seal-ring2 { position: absolute; inset: 16px; border-radius: 50%; border: 1px dashed rgba(0,0,0,.05); }
+  .pb-seal-inner { text-align: center; z-index: 2; }
+  .pb-seal-status { font-size: 11px; font-weight: 900; letter-spacing: .06em; }
+  .pb-auth-details { display: flex; flex-direction: column; gap: 0; }
+  .pb-auth-row {
+    display: flex; justify-content: space-between; align-items: flex-start;
+    padding: 6px 0; border-bottom: 1px solid #F5F0E8; gap: 8px;
   }
-  .pp-seal-text-ring span {
-    position: absolute; left: 50%; top: 0; font-size: 7px; font-weight: 800;
-    color: rgba(0,0,0,0.08); letter-spacing: 0.1em; text-transform: uppercase;
-    transform-origin: 0 100px;
-  }
-  .pp-auth-details { display: flex; flex-direction: column; gap: 20px; }
-  .pp-auth-status-badge {
-    display: inline-flex; align-items: center; gap: 8px; width: fit-content;
-    padding: 8px 18px; border-radius: 12px; border: 2px solid;
-    font-size: 15px; font-weight: 900; letter-spacing: -0.2px;
-  }
-  .pp-auth-status-icon { font-size: 18px; }
-  .pp-auth-fields { display: flex; flex-direction: column; gap: 0; }
-  .pp-auth-field {
-    display: flex; align-items: flex-start; gap: 12px;
-    padding: 14px 0; border-bottom: 1px solid #E0D8CA;
-  }
-  .pp-auth-field:last-child { border-bottom: none; }
-  .pp-auth-field-icon { color: #9B8F7A; margin-top: 2px; flex-shrink: 0; }
-  .pp-auth-field-label { font-size: 10px; font-weight: 800; color: #9B8F7A; text-transform: uppercase; letter-spacing: 0.12em; margin-bottom: 2px; }
-  .pp-auth-field-value { font-size: 15px; font-weight: 700; color: #111110; }
-  .pp-auth-field-value.mono { font-family: monospace; letter-spacing: 0.1em; font-size: 14px; }
-  .pp-auth-notes { background: #fff; border: 2px solid #E0D8CA; border-radius: 12px; padding: 16px; }
-  .pp-auth-notes-label { font-size: 10px; font-weight: 800; color: #9B8F7A; text-transform: uppercase; letter-spacing: 0.12em; margin-bottom: 6px; }
-  .pp-auth-notes-text { font-size: 13px; color: #5C5346; line-height: 1.7; font-weight: 500; }
+  .pb-auth-lbl { font-size: 9px; font-weight: 800; color: #C0B8A8; text-transform: uppercase; letter-spacing: .14em; flex-shrink: 0; }
+  .pb-auth-val { font-size: 12px; font-weight: 700; color: #111110; text-align: right; font-family: monospace; }
+  .pb-auth-notes { padding: 8px 0; }
 
-  /* ── PROVENANCE ──────────────────────────────────────────────── */
-  .pp-section-provenance { background: #FFFBEA; }
-  .pp-timeline { position: relative; padding-left: 36px; }
-  .pp-timeline-line {
-    position: absolute; left: 13px; top: 0; bottom: 0; width: 2px;
-    background: linear-gradient(to bottom, #FFD400, #E8E0D0 60%, transparent);
+  /* Provenance timeline */
+  .pb-timeline { display: flex; flex-direction: column; }
+  .pb-timeline-item { display: flex; gap: 10px; position: relative; padding-bottom: 14px; }
+  .pb-timeline-dot {
+    width: 22px; height: 22px; border-radius: 50%;
+    border: 1.5px solid; display: flex; align-items: center; justify-content: center;
+    font-size: 9px; flex-shrink: 0; background: #fff; z-index: 1;
   }
-  .pp-timeline-entry {
-    position: relative; margin-bottom: 20px;
-    animation: fadeUp 0.5s cubic-bezier(0.16,1,0.3,1) both;
+  .pb-timeline-line {
+    position: absolute; left: 10px; top: 22px; bottom: 0; width: 1.5px;
+    background: #E8E0D0;
   }
-  .pp-timeline-entry:last-child { margin-bottom: 0; }
-  .pp-timeline-dot {
-    position: absolute; left: -36px; top: 14px;
-    width: 28px; height: 28px; border-radius: 50%;
-    border: 3px solid; display: flex; align-items: center; justify-content: center;
-    z-index: 2; box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  .pb-timeline-content { flex: 1; min-width: 0; }
+  .pb-timeline-type { font-size: 11px; font-weight: 900; letter-spacing: .04em; }
+  .pb-timeline-date { font-size: 10px; font-weight: 600; color: #9B8F7A; margin-top: 1px; }
+  .pb-timeline-owner { font-size: 11px; font-weight: 700; color: #111110; margin-top: 2px; }
+  .pb-timeline-loc { display: flex; align-items: center; gap: 3px; font-size: 10px; color: #9B8F7A; margin-top: 2px; }
+  .pb-timeline-notes { font-size: 10px; color: #5C5346; line-height: 1.5; margin-top: 3px; font-style: italic; }
+
+  /* Exhibitions page */
+  .pb-exhibitions { display: flex; flex-direction: column; gap: 10px; }
+  .pb-ex-card {
+    display: flex; gap: 10px; padding: 10px;
+    background: #fff; border: 1.5px solid #E8E0D0; border-radius: 10px;
+    box-shadow: 2px 2px 0 #E0D8CA;
   }
-  .pp-timeline-dot-icon { font-size: 11px; font-weight: 900; color: #fff; }
-  .pp-timeline-card {
+  .pb-ex-img {
+    width: 48px; height: 48px; border-radius: 6px;
+    border: 1.5px solid #E8E0D0; overflow: hidden; flex-shrink: 0;
+    background: #F5F0E8;
+  }
+  .pb-ex-info { flex: 1; min-width: 0; }
+  .pb-ex-title { font-size: 12px; font-weight: 800; color: #111110; margin-bottom: 3px; }
+  .pb-ex-venue { display: flex; align-items: center; gap: 3px; font-size: 10px; color: #9B8F7A; margin-bottom: 2px; }
+  .pb-ex-dates { display: flex; align-items: center; gap: 3px; font-size: 10px; color: #9B8F7A; }
+
+  /* Empty */
+  .pb-empty-state {
+    text-align: center; padding: 40px 20px;
+    font-size: 12px; color: #C0B8A8; font-weight: 600;
+    border: 1.5px dashed #E8E0D0; border-radius: 12px;
+  }
+
+  /* Page number */
+  .pb-page-number {
+    position: absolute; bottom: 12px; right: 20px;
+    font-size: 9px; font-weight: 700; color: #C0B8A8;
+    letter-spacing: .1em;
+  }
+
+  /* Navigation */
+  .pb-nav {
+    display: flex; align-items: center; gap: 16px;
+  }
+  .pb-nav-btn {
+    width: 40px; height: 40px; border-radius: 50%;
+    background: #111110; color: #FFD400; border: none;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; transition: all .2s;
+    box-shadow: 2px 2px 0 rgba(0,0,0,.2);
+  }
+  .pb-nav-btn:hover:not(:disabled) { background: #FFD400; color: #111110; transform: scale(1.08); }
+  .pb-nav-btn:disabled { background: #E8E0D0; color: #C0B8A8; cursor: not-allowed; box-shadow: none; }
+  .pb-dots { display: flex; gap: 6px; }
+  .pb-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: #E8E0D0; cursor: pointer; transition: all .2s;
+  }
+  .pb-dot.active { background: #111110; transform: scale(1.3); }
+  .pb-hint { font-size: 11px; color: #C0B8A8; font-weight: 600; letter-spacing: .05em; }
+
+  /* ── DETAILS SECTION ─────────────────────────────────────────── */
+  .pp-details-section { padding: 80px 0; background: #F5F0E8; border-top: 2px solid #E8E0D0; }
+  .pp-details-grid { display: grid; grid-template-columns: 1fr 320px; gap: 40px; align-items: start; }
+  .pp-details-desc {
     background: #fff; border: 2px solid #E8E0D0; border-radius: 16px;
-    overflow: hidden; box-shadow: 3px 3px 0 #E0D8CA;
-    transition: all 0.2s;
+    padding: 28px; box-shadow: 3px 3px 0 #E0D8CA;
+    font-size: 15px; color: #5C5346; line-height: 1.8; font-weight: 500;
   }
-  .pp-timeline-card:hover { border-color: #111110; box-shadow: 4px 5px 0 #111110; transform: translate(-1px,-1px); }
-  .pp-timeline-card-header {
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 12px 16px; border-bottom: 1px solid #F5F0E8;
+  .pp-details-stats { display: flex; flex-direction: column; gap: 12px; }
+  .pp-stat {
+    background: #fff; border: 2px solid #E8E0D0; border-radius: 14px;
+    padding: 16px 20px; display: flex; align-items: center; gap: 14px;
+    box-shadow: 2px 3px 0 #E0D8CA; transition: all .2s;
   }
-  .pp-timeline-type {
-    display: inline-flex; align-items: center; gap: 4px;
-    padding: 3px 10px; border-radius: 9999px; border: 1.5px solid;
-    font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em;
-  }
-  .pp-timeline-date { font-size: 12px; font-weight: 600; color: #9B8F7A; }
-  .pp-timeline-card-body { padding: 14px 16px; }
-  .pp-timeline-owner { font-size: 15px; font-weight: 800; color: #111110; margin-bottom: 4px; }
-  .pp-timeline-location {
-    display: flex; align-items: center; gap: 5px;
-    font-size: 12px; font-weight: 600; color: #9B8F7A; margin-bottom: 6px;
-  }
-  .pp-timeline-notes { font-size: 13px; color: #5C5346; line-height: 1.6; font-weight: 500; }
+  .pp-stat:hover { box-shadow: 4px 5px 0 #111110; transform: translate(-1px,-1px); border-color: #111110; }
+  .pp-stat-icon { font-size: 24px; flex-shrink: 0; }
+  .pp-stat-num { font-size: 26px; font-weight: 900; color: #111110; letter-spacing: -1px; }
+  .pp-stat-lbl { font-size: 11px; font-weight: 700; color: #9B8F7A; text-transform: uppercase; letter-spacing: .1em; }
 
-  /* ── EXHIBITIONS ─────────────────────────────────────────────── */
-  .pp-section-exhibitions { background: #F5F0E8; }
-  .pp-exhibition-grid {
-    display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px;
-  }
-  .pp-exhibition-card {
-    background: #fff; border: 2.5px solid #E8E0D0; border-radius: 18px;
-    overflow: hidden; box-shadow: 3px 4px 0 #D4C9A8;
-    transition: all 0.25s cubic-bezier(0.16,1,0.3,1);
-    animation: fadeUp 0.4s cubic-bezier(0.16,1,0.3,1) both;
-  }
-  .pp-exhibition-card:hover { border-color: #111110; box-shadow: 5px 6px 0 #111110; transform: translate(-1px,-2px); }
-  .pp-ex-cover { height: 120px; overflow: hidden; }
-  .pp-ex-body { padding: 14px 16px; }
-  .pp-ex-title { font-size: 15px; font-weight: 800; color: #111110; margin-bottom: 6px; letter-spacing: -0.2px; }
-  .pp-ex-venue { display: flex; align-items: center; gap: 5px; font-size: 12px; color: #9B8F7A; font-weight: 600; margin-bottom: 4px; }
-  .pp-ex-dates { display: flex; align-items: center; gap: 5px; font-size: 11px; color: #C0B8A8; font-weight: 600; }
-
-  /* ── VERIFICATION ────────────────────────────────────────────── */
-  .pp-section-verify { background: #FFFBEA; border-bottom: none; padding-bottom: 0; }
+  /* ── VERIFY SECTION ──────────────────────────────────────────── */
+  .pp-verify-section { padding: 80px 0; background: #111110; }
   .pp-verify-card {
-    background: #111110; border: 3px solid #111110; border-radius: 24px;
-    display: grid; grid-template-columns: 1fr 280px; overflow: hidden;
-    box-shadow: 8px 8px 0 #FFD400;
+    display: grid; grid-template-columns: 1fr 280px;
+    background: rgba(255,255,255,.03); border: 1.5px solid rgba(255,255,255,.08);
+    border-radius: 24px; overflow: hidden;
   }
-  .pp-verify-left { padding: 48px 40px; }
-  .pp-verify-eyebrow {
-    display: inline-flex; align-items: center; gap: 6px;
-    color: #FFD400; font-size: 10px; font-weight: 800;
-    letter-spacing: 0.2em; text-transform: uppercase; margin-bottom: 16px;
-  }
+  .pp-verify-left { padding: 40px 48px; }
+  .pp-verify-left .pp-section-eyebrow { color: rgba(255,212,0,.5); }
+  .pp-verify-left .pp-eyebrow-line { background: rgba(255,255,255,.08); }
   .pp-verify-title {
     font-family: 'Playfair Display', serif;
-    font-size: clamp(28px, 4vw, 42px); font-weight: 900; color: #fff;
-    letter-spacing: -1px; line-height: 1; margin-bottom: 16px;
+    font-size: 40px; font-weight: 900; color: #fff; line-height: .95;
+    margin-bottom: 16px; letter-spacing: -1px;
   }
-  .pp-verify-sub { font-size: 14px; color: rgba(255,255,255,0.4); font-weight: 600; line-height: 1.7; margin-bottom: 28px; max-width: 420px; }
-  .pp-verify-cert-row {
-    background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1);
-    border-radius: 12px; padding: 14px 18px; margin-bottom: 24px;
-  }
-  .pp-verify-cert-label { font-size: 9px; font-weight: 800; color: rgba(255,212,0,0.5); text-transform: uppercase; letter-spacing: 0.16em; margin-bottom: 4px; }
-  .pp-verify-cert-value { font-family: monospace; font-size: 18px; font-weight: 900; color: #FFD400; letter-spacing: 0.12em; }
+  .pp-verify-sub { font-size: 14px; color: rgba(255,255,255,.4); font-weight: 600; line-height: 1.7; margin-bottom: 24px; }
+  .pp-cert-row { margin-bottom: 24px; }
+  .pp-cert-label { font-size: 9px; font-weight: 800; color: rgba(255,255,255,.3); text-transform: uppercase; letter-spacing: .16em; margin-bottom: 4px; }
+  .pp-cert-value { font-family: monospace; font-size: 13px; font-weight: 700; color: #FFD400; letter-spacing: .1em; }
   .pp-verify-actions { display: flex; gap: 10px; flex-wrap: wrap; }
-  .pp-verify-btn {
-    display: flex; align-items: center; gap: 6px;
-    padding: 10px 20px; border-radius: 12px;
-    font-family: inherit; font-size: 13px; font-weight: 800;
-    cursor: pointer; transition: all 0.15s;
+  .pp-btn-primary {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 10px 20px; background: #FFD400; color: #111110;
+    border: none; border-radius: 10px; font-size: 13px; font-weight: 800;
+    cursor: pointer; font-family: inherit; transition: all .2s;
   }
-  .pp-verify-btn.primary { background: #FFD400; color: #111110; border: 2px solid #FFD400; }
-  .pp-verify-btn.primary:hover { box-shadow: 0 0 0 3px rgba(255,212,0,0.3); }
-  .pp-verify-btn.secondary { background: transparent; color: rgba(255,255,255,0.6); border: 2px solid rgba(255,255,255,0.2); }
-  .pp-verify-btn.secondary:hover { border-color: rgba(255,255,255,0.4); color: #fff; }
-  .pp-verify-qr { margin-top: 20px; display: flex; align-items: center; gap: 16px; }
-  .pp-verify-qr img { border-radius: 12px; border: 2px solid rgba(255,255,255,0.1); }
-  .pp-verify-qr-hint { font-size: 11px; font-weight: 700; color: rgba(255,255,255,0.3); }
+  .pp-btn-primary:hover { background: #FFC200; transform: translateY(-1px); }
+  .pp-btn-secondary {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 10px 20px; background: transparent; color: rgba(255,255,255,.5);
+    border: 1.5px solid rgba(255,255,255,.15); border-radius: 10px;
+    font-size: 13px; font-weight: 700; cursor: pointer; font-family: inherit; transition: all .2s;
+  }
+  .pp-btn-secondary:hover { border-color: rgba(255,255,255,.4); color: rgba(255,255,255,.8); }
+  .pp-qr-inline { margin-top: 20px; }
   .pp-verify-right {
     display: flex; align-items: center; justify-content: center;
-    background: rgba(255,212,0,0.04); border-left: 1px solid rgba(255,255,255,0.06);
+    background: rgba(255,212,0,.03); border-left: 1px solid rgba(255,255,255,.06);
+    padding: 40px;
   }
   .pp-verify-stamp {
-    width: 140px; height: 140px; border-radius: 50%;
-    border: 2px dashed rgba(255,212,0,0.2);
+    width: 160px; height: 160px; border-radius: 50%;
+    border: 2px dashed rgba(255,212,0,.2);
     display: flex; align-items: center; justify-content: center;
-    position: relative; animation: stampIn 0.6s 0.3s cubic-bezier(0.34,1.56,0.64,1) both;
+    position: relative;
   }
+  .pp-verify-stamp.verified { border-color: rgba(255,212,0,.4); }
   .pp-stamp-ring {
-    position: absolute; inset: -12px; border-radius: 50%;
-    border: 1px dashed rgba(255,212,0,0.1);
-  }
-  .pp-stamp-inner { text-align: center; }
-
-  /* ── EMPTY ───────────────────────────────────────────────────── */
-  .pp-empty {
-    text-align: center; padding: 56px 24px;
-    background: #fff; border: 2px dashed #E0D8CA; border-radius: 18px;
+    position: absolute; inset: -14px; border-radius: 50%;
+    border: 1px dashed rgba(255,212,0,.1);
   }
 
-  /* ── QR OVERLAY ──────────────────────────────────────────────── */
+  /* ── FOOTER ──────────────────────────────────────────────────── */
+  .pp-footer { background: #0a0a0a; padding: 20px 0; border-top: 2px solid rgba(255,255,255,.05); }
+  .pp-footer-inner {
+    max-width: 900px; margin: 0 auto; padding: 0 24px;
+    display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;
+  }
+
+  /* ── QR MODAL ────────────────────────────────────────────────── */
   .pp-qr-overlay {
     position: fixed; inset: 0; z-index: 200;
-    background: rgba(0,0,0,0.7); backdrop-filter: blur(8px);
+    background: rgba(0,0,0,.7); backdrop-filter: blur(8px);
     display: flex; align-items: center; justify-content: center;
   }
   .pp-qr-modal {
     background: #FFFBEA; border: 2.5px solid #111110; border-radius: 24px;
-    padding: 36px; text-align: center; box-shadow: 8px 8px 0 #111110;
+    padding: 40px; text-align: center; box-shadow: 8px 8px 0 #111110;
     position: relative; max-width: 340px;
   }
-
-  /* ── FOOTER ──────────────────────────────────────────────────── */
-  .pp-footer {
-    background: #111110; padding: 24px 0; border-top: 3px solid #111110;
+  .pp-qr-close {
+    position: absolute; top: 14px; right: 14px;
+    background: #F5F0E8; border: 1.5px solid #E8E0D0; border-radius: 50%;
+    width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;
+    cursor: pointer; color: #111110; transition: all .2s;
   }
-  .pp-footer-inner {
-    max-width: 1100px; margin: 0 auto; padding: 0 24px;
-    display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;
-  }
+  .pp-qr-close:hover { background: #111110; color: #fff; }
 
   /* ── RESPONSIVE ──────────────────────────────────────────────── */
-  @media (max-width: 860px) {
-    .pp-identity-grid { grid-template-columns: 1fr; }
-    .pp-passport-body { grid-template-columns: 100px 1fr; }
-    .pp-passport-thumb { width: 100px; height: 130px; }
-    .pp-auth-grid { grid-template-columns: 1fr; gap: 32px; }
+  @media (max-width: 700px) {
+    .pb-book { width: 340px; height: 380px; }
+    .pb-cover-left { width: 36px; min-width: 36px; }
+    .pb-page-cover-img { height: 160px; }
+    .pp-hero-content { padding: 0 24px 60px; }
+    .pp-details-grid { grid-template-columns: 1fr; }
     .pp-verify-card { grid-template-columns: 1fr; }
-    .pp-verify-right { padding: 32px; }
-    .pp-cover-content { padding: 0 24px 48px; }
-    .pp-cover-title { font-size: clamp(32px, 9vw, 56px); }
-  }
-  @media (max-width: 600px) {
-    .pp-identity-stats { grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
-    .pp-stat-card { padding: 12px 8px; }
-    .pp-stat-num { font-size: 22px; }
-    .pp-exhibition-grid { grid-template-columns: 1fr; }
+    .pp-verify-right { display: none; }
     .pp-verify-left { padding: 32px 24px; }
   }
 `;

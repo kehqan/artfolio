@@ -10,13 +10,13 @@ export async function GET(request: NextRequest) {
 
     const { data: convos, error } = await supabase
       .from("conversations")
-      .select("*")
+      .select("*")  // includes context_meta if the column exists
       .or(`participant_a.eq.${user.id},participant_b.eq.${user.id}`)
       .order("last_message_at", { ascending: false });
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-    // Enrich with other participant profile
+    // Enrich with other participant profile + unread count
     const enriched = await Promise.all((convos || []).map(async (c) => {
       const otherId = c.participant_a === user.id ? c.participant_b : c.participant_a;
       let otherProfile = null;
@@ -28,6 +28,7 @@ export async function GET(request: NextRequest) {
           .single();
         otherProfile = prof;
       }
+
       // Unread count for this user
       const isA = c.participant_a === user.id;
       const { count: unread } = await supabase
@@ -37,7 +38,11 @@ export async function GET(request: NextRequest) {
         .eq(isA ? "read_by_a" : "read_by_b", false)
         .neq("sender_id", user.id);
 
-      return { ...c, other_profile: otherProfile, unread_count: unread || 0 };
+      return {
+        ...c,
+        other_profile: otherProfile,
+        unread_count: unread || 0,
+      };
     }));
 
     return NextResponse.json({ conversations: enriched });
@@ -54,10 +59,11 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
 
     const {
-      recipient_id,     // UUID of the person to message
+      recipient_id,
       context_type = "direct",
       context_id,
       context_title,
+      context_meta,       // ← now included
       initial_message,
       guest_name,
       guest_email,
@@ -80,11 +86,12 @@ export async function POST(request: NextRequest) {
         .maybeSingle();
 
       if (existing) {
-        // Add message to existing conversation
         await supabase.from("messages").insert({
           conversation_id: existing.id,
           sender_id: senderId,
           body: initial_message.trim(),
+          read_by_a: true,
+          read_by_b: false,
         });
         await supabase.from("conversations").update({
           last_message_at: new Date().toISOString(),
@@ -95,7 +102,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Create new conversation
+    // Create new conversation (with context_meta)
     const { data: convo, error: convoErr } = await supabase
       .from("conversations")
       .insert({
@@ -104,6 +111,7 @@ export async function POST(request: NextRequest) {
         context_type,
         context_id: context_id || null,
         context_title: context_title || null,
+        context_meta: context_meta || null,   // ← stored
         guest_name: guest_name || null,
         guest_email: guest_email || null,
         last_message_at: new Date().toISOString(),
@@ -112,20 +120,19 @@ export async function POST(request: NextRequest) {
       .select()
       .single();
 
-    if (convoErr || !convo) return NextResponse.json({ error: convoErr?.message || "Failed to create conversation" }, { status: 500 });
+    if (convoErr || !convo) return NextResponse.json({ error: convoErr?.message || "Failed" }, { status: 500 });
 
-    // Insert the first message
     await supabase.from("messages").insert({
       conversation_id: convo.id,
       sender_id: senderId,
       guest_name: guest_name || null,
       guest_email: guest_email || null,
       body: initial_message.trim(),
-      read_by_a: true, // sender already read it
+      read_by_a: true,
       read_by_b: false,
     });
 
-    // Create notification for recipient
+    // Notify recipient
     await supabase.from("notifications").insert({
       user_id: recipient_id,
       type: "message",

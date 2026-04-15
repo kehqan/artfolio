@@ -2,10 +2,11 @@
 import React, { useState, useEffect, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import {
-  X, Plus, MapPin, Calendar, ArrowUpRight, Clock,
+  X, Plus, MapPin, ArrowUpRight, Clock,
   Search, SlidersHorizontal, Sparkles, Upload, Check,
-  ChevronLeft, ChevronRight, Pencil, Trash2,
+  ChevronLeft, ChevronRight, Pencil, Trash2, MessageSquare,
 } from "lucide-react";
+import MessageModal from "@/components/MessageModal";
 
 // ─────────────────────────────────────────────
 // Types
@@ -118,6 +119,8 @@ function RequestModal({ req, onClose, currentUserId, onEdit, onDelete }: {
   req: PoolRequest; onClose: () => void; currentUserId?: string;
   onEdit: (r: PoolRequest) => void; onDelete: (id: string) => void;
 }) {
+  const [msgOpen, setMsgOpen] = useState(false);  // ← NEW
+
   const ti = tInfo(req.request_type);
   const style = tStyle(req.request_type);
   const isVenue = (req.poster_role || req.poster_type) === "venue";
@@ -127,6 +130,7 @@ function RequestModal({ req, onClose, currentUserId, onEdit, onDelete }: {
   return (
     <div style={{ position: "fixed", inset: 0, zIndex: 9000, background: "rgba(17,17,16,0.75)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }} onClick={onClose}>
       <div onClick={e => e.stopPropagation()} style={{ background: "#FFFBEA", border: "2.5px solid #111110", borderRadius: 24, boxShadow: "8px 8px 0 #111110", width: "100%", maxWidth: 640, maxHeight: "92vh", overflowY: "auto", position: "relative" }}>
+
         {/* Image header */}
         <div style={{ position: "relative" }}>
           {imgs.length > 0
@@ -145,27 +149,46 @@ function RequestModal({ req, onClose, currentUserId, onEdit, onDelete }: {
         </div>
 
         <div style={{ padding: "22px 26px 28px" }}>
-          {/* Author */}
+
+          {/* Author row */}
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
             <div style={{ width: 38, height: 38, borderRadius: 11, border: "2px solid #111110", overflow: "hidden", background: "#FFD400", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 900, color: "#111110", flexShrink: 0 }}>
               {req.profiles?.avatar_url ? <img src={req.profiles.avatar_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : (req.profiles?.full_name || "?")[0]}
             </div>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 13, fontWeight: 800, color: "#111110" }}>{req.profiles?.full_name || "Unknown"}</div>
-              <div style={{ fontSize: 11, fontWeight: 600, color: "#9B8F7A" }}>{req.profiles?.username ? `@${req.profiles.username}` : ""}{req.profiles?.location ? ` · ${req.profiles.location}` : ""}</div>
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 800, color: "#111110" }}>{req.profiles?.full_name || "Unknown"}</div>
+              <div style={{ fontSize: 11, fontWeight: 600, color: "#9B8F7A" }}>
+                {req.profiles?.location || req.location || ""}
+                {req.profiles?.role && <> · <span style={{ textTransform: "capitalize" }}>{req.profiles.role}</span></>}
+              </div>
             </div>
-            <div style={{ fontSize: 11, fontWeight: 700, color: "#9B8F7A", display: "flex", alignItems: "center", gap: 4 }}><Clock size={10} /> {timeAgo(req.created_at)}</div>
+            <div style={{ marginLeft: "auto", fontSize: 11, fontWeight: 700, color: "#C0B8A8", display: "flex", alignItems: "center", gap: 4 }}>
+              <Clock size={11} /> {timeAgo(req.created_at)}
+            </div>
           </div>
 
-          <h2 style={{ fontSize: 24, fontWeight: 900, color: "#111110", letterSpacing: "-0.6px", lineHeight: 1.15, marginBottom: 12 }}>{req.title}</h2>
-          {req.description && <p style={{ fontSize: 14, color: "#5C5346", lineHeight: 1.75, fontWeight: 500, marginBottom: 18 }}>{req.description}</p>}
+          {/* Title & description */}
+          <h2 style={{ fontSize: 22, fontWeight: 900, color: "#111110", letterSpacing: "-0.5px", marginBottom: 10 }}>{req.title}</h2>
+          {req.description && <p style={{ fontSize: 14, color: "#5C5346", lineHeight: 1.75, marginBottom: 16, fontWeight: 500 }}>{req.description}</p>}
 
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 22 }}>
-            {req.location && <div style={{ display: "flex", alignItems: "center", gap: 4, padding: "5px 12px", background: "#F5F0E8", borderRadius: 9999, fontSize: 12, fontWeight: 700, color: "#5C5346", border: "1.5px solid #E8E0D0" }}><MapPin size={10} color="#FF6B6B" /> {req.location}</div>}
-            {req.deadline && <div style={{ display: "flex", alignItems: "center", gap: 4, padding: "5px 12px", background: "#F5F0E8", borderRadius: 9999, fontSize: 12, fontWeight: 700, color: "#5C5346", border: "1.5px solid #E8E0D0" }}><Calendar size={10} color="#9B8F7A" /> Deadline: {fmtDate(req.deadline)}</div>}
-            <div style={{ padding: "5px 12px", background: req.status === "open" ? "#DCFCE7" : "#F5F0E8", borderRadius: 9999, fontSize: 12, fontWeight: 700, color: req.status === "open" ? "#16A34A" : "#9B8F7A", border: `1.5px solid ${req.status === "open" ? "#86EFAC" : "#E8E0D0"}` }}>{req.status === "open" ? "✓ Open" : "Closed"}</div>
+          {/* Meta chips */}
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 20 }}>
+            {req.location && (
+              <div style={{ display: "flex", alignItems: "center", gap: 4, padding: "4px 11px", borderRadius: 9999, background: "#F5F0E8", border: "1.5px solid #E8E0D0", fontSize: 11, fontWeight: 700, color: "#9B8F7A" }}>
+                <MapPin size={10} color="#FF6B6B" /> {req.location}
+              </div>
+            )}
+            {req.deadline && (
+              <div style={{ display: "flex", alignItems: "center", gap: 4, padding: "4px 11px", borderRadius: 9999, background: "#FEF9C3", border: "1.5px solid #FDE047", fontSize: 11, fontWeight: 700, color: "#854D0E" }}>
+                <Clock size={10} /> Deadline: {fmtDate(req.deadline)}
+              </div>
+            )}
+            <div style={{ padding: "4px 11px", borderRadius: 9999, background: req.status === "open" ? "#DCFCE7" : "#F5F0E8", border: `1.5px solid ${req.status === "open" ? "#86EFAC" : "#E8E0D0"}`, fontSize: 11, fontWeight: 800, color: req.status === "open" ? "#16A34A" : "#9B8F7A", textTransform: "capitalize" }}>
+              {req.status}
+            </div>
           </div>
 
+          {/* Action buttons */}
           {isOwn ? (
             <div style={{ display: "flex", gap: 8 }}>
               <button onClick={() => { onClose(); onEdit(req); }} style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 7, padding: "12px", background: "#FFD400", border: "2.5px solid #111110", borderRadius: 13, fontSize: 13, fontWeight: 800, cursor: "pointer", fontFamily: "inherit", color: "#111110", boxShadow: "3px 3px 0 #111110" }}>
@@ -176,15 +199,166 @@ function RequestModal({ req, onClose, currentUserId, onEdit, onDelete }: {
               </button>
             </div>
           ) : (
-            <a href={req.profiles?.username ? `/${req.profiles.username}` : "#"} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none", display: "block" }}>
-              <button style={{ width: "100%", padding: "13px", background: "#FFD400", border: "2.5px solid #111110", borderRadius: 13, fontSize: 14, fontWeight: 800, cursor: "pointer", fontFamily: "inherit", boxShadow: "3px 3px 0 #111110", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, color: "#111110" }}>
-                <ArrowUpRight size={16} /> View Profile & Connect
+            // ── NON-OWNER: Message + View Profile ──────────────────
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {/* Primary: Send Message */}
+              <button
+                onClick={() => setMsgOpen(true)}
+                style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "13px", background: "#FFD400", border: "2.5px solid #111110", borderRadius: 13, fontSize: 14, fontWeight: 800, cursor: "pointer", fontFamily: "inherit", color: "#111110", boxShadow: "3px 3px 0 #111110", transition: "all .15s" }}
+                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.boxShadow = "5px 5px 0 #111110"; (e.currentTarget as HTMLElement).style.transform = "translate(-1px,-1px)"; }}
+                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.boxShadow = "3px 3px 0 #111110"; (e.currentTarget as HTMLElement).style.transform = "none"; }}
+              >
+                <MessageSquare size={15} /> Send Message
               </button>
-            </a>
+
+              {/* Secondary: View Profile */}
+              {req.profiles?.username && (
+                <a href={`/${req.profiles.username}`} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none" }}>
+                  <button
+                    style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 7, padding: "11px", background: "#fff", border: "2px solid #E8E0D0", borderRadius: 13, fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", color: "#111110", transition: "border-color .15s" }}
+                    onMouseEnter={e => (e.currentTarget as HTMLElement).style.borderColor = "#111110"}
+                    onMouseLeave={e => (e.currentTarget as HTMLElement).style.borderColor = "#E8E0D0"}
+                  >
+                    <ArrowUpRight size={14} /> View Profile
+                  </button>
+                </a>
+              )}
+            </div>
           )}
         </div>
       </div>
+
+      {/* ── MessageModal for this collab request ── */}
+      <MessageModal
+        isOpen={msgOpen}
+        onClose={() => setMsgOpen(false)}
+        recipientId={req.user_id}
+        recipientName={req.profiles?.full_name || "Artist"}
+        recipientAvatar={req.profiles?.avatar_url}
+        recipientRole={req.profiles?.role}
+        contextType="collab"
+        contextTitle={req.title}
+        contextId={req.id}
+        contextMeta={{
+          emoji: isVenue ? "🏛️" : "🎨",
+          label: tInfo(req.request_type)?.label || req.request_type,
+          image: getImgs(req)[0],
+          subtitle: req.location || req.profiles?.location,
+        }}
+      />
     </div>
+  );
+}
+
+// ─────────────────────────────────────────────
+// Pool Card
+// ─────────────────────────────────────────────
+function PoolCard({ req, onClick, isOwn }: { req: PoolRequest; onClick: () => void; isOwn: boolean }) {
+  const [msgOpen, setMsgOpen] = useState(false);  // ← NEW
+
+  const style = tStyle(req.request_type);
+  const ti = tInfo(req.request_type);
+  const isVenue = (req.poster_role || req.poster_type) === "venue";
+  const imgs = getImgs(req);
+
+  return (
+    <>
+      <div
+        onClick={onClick}
+        style={{ background: "#fff", border: "2.5px solid #E8E0D0", borderRadius: 20, overflow: "hidden", cursor: "pointer", transition: "all .25s cubic-bezier(.16,1,.3,1)", position: "relative" }}
+        onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.borderColor = "#111110"; el.style.boxShadow = "5px 6px 0 #111110"; el.style.transform = "translate(-2px,-3px)"; }}
+        onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.borderColor = "#E8E0D0"; el.style.boxShadow = "none"; el.style.transform = "none"; }}
+      >
+        {/* Cover image */}
+        <div style={{ height: 148, position: "relative", overflow: "hidden", background: imgs.length > 0 ? "#111" : isVenue ? "#111110" : "#FFD400", flexShrink: 0 }}>
+          {imgs.length > 0
+            ? <img src={imgs[0]} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+            : <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 52, opacity: 0.14 }}>{isVenue ? "🏛️" : "🎨"}</div>
+          }
+          <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to bottom, transparent 28%, rgba(17,17,16,0.6) 100%)" }} />
+
+          {/* Type badge */}
+          <div style={{ position: "absolute", top: 9, left: 9, display: "flex", alignItems: "center", gap: 3, padding: "3px 9px", borderRadius: 9999, background: style.bg, border: `1.5px solid ${style.border}`, fontSize: 9, fontWeight: 800, color: style.color, textTransform: "uppercase" as const, letterSpacing: "0.1em" }}>
+            {ti?.emoji} {ti?.label || req.request_type}
+          </div>
+
+          {/* Image count */}
+          {imgs.length > 1 && (
+            <div style={{ position: "absolute", top: 9, right: isOwn ? 9 : 9, padding: "2px 7px", borderRadius: 9999, background: "rgba(17,17,16,0.65)", fontSize: 9, fontWeight: 800, color: "#fff" }}>
+              {imgs.length} photos
+            </div>
+          )}
+        </div>
+
+        {/* Card body */}
+        <div style={{ padding: "13px 14px 42px" }}>  {/* extra bottom padding for the message btn */}
+          {/* Author */}
+          <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 8 }}>
+            <div style={{ width: 26, height: 26, borderRadius: 8, border: "1.5px solid #E8E0D0", overflow: "hidden", background: "#FFD400", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 900, flexShrink: 0 }}>
+              {req.profiles?.avatar_url ? <img src={req.profiles.avatar_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : (req.profiles?.full_name || "?")[0]}
+            </div>
+            <span style={{ fontSize: 12, fontWeight: 700, color: "#5C5346", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{req.profiles?.full_name || "Unknown"}</span>
+            <span style={{ fontSize: 10, fontWeight: 700, color: "#C0B8A8", flexShrink: 0 }}>{timeAgo(req.created_at)}</span>
+          </div>
+
+          {/* Title */}
+          <div style={{ fontSize: 14, fontWeight: 800, color: "#111110", marginBottom: 6, lineHeight: 1.3, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+            {req.title}
+          </div>
+
+          {/* Description preview */}
+          {req.description && (
+            <div style={{ fontSize: 12, color: "#9B8F7A", fontWeight: 500, lineHeight: 1.5, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", marginBottom: 8 }}>
+              {req.description}
+            </div>
+          )}
+
+          {/* Location & status dot */}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 4 }}>
+            {req.location
+              ? <span style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 10, fontWeight: 700, color: "#9B8F7A" }}><MapPin size={9} color="#FF6B6B" />{req.location}</span>
+              : <span />
+            }
+          </div>
+        </div>
+
+        {/* Status dot */}
+        <div style={{ position: "absolute", bottom: 14, left: 14, width: 7, height: 7, borderRadius: "50%", background: req.status === "open" ? "#16A34A" : "#C0B8A8", border: "1.5px solid #fff" }} />
+
+        {/* ── Quick Message button (non-owners only) ── */}
+        {!isOwn && (
+          <button
+            onClick={e => { e.stopPropagation(); setMsgOpen(true); }}
+            style={{ position: "absolute", bottom: 10, right: 12, display: "flex", alignItems: "center", gap: 4, padding: "4px 11px", background: "#FFD400", border: "2px solid #111110", borderRadius: 99, fontSize: 10, fontWeight: 800, cursor: "pointer", fontFamily: "inherit", color: "#111110", boxShadow: "2px 2px 0 #111110", zIndex: 3, transition: "all .12s" }}
+            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = "translate(-1px,-1px)"; (e.currentTarget as HTMLElement).style.boxShadow = "3px 3px 0 #111110"; }}
+            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = "none"; (e.currentTarget as HTMLElement).style.boxShadow = "2px 2px 0 #111110"; }}
+          >
+            <MessageSquare size={10} /> Message
+          </button>
+        )}
+      </div>
+
+      {/* ── MessageModal for card quick-message ── */}
+      {!isOwn && (
+        <MessageModal
+          isOpen={msgOpen}
+          onClose={() => setMsgOpen(false)}
+          recipientId={req.user_id}
+          recipientName={req.profiles?.full_name || "Artist"}
+          recipientAvatar={req.profiles?.avatar_url}
+          recipientRole={req.profiles?.role}
+          contextType="collab"
+          contextTitle={req.title}
+          contextId={req.id}
+          contextMeta={{
+            emoji: isVenue ? "🏛️" : "🎨",
+            label: tInfo(req.request_type)?.label || req.request_type,
+            image: imgs[0],
+            subtitle: req.location || req.profiles?.location,
+          }}
+        />
+      )}
+    </>
   );
 }
 
@@ -221,14 +395,12 @@ function RequestFormModal({ userRole, userId, existing, onClose, onSaved }: {
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
       const ext = file.name.split(".").pop() || "jpg";
-      // CRITICAL: path must start with userId/ to pass the storage INSERT policy
       const path = `${userId}/pool/${Date.now()}-${i}.${ext}`;
-      const { error: upErr, data } = await sb.storage.from("artworks").upload(path, file, { upsert: true, contentType: file.type });
+      const { error: upErr } = await sb.storage.from("artworks").upload(path, file, { upsert: true, contentType: file.type });
       if (!upErr) {
         const { data: { publicUrl } } = sb.storage.from("artworks").getPublicUrl(path);
         uploaded.push(publicUrl);
       } else {
-        console.error("Upload failed:", upErr.message);
         setError(`Upload failed: ${upErr.message}`);
       }
     }
@@ -267,6 +439,7 @@ function RequestFormModal({ userRole, userId, existing, onClose, onSaved }: {
   return (
     <div style={{ position: "fixed", inset: 0, zIndex: 9000, background: "rgba(17,17,16,0.8)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }} onClick={onClose}>
       <div onClick={e => e.stopPropagation()} style={{ background: "#FFFBEA", border: "2.5px solid #111110", borderRadius: 24, boxShadow: "8px 8px 0 #111110", width: "100%", maxWidth: 520, maxHeight: "92vh", overflowY: "auto" }}>
+
         {/* Header */}
         <div style={{ padding: "18px 20px 14px", borderBottom: "2px solid #E8E0D0", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <div>
@@ -283,191 +456,103 @@ function RequestFormModal({ userRole, userId, existing, onClose, onSaved }: {
         </div>
 
         <div style={{ padding: "18px 20px 24px" }}>
-          {/* ── STEP 1: type picker ── */}
+          {/* Step 1: Type picker */}
           {step === "type" && (
             <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
               {TYPES.map(t => {
                 const st = tStyle(t.key);
                 const sel = form.request_type === t.key;
                 return (
-                  <button key={t.key} onClick={() => setForm(p => ({ ...p, request_type: t.key }))} style={{ display: "flex", alignItems: "center", gap: 11, padding: "12px 13px", border: `2.5px solid ${sel ? "#111110" : "#E8E0D0"}`, borderRadius: 13, background: sel ? "#FFFBEA" : "#fff", cursor: "pointer", fontFamily: "inherit", textAlign: "left", transition: "all .12s", boxShadow: sel ? "3px 3px 0 #111110" : "none" }}>
-                    <div style={{ width: 36, height: 36, borderRadius: 10, background: st.bg, border: `2px solid ${sel ? "#111110" : st.border}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 }}>{t.emoji}</div>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 13, fontWeight: 800, color: "#111110", marginBottom: 1 }}>{t.label}</div>
-                      <div style={{ fontSize: 11, fontWeight: 600, color: "#9B8F7A" }}>{t.desc}</div>
+                  <button key={t.key} onClick={() => setForm(p => ({ ...p, request_type: t.key }))} style={{ display: "flex", alignItems: "center", gap: 11, padding: "12px 13px", border: `2.5px solid ${sel ? "#111110" : "#E8E0D0"}`, borderRadius: 13, background: sel ? "#FFFBEA" : "#fff", cursor: "pointer", fontFamily: "inherit", transition: "all .14s", textAlign: "left" as const }}>
+                    <div style={{ width: 36, height: 36, borderRadius: 10, background: st.bg, border: `1.5px solid ${st.border}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 }}>{t.emoji}</div>
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 800, color: "#111110" }}>{t.label}</div>
+                      <div style={{ fontSize: 11, color: "#9B8F7A", fontWeight: 500 }}>{t.desc}</div>
                     </div>
-                    {sel && <div style={{ width: 20, height: 20, borderRadius: "50%", background: "#FFD400", border: "2px solid #111110", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Check size={11} strokeWidth={3} /></div>}
+                    {sel && <div style={{ marginLeft: "auto", width: 20, height: 20, borderRadius: "50%", background: "#FFD400", border: "2px solid #111110", display: "flex", alignItems: "center", justifyContent: "center" }}><Check size={11} strokeWidth={3} /></div>}
                   </button>
                 );
               })}
-              <button onClick={() => { if (form.request_type) setStep("details"); }} disabled={!form.request_type} style={{ marginTop: 6, padding: "12px", background: form.request_type ? "#FFD400" : "#F5F0E8", border: "2.5px solid #111110", borderRadius: 13, fontSize: 13, fontWeight: 800, cursor: form.request_type ? "pointer" : "not-allowed", fontFamily: "inherit", color: "#111110", boxShadow: form.request_type ? "3px 3px 0 #111110" : "none" }}>
-                Continue →
+              <button disabled={!form.request_type} onClick={() => setStep("details")} style={{ marginTop: 8, padding: "12px", background: form.request_type ? "#FFD400" : "#F5F0E8", border: "2.5px solid #111110", borderRadius: 13, fontSize: 14, fontWeight: 800, cursor: form.request_type ? "pointer" : "not-allowed", fontFamily: "inherit", color: "#111110", boxShadow: form.request_type ? "3px 3px 0 #111110" : "none" }}>
+                {selType ? `Continue with "${selType.label}" →` : "Select a type to continue"}
               </button>
             </div>
           )}
 
-          {/* ── STEP 2: details ── */}
+          {/* Step 2: Details */}
           {step === "details" && (
-            <div>
-              {/* Type indicator */}
-              {selType && (
-                <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 12px", background: "#fff", border: "2px solid #E8E0D0", borderRadius: 11, marginBottom: 16 }}>
-                  <span style={{ fontSize: 18 }}>{selType.emoji}</span>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 12, fontWeight: 800, color: "#111110" }}>{selType.label}</div>
-                    <div style={{ fontSize: 11, color: "#9B8F7A", fontWeight: 600 }}>{selType.desc}</div>
-                  </div>
-                  {!isEdit && <button onClick={() => setStep("type")} style={{ fontSize: 11, fontWeight: 700, color: "#9B8F7A", background: "none", border: "none", cursor: "pointer", flexShrink: 0 }}>Change</button>}
-                </div>
-              )}
-
-              {/* Photos */}
-              <div style={{ marginBottom: 14 }}>
-                <label style={lbl}>Photos <span style={{ fontWeight: 600, color: "#C0B8A8" }}>(optional · select multiple)</span></label>
-                {form.images.length > 0 ? (
-                  <div style={{ display: "flex", gap: 7, flexWrap: "wrap", marginBottom: 6 }}>
-                    {form.images.map((url, i) => (
-                      <div key={i} style={{ position: "relative", width: 70, height: 70, borderRadius: 10, overflow: "hidden", border: `2px solid ${i === 0 ? "#FFD400" : "#111110"}`, flexShrink: 0 }}>
-                        <img src={url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                        {i === 0 && <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, background: "rgba(17,17,16,0.75)", fontSize: 7, fontWeight: 800, color: "#FFD400", textAlign: "center", padding: "2px 0", textTransform: "uppercase" }}>Cover</div>}
-                        <button onClick={() => setForm(p => ({ ...p, images: p.images.filter((_, j) => j !== i) }))} style={{ position: "absolute", top: 3, right: 3, width: 17, height: 17, borderRadius: 5, background: "#111110", border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
-                          <X size={9} color="#FFD400" />
-                        </button>
-                      </div>
-                    ))}
-                    <div onClick={() => fileRef.current?.click()} style={{ width: 70, height: 70, borderRadius: 10, border: "2.5px dashed #D4C9A8", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 2, cursor: "pointer", background: "#FAF7F3" }}>
-                      {uploading ? <div style={{ width: 13, height: 13, border: "2px solid #FFD400", borderTopColor: "transparent", borderRadius: "50%", animation: "spin .7s linear infinite" }} /> : <Plus size={15} color="#C0B8A8" />}
-                      <span style={{ fontSize: 9, fontWeight: 700, color: "#C0B8A8" }}>{uploading ? "…" : "Add"}</span>
-                    </div>
-                  </div>
-                ) : (
-                  <div onClick={() => fileRef.current?.click()} style={{ height: 86, border: "2.5px dashed #D4C9A8", borderRadius: 11, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 5, cursor: "pointer", background: "#FAF7F3", transition: "border-color .15s" }}
-                    onMouseEnter={e => (e.currentTarget.style.borderColor = "#FFD400")}
-                    onMouseLeave={e => (e.currentTarget.style.borderColor = "#D4C9A8")}
-                  >
-                    {uploading ? <div style={{ width: 18, height: 18, border: "2.5px solid #FFD400", borderTopColor: "transparent", borderRadius: "50%", animation: "spin .7s linear infinite" }} /> : <Upload size={18} color="#C0B8A8" />}
-                    <span style={{ fontSize: 12, fontWeight: 700, color: "#9B8F7A" }}>{uploading ? "Uploading…" : "Click to add photos"}</span>
-                    <span style={{ fontSize: 10, fontWeight: 600, color: "#C0B8A8" }}>First photo becomes the cover</span>
-                  </div>
-                )}
-                <input ref={fileRef} type="file" accept="image/*" multiple hidden onChange={e => { if (e.target.files?.length) uploadImages(e.target.files); e.target.value = ""; }} />
-              </div>
-
-              {/* Title */}
-              <div style={{ marginBottom: 12 }}>
-                <label style={lbl}>Title *</label>
-                <input value={form.title} onChange={e => setForm(p => ({ ...p, title: e.target.value }))} placeholder="Add a clear, descriptive title…" maxLength={120} style={inp} onFocus={e => (e.target.style.borderColor = "#FFD400")} onBlur={e => (e.target.style.borderColor = "#E8E0D0")} />
-              </div>
-
-              {/* Description */}
-              <div style={{ marginBottom: 12 }}>
-                <label style={lbl}>Details <span style={{ fontWeight: 600, color: "#C0B8A8" }}>(optional)</span></label>
-                <textarea value={form.description} onChange={e => setForm(p => ({ ...p, description: e.target.value }))} placeholder="What are you looking for, what can you offer, timeline, style…" rows={3} style={{ ...inp, resize: "vertical" as const }} onFocus={e => (e.target.style.borderColor = "#FFD400")} onBlur={e => (e.target.style.borderColor = "#E8E0D0")} />
-              </div>
-
-              {/* Location + Deadline */}
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
-                <div>
-                  <label style={lbl}>Location <span style={{ fontWeight: 600, color: "#C0B8A8" }}>(opt.)</span></label>
-                  <input value={form.location} onChange={e => setForm(p => ({ ...p, location: e.target.value }))} placeholder="City, Country" style={inp} onFocus={e => (e.target.style.borderColor = "#FFD400")} onBlur={e => (e.target.style.borderColor = "#E8E0D0")} />
-                </div>
-                <div>
-                  <label style={lbl}>Deadline <span style={{ fontWeight: 600, color: "#C0B8A8" }}>(opt.)</span></label>
-                  <input type="date" value={form.deadline} onChange={e => setForm(p => ({ ...p, deadline: e.target.value }))} style={inp} onFocus={e => (e.target.style.borderColor = "#FFD400")} onBlur={e => (e.target.style.borderColor = "#E8E0D0")} />
-                </div>
-              </div>
-
-              {/* Status (edit only) */}
-              {isEdit && (
-                <div style={{ marginBottom: 14 }}>
-                  <label style={lbl}>Status</label>
-                  <div style={{ display: "flex", gap: 8 }}>
-                    {["open", "closed"].map(s => (
-                      <button key={s} onClick={() => setForm(p => ({ ...p, status: s }))} style={{ flex: 1, padding: "9px", border: `2px solid ${form.status === s ? "#111110" : "#E8E0D0"}`, borderRadius: 10, background: form.status === s ? (s === "open" ? "#DCFCE7" : "#F5F0E8") : "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", color: form.status === s ? (s === "open" ? "#16A34A" : "#9B8F7A") : "#9B8F7A", textTransform: "capitalize" as const }}>
-                        {s === "open" ? "✓ Open" : "Closed"}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {error && <div style={{ fontSize: 12, fontWeight: 700, color: "#EF4444", marginBottom: 12 }}>⚠ {error}</div>}
-
-              <div style={{ display: "flex", gap: 8 }}>
-                {!isEdit && <button onClick={() => setStep("type")} style={{ padding: "11px 16px", border: "2px solid #E8E0D0", borderRadius: 11, background: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", color: "#111110" }}>← Back</button>}
-                <button onClick={handleSubmit} disabled={saving || !form.title.trim() || uploading} style={{ flex: 1, padding: "11px", background: saving || !form.title.trim() || uploading ? "#F5F0E8" : "#FFD400", border: "2.5px solid #111110", borderRadius: 11, fontSize: 13, fontWeight: 800, cursor: saving || !form.title.trim() || uploading ? "not-allowed" : "pointer", fontFamily: "inherit", color: "#111110", boxShadow: saving || !form.title.trim() || uploading ? "none" : "3px 3px 0 #111110" }}>
-                  {saving ? "Saving…" : uploading ? "Uploading…" : isEdit ? "Save changes ✓" : "Post to Pool ✓"}
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              {!isEdit && (
+                <button onClick={() => setStep("type")} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 700, color: "#9B8F7A", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", padding: 0, marginBottom: -4 }}>
+                  ← Change type ({selType?.emoji} {selType?.label})
                 </button>
+              )}
+
+              <div>
+                <label style={lbl}>Title *</label>
+                <input style={inp} value={form.title} onChange={e => setForm(p => ({ ...p, title: e.target.value }))} placeholder="Describe what you're looking for…" />
               </div>
+
+              <div>
+                <label style={lbl}>Description</label>
+                <textarea style={{ ...inp, minHeight: 90, resize: "vertical" as const }} value={form.description} onChange={e => setForm(p => ({ ...p, description: e.target.value }))} placeholder="More details about your request, timeline, what you're looking for…" rows={3} />
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <div>
+                  <label style={lbl}>Location</label>
+                  <input style={inp} value={form.location} onChange={e => setForm(p => ({ ...p, location: e.target.value }))} placeholder="Prague, CZ" />
+                </div>
+                <div>
+                  <label style={lbl}>Deadline</label>
+                  <input type="date" style={inp} value={form.deadline} onChange={e => setForm(p => ({ ...p, deadline: e.target.value }))} />
+                </div>
+              </div>
+
+              {/* Images */}
+              <div>
+                <label style={lbl}>Images ({form.images.length}/5)</label>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
+                  {form.images.map((img, i) => (
+                    <div key={i} style={{ width: 72, height: 72, borderRadius: 10, border: "2px solid #E8E0D0", overflow: "hidden", position: "relative" }}>
+                      <img src={img} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                      <button onClick={() => setForm(p => ({ ...p, images: p.images.filter((_, j) => j !== i) }))} style={{ position: "absolute", top: 3, right: 3, width: 18, height: 18, borderRadius: "50%", background: "#111110", border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
+                        <X size={9} color="#FFD400" />
+                      </button>
+                    </div>
+                  ))}
+                  {form.images.length < 5 && (
+                    <button onClick={() => fileRef.current?.click()} style={{ width: 72, height: 72, borderRadius: 10, border: "2px dashed #E8E0D0", background: "#F5F0E8", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 4, cursor: "pointer", fontSize: 10, fontWeight: 700, color: "#9B8F7A", fontFamily: "inherit" }}>
+                      <Upload size={16} color="#9B8F7A" /> Add
+                    </button>
+                  )}
+                </div>
+                <input ref={fileRef} type="file" accept="image/*" multiple style={{ display: "none" }} onChange={e => e.target.files && uploadImages(e.target.files)} />
+                {uploading && <div style={{ fontSize: 11, color: "#9B8F7A", fontWeight: 700 }}>Uploading…</div>}
+              </div>
+
+              {/* Status */}
+              <div>
+                <label style={lbl}>Status</label>
+                <div style={{ display: "flex", gap: 8 }}>
+                  {(["open", "closed"] as const).map(s => (
+                    <button key={s} onClick={() => setForm(p => ({ ...p, status: s }))} style={{ flex: 1, padding: "9px", border: `2px solid ${form.status === s ? "#111110" : "#E8E0D0"}`, borderRadius: 10, background: form.status === s ? "#FFD400" : "#fff", fontSize: 13, fontWeight: 800, cursor: "pointer", fontFamily: "inherit", textTransform: "capitalize" }}>
+                      {s}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {error && <div style={{ fontSize: 12, fontWeight: 700, color: "#EF4444" }}>{error}</div>}
+
+              <button onClick={handleSubmit} disabled={saving || !form.title.trim() || uploading} style={{ padding: "13px", background: saving || !form.title.trim() || uploading ? "#F5F0E8" : "#FFD400", border: "2.5px solid #111110", borderRadius: 13, fontSize: 14, fontWeight: 800, cursor: saving || !form.title.trim() || uploading ? "not-allowed" : "pointer", fontFamily: "inherit", color: "#111110", boxShadow: saving || !form.title.trim() || uploading ? "none" : "3px 3px 0 #111110" }}>
+                {saving ? "Saving…" : uploading ? "Uploading…" : isEdit ? "Save changes ✓" : "Post to Pool ✓"}
+              </button>
             </div>
           )}
         </div>
       </div>
       <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
-    </div>
-  );
-}
-
-// ─────────────────────────────────────────────
-// Pool Card
-// ─────────────────────────────────────────────
-function PoolCard({ req, onClick, isOwn }: { req: PoolRequest; onClick: () => void; isOwn: boolean }) {
-  const style = tStyle(req.request_type);
-  const ti = tInfo(req.request_type);
-  const isVenue = (req.poster_role || req.poster_type) === "venue";
-  const imgs = getImgs(req);
-
-  return (
-    <div onClick={onClick} style={{ background: "#fff", border: "2.5px solid #E8E0D0", borderRadius: 20, overflow: "hidden", cursor: "pointer", transition: "all .25s cubic-bezier(.16,1,.3,1)", position: "relative" }}
-      onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.borderColor = "#111110"; el.style.boxShadow = "5px 6px 0 #111110"; el.style.transform = "translate(-2px,-3px)"; }}
-      onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.borderColor = "#E8E0D0"; el.style.boxShadow = "none"; el.style.transform = "none"; }}
-    >
-      {/* Image */}
-      <div style={{ height: 148, position: "relative", overflow: "hidden", background: imgs.length > 0 ? "#111" : isVenue ? "#111110" : "#FFD400", flexShrink: 0 }}>
-        {imgs.length > 0
-          ? <img src={imgs[0]} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-          : <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 52, opacity: 0.14 }}>{isVenue ? "🏛️" : "🎨"}</div>
-        }
-        <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to bottom, transparent 28%, rgba(17,17,16,0.6) 100%)" }} />
-
-        <div style={{ position: "absolute", top: 9, left: 9, display: "flex", alignItems: "center", gap: 3, padding: "3px 9px", borderRadius: 9999, background: style.bg, border: `1.5px solid ${style.border}`, fontSize: 9, fontWeight: 800, color: style.color, textTransform: "uppercase" as const, letterSpacing: "0.1em" }}>
-          {ti?.emoji} {ti?.label || req.request_type}
-        </div>
-
-        {imgs.length > 1 && (
-          <div style={{ position: "absolute", top: 9, right: isOwn ? 44 : 9, padding: "2px 7px", borderRadius: 9999, background: "rgba(17,17,16,0.65)", fontSize: 9, fontWeight: 800, color: "#fff" }}>
-            📷 {imgs.length}
-          </div>
-        )}
-
-        {isOwn && (
-          <div style={{ position: "absolute", top: 9, right: 9, padding: "2px 7px", borderRadius: 9999, background: "#FFD400", border: "1.5px solid #111110", fontSize: 9, fontWeight: 800, color: "#111110" }}>Yours</div>
-        )}
-
-        <div style={{ position: "absolute", bottom: 9, left: 9, display: "flex", alignItems: "center", gap: 6 }}>
-          <div style={{ width: 26, height: 26, borderRadius: 8, border: "2px solid #fff", overflow: "hidden", background: "#FFD400", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 900, color: "#111110", flexShrink: 0 }}>
-            {req.profiles?.avatar_url ? <img src={req.profiles.avatar_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : (req.profiles?.full_name || "?")[0]}
-          </div>
-          <span style={{ fontSize: 11, fontWeight: 700, color: "#fff", textShadow: "0 1px 4px rgba(0,0,0,0.5)" }}>{req.profiles?.full_name}</span>
-        </div>
-
-        <div style={{ position: "absolute", bottom: 9, right: 9, padding: "2px 7px", borderRadius: 9999, background: isVenue ? "#E0F2FE" : "#FFD400", border: "1.5px solid #111110", fontSize: 8, fontWeight: 800, color: isVenue ? "#0C4A6E" : "#111110", textTransform: "uppercase" as const }}>
-          {isVenue ? "Venue" : "Artist"}
-        </div>
-      </div>
-
-      {/* Body */}
-      <div style={{ padding: "12px 14px 14px" }}>
-        <div style={{ fontSize: 14, fontWeight: 800, color: "#111110", letterSpacing: "-0.3px", marginBottom: 5, lineHeight: 1.3, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as any }}>{req.title}</div>
-        {req.description && (
-          <p style={{ fontSize: 11, color: "#9B8F7A", lineHeight: 1.5, fontWeight: 500, marginBottom: 10, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as any }}>{req.description}</p>
-        )}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: req.description ? 0 : 6 }}>
-          {req.location ? <span style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 10, fontWeight: 700, color: "#9B8F7A" }}><MapPin size={9} color="#FF6B6B" />{req.location}</span> : <span />}
-          <span style={{ fontSize: 10, fontWeight: 700, color: "#C0B8A8" }}>{timeAgo(req.created_at)}</span>
-        </div>
-      </div>
-      <div style={{ position: "absolute", bottom: 14, right: 14, width: 7, height: 7, borderRadius: "50%", background: req.status === "open" ? "#16A34A" : "#C0B8A8", border: "1.5px solid #fff" }} />
     </div>
   );
 }
@@ -538,8 +623,6 @@ export default function PoolPage() {
     return true;
   });
 
-  const myRequests = requests.filter(r => r.user_id === profile?.id);
-
   return (
     <>
       <style>{`
@@ -572,88 +655,61 @@ export default function PoolPage() {
             <p style={{ fontSize: 13, fontWeight: 600, color: "#9B8F7A", margin: 0 }}>Open requests from artists and venues — find your next collab, showcase, or acquisition</p>
           </div>
           {profile && (
-            <button onClick={() => { setEditReq(undefined); setShowForm(true); }}
+            <button
+              onClick={() => { setEditReq(undefined); setShowForm(true); }}
               style={{ display: "flex", alignItems: "center", gap: 7, padding: "10px 16px", background: "#FFD400", border: "2.5px solid #111110", borderRadius: 12, fontSize: 13, fontWeight: 800, cursor: "pointer", fontFamily: "inherit", color: "#111110", boxShadow: "3px 3px 0 #111110", transition: "all .12s", flexShrink: 0 }}
               onMouseEnter={e => { (e.currentTarget as HTMLElement).style.boxShadow = "5px 5px 0 #111110"; (e.currentTarget as HTMLElement).style.transform = "translate(-1px,-1px)"; }}
               onMouseLeave={e => { (e.currentTarget as HTMLElement).style.boxShadow = "3px 3px 0 #111110"; (e.currentTarget as HTMLElement).style.transform = "none"; }}
             >
-              <Plus size={15} /> Post a Request
+              <Plus size={14} strokeWidth={3} /> Post a Request
             </button>
           )}
         </div>
 
-        {/* My requests strip */}
-        {myRequests.length > 0 && (
-          <div style={{ marginBottom: 26 }}>
-            <div style={{ fontSize: 10, fontWeight: 800, color: "#9B8F7A", textTransform: "uppercase", letterSpacing: "0.16em", marginBottom: 11, display: "flex", alignItems: "center", gap: 8 }}>
-              Your requests <div style={{ flex: 1, height: 1, background: "#E8E0D0" }} />
+        {/* Filters bar */}
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 20, flexWrap: "wrap" }}>
+          <div className="sw">
+            <Search size={13} color="#9B8F7A" />
+            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search requests…" />
+            {search && <button onClick={() => setSearch("")} style={{ background: "none", border: "none", cursor: "pointer", color: "#9B8F7A", display: "flex", padding: 0 }}><X size={12} /></button>}
+          </div>
+
+          <button onClick={() => setShowFilters(p => !p)} className={`fc${showFilters ? " on" : ""}`}>
+            <SlidersHorizontal size={12} /> {showFilters ? "Hide filters" : "Filters"}
+          </button>
+
+          {(["all", "open", "closed"] as const).map(s => (
+            <button key={s} onClick={() => setFilterStatus(s)} className={`fc${filterStatus === s ? " on" : ""}`} style={{ textTransform: "capitalize" }}>{s === "all" ? "All status" : s}</button>
+          ))}
+        </div>
+
+        {showFilters && (
+          <div style={{ background: "#fff", border: "2px solid #E8E0D0", borderRadius: 16, padding: "16px 20px", marginBottom: 18, display: "flex", flexDirection: "column", gap: 12 }}>
+            <div>
+              <div style={{ fontSize: 9, fontWeight: 800, color: "#9B8F7A", textTransform: "uppercase" as const, letterSpacing: "0.14em", marginBottom: 7 }}>Who</div>
+              <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
+                {([["all","All",""],["artist","🎨 Artists","artist"],["venue","🏛️ Venues","venue"]] as [string,string,string][]).map(([v,l,cls]) => (
+                  <button key={v} onClick={() => setFilterRole(v as any)} className={`fc${filterRole === v ? (cls ? ` ${cls}` : " on") : ""}`}>{l}</button>
+                ))}
+              </div>
             </div>
-            <div style={{ display: "flex", gap: 10, overflowX: "auto", paddingBottom: 4 }}>
-              {myRequests.map(r => {
-                const ti = tInfo(r.request_type);
-                const style = tStyle(r.request_type);
-                return (
-                  <div key={r.id} onClick={() => setSelected(r)} style={{ flexShrink: 0, width: 210, background: "#fff", border: "2px solid #E8E0D0", borderRadius: 13, padding: "11px 13px", cursor: "pointer", transition: "all .12s" }}
-                    onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = "#FFD400"; (e.currentTarget as HTMLElement).style.boxShadow = "3px 3px 0 #FFD400"; }}
-                    onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = "#E8E0D0"; (e.currentTarget as HTMLElement).style.boxShadow = "none"; }}
-                  >
-                    <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 6 }}>
-                      <span style={{ padding: "2px 7px", borderRadius: 9999, background: style.bg, color: style.color, fontSize: 9, fontWeight: 800, textTransform: "uppercase" as const }}>{ti?.emoji} {ti?.label || r.request_type}</span>
-                      <span style={{ marginLeft: "auto", width: 6, height: 6, borderRadius: "50%", background: r.status === "open" ? "#16A34A" : "#C0B8A8", flexShrink: 0 }} />
-                    </div>
-                    <div style={{ fontSize: 12, fontWeight: 800, color: "#111110", lineHeight: 1.3, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as any }}>{r.title}</div>
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 7 }}>
-                      <span style={{ fontSize: 10, fontWeight: 700, color: "#C0B8A8" }}>{timeAgo(r.created_at)}</span>
-                      <button onClick={e => { e.stopPropagation(); setEditReq(r); setShowForm(true); }} style={{ fontSize: 10, fontWeight: 800, color: "#9B8F7A", background: "none", border: "1.5px solid #E8E0D0", borderRadius: 7, padding: "2px 7px", cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", gap: 3 }}>
-                        <Pencil size={9} /> Edit
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
+            <div>
+              <div style={{ fontSize: 9, fontWeight: 800, color: "#9B8F7A", textTransform: "uppercase" as const, letterSpacing: "0.14em", marginBottom: 7 }}>Type</div>
+              <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
+                <button onClick={() => setFilterType("all")} className={`fc${filterType === "all" ? " on" : ""}`}>All</button>
+                {UNIQUE_TYPES.map(t => <button key={t.key} onClick={() => setFilterType(t.key)} className={`fc${filterType === t.key ? " on" : ""}`}>{t.emoji} {t.label}</button>)}
+              </div>
             </div>
           </div>
         )}
 
-        {/* Filters */}
-        <div style={{ marginBottom: 18 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
-            <div className="sw"><Search size={12} color="#C0B8A8" /><input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search requests…" /></div>
-            <button onClick={() => setShowFilters(p => !p)} className={`fc${showFilters ? " on" : ""}`}><SlidersHorizontal size={11} /> Filters {showFilters ? "▲" : "▼"}</button>
-            <div style={{ marginLeft: "auto", fontSize: 12, fontWeight: 700, color: "#9B8F7A" }}>{filtered.length} requests</div>
+        {!showFilters && (
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 20 }}>
+            {([["all","All",""],["artist","🎨 Artists","artist"],["venue","🏛️ Venues","venue"]] as [string,string,string][]).map(([v,l,cls]) => (
+              <button key={v} onClick={() => setFilterRole(v as any)} className={`fc${filterRole === v ? (cls ? ` ${cls}` : " on") : ""}`}>{l}</button>
+            ))}
           </div>
-
-          {showFilters && (
-            <div className="fu" style={{ background: "#fff", border: "2px solid #E8E0D0", borderRadius: 13, padding: "13px 15px", display: "flex", flexDirection: "column", gap: 11, marginBottom: 10 }}>
-              {[
-                { label: "Posted by", opts: [["all","All",""],["artist","🎨 Artists","artist"],["venue","🏛️ Venues","venue"]] as [string,string,string][], val: filterRole, set: setFilterRole },
-                { label: "Status", opts: [["all","All",""],["open","✓ Open",""],["closed","Closed",""]] as [string,string,string][], val: filterStatus, set: setFilterStatus },
-              ].map(({ label, opts, val, set }) => (
-                <div key={label}>
-                  <div style={{ fontSize: 9, fontWeight: 800, color: "#9B8F7A", textTransform: "uppercase" as const, letterSpacing: "0.14em", marginBottom: 7 }}>{label}</div>
-                  <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
-                    {opts.map(([v, l, cls]) => <button key={v} onClick={() => set(v as any)} className={`fc${val === v ? (cls ? ` ${cls}` : " on") : ""}`}>{l}</button>)}
-                  </div>
-                </div>
-              ))}
-              <div>
-                <div style={{ fontSize: 9, fontWeight: 800, color: "#9B8F7A", textTransform: "uppercase" as const, letterSpacing: "0.14em", marginBottom: 7 }}>Type</div>
-                <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
-                  <button onClick={() => setFilterType("all")} className={`fc${filterType === "all" ? " on" : ""}`}>All</button>
-                  {UNIQUE_TYPES.map(t => <button key={t.key} onClick={() => setFilterType(t.key)} className={`fc${filterType === t.key ? " on" : ""}`}>{t.emoji} {t.label}</button>)}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {!showFilters && (
-            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-              {([["all","All",""],["artist","🎨 Artists","artist"],["venue","🏛️ Venues","venue"]] as [string,string,string][]).map(([v,l,cls]) => (
-                <button key={v} onClick={() => setFilterRole(v as any)} className={`fc${filterRole === v ? (cls ? ` ${cls}` : " on") : ""}`}>{l}</button>
-              ))}
-            </div>
-          )}
-        </div>
+        )}
 
         {/* Grid */}
         {loading ? (
@@ -683,13 +739,19 @@ export default function PoolPage() {
 
       {/* Modals */}
       {selected && (
-        <RequestModal req={selected} onClose={() => setSelected(null)} currentUserId={profile?.id}
+        <RequestModal
+          req={selected}
+          onClose={() => setSelected(null)}
+          currentUserId={profile?.id}
           onEdit={r => { setEditReq(r); setShowForm(true); }}
           onDelete={async id => { await handleDelete(id); setSelected(null); }}
         />
       )}
       {showForm && profile && (
-        <RequestFormModal userRole={profile.role || "artist"} userId={profile.id} existing={editReq}
+        <RequestFormModal
+          userRole={profile.role || "artist"}
+          userId={profile.id}
+          existing={editReq}
           onClose={() => { setShowForm(false); setEditReq(undefined); }}
           onSaved={loadRequests}
         />

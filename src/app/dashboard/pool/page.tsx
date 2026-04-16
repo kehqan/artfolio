@@ -251,94 +251,187 @@ function RequestModal({ req, onClose, currentUserId, onEdit, onDelete }: {
 }
 
 // ─────────────────────────────────────────────
-// Pool Card
+// Pool Card — unified card design
 // ─────────────────────────────────────────────
 function PoolCard({ req, onClick, isOwn }: { req: PoolRequest; onClick: () => void; isOwn: boolean }) {
-  const [msgOpen, setMsgOpen] = useState(false);  // ← NEW
+  const [msgOpen, setMsgOpen] = useState(false);
+  const [isHov, setIsHov] = useState(false);
 
   const style = tStyle(req.request_type);
   const ti = tInfo(req.request_type);
   const isVenue = (req.poster_role || req.poster_type) === "venue";
   const imgs = getImgs(req);
+  const hasImg = imgs.length > 0;
+
+  // Fallback gradient when no image
+  const fallbackGradient = isVenue
+    ? "linear-gradient(135deg, #0f172a 0%, #1e3a5f 50%, #2563eb 100%)"
+    : "linear-gradient(135deg, #1a0a00 0%, #7c2d00 50%, #ea580c 100%)";
 
   return (
     <>
       <div
         onClick={onClick}
-        style={{ background: "#fff", border: "2.5px solid #E8E0D0", borderRadius: 20, overflow: "hidden", cursor: "pointer", transition: "all .25s cubic-bezier(.16,1,.3,1)", position: "relative" }}
-        onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.borderColor = "#111110"; el.style.boxShadow = "5px 6px 0 #111110"; el.style.transform = "translate(-2px,-3px)"; }}
-        onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.borderColor = "#E8E0D0"; el.style.boxShadow = "none"; el.style.transform = "none"; }}
+        onMouseEnter={() => setIsHov(true)}
+        onMouseLeave={() => setIsHov(false)}
+        style={{
+          background: "#fff",
+          border: `2.5px solid ${isHov ? "#111110" : "#E8E0D0"}`,
+          borderRadius: 20, overflow: "hidden", cursor: "pointer",
+          transition: "all .25s cubic-bezier(.16,1,.3,1)", position: "relative",
+          boxShadow: isHov ? "5px 6px 0 #111110" : "3px 4px 0 #D4C9A8",
+          transform: isHov ? "translate(-2px,-3px)" : "none",
+        }}
       >
-        {/* Cover image */}
-        <div style={{ height: 148, position: "relative", overflow: "hidden", background: imgs.length > 0 ? "#111" : isVenue ? "#111110" : "#FFD400", flexShrink: 0 }}>
-          {imgs.length > 0
-            ? <img src={imgs[0]} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-            : <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 52, opacity: 0.14 }}>{isVenue ? "🏛️" : "🎨"}</div>
-          }
-          <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to bottom, transparent 28%, rgba(17,17,16,0.6) 100%)" }} />
-
-          {/* Type badge */}
-          <div style={{ position: "absolute", top: 9, left: 9, display: "flex", alignItems: "center", gap: 3, padding: "3px 9px", borderRadius: 9999, background: style.bg, border: `1.5px solid ${style.border}`, fontSize: 9, fontWeight: 800, color: style.color, textTransform: "uppercase" as const, letterSpacing: "0.1em" }}>
-            {ti?.emoji} {ti?.label || req.request_type}
-          </div>
-
-          {/* Image count */}
-          {imgs.length > 1 && (
-            <div style={{ position: "absolute", top: 9, right: isOwn ? 9 : 9, padding: "2px 7px", borderRadius: 9999, background: "rgba(17,17,16,0.65)", fontSize: 9, fontWeight: 800, color: "#fff" }}>
-              {imgs.length} photos
+        {/* ── HERO ── */}
+        <div style={{
+          height: 200, position: "relative", overflow: "hidden", flexShrink: 0,
+          background: hasImg ? "#111" : fallbackGradient,
+        }}>
+          {hasImg && (
+            <img src={imgs[0]} alt="" style={{
+              width: "100%", height: "100%", objectFit: "cover",
+              transition: "transform .4s cubic-bezier(.16,1,.3,1)",
+              transform: isHov ? "scale(1.04)" : "scale(1)",
+            }} />
+          )}
+          {!hasImg && (
+            <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 56, opacity: 0.2 }}>
+              {isVenue ? "🏛️" : "🎨"}
             </div>
           )}
+
+          {/* Dark gradient overlay */}
+          <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to bottom, rgba(0,0,0,0.05) 0%, rgba(0,0,0,0.62) 100%)" }} />
+
+          {/* ── Liquid glass type badge — top left ── */}
+          <div style={{ position: "absolute", top: 12, left: 12, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+            <div style={{
+              display: "inline-flex", alignItems: "center", gap: 5,
+              padding: "4px 10px", borderRadius: 99,
+              background: "rgba(255,255,255,0.15)",
+              border: "1.5px solid rgba(255,255,255,0.25)",
+              backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)",
+              fontSize: 9, fontWeight: 900, color: "#fff",
+              textTransform: "uppercase" as const, letterSpacing: ".12em",
+            }}>
+              {ti?.emoji} {ti?.label || req.request_type}
+            </div>
+            {imgs.length > 1 && (
+              <div style={{
+                padding: "4px 8px", borderRadius: 99,
+                background: "rgba(0,0,0,0.4)",
+                border: "1px solid rgba(255,255,255,0.15)",
+                backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)",
+                fontSize: 9, fontWeight: 800, color: "#fff",
+              }}>
+                {imgs.length} photos
+              </div>
+            )}
+          </div>
+
+          {/* ── Liquid glass owner controls — top right ── */}
+          {isOwn && (
+            <div style={{ position: "absolute", top: 10, right: 10 }} onClick={e => e.stopPropagation()}>
+              <div style={{ display: "flex", gap: 5 }}>
+                {/* edit/delete handled via onClick → detail modal */}
+              </div>
+            </div>
+          )}
+
+          {/* ── Author + title on image bottom ── */}
+          <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "12px 14px 14px" }}>
+            {/* Author row */}
+            <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 6 }}>
+              <div style={{
+                width: 22, height: 22, borderRadius: 7,
+                border: "1.5px solid rgba(255,255,255,0.4)",
+                overflow: "hidden", background: "#FFD400",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: 9, fontWeight: 900, color: "#111110", flexShrink: 0,
+              }}>
+                {req.profiles?.avatar_url
+                  ? <img src={req.profiles.avatar_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                  : (req.profiles?.full_name || "?")[0]}
+              </div>
+              <span style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.75)", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {req.profiles?.full_name || "Unknown"}
+              </span>
+              <span style={{ fontSize: 9, fontWeight: 700, color: "rgba(255,255,255,0.4)", flexShrink: 0 }}>{timeAgo(req.created_at)}</span>
+            </div>
+            {/* Title */}
+            <h3 style={{
+              fontSize: 15, fontWeight: 900, color: "#fff", letterSpacing: "-.3px", margin: 0, lineHeight: 1.2,
+              textShadow: "0 1px 8px rgba(0,0,0,.5)",
+              display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as any, overflow: "hidden",
+            }}>
+              {req.title}
+            </h3>
+          </div>
         </div>
 
-        {/* Card body */}
-        <div style={{ padding: "13px 14px 42px" }}>  {/* extra bottom padding for the message btn */}
-          {/* Author */}
-          <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 8 }}>
-            <div style={{ width: 26, height: 26, borderRadius: 8, border: "1.5px solid #E8E0D0", overflow: "hidden", background: "#FFD400", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 900, flexShrink: 0 }}>
-              {req.profiles?.avatar_url ? <img src={req.profiles.avatar_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : (req.profiles?.full_name || "?")[0]}
-            </div>
-            <span style={{ fontSize: 12, fontWeight: 700, color: "#5C5346", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{req.profiles?.full_name || "Unknown"}</span>
-            <span style={{ fontSize: 10, fontWeight: 700, color: "#C0B8A8", flexShrink: 0 }}>{timeAgo(req.created_at)}</span>
-          </div>
-
-          {/* Title */}
-          <div style={{ fontSize: 14, fontWeight: 800, color: "#111110", marginBottom: 6, lineHeight: 1.3, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
-            {req.title}
-          </div>
-
-          {/* Description preview */}
+        {/* ── CARD BODY ── */}
+        <div style={{ padding: "12px 14px 14px" }}>
+          {/* Description */}
           {req.description && (
-            <div style={{ fontSize: 12, color: "#9B8F7A", fontWeight: 500, lineHeight: 1.5, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", marginBottom: 8 }}>
+            <div style={{ fontSize: 12, color: "#9B8F7A", fontWeight: 500, lineHeight: 1.5, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as any, overflow: "hidden", marginBottom: 8 }}>
               {req.description}
             </div>
           )}
 
-          {/* Location & status dot */}
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 4 }}>
-            {req.location
-              ? <span style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 10, fontWeight: 700, color: "#9B8F7A" }}><MapPin size={9} color="#FF6B6B" />{req.location}</span>
-              : <span />
-            }
+          {/* Meta row */}
+          <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+            {req.location && (
+              <span style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 10, fontWeight: 700, color: "#9B8F7A" }}>
+                <MapPin size={9} color="#FF6B6B" />{req.location}
+              </span>
+            )}
+            {req.deadline && (
+              <span style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 10, fontWeight: 700, color: "#854D0E" }}>
+                <Clock size={9} /> {fmtDate(req.deadline)}
+              </span>
+            )}
           </div>
         </div>
 
-        {/* Status dot */}
-        <div style={{ position: "absolute", bottom: 14, left: 14, width: 7, height: 7, borderRadius: "50%", background: req.status === "open" ? "#16A34A" : "#C0B8A8", border: "1.5px solid #fff" }} />
+        {/* ── CARD FOOTER ── */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 14px 12px", borderTop: "1px solid #F5F0E8" }}>
+          {/* Status liquid glass pill */}
+          <div style={{
+            display: "inline-flex", alignItems: "center", gap: 5,
+            padding: "4px 11px", borderRadius: 99,
+            background: req.status === "open" ? "rgba(22,163,74,0.1)" : "rgba(155,143,122,0.1)",
+            border: `1.5px solid ${req.status === "open" ? "rgba(22,163,74,0.3)" : "rgba(155,143,122,0.2)"}`,
+            fontSize: 10, fontWeight: 800,
+            color: req.status === "open" ? "#16A34A" : "#9B8F7A",
+          }}>
+            <span style={{ width: 5, height: 5, borderRadius: "50%", background: req.status === "open" ? "#16A34A" : "#C0B8A8" }} />
+            {req.status === "open" ? "Open" : "Closed"}
+          </div>
 
-        {/* ── Quick Message button (non-owners only) ── */}
-        {!isOwn && (
-          <button
-            onClick={e => { e.stopPropagation(); setMsgOpen(true); }}
-            style={{ position: "absolute", bottom: 10, right: 12, display: "flex", alignItems: "center", gap: 4, padding: "4px 11px", background: "#FFD400", border: "2px solid #111110", borderRadius: 99, fontSize: 10, fontWeight: 800, cursor: "pointer", fontFamily: "inherit", color: "#111110", boxShadow: "2px 2px 0 #111110", zIndex: 3, transition: "all .12s" }}
-            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = "translate(-1px,-1px)"; (e.currentTarget as HTMLElement).style.boxShadow = "3px 3px 0 #111110"; }}
-            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = "none"; (e.currentTarget as HTMLElement).style.boxShadow = "2px 2px 0 #111110"; }}
-          >
-            <MessageSquare size={10} /> Message
-          </button>
-        )}
+          {/* Message liquid glass pill (non-owners) */}
+          {!isOwn && (
+            <button
+              onClick={e => { e.stopPropagation(); setMsgOpen(true); }}
+              style={{
+                display: "flex", alignItems: "center", gap: 5,
+                padding: "4px 12px", borderRadius: 99, border: "none",
+                background: "rgba(255,212,0,0.15)",
+                border: "1.5px solid rgba(255,212,0,0.4)" as any,
+                backdropFilter: "blur(4px)",
+                fontSize: 10, fontWeight: 800, color: "#111110",
+                cursor: "pointer", fontFamily: "inherit", transition: "all .15s",
+              }}
+              onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.background = "#FFD400"; el.style.borderColor = "#111110"; el.style.boxShadow = "2px 2px 0 #111110"; }}
+              onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.background = "rgba(255,212,0,0.15)"; el.style.borderColor = "rgba(255,212,0,0.4)"; el.style.boxShadow = "none"; }}
+            >
+              <MessageSquare size={10} /> Message
+            </button>
+          )}
+        </div>
       </div>
 
-      {/* ── MessageModal for card quick-message ── */}
+      {/* MessageModal */}
       {!isOwn && (
         <MessageModal
           isOpen={msgOpen}

@@ -24,12 +24,15 @@ type Event = {
   event_type?: EventType; is_online?: boolean; online_url?: string;
   location_name?: string; lat?: number; lng?: number;
   user_id?: string;
+  poster_name?: string; poster_avatar?: string; poster_username?: string;
 };
 
 type ResourceType = "video" | "article" | "post";
 type Resource = {
   id: string; type: ResourceType; title: string; url?: string;
   description?: string; thumbnail_url?: string; created_at: string;
+  user_id?: string;
+  poster_name?: string; poster_avatar?: string; poster_username?: string;
 };
 
 type MainTab    = "events" | "education";
@@ -145,6 +148,22 @@ function EventDetailModal({ ev, onClose, onEdit, onDelete, isOwn }: {
               {isUpcoming(ev) ? "📅 Upcoming" : "🗂️ Past"}
             </div>
           </div>
+
+          {/* Poster */}
+          {ev.poster_name && (
+            <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:16, padding:"10px 14px", background:"#F5F0E8", borderRadius:12, border:"1.5px solid #E8E0D0" }}>
+              <div style={{ width:32, height:32, borderRadius:10, border:"2px solid #111110", overflow:"hidden", background:"#FFD400", display:"flex", alignItems:"center", justifyContent:"center", fontSize:12, fontWeight:900, color:"#111110", flexShrink:0 }}>
+                {ev.poster_avatar ? <img src={ev.poster_avatar} alt="" style={{ width:"100%", height:"100%", objectFit:"cover" }} /> : (ev.poster_name||"?")[0]}
+              </div>
+              <div>
+                <div style={{ fontSize:12, fontWeight:800, color:"#111110" }}>{ev.poster_name}</div>
+                <div style={{ fontSize:10, fontWeight:600, color:"#9B8F7A" }}>Posted this event</div>
+              </div>
+              {ev.poster_username && (
+                <a href={`/${ev.poster_username}`} target="_blank" rel="noopener noreferrer" style={{ marginLeft:"auto", fontSize:11, fontWeight:800, color:"#111110", textDecoration:"none", padding:"4px 10px", border:"1.5px solid #E8E0D0", borderRadius:8, background:"#fff" }}>View profile</a>
+              )}
+            </div>
+          )}
 
           {/* Description */}
           {ev.description && (
@@ -274,6 +293,16 @@ function EventCard({ ev, onEdit, onDelete, delay = 0, isOwn = false }: {
               </p>
             )}
           </div>
+
+          {/* Poster row */}
+          {ev.poster_name && (
+            <div style={{ display:"flex", alignItems:"center", gap:6, marginTop:8, paddingTop:8, borderTop:"1px solid #F5F0E8" }}>
+              <div style={{ width:20, height:20, borderRadius:6, border:"1.5px solid #E8E0D0", overflow:"hidden", background:"#FFD400", display:"flex", alignItems:"center", justifyContent:"center", fontSize:9, fontWeight:900, color:"#111110", flexShrink:0 }}>
+                {ev.poster_avatar ? <img src={ev.poster_avatar} alt="" style={{ width:"100%", height:"100%", objectFit:"cover" }} /> : (ev.poster_name||"?")[0]}
+              </div>
+              <span style={{ fontSize:11, fontWeight:700, color:"#9B8F7A" }}>{ev.poster_name}</span>
+            </div>
+          )}
 
           {/* Tap hint */}
           <div style={{ marginTop:10, display:"flex", alignItems:"center", gap:4, fontSize:11, fontWeight:700, color:etc.color }}>
@@ -433,9 +462,17 @@ function ResourceCard({ res, onDelete, delay = 0, isOwn = false }: {
           )}
         </div>
 
-        {/* Arrow */}
-        <div style={{ display:"flex", alignItems:"center", paddingRight:14, color:cfg.color, flexShrink:0 }}>
-          <ChevronRight size={16} />
+        {/* Poster + Arrow */}
+        <div style={{ display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", paddingRight:14, gap:6, flexShrink:0 }}>
+          {res.poster_name && (
+            <div style={{ display:"flex", alignItems:"center", gap:4 }}>
+              <div style={{ width:18, height:18, borderRadius:5, border:"1.5px solid #E8E0D0", overflow:"hidden", background:"#FFD400", display:"flex", alignItems:"center", justifyContent:"center", fontSize:8, fontWeight:900, color:"#111110", flexShrink:0 }}>
+                {res.poster_avatar ? <img src={res.poster_avatar} alt="" style={{ width:"100%", height:"100%", objectFit:"cover" }} /> : (res.poster_name||"?")[0]}
+              </div>
+              <span style={{ fontSize:9, fontWeight:700, color:"#9B8F7A", whiteSpace:"nowrap" }}>{res.poster_name.split(" ")[0]}</span>
+            </div>
+          )}
+          <ChevronRight size={14} color={cfg.color} />
         </div>
       </div>
 
@@ -482,20 +519,43 @@ export default function EventsEducationPage() {
   const [resForm, setResForm] = useState({ type: "video" as ResourceType, title: "", url: "", description: "" });
 
   useEffect(() => {
+    // Get current user ID for owner-check (optional, page works without login)
     sb.auth.getUser().then(({ data: { user } }) => { if (user) setUserId(user.id); });
     load();
   }, []);
 
   async function load() {
     setLoading(true);
-    const { data: { user } } = await sb.auth.getUser();
-    if (!user) { setLoading(false); return; }
+    // Fetch ALL public events and ALL resources (not just current user's)
     const [{ data: evs }, { data: ress }] = await Promise.all([
-      sb.from("exhibitions").select("*").eq("user_id", user.id).order("start_date", { ascending: true }),
-      sb.from("education_resources").select("*").eq("user_id", user.id).order("created_at", { ascending: false }),
+      sb.from("exhibitions").select("*").eq("is_public", true).order("start_date", { ascending: true }),
+      sb.from("education_resources").select("*").order("created_at", { ascending: false }),
     ]);
-    setEvents(evs || []);
-    setResources(ress || []);
+
+    // Enrich with poster profiles
+    const allUserIds = Array.from(new Set([
+      ...(evs || []).map((e: any) => e.user_id),
+      ...(ress || []).map((r: any) => r.user_id),
+    ].filter(Boolean)));
+
+    let profileMap: Record<string, any> = {};
+    if (allUserIds.length) {
+      const { data: profs } = await sb.from("profiles").select("id, full_name, username, avatar_url").in("id", allUserIds);
+      (profs || []).forEach((p: any) => { profileMap[p.id] = p; });
+    }
+
+    setEvents((evs || []).map((e: any) => ({
+      ...e,
+      poster_name: profileMap[e.user_id]?.full_name || null,
+      poster_avatar: profileMap[e.user_id]?.avatar_url || null,
+      poster_username: profileMap[e.user_id]?.username || null,
+    })));
+    setResources((ress || []).map((r: any) => ({
+      ...r,
+      poster_name: profileMap[r.user_id]?.full_name || null,
+      poster_avatar: profileMap[r.user_id]?.avatar_url || null,
+      poster_username: profileMap[r.user_id]?.username || null,
+    })));
     setLoading(false);
   }
 

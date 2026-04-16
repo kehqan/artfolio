@@ -672,7 +672,7 @@ export default function EventsEducationPage() {
                         <div className="section-label">🗂️ Past ({past.length})</div>
                         <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(300px,1fr))", gap:18 }}>
                           {past.map((ev, i) => (
-                            <EventCard key={ev.id} ev={ev} onEdit={() => openEdit(ev)} onDelete={() => deleteEvent(ev.id)} delay={i * 0.04} past isOwn={ev.user_id === userId} />
+                            <EventCard key={ev.id} ev={ev} onEdit={() => openEdit(ev)} onDelete={() => deleteEvent(ev.id)} delay={i * 0.04} isOwn={ev.user_id === userId} />
                           ))}
                         </div>
                       </div>

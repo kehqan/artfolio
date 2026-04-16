@@ -415,9 +415,9 @@ function PoolCard({ req, onClick, isOwn }: { req: PoolRequest; onClick: () => vo
               onClick={e => { e.stopPropagation(); setMsgOpen(true); }}
               style={{
                 display: "flex", alignItems: "center", gap: 5,
-                padding: "4px 12px", borderRadius: 99, border: "none",
+                padding: "4px 12px", borderRadius: 99,
                 background: "rgba(255,212,0,0.15)",
-                border: "1.5px solid rgba(255,212,0,0.4)" as any,
+                border: "1.5px solid rgba(255,212,0,0.4)",
                 backdropFilter: "blur(4px)",
                 fontSize: 10, fontWeight: 800, color: "#111110",
                 cursor: "pointer", fontFamily: "inherit", transition: "all .15s",

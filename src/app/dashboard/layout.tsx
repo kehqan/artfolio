@@ -9,7 +9,7 @@ import {
   CalendarDays, LogOut, Bell, Search, X,
   ChevronDown, Handshake, TrendingUp, CheckSquare,
   MapPin, CalendarRange, Menu, Globe, ShoppingBag,
-  BellOff, MessageSquare, Plus,
+  BellOff, MessageSquare, Plus, Layers,
 } from "lucide-react";
 
 // ── Nav structure ──────────────────────────────────────────────────
@@ -22,17 +22,18 @@ const NAV_SECTIONS = [
     items: [
       { href: "/dashboard/artworks", label: "Artworks",  icon: ImageIcon,   desc: "Manage your artwork inventory", emoji: "🖼️", color: "#7C3AED", bg: "#EDE9FE" },
       { href: "/dashboard/mystore",  label: "MyStore",   icon: ShoppingBag, desc: "Your public storefront",        emoji: "🛍️", color: "#0EA5E9", bg: "#E0F2FE" },
+      { href: "/dashboard/moodboard",label: "Moodboard", icon: Layers,      desc: "Visual boards & references",   emoji: "🗂️", color: "#EC4899", bg: "#FCE7F3" },
     ],
   },
   {
-    key: "studio",
-    label: "Studio",
-    emoji: "🎨",
-    icon: ImageIcon,
+    key: "scene",
+    label: "Scene",
+    emoji: "🗺️",
+    icon: CalendarRange,
     items: [
-      { href: "/dashboard/artworks",   label: "Artworks",   icon: ImageIcon,   desc: "Manage your artwork inventory", emoji: "🖼️", color: "#7C3AED", bg: "#EDE9FE" },
-      { href: "/dashboard/mystore",    label: "MyStore",    icon: ShoppingBag, desc: "Your public storefront",        emoji: "🛍️", color: "#0EA5E9", bg: "#E0F2FE" },
-      { href: "/dashboard/moodboard",  label: "Moodboard",  icon: Layers,      desc: "Visual boards & references",   emoji: "🗂️", color: "#EC4899", bg: "#FCE7F3" },
+      { href: "/dashboard/exhibitions", label: "Events & Education", icon: CalendarRange, desc: "Events, workshops & resources",  emoji: "🎪", color: "#EC4899", bg: "#FCE7F3" },
+      { href: "/dashboard/pool",        label: "Collabs",            icon: Handshake,     desc: "Collaboration requests",        emoji: "🤝", color: "#CA8A04", bg: "#FEF9C3" },
+      { href: "/dashboard/map",         label: "Map",                icon: MapPin,        desc: "Prague art scene map",          emoji: "📍", color: "#EF4444", bg: "#FEE2E2" },
     ],
   },
   {
@@ -61,6 +62,7 @@ const NAV_SECTIONS = [
 const ALL_NAV_ITEMS = [
   { href: "/dashboard",          label: "Dashboard", icon: LayoutDashboard },
   { href: "/dashboard/messages", label: "Messages",  icon: MessageSquare   },
+  { href: "/dashboard/moodboard",label: "Moodboard", icon: Layers          },
   ...NAV_SECTIONS.flatMap(s => s.items),
 ];
 

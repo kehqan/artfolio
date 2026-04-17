@@ -1,7 +1,3 @@
-// src/app/api/og-preview/route.ts
-// Fetches Open Graph metadata from an external URL for moodboard preview auto-fill.
-// Runs server-side so we avoid CORS issues hitting external sites from the browser.
-
 import { NextRequest, NextResponse } from "next/server";
 
 export const runtime = "edge";
@@ -32,27 +28,22 @@ export async function GET(req: NextRequest) {
     const html = await res.text();
 
     // Extract OG tags with a simple regex scan (no DOM parser needed in edge)
-    function getMeta(property: string): string {
-      // Try og: property
+    const getMeta = (property: string): string => {
       const ogMatch = html.match(new RegExp(`<meta[^>]+property=["']og:${property}["'][^>]+content=["']([^"']+)["']`, "i"))
         || html.match(new RegExp(`<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:${property}["']`, "i"));
       if (ogMatch?.[1]) return ogMatch[1].trim();
-
-      // Try name= variant (Twitter cards etc)
       const nameMatch = html.match(new RegExp(`<meta[^>]+name=["']${property}["'][^>]+content=["']([^"']+)["']`, "i"))
         || html.match(new RegExp(`<meta[^>]+content=["']([^"']+)["'][^>]+name=["']${property}["']`, "i"));
       if (nameMatch?.[1]) return nameMatch[1].trim();
-
       return "";
-    }
+    };
 
-    // <title> fallback
-    function getTitle(): string {
+    const getTitle = (): string => {
       const t = getMeta("title") || getMeta("twitter:title");
       if (t) return t;
       const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
       return titleMatch?.[1]?.trim() || "";
-    }
+    };
 
     const title       = getTitle();
     const description = getMeta("description") || getMeta("twitter:description");

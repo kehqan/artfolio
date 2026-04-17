@@ -121,7 +121,10 @@ export default function ArtworkPassportPage() {
 
             {/* Header */}
             <div className="cert-header">
-              <div className="cert-issuer">🥭 Artomango</div>
+              <div className="cert-issuer" style={{display:"flex",alignItems:"center",gap:5}}>
+                <img src="/logo.png" alt="artomango" style={{width:24,height:24,objectFit:"contain"}} />
+                Artomango
+              </div>
               <div className="cert-title-block">
                 <div className="cert-title">ARTWORK PASSPORT</div>
                 <div className="cert-subtitle">Certificate of Authenticity</div>

@@ -25,14 +25,14 @@ const NAV_SECTIONS = [
     ],
   },
   {
-    key: "scene",
-    label: "Scene",
-    emoji: "🗺️",
-    icon: CalendarRange,
+    key: "studio",
+    label: "Studio",
+    emoji: "🎨",
+    icon: ImageIcon,
     items: [
-      { href: "/dashboard/exhibitions", label: "Events & Education", icon: CalendarRange, desc: "Events, workshops & resources",  emoji: "🎪", color: "#EC4899", bg: "#FCE7F3" },
-      { href: "/dashboard/pool",        label: "Collabs",            icon: Handshake,     desc: "Collaboration requests",        emoji: "🤝", color: "#CA8A04", bg: "#FEF9C3" },
-      { href: "/dashboard/map",         label: "Map",                icon: MapPin,        desc: "Prague art scene map",          emoji: "📍", color: "#EF4444", bg: "#FEE2E2" },
+      { href: "/dashboard/artworks",   label: "Artworks",   icon: ImageIcon,   desc: "Manage your artwork inventory", emoji: "🖼️", color: "#7C3AED", bg: "#EDE9FE" },
+      { href: "/dashboard/mystore",    label: "MyStore",    icon: ShoppingBag, desc: "Your public storefront",        emoji: "🛍️", color: "#0EA5E9", bg: "#E0F2FE" },
+      { href: "/dashboard/moodboard",  label: "Moodboard",  icon: Layers,      desc: "Visual boards & references",   emoji: "🗂️", color: "#EC4899", bg: "#FCE7F3" },
     ],
   },
   {

@@ -115,7 +115,7 @@ function PreviewModal({ board, onClose }: { board: Moodboard; onClose: () => voi
           {iframeOk !== false && (
             <iframe
               src={board.url}
-              style={{ width:"100%", height:"100%", border:"none", display: iframeOk === false ? "none" : "block" }}
+              style={{ width:"100%", height:"100%", border:"none", display:"block" }}
               onLoad={() => setIframeOk(true)}
               onError={() => setIframeOk(false)}
               sandbox="allow-scripts allow-same-origin allow-forms"

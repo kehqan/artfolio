@@ -49,11 +49,20 @@ export const metadata: Metadata = {
     description: "Manage your art, find venues, grow your practice.",
     type: "website",
     siteName: "Artomango",
+    images: [
+      {
+        url: "/og-image.jpg",
+        width: 1200,
+        height: 630,
+        alt: "Artomango — Art · Community · Discovery",
+      },
+    ],
   },
   twitter: {
-    card: "summary",
+    card: "summary_large_image",
     title: "Artomango",
     description: "Manage your art, find venues, grow your practice.",
+    images: ["/og-image.jpg"],
   },
 };
 

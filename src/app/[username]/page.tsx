@@ -610,7 +610,7 @@ export default function PublicProfilePage() {
       {/* ── FOOTER ── */}
       <div style={{ borderTop: "2.5px solid #111110", background: "#111110", padding: "20px 28px", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 700, color: "#555" }}>
-          🥭 <a href="/" style={{ color: "#FFD400", textDecoration: "none", fontWeight: 800 }}>artomango</a> · Manage, Exhibit, Collab
+          <img src="/logo.png" alt="" style={{width:18,height:18,objectFit:"contain"}} /> <a href="/" style={{ color: "#FFD400", textDecoration: "none", fontWeight: 800 }}>artomango</a> · Manage, Exhibit, Collab
         </div>
         <Link href="/register" style={{ textDecoration: "none" }}>
           <span style={{ fontSize: 12, fontWeight: 800, color: "#FFD400" }}>Create your profile →</span>

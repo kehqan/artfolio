@@ -7,7 +7,7 @@ import {
   MapPin, Globe, Instagram, ExternalLink,
   ImageIcon, Star, X, ChevronLeft, ChevronRight,
   Users, CalendarDays, Handshake, ShoppingBag,
-  Check, Copy, MessageSquare,
+  Check, Copy, MessageSquare, Layers,
 } from "lucide-react";
 import MessageModal from "@/components/MessageModal";
 
@@ -37,7 +37,18 @@ type Exhibition = {
   id: string; title: string; venue?: string; start_date?: string;
   end_date?: string; status: string; cover_image?: string; description?: string;
 };
-type Tab = "store" | "artworks" | "collabs" | "events";
+type Tab = "store" | "artworks" | "collabs" | "events" | "moodboards";
+
+type Moodboard = {
+  id: string;
+  provider: string;
+  url: string;
+  title: string;
+  description?: string;
+  thumbnail_url?: string;
+  og_image?: string;
+  tags: string[];
+};
 
 const SALE_CFG: Record<string, { icon: string; label: string; color: string }> = {
   direct:           { icon: "🛒", label: "Buy Now",          color: "#16A34A" },
@@ -251,6 +262,7 @@ export default function PublicProfilePage() {
   const [artworkCount, setArtworkCount]     = useState(0);
   const [copied, setCopied]                 = useState(false);
   const [msgOpen, setMsgOpen]               = useState(false); // ← NEW
+  const [moodboards, setMoodboards]         = useState<Moodboard[]>([]);
 
   useEffect(() => { if (username) load(); }, [username]);
 
@@ -283,6 +295,10 @@ export default function PublicProfilePage() {
 
     const { data: ex } = await sb.from("exhibitions").select("id, title, venue, start_date, end_date, status, cover_image, description").eq("user_id", prof.id).eq("is_public", true).order("start_date", { ascending: false }).limit(20);
     setEvents(ex || []);
+
+    // Public moodboards
+    const { data: mb } = await sb.from("moodboards").select("id,provider,url,title,description,thumbnail_url,og_image,tags").eq("user_id", prof.id).eq("is_public", true).order("created_at", { ascending: false });
+    setMoodboards((mb || []).map((b: any) => ({ ...b, tags: b.tags || [] })));
 
     const { count } = await sb.from("follows").select("*", { count: "exact", head: true }).eq("following_id", prof.id);
     setFollowerCount(count || 0);
@@ -423,10 +439,11 @@ export default function PublicProfilePage() {
         {/* ── TABS ── */}
         <div style={{ display: "flex", gap: 4, padding: "16px 0", borderBottom: "2px solid #E8E0D0", overflowX: "auto" }}>
           {[
-            { key: "store",    label: `🛍 Store (${storeArtworks.length})` },
-            { key: "artworks", label: `🖼 All Works (${artworkCount})` },
-            { key: "collabs",  label: `🤝 Collabs (${collabs.length})` },
-            { key: "events",   label: `📅 Events (${events.length})` },
+            { key: "store",      label: `🛍 Store (${storeArtworks.length})` },
+            { key: "artworks",   label: `🖼 All Works (${artworkCount})` },
+            { key: "collabs",    label: `🤝 Collabs (${collabs.length})` },
+            { key: "events",     label: `📅 Events (${events.length})` },
+            { key: "moodboards", label: `🗂 Moodboards (${moodboards.length})` },
           ].map(t => (
             <button key={t.key} className={`pub-tab ${tab === t.key ? "active" : ""}`} onClick={() => setTab(t.key as Tab)}>
               {t.label}
@@ -501,6 +518,90 @@ export default function PublicProfilePage() {
                   </div>
                 </div>
               ))}
+            </div>
+          )}
+
+          {/* ═══ MOODBOARDS TAB ═══ */}
+          {tab === "moodboards" && (
+            <div className="fade-up">
+              {moodboards.length === 0 ? (
+                <div style={{ textAlign: "center", padding: "60px 24px", color: "#9B8F7A" }}>
+                  <div style={{ fontSize: 40, marginBottom: 12 }}>🗂️</div>
+                  <div style={{ fontSize: 16, fontWeight: 800, color: "#111110", marginBottom: 4 }}>No moodboards shared yet</div>
+                </div>
+              ) : (
+                <>
+                  <div style={{ marginBottom: 20, fontSize: 13, fontWeight: 600, color: "#9B8F7A" }}>
+                    {moodboards.length} visual {moodboards.length === 1 ? "board" : "boards"} shared publicly
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 18 }}>
+                    {moodboards.map((board, i) => {
+                      const PROV: Record<string, { emoji: string; label: string; grad: string }> = {
+                        milanote:  { emoji: "🟤", label: "Milanote",  grad: "135deg,#3D2010,#8B4513,#D2691E" },
+                        pinterest: { emoji: "📌", label: "Pinterest", grad: "135deg,#7F1D1D,#E60023,#FF4757" },
+                        figma:     { emoji: "🎨", label: "Figma",     grad: "135deg,#4C1D95,#7C3AED,#A78BFA" },
+                        miro:      { emoji: "🟡", label: "Miro",      grad: "135deg,#713F12,#CA8A04,#FBBF24" },
+                        notion:    { emoji: "📓", label: "Notion",    grad: "135deg,#111827,#374151,#6B7280" },
+                        other:     { emoji: "🔗", label: "Board",     grad: "135deg,#075985,#0EA5E9,#38BDF8" },
+                      };
+                      const cfg = PROV[board.provider] || PROV.other;
+                      const thumb = board.thumbnail_url || board.og_image;
+
+                      return (
+                        <div key={board.id}
+                          style={{ background: "#fff", border: "2.5px solid #E8E0D0", borderRadius: 20, overflow: "hidden", transition: "all .25s cubic-bezier(.16,1,.3,1)", animation: `fadeUp .3s cubic-bezier(.16,1,.3,1) ${Math.min(i * .04, .3)}s both` }}
+                          onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.borderColor="#111110"; el.style.boxShadow="5px 6px 0 #111110"; el.style.transform="translate(-2px,-3px)"; }}
+                          onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.borderColor="#E8E0D0"; el.style.boxShadow="none"; el.style.transform="none"; }}>
+
+                          {/* Hero */}
+                          <div style={{ height: 200, position: "relative", overflow: "hidden" }}>
+                            {thumb
+                              ? <img src={thumb} alt={board.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                              : <div style={{ width: "100%", height: "100%", background: `linear-gradient(${cfg.grad})`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                                  <div style={{ textAlign: "center" }}>
+                                    <div style={{ fontSize: 44, opacity: .7, marginBottom: 6 }}>{cfg.emoji}</div>
+                                    <div style={{ fontSize: 10, fontWeight: 800, color: "rgba(255,255,255,0.5)", textTransform: "uppercase", letterSpacing: ".14em" }}>{cfg.label}</div>
+                                  </div>
+                                </div>
+                            }
+                            {/* Gradient overlay */}
+                            <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to bottom, rgba(0,0,0,0) 30%, rgba(0,0,0,0.65) 100%)" }} />
+                            {/* Liquid glass provider badge */}
+                            <div style={{ position: "absolute", top: 10, left: 10, display: "inline-flex", alignItems: "center", gap: 5, padding: "4px 10px", borderRadius: 99, background: "rgba(255,255,255,0.15)", border: "1.5px solid rgba(255,255,255,0.3)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)", fontSize: 9, fontWeight: 800, color: "#fff", textTransform: "uppercase", letterSpacing: ".1em" }}>
+                              {cfg.emoji} {cfg.label}
+                            </div>
+                            {/* Title overlay */}
+                            <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "10px 13px 12px" }}>
+                              <div style={{ fontSize: 14, fontWeight: 900, color: "#fff", textShadow: "0 1px 6px rgba(0,0,0,.5)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{board.title}</div>
+                              {board.description && (
+                                <div style={{ fontSize: 11, color: "rgba(255,255,255,.7)", fontWeight: 600, marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{board.description}</div>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Footer */}
+                          <div style={{ padding: "11px 13px 13px" }}>
+                            {board.tags.length > 0 && (
+                              <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginBottom: 10 }}>
+                                {board.tags.map(t => (
+                                  <span key={t} style={{ display: "inline-flex", padding: "2px 8px", borderRadius: 99, background: "#F5F0E8", border: "1px solid #E8E0D0", fontSize: 10, fontWeight: 700, color: "#9B8F7A" }}>{t}</span>
+                                ))}
+                              </div>
+                            )}
+                            <a href={board.url} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none", display: "block" }}>
+                              <button style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "9px 0", background: "#111110", border: "2px solid #111110", borderRadius: 10, fontSize: 12, fontWeight: 800, cursor: "pointer", fontFamily: "inherit", color: "#FFD400", transition: "background .12s" }}
+                                onMouseEnter={e => ((e.currentTarget as HTMLElement).style.background="#000")}
+                                onMouseLeave={e => ((e.currentTarget as HTMLElement).style.background="#111110")}>
+                                <ExternalLink size={12} /> Open Board
+                              </button>
+                            </a>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
             </div>
           )}
         </div>

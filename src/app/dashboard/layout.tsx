@@ -378,8 +378,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <div className="am-nav-pill" style={{ display: "flex", alignItems: "center", gap: 4, padding: "5px 6px 5px 10px", position: "relative" }}>
 
             {/* Logo */}
-            <Link href="/dashboard" style={{ display: "flex", alignItems: "center", textDecoration: "none", flexShrink: 0, fontSize: 24, lineHeight: 1, padding: "2px 2px" }}>
-              🥭
+            <Link href="/dashboard" style={{ display: "flex", alignItems: "center", textDecoration: "none", flexShrink: 0, padding: "2px 2px" }}>
+              <img src="/logo.png" alt="artomango" style={{width:28,height:28,objectFit:"contain"}} />
             </Link>
             <div className="am-divider" />
 

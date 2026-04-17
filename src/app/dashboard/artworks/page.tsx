@@ -322,7 +322,7 @@ export default function ArtworksPage() {
         .aw-filter-btn.active { background:#111110; border-color:#111110; color:#FFD400; }
 
         .ripe-table-wrap { background:#fff; border:2.5px solid #111110; border-radius:18px; overflow:hidden; box-shadow:4px 5px 0 #D4C9A8; margin-bottom:8px; overflow-x:auto; }
-        .ripe-table { width:100%; border-collapse:collapse; min-width:760px; }
+        .ripe-table { width:100%; border-collapse:collapse; min-width:880px; }
         .ripe-row { cursor:pointer; transition:background .1s; }
         .ripe-row:hover td { background:#FFFBEA !important; }
         .ripe-row:last-child td { border-bottom:none !important; }
@@ -543,12 +543,13 @@ export default function ArtworksPage() {
               <thead>
                 <tr>
                   <th style={{ ...TH, width: 52, cursor: "default" }}>Image</th>
-                  <SortTh k="title"      label="Title"   sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
-                  <SortTh k="medium"     label="Medium"  sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
-                  <SortTh k="year"       label="Year"    sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
-                  <SortTh k="price"      label="Price"   sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
-                  <SortTh k="status"     label="Stage"   sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
-                  <SortTh k="created_at" label="Added"   sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
+                  <SortTh k="title"      label="Title"    sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
+                  <SortTh k="medium"     label="Medium"   sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
+                  <SortTh k="year"       label="Year"     sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
+                  <SortTh k="price"      label="Price"    sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
+                  <SortTh k="status"     label="Stage"    sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
+                  <th style={{ ...TH, cursor: "default" }}>Location</th>
+                  <SortTh k="created_at" label="Added"    sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
                   <th style={{ ...TH, width: 44, cursor: "default" }}></th>
                 </tr>
               </thead>
@@ -593,6 +594,15 @@ export default function ArtworksPage() {
                       <EditableCell aw={aw} field="status">
                         <StatusPill stageKey={sk} />
                       </EditableCell>
+
+                      {/* Location */}
+                      <td style={{ ...TD, fontSize: 12, color: "#9B8F7A", maxWidth: 180 }}>
+                        {(() => {
+                          const loc = aw.venue_location || aw.location;
+                          if (!loc) return <span style={{ color: "#D4C9A8" }}>—</span>;
+                          return <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "block", maxWidth: 170 }} title={loc}>{loc}</span>;
+                        })()}
+                      </td>
 
                       {/* Added */}
                       <td style={{ ...TD, fontSize: 12, color: "#9B8F7A" }}>

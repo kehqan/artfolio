@@ -405,12 +405,12 @@ export default function LoginPage() {
         {/* ══════════════ LEFT ══════════════ */}
         <div className="login-left">
           <Link href="/" className="left-logo">
-            <span style={{ fontSize: 22, lineHeight: 1 }}>🥭</span>
+            <img src="/logo.png" alt="artomango" style={{width:32,height:32,objectFit:"contain"}} />
             <span className="left-logo-text">artomango</span>
           </Link>
 
           <div className="left-hero">
-            <span className="mango-float">🥭</span>
+            <img src="/logo.png" alt="" className="mango-float" style={{width:96,height:96,objectFit:"contain",fontSize:"unset"}} />
             <h2 className="left-headline">
               Welcome<br />
               <span className="hl-yellow">back.</span>

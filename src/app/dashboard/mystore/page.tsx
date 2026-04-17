@@ -8,7 +8,7 @@ import {
   Globe, Handshake, MapPin, CalendarDays, QrCode,
   ImageIcon, ArrowRight, Settings, Zap, Layout,
   LayoutGrid, List, Rows3, ChevronDown, Save,
-  Sparkles, Users, ShoppingBag,
+  Sparkles, Users, ShoppingBag, Layers,
 } from "lucide-react";
 
 /* ── Types ────────────────────────────────────────────────────── */
@@ -36,6 +36,18 @@ type StoreArtwork = {
   artwork_id: string;
   sort_order: number;
   featured: boolean;
+};
+
+type Moodboard = {
+  id: string;
+  provider: string;
+  url: string;
+  title: string;
+  description?: string;
+  thumbnail_url?: string;
+  og_image?: string;
+  tags: string[];
+  is_public: boolean;
 };
 
 const DEFAULT_SETTINGS: StoreSettings = {
@@ -80,7 +92,9 @@ export default function MyStorePage() {
   const [saving, setSaving]               = useState(false);
   const [saved, setSaved]                 = useState(false);
   const [copied, setCopied]              = useState(false);
-  const [activeTab, setActiveTab]         = useState<"artworks" | "customize" | "settings">("artworks");
+  const [activeTab, setActiveTab]         = useState<"artworks" | "moodboards" | "customize" | "settings">("artworks");
+  const [moodboards, setMoodboards]       = useState<Moodboard[]>([]);
+  const [mbSaving, setMbSaving]           = useState<string | null>(null);
   const [showQR, setShowQR]               = useState(false);
   const [bannerUploading, setBannerUploading] = useState(false);
   const [customColor, setCustomColor]     = useState("");
@@ -139,6 +153,10 @@ export default function MyStorePage() {
       .eq("user_id", user.id)
       .order("sort_order", { ascending: true });
     setStoreArtworks(sa || []);
+
+    // Moodboards
+    const { data: mb } = await supabase.from("moodboards").select("*").eq("user_id", user.id).order("created_at", { ascending: false });
+    setMoodboards((mb || []).map((b: any) => ({ ...b, tags: b.tags || [] })));
 
     setLoading(false);
   }
@@ -382,9 +400,10 @@ export default function MyStorePage() {
         {/* ═══ TABS ═══ */}
         <div className="ripe-in" style={{ display: "flex", borderBottom: "2px solid #E8E0D0", marginBottom: 20, gap: 0, animationDelay: "0.1s" }}>
           {([
-            { id: "artworks", label: "Store Artworks", icon: ImageIcon, count: storeArtworks.length },
-            { id: "customize", label: "Customize", icon: Palette },
-            { id: "settings", label: "Visibility", icon: Settings },
+            { id: "artworks",   label: "Store Artworks", icon: ImageIcon, count: storeArtworks.length },
+            { id: "moodboards", label: "Moodboards",      icon: Layers,   count: moodboards.length },
+            { id: "customize",  label: "Customize",       icon: Palette },
+            { id: "settings",   label: "Visibility",      icon: Settings },
           ] as const).map(tab => (
             <button key={tab.id} className={`ms-tab${activeTab === tab.id ? " active" : ""}`} onClick={() => setActiveTab(tab.id)}>
               <tab.icon size={14} />
@@ -512,6 +531,97 @@ export default function MyStorePage() {
                 </div>
               )}
             </div>
+          </div>
+        )}
+
+        {/* ═══ TAB: MOODBOARDS ═══ */}
+        {activeTab === "moodboards" && (
+          <div>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 800, color: "#111110", marginBottom: 2 }}>Moodboards on your public profile</div>
+                <div style={{ fontSize: 12, color: "#9B8F7A", fontWeight: 600 }}>Toggle which boards visitors can see. Manage boards in <a href="/dashboard/moodboard" style={{ color: "#EC4899", fontWeight: 700, textDecoration: "none" }}>Studio → Moodboard</a>.</div>
+              </div>
+              <a href="/dashboard/moodboard" style={{ textDecoration: "none" }}>
+                <button style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", background: "#FFD400", border: "2px solid #111110", borderRadius: 10, fontSize: 12, fontWeight: 800, cursor: "pointer", fontFamily: "inherit", color: "#111110", boxShadow: "2px 2px 0 #111110" }}>
+                  <Layers size={13} /> Add boards
+                </button>
+              </a>
+            </div>
+
+            {moodboards.length === 0 ? (
+              <div style={{ textAlign: "center", padding: "60px 24px", background: "#fff", borderRadius: 18, border: "2px solid #E8E0D0", boxShadow: "3px 4px 0 #E0D8CA" }}>
+                <div style={{ fontSize: 44, marginBottom: 12 }}>🗂️</div>
+                <div style={{ fontSize: 16, fontWeight: 800, color: "#111110", marginBottom: 6 }}>No moodboards yet</div>
+                <div style={{ fontSize: 13, color: "#9B8F7A", fontWeight: 600, marginBottom: 20 }}>
+                  Add Milanote, Pinterest or Figma boards in the Moodboard section
+                </div>
+                <a href="/dashboard/moodboard" style={{ textDecoration: "none" }}>
+                  <button style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "10px 20px", background: "#FFD400", border: "2px solid #111110", borderRadius: 11, fontSize: 13, fontWeight: 800, cursor: "pointer", fontFamily: "inherit", color: "#111110", boxShadow: "3px 3px 0 #111110" }}>
+                    <Layers size={14} /> Go to Moodboard
+                  </button>
+                </a>
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {moodboards.map(board => {
+                  const thumb = board.thumbnail_url || board.og_image;
+                  const PROV_EMOJI: Record<string, string> = { milanote:"🟤", pinterest:"📌", figma:"🎨", miro:"🟡", notion:"📓", other:"🔗" };
+                  const emoji = PROV_EMOJI[board.provider] || "🔗";
+                  return (
+                    <div key={board.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", background: "#fff", border: "2px solid #E8E0D0", borderRadius: 14, transition: "border-color .15s" }}
+                      onMouseEnter={e => (e.currentTarget.style.borderColor="#111110")}
+                      onMouseLeave={e => (e.currentTarget.style.borderColor="#E8E0D0")}>
+
+                      {/* Thumbnail or gradient */}
+                      <div style={{ width: 52, height: 52, borderRadius: 11, overflow: "hidden", border: "1.5px solid #E8E0D0", flexShrink: 0, background: thumb ? "#000" : "#F5F0E8", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22 }}>
+                        {thumb
+                          ? <img src={thumb} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                          : emoji}
+                      </div>
+
+                      {/* Info */}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 13, fontWeight: 800, color: "#111110", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{board.title}</div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 3 }}>
+                          <span style={{ fontSize: 10, fontWeight: 700, color: "#9B8F7A" }}>{emoji} {board.provider}</span>
+                          {board.tags.slice(0, 3).map(t => (
+                            <span key={t} style={{ fontSize: 10, fontWeight: 700, padding: "1px 7px", borderRadius: 99, background: "#F5F0E8", color: "#9B8F7A" }}>{t}</span>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* External link */}
+                      <a href={board.url} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none" }}>
+                        <button style={{ display: "flex", alignItems: "center", gap: 4, padding: "6px 10px", border: "1.5px solid #E8E0D0", borderRadius: 8, background: "#FAF7F3", fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", color: "#9B8F7A", transition: "all .12s" }}
+                          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor="#111110"; (e.currentTarget as HTMLElement).style.color="#111110"; }}
+                          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor="#E8E0D0"; (e.currentTarget as HTMLElement).style.color="#9B8F7A"; }}>
+                          <ExternalLink size={11} /> Open
+                        </button>
+                      </a>
+
+                      {/* Public toggle */}
+                      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, flexShrink: 0 }}>
+                        <div
+                          onClick={async () => {
+                            setMbSaving(board.id);
+                            const sb = (await import("@/lib/supabase/client")).createClient();
+                            await sb.from("moodboards").update({ is_public: !board.is_public }).eq("id", board.id);
+                            setMoodboards(p => p.map(b => b.id === board.id ? { ...b, is_public: !b.is_public } : b));
+                            setMbSaving(null);
+                          }}
+                          style={{ width: 42, height: 24, borderRadius: 12, background: board.is_public ? "#4ECDC4" : "#E8E0D0", position: "relative", cursor: "pointer", transition: "background .2s", border: "1.5px solid #111110", opacity: mbSaving === board.id ? 0.6 : 1 }}>
+                          <div style={{ position: "absolute", top: 2, left: board.is_public ? 20 : 2, width: 16, height: 16, borderRadius: "50%", background: "#fff", border: "1.5px solid #111110", transition: "left .2s", boxShadow: "1px 1px 0 rgba(0,0,0,0.1)" }} />
+                        </div>
+                        <div style={{ fontSize: 9, fontWeight: 800, color: board.is_public ? "#16A34A" : "#9B8F7A", textTransform: "uppercase", letterSpacing: ".08em" }}>
+                          {board.is_public ? "Public" : "Hidden"}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
 

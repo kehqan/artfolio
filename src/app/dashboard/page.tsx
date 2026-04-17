@@ -3,84 +3,60 @@ import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import {
-  ImageIcon, Globe, BarChart3, CalendarDays,
-  FolderOpen, Handshake, Users, TrendingUp,
-  CheckSquare, Plus, ArrowRight, ExternalLink,
-  Eye, DollarSign, Clock, Bell, Check,
-  Megaphone, MapPin, Package, Tag, Sparkles,
-  Calendar, X, Trash2, BellOff, ChevronRight,
-  Palette, Building2, Zap,
+  ImageIcon, Bell, X, ArrowRight, Plus, ExternalLink,
+  Package, Eye, Users, CheckSquare, DollarSign, Handshake,
+  BarChart3, CalendarDays, MapPin, Sparkles,
 } from "lucide-react";
 
-/* ── Types ─────────────────────────────────────────────────────── */
-type Stats = {
-  artworks: number; available: number; sold: number;
-  exhibitions: number; collabs: number;
-  sales_total: number; tasks_pending: number;
-  followers: number;
-};
-type Notification = {
-  id: string; type: string; title: string; body?: string;
-  read: boolean; data?: any; created_at: string;
-};
-type RecentArtwork = {
-  id: string; title: string; status: string; images?: string[];
-  price?: number; medium?: string; created_at: string;
-};
-type UpcomingEvent = {
-  id: string; title: string; start_date?: string; venue?: string;
-  status: string;
-};
-type PendingTask = {
-  id: string; title: string; status: string; priority: string;
-  due_date?: string; progress: number;
-};
-type RecentSale = {
-  id: string; sale_price: number; sale_date?: string;
-  status: string; artwork_title?: string;
-};
-
-/* ── Animated counter ──────────────────────────────────────────── */
-function AnimNum({ target, prefix = "", suffix = "" }: { target: number; prefix?: string; suffix?: string }) {
+/* ── Helpers ───────────────────────────────────────────────────── */
+function AnimNum({ target }: { target: number }) {
   const [val, setVal] = useState(0);
-  const ref = useRef<HTMLSpanElement>(null);
+  const ref = useRef<HTMLDivElement>(null);
   const started = useRef(false);
   useEffect(() => {
-    if (started.current) { setVal(target); return; }
-    started.current = true;
-    const dur = 1200;
-    const start = performance.now();
-    const step = (now: number) => {
-      const p = Math.min((now - start) / dur, 1);
-      const ease = 1 - Math.pow(1 - p, 3);
-      setVal(Math.round(ease * target));
-      if (p < 1) requestAnimationFrame(step);
-    };
-    requestAnimationFrame(step);
+    const el = ref.current; if (!el) return;
+    const obs = new IntersectionObserver(([e]) => {
+      if (e.isIntersecting && !started.current) {
+        started.current = true;
+        const start = performance.now();
+        const dur = 900;
+        const step = (now: number) => {
+          const p = Math.min((now - start) / dur, 1);
+          const ease = 1 - Math.pow(1 - p, 3);
+          setVal(Math.round(ease * target));
+          if (p < 1) requestAnimationFrame(step);
+        };
+        requestAnimationFrame(step);
+        obs.disconnect();
+      }
+    }, { threshold: 0.5 });
+    obs.observe(el);
+    return () => obs.disconnect();
   }, [target]);
-  return <span ref={ref}>{prefix}{val.toLocaleString()}{suffix}</span>;
+  return <div ref={ref}>{val}</div>;
 }
 
-/* ── Time ago helper ───────────────────────────────────────────── */
 function timeAgo(date: string) {
   const s = Math.floor((Date.now() - new Date(date).getTime()) / 1000);
   if (s < 60) return "just now";
   if (s < 3600) return `${Math.floor(s / 60)}m ago`;
   if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
-  if (s < 604800) return `${Math.floor(s / 86400)}d ago`;
+  return `${Math.floor(s / 86400)}d ago`;
+}
+
+function fmtDate(date: string) {
   return new Date(date).toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
-/* ── Notification icon/color config ────────────────────────────── */
+/* ── Config ────────────────────────────────────────────────────── */
 const NOTIF_CFG: Record<string, { icon: any; color: string; bg: string }> = {
   follow:  { icon: Users,      color: "#4ECDC4", bg: "#F0FDF4" },
-  sale:    { icon: DollarSign,  color: "#16A34A", bg: "#DCFCE7" },
-  collab:  { icon: Handshake,   color: "#CA8A04", bg: "#FEF9C3" },
-  system:  { icon: Sparkles,    color: "#8B5CF6", bg: "#EDE9FE" },
-  artwork: { icon: ImageIcon,   color: "#FF6B6B", bg: "#FFE4E6" },
+  sale:    { icon: DollarSign, color: "#16A34A", bg: "#DCFCE7" },
+  collab:  { icon: Handshake,  color: "#CA8A04", bg: "#FEF9C3" },
+  system:  { icon: Sparkles,   color: "#8B5CF6", bg: "#EDE9FE" },
+  artwork: { icon: ImageIcon,  color: "#FF6B6B", bg: "#FFE4E6" },
 };
 
-/* ── Status colors ─────────────────────────────────────────────── */
 const STATUS_DOT: Record<string, string> = {
   available: "#16A34A", sold: "#111110", reserved: "#D97706",
   "in progress": "#8B5CF6", "in_progress": "#8B5CF6",
@@ -91,14 +67,13 @@ const PRIORITY_COLOR: Record<string, string> = {
   low: "#4ECDC4", medium: "#FFD400", high: "#FF6B6B",
 };
 
-/* ── Section quick-nav data ────────────────────────────────────── */
 const QUICK_NAV = [
-  { href: "/dashboard/artworks",    label: "Artworks",    icon: ImageIcon,    color: "#FFD400", desc: "Manage inventory" },
-  { href: "/dashboard/exhibitions", label: "Events",      icon: CalendarDays, color: "#4ECDC4", desc: "Shows & exhibitions" },
-  { href: "/dashboard/pool",        label: "Collabs",     icon: Handshake,    color: "#FF6B6B", desc: "Discovery pool" },
-  { href: "/dashboard/sales",       label: "Sales",       icon: BarChart3,    color: "#8B5CF6", desc: "Track revenue" },
-  { href: "/dashboard/tasks",       label: "Tasks",       icon: CheckSquare,  color: "#95E1D3", desc: "To-dos & planning" },
-  { href: "/dashboard/map",         label: "Map",         icon: MapPin,       color: "#FF6B6B", desc: "Art scene map" },
+  { href: "/dashboard/artworks",    label: "Artworks",  icon: ImageIcon,    color: "#FFD400", desc: "Manage inventory" },
+  { href: "/dashboard/exhibitions", label: "Events",    icon: CalendarDays, color: "#4ECDC4", desc: "Shows & exhibitions" },
+  { href: "/dashboard/pool",        label: "Collabs",   icon: Handshake,    color: "#FF6B6B", desc: "Discovery pool" },
+  { href: "/dashboard/sales",       label: "Sales",     icon: BarChart3,    color: "#8B5CF6", desc: "Track revenue" },
+  { href: "/dashboard/tasks",       label: "Tasks",     icon: CheckSquare,  color: "#95E1D3", desc: "To-dos & planning" },
+  { href: "/dashboard/map",         label: "Map",       icon: MapPin,       color: "#FF6B6B", desc: "Art scene map" },
 ];
 
 /* ══════════════════════════════════════════════════════════════════
@@ -106,24 +81,19 @@ const QUICK_NAV = [
    ══════════════════════════════════════════════════════════════════ */
 export default function DashboardPage() {
   const [profile, setProfile]           = useState<{ full_name?: string; role?: string; username?: string; avatar_url?: string } | null>(null);
-  const [stats, setStats]               = useState<Stats>({ artworks:0, available:0, sold:0, exhibitions:0, collabs:0, sales_total:0, tasks_pending:0, followers:0 });
-  const [artworks, setArtworks]         = useState<RecentArtwork[]>([]);
-  const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [events, setEvents]             = useState<UpcomingEvent[]>([]);
-  const [tasks, setTasks]               = useState<PendingTask[]>([]);
-  const [recentSales, setRecentSales]   = useState<RecentSale[]>([]);
-  const [greeting, setGreeting]         = useState("Good morning");
-  const [greetEmoji, setGreetEmoji]     = useState("☀️");
+  const [artworks, setArtworks]         = useState<any[]>([]);
+  const [stats, setStats]               = useState({ artworks: 0, available: 0, sold: 0, exhibitions: 0, collabs: 0, sales_total: 0, tasks_pending: 0, followers: 0 });
+  const [tasks, setTasks]               = useState<any[]>([]);
+  const [events, setEvents]             = useState<any[]>([]);
+  const [recentSales, setRecentSales]   = useState<any[]>([]);
+  const [notifications, setNotifications] = useState<any[]>([]);
   const [loaded, setLoaded]             = useState(false);
-  const [notifTab, setNotifTab]         = useState<"all"|"unread">("all");
-  const today = new Date();
+  const [notifTab, setNotifTab]         = useState<"all" | "unread">("all");
 
-  useEffect(() => {
-    const h = today.getHours();
-    if (h >= 5  && h < 12) { setGreeting("Good morning"); setGreetEmoji("☀️"); }
-    else if (h >= 12 && h < 17) { setGreeting("Good afternoon"); setGreetEmoji("🌤"); }
-    else { setGreeting("Good evening"); setGreetEmoji("🌙"); }
-  }, []);
+  const today = new Date();
+  const hour  = today.getHours();
+  const greeting    = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
+  const greetEmoji  = hour < 12 ? "☀️" : hour < 18 ? "🌤️" : "🌙";
 
   useEffect(() => {
     const supabase = createClient();
@@ -133,50 +103,49 @@ export default function DashboardPage() {
       const [
         { data: prof },
         { data: aw },
-        { data: ex },
-        { data: co },
         { data: tk },
-        { data: notifData },
-        { data: salesData },
         { data: eventsData },
+        { data: salesData },
+        { count: ex },
+        { count: co },
         { count: followerCount },
+        { data: notifs },
       ] = await Promise.all([
         supabase.from("profiles").select("full_name,role,username,avatar_url").eq("id", user.id).single(),
-        supabase.from("artworks").select("id,title,status,images,price,medium,created_at").eq("user_id", user.id).order("created_at", { ascending: false }).limit(8),
+        supabase.from("artworks").select("id,title,images,status,price").eq("user_id", user.id).order("created_at", { ascending: false }).limit(8),
+        supabase.from("tasks").select("*").eq("user_id", user.id).neq("status", "done").order("due_date", { ascending: true }).limit(5),
+        supabase.from("exhibitions").select("*").eq("user_id", user.id).gte("end_date", new Date().toISOString().split("T")[0]).order("start_date").limit(3),
+        supabase.from("sales").select("*").eq("user_id", user.id).order("created_at", { ascending: false }).limit(3),
         supabase.from("exhibitions").select("id", { count: "exact", head: true }).eq("user_id", user.id),
         supabase.from("collaborations").select("id", { count: "exact", head: true }).eq("user_id", user.id),
-        supabase.from("tasks").select("id,title,status,priority,due_date,progress").eq("user_id", user.id).in("status", ["pending", "in_progress"]).order("created_at", { ascending: false }).limit(5),
+        supabase.from("follows").select("id", { count: "exact", head: true }).eq("following_id", user.id),
         supabase.from("notifications").select("*").eq("user_id", user.id).order("created_at", { ascending: false }).limit(20),
-        supabase.from("sales").select("id,sale_price,sale_date,status,artwork_id").eq("user_id", user.id).order("created_at", { ascending: false }).limit(5),
-        supabase.from("exhibitions").select("id,title,start_date,venue,status").eq("user_id", user.id).in("status", ["planning","upcoming","current","Planning","Upcoming","Current"]).order("start_date", { ascending: true }).limit(4),
-        supabase.from("follows").select("*", { count: "exact", head: true }).eq("following_id", user.id),
       ]);
 
       setProfile(prof);
       setArtworks(aw || []);
-      setTasks((tk || []).map(t => ({ ...t, progress: t.progress || 0 })));
-      setNotifications(notifData || []);
+      setTasks(tk || []);
       setEvents(eventsData || []);
+      setNotifications(notifs || []);
 
-      // Enrich sales with artwork titles
       if (salesData?.length) {
-        const artIds = salesData.map(s => s.artwork_id).filter(Boolean);
+        const artIds = salesData.map((s: any) => s.artwork_id).filter(Boolean);
         const { data: saleArtworks } = await supabase.from("artworks").select("id,title").in("id", artIds);
         const am: Record<string, string> = {};
-        saleArtworks?.forEach(a => { am[a.id] = a.title; });
-        setRecentSales(salesData.map(s => ({ ...s, artwork_title: am[s.artwork_id] })));
+        saleArtworks?.forEach((a: any) => { am[a.id] = a.title; });
+        setRecentSales(salesData.map((s: any) => ({ ...s, artwork_title: am[s.artwork_id] })));
       }
 
       const awList = aw || [];
-      const completedSales = (salesData || []).filter(s => s.status?.toLowerCase() === "completed");
-      const totalRev = completedSales.reduce((sum, s) => sum + (s.sale_price || 0), 0);
+      const completedSales = (salesData || []).filter((s: any) => s.status?.toLowerCase() === "completed");
+      const totalRev = completedSales.reduce((sum: number, s: any) => sum + (s.sale_price || 0), 0);
 
       setStats({
         artworks:      awList.length,
         available:     awList.filter((a: any) => String(a.status).toLowerCase() === "available").length,
         sold:          awList.filter((a: any) => String(a.status).toLowerCase() === "sold").length,
-        exhibitions:   (ex as any)?.count || 0,
-        collabs:       (co as any)?.count || 0,
+        exhibitions:   (ex as any) || 0,
+        collabs:       (co as any) || 0,
         sales_total:   totalRev,
         tasks_pending: (tk || []).length,
         followers:     followerCount || 0,
@@ -186,7 +155,6 @@ export default function DashboardPage() {
     });
   }, []);
 
-  /* ── Notification actions ────────────────────────────────────── */
   async function markRead(id: string) {
     const supabase = createClient();
     await supabase.from("notifications").update({ read: true }).eq("id", id);
@@ -219,246 +187,203 @@ export default function DashboardPage() {
   const fname = profile?.full_name?.split(" ")[0] || "Artist";
   const unreadCount = notifications.filter(n => !n.read).length;
   const filteredNotifs = notifTab === "unread" ? notifications.filter(n => !n.read) : notifications;
-
   const initials = profile?.full_name
-    ? profile.full_name.split(" ").map(w => w[0]).join("").slice(0,2).toUpperCase()
+    ? profile.full_name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase()
     : "A";
 
   return (
     <>
       <style>{`
-        /* Ripe × Neo-brutalism fusion */
+        /* ── Base cards ── */
         .ripe-card {
-          background: #fff;
-          border: 2.5px solid #111110;
-          border-radius: 20px;
-          box-shadow: 4px 5px 0 #D4C9A8;
-          overflow: hidden;
+          background: #fff; border: 2.5px solid #111110; border-radius: 20px;
+          box-shadow: 4px 5px 0 #D4C9A8; overflow: hidden;
           transition: box-shadow 0.25s cubic-bezier(0.16,1,0.3,1), transform 0.25s cubic-bezier(0.16,1,0.3,1);
         }
-        .ripe-card:hover {
-          box-shadow: 6px 7px 0 #111110;
-          transform: translate(-1px, -2px);
-        }
+        .ripe-card:hover { box-shadow: 6px 7px 0 #111110; transform: translate(-1px,-2px); }
         .ripe-card-static {
-          background: #fff;
-          border: 2.5px solid #111110;
-          border-radius: 20px;
-          box-shadow: 4px 5px 0 #D4C9A8;
-          overflow: hidden;
+          background: #fff; border: 2.5px solid #111110; border-radius: 20px;
+          box-shadow: 4px 5px 0 #D4C9A8; overflow: hidden;
         }
 
-        /* Stat card */
+        /* ── Stat card ── */
         .stat-card {
-          background: #fff;
-          border: 2.5px solid #111110;
-          border-radius: 18px;
-          padding: 20px 22px;
-          box-shadow: 3px 4px 0 #D4C9A8;
-          position: relative;
-          overflow: hidden;
+          background: #fff; border: 2.5px solid #111110; border-radius: 18px;
+          padding: 20px 22px; box-shadow: 3px 4px 0 #D4C9A8;
+          position: relative; overflow: hidden;
           transition: all 0.25s cubic-bezier(0.16,1,0.3,1);
         }
-        .stat-card:hover {
-          box-shadow: 5px 6px 0 #111110;
-          transform: translate(-1px, -1px);
-        }
+        .stat-card:hover { box-shadow: 5px 6px 0 #111110; transform: translate(-1px,-1px); }
         .stat-accent {
-          position: absolute;
-          bottom: -8px;
-          right: -8px;
-          width: 56px;
-          height: 56px;
-          border-radius: 50%;
-          opacity: 0.12;
-          transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1);
+          position: absolute; bottom: -8px; right: -8px;
+          width: 56px; height: 56px; border-radius: 50%;
+          opacity: 0.12; transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1);
         }
-        .stat-card:hover .stat-accent {
-          transform: scale(1.3);
-        }
+        .stat-card:hover .stat-accent { transform: scale(1.3); }
 
-        /* Quick nav */
+        /* ── Quick nav card ── */
         .qnav-card {
-          display: flex;
-          align-items: center;
-          gap: 14px;
-          padding: 14px 18px;
-          background: #fff;
-          border: 2px solid #E8E0D0;
-          border-radius: 16px;
-          text-decoration: none;
-          color: #111110;
-          transition: all 0.2s cubic-bezier(0.16,1,0.3,1);
-          cursor: pointer;
+          display: flex; align-items: center; gap: 14px; padding: 14px 18px;
+          background: #fff; border: 2px solid #E8E0D0; border-radius: 16px;
+          text-decoration: none; color: #111110;
+          transition: all 0.2s cubic-bezier(0.16,1,0.3,1); cursor: pointer;
         }
-        .qnav-card:hover {
-          border-color: #111110;
-          box-shadow: 3px 4px 0 #111110;
-          transform: translate(-1px, -1px);
-          background: #FFFBEA;
-        }
+        .qnav-card:hover { border-color: #111110; box-shadow: 3px 4px 0 #111110; transform: translate(-1px,-1px); background: #FFFBEA; }
         .qnav-icon {
-          width: 40px;
-          height: 40px;
-          border-radius: 12px;
-          border: 2px solid #111110;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          flex-shrink: 0;
+          width: 40px; height: 40px; border-radius: 12px; border: 2px solid #111110;
+          display: flex; align-items: center; justify-content: center; flex-shrink: 0;
           transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1);
         }
-        .qnav-card:hover .qnav-icon {
-          transform: scale(1.08) rotate(-3deg);
-        }
+        .qnav-card:hover .qnav-icon { transform: scale(1.08) rotate(-3deg); }
 
-        /* Notification item */
+        /* ── Notification ── */
         .notif-item {
-          display: flex;
-          align-items: flex-start;
-          gap: 12px;
-          padding: 14px 18px;
-          border-bottom: 1px solid #F5F0E8;
-          transition: background 0.15s;
-          cursor: pointer;
-          position: relative;
+          display: flex; align-items: flex-start; gap: 12px; padding: 14px 18px;
+          border-bottom: 1px solid #F5F0E8; transition: background 0.15s;
+          cursor: pointer; position: relative;
         }
-        .notif-item:hover {
-          background: #FFFBEA;
-        }
-        .notif-item:last-child {
-          border-bottom: none;
-        }
+        .notif-item:hover { background: #FFFBEA; }
+        .notif-item:last-child { border-bottom: none; }
         .notif-dot {
-          width: 36px;
-          height: 36px;
-          border-radius: 12px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          flex-shrink: 0;
-          transition: transform 0.2s;
+          width: 36px; height: 36px; border-radius: 12px;
+          display: flex; align-items: center; justify-content: center;
+          flex-shrink: 0; transition: transform 0.2s;
         }
-        .notif-item:hover .notif-dot {
-          transform: scale(1.08);
-        }
+        .notif-item:hover .notif-dot { transform: scale(1.08); }
         .notif-del {
-          position: absolute;
-          top: 14px;
-          right: 14px;
-          opacity: 0;
-          transition: opacity 0.15s;
-          background: none;
-          border: none;
-          cursor: pointer;
-          color: #C0B8A8;
-          padding: 2px;
+          position: absolute; top: 14px; right: 14px; opacity: 0;
+          transition: opacity 0.15s; background: none; border: none;
+          cursor: pointer; color: #C0B8A8; padding: 2px;
         }
-        .notif-item:hover .notif-del {
-          opacity: 1;
-        }
-        .notif-del:hover {
-          color: #FF6B6B;
-        }
+        .notif-item:hover .notif-del { opacity: 1; }
+        .notif-del:hover { color: #FF6B6B; }
 
-        /* Artwork mini card */
+        /* ── Artwork mini card ── */
         .aw-mini {
-          border-radius: 16px;
-          border: 2px solid #E8E0D0;
-          overflow: hidden;
-          background: #fff;
-          transition: all 0.25s cubic-bezier(0.16,1,0.3,1);
-          cursor: pointer;
-          text-decoration: none;
-          display: block;
-          color: inherit;
+          border-radius: 16px; border: 2px solid #E8E0D0; overflow: hidden;
+          background: #fff; transition: all 0.25s cubic-bezier(0.16,1,0.3,1);
+          cursor: pointer; text-decoration: none; display: block; color: inherit;
         }
-        .aw-mini:hover {
-          border-color: #111110;
-          box-shadow: 4px 5px 0 #111110;
-          transform: translate(-2px, -2px);
-        }
-        .aw-mini:hover img {
-          transform: scale(1.06);
-        }
-        .aw-mini img {
-          transition: transform 0.4s cubic-bezier(0.16,1,0.3,1);
-        }
+        .aw-mini:hover { border-color: #111110; box-shadow: 4px 5px 0 #111110; transform: translate(-2px,-2px); }
+        .aw-mini:hover img { transform: scale(1.06); }
+        .aw-mini img { transition: transform 0.4s cubic-bezier(0.16,1,0.3,1); }
 
-        /* Event row */
-        .event-row {
-          display: flex;
-          align-items: center;
-          gap: 12px;
-          padding: 12px 0;
-          border-bottom: 1px solid #F5F0E8;
-          transition: background 0.15s;
-        }
+        /* ── Event / task rows ── */
+        .event-row { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid #F5F0E8; transition: background 0.15s; }
         .event-row:last-child { border-bottom: none; }
-
-        /* Task row */
-        .task-row {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-          padding: 10px 0;
-          border-bottom: 1px solid #F5F0E8;
-        }
+        .task-row { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid #F5F0E8; }
         .task-row:last-child { border-bottom: none; }
 
-        /* Section header */
+        /* ── Section header ── */
         .sec-header {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          padding: 16px 20px;
-          border-bottom: 2px solid #111110;
-          background: #FAF7F3;
-          border-radius: 20px 20px 0 0;
+          display: flex; align-items: center; justify-content: space-between;
+          padding: 16px 20px; border-bottom: 2px solid #111110;
+          background: #FAF7F3; border-radius: 20px 20px 0 0;
         }
 
-        /* Stagger entry */
-        @keyframes ripeIn {
-          from { opacity: 0; transform: translateY(16px); }
-          to { opacity: 1; transform: none; }
-        }
-        .ripe-in {
-          animation: ripeIn 0.5s cubic-bezier(0.16,1,0.3,1) both;
-        }
-
-        /* Tab button */
+        /* ── Notif tab ── */
         .notif-tab {
-          padding: 6px 14px;
-          border-radius: 9999px;
-          border: 2px solid #E8E0D0;
-          background: #fff;
-          font-family: inherit;
-          font-size: 12px;
-          font-weight: 700;
-          color: #9B8F7A;
-          cursor: pointer;
-          transition: all 0.15s;
+          padding: 6px 14px; border-radius: 9999px; border: 2px solid #E8E0D0;
+          background: #fff; font-family: inherit; font-size: 12px; font-weight: 700;
+          color: #9B8F7A; cursor: pointer; transition: all 0.15s;
         }
-        .notif-tab.active {
-          background: #111110;
-          border-color: #111110;
-          color: #FFD400;
+        .notif-tab.active { background: #111110; border-color: #111110; color: #FFD400; }
+        .notif-tab:not(.active):hover { border-color: #111110; color: #111110; }
+
+        /* ── Entry animation ── */
+        @keyframes ripeIn { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
+        .ripe-in { animation: ripeIn 0.5s cubic-bezier(0.16,1,0.3,1) both; }
+
+        /* ══════════════════════════════════════════════════════════
+           RESPONSIVE — TABLET (≤ 900px)
+        ══════════════════════════════════════════════════════════ */
+        @media (max-width: 900px) {
+          .dash-main-grid {
+            grid-template-columns: 1fr !important;
+          }
         }
-        .notif-tab:not(.active):hover {
-          border-color: #111110;
-          color: #111110;
+
+        /* ══════════════════════════════════════════════════════════
+           RESPONSIVE — MOBILE (≤ 640px)
+        ══════════════════════════════════════════════════════════ */
+        @media (max-width: 640px) {
+
+          /* Header: stack vertically */
+          .dash-header {
+            flex-direction: column !important;
+            align-items: flex-start !important;
+            gap: 14px !important;
+            margin-bottom: 20px !important;
+          }
+          .dash-header-actions {
+            width: 100%;
+            display: flex !important;
+            flex-wrap: wrap;
+            gap: 8px;
+          }
+          .dash-header-actions a,
+          .dash-header-actions button {
+            flex: 1;
+            min-width: 130px;
+            justify-content: center !important;
+          }
+          .dash-avatar {
+            width: 44px !important;
+            height: 44px !important;
+            border-radius: 14px !important;
+            font-size: 16px !important;
+          }
+
+          /* Stat cards: 4 → 2×2 */
+          .dash-stats {
+            grid-template-columns: repeat(2, 1fr) !important;
+            gap: 10px !important;
+            margin-bottom: 18px !important;
+          }
+          .stat-card { padding: 14px 16px !important; }
+          .stat-card div[style*="font-size: 32"] { font-size: 24px !important; }
+
+          /* Artwork mini grid: 4 → 2 */
+          .dash-artworks-grid {
+            grid-template-columns: repeat(2, 1fr) !important;
+            gap: 8px !important;
+            padding: 10px !important;
+          }
+
+          /* Quick nav: 3 → 2 */
+          .dash-quick-nav {
+            grid-template-columns: repeat(2, 1fr) !important;
+            gap: 8px !important;
+          }
+          .qnav-card { padding: 11px 13px !important; gap: 10px !important; }
+          .qnav-icon { width: 34px !important; height: 34px !important; }
+
+          /* Cards */
+          .ripe-card-static, .ripe-card { border-radius: 16px !important; }
+          .sec-header { padding: 12px 14px !important; border-radius: 14px 14px 0 0 !important; }
+
+          /* Notification items */
+          .notif-item { padding: 10px 14px !important; gap: 9px !important; }
+          .notif-dot { width: 30px !important; height: 30px !important; border-radius: 9px !important; }
+          .notif-del { top: 10px !important; right: 10px !important; }
+
+          /* Event / task rows */
+          .event-row { padding: 10px 0 !important; gap: 9px !important; }
+          .task-row  { padding: 8px 0 !important; gap: 8px !important; }
         }
       `}</style>
 
       <div>
 
         {/* ═══════════════════════════════════════════════════════
-            HEADER — Greeting + Quick Actions
-            ═══════════════════════════════════════════════════════ */}
-        <div className="ripe-in" style={{ marginBottom: 28, display: "flex", alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap", gap: 16 }}>
+            HEADER
+        ═══════════════════════════════════════════════════════ */}
+        {/* className="dash-header" enables mobile stack */}
+        <div className="ripe-in dash-header" style={{ marginBottom: 28, display: "flex", alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap", gap: 16 }}>
+
           <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-            {/* Avatar */}
-            <div style={{ width: 56, height: 56, borderRadius: 18, border: "2.5px solid #111110", background: "#FFD400", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, fontWeight: 900, color: "#111110", overflow: "hidden", boxShadow: "3px 3px 0 #111110", flexShrink: 0 }}>
+            {/* className="dash-avatar" enables mobile shrink */}
+            <div className="dash-avatar" style={{ width: 56, height: 56, borderRadius: 18, border: "2.5px solid #111110", background: "#FFD400", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, fontWeight: 900, color: "#111110", overflow: "hidden", boxShadow: "3px 3px 0 #111110", flexShrink: 0 }}>
               {profile?.avatar_url
                 ? <img src={profile.avatar_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                 : initials
@@ -468,13 +393,14 @@ export default function DashboardPage() {
               <div style={{ fontSize: 11, fontWeight: 700, color: "#9B8F7A", textTransform: "uppercase", letterSpacing: "0.15em", marginBottom: 2 }}>
                 {today.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
               </div>
-              <h1 style={{ fontSize: "clamp(24px, 3vw, 34px)", fontWeight: 900, color: "#111110", letterSpacing: "-0.8px", margin: 0, lineHeight: 1.1 }}>
+              <h1 style={{ fontSize: "clamp(20px, 3vw, 34px)", fontWeight: 900, color: "#111110", letterSpacing: "-0.8px", margin: 0, lineHeight: 1.1 }}>
                 {greetEmoji} {greeting}, {fname}
               </h1>
             </div>
           </div>
 
-          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+          {/* className="dash-header-actions" enables full-width on mobile */}
+          <div className="dash-header-actions" style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
             {profile?.username && (
               <Link href={`/${profile.username}`} style={{ textDecoration: "none" }}>
                 <button style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 16px", border: "2px solid #E8E0D0", borderRadius: 12, background: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", transition: "all 0.15s", fontFamily: "inherit", color: "#111110" }}
@@ -495,13 +421,13 @@ export default function DashboardPage() {
         </div>
 
         {/* ═══════════════════════════════════════════════════════
-            STAT CARDS
-            ═══════════════════════════════════════════════════════ */}
-        <div className="ripe-in" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14, marginBottom: 24, animationDelay: "0.08s" }}>
+            STAT CARDS — className="dash-stats" → 4→2 on mobile
+        ═══════════════════════════════════════════════════════ */}
+        <div className="ripe-in dash-stats" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14, marginBottom: 24, animationDelay: "0.08s" }}>
           {[
-            { label: "Total Works",  value: stats.artworks,      icon: Package,    color: "#FFD400" },
-            { label: "Available",    value: stats.available,     icon: Eye,        color: "#4ECDC4" },
-            { label: "Followers",    value: stats.followers,     icon: Users,      color: "#FF6B6B" },
+            { label: "Total Works",  value: stats.artworks,      icon: Package,     color: "#FFD400" },
+            { label: "Available",    value: stats.available,     icon: Eye,         color: "#4ECDC4" },
+            { label: "Followers",    value: stats.followers,     icon: Users,       color: "#FF6B6B" },
             { label: "Active Tasks", value: stats.tasks_pending, icon: CheckSquare, color: "#8B5CF6" },
           ].map((stat, i) => {
             const Icon = stat.icon;
@@ -523,11 +449,11 @@ export default function DashboardPage() {
         </div>
 
         {/* ═══════════════════════════════════════════════════════
-            MAIN GRID — Content + Sidebar
-            ═══════════════════════════════════════════════════════ */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 380px", gap: 20, marginBottom: 28, alignItems: "start" }}>
+            MAIN GRID — className="dash-main-grid" → 1-col on tablet
+        ═══════════════════════════════════════════════════════ */}
+        <div className="dash-main-grid" style={{ display: "grid", gridTemplateColumns: "1fr 380px", gap: 20, marginBottom: 28, alignItems: "start" }}>
 
-          {/* ── LEFT COLUMN ─────────────────────────────────────── */}
+          {/* ── LEFT COLUMN ── */}
           <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
 
             {/* Recent Artworks */}
@@ -545,7 +471,8 @@ export default function DashboardPage() {
               </div>
 
               {artworks.length > 0 ? (
-                <div style={{ padding: 16, display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12 }}>
+                /* className="dash-artworks-grid" → 2-col on mobile */
+                <div className="dash-artworks-grid" style={{ padding: 16, display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12 }}>
                   {artworks.slice(0, 8).map((aw) => {
                     const img = Array.isArray(aw.images) ? aw.images[0] : null;
                     const sc = STATUS_DOT[String(aw.status).toLowerCase()] || "#9B8F7A";
@@ -553,42 +480,37 @@ export default function DashboardPage() {
                       <Link key={aw.id} href={`/dashboard/artworks/${aw.id}`} className="aw-mini">
                         <div style={{ aspectRatio: "1/1", background: "#FAF7F3", position: "relative", overflow: "hidden" }}>
                           {img
-                            ? <img src={img} alt={aw.title} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
-                            : <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                                <ImageIcon size={20} color="#D4C9A8" />
-                              </div>
+                            ? <img src={img} alt={aw.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                            : <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}><ImageIcon size={24} color="#D4C9A8" /></div>
                           }
-                          <div style={{ position: "absolute", bottom: 6, left: 6, width: 10, height: 10, borderRadius: "50%", background: sc, border: "2px solid #fff", boxShadow: "0 1px 3px rgba(0,0,0,0.15)" }} />
+                          <div style={{ position: "absolute", top: 6, right: 6, width: 8, height: 8, borderRadius: "50%", background: sc, border: "1.5px solid #fff", boxShadow: "0 1px 3px rgba(0,0,0,0.2)" }} />
                         </div>
-                        <div style={{ padding: "8px 10px" }}>
-                          <div style={{ fontSize: 12, fontWeight: 700, color: "#111110", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{aw.title}</div>
-                          <div style={{ fontSize: 10, color: "#9B8F7A", fontWeight: 600, marginTop: 2 }}>
-                            {aw.medium || "—"}
-                            {aw.price ? <span style={{ fontFamily: "monospace", marginLeft: 6 }}>${Number(aw.price).toLocaleString()}</span> : ""}
-                          </div>
+                        <div style={{ padding: "7px 9px 9px" }}>
+                          <div style={{ fontSize: 11, fontWeight: 700, color: "#111110", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{aw.title}</div>
+                          {aw.price && <div style={{ fontSize: 10, color: "#9B8F7A", fontWeight: 600 }}>${aw.price.toLocaleString()}</div>}
                         </div>
                       </Link>
                     );
                   })}
                 </div>
               ) : (
-                <div style={{ padding: "40px 20px", textAlign: "center" }}>
-                  <div style={{ fontSize: 32, marginBottom: 8 }}>🎨</div>
-                  <div style={{ fontSize: 14, fontWeight: 800, color: "#111110", marginBottom: 4 }}>No artworks yet</div>
-                  <div style={{ fontSize: 12, color: "#9B8F7A", marginBottom: 16 }}>Add your first piece to start building your inventory</div>
+                <div style={{ padding: "32px 20px", textAlign: "center" }}>
+                  <div style={{ fontSize: 32, marginBottom: 8 }}>🖼️</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "#9B8F7A", marginBottom: 12 }}>No artworks yet</div>
                   <Link href="/dashboard/artworks/new" style={{ textDecoration: "none" }}>
-                    <button style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 18px", background: "#FFD400", border: "2px solid #111110", borderRadius: 10, fontSize: 13, fontWeight: 800, cursor: "pointer", boxShadow: "2px 2px 0 #111110", fontFamily: "inherit" }}>
-                      <Plus size={13} strokeWidth={3} /> Add Artwork
+                    <button style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 16px", background: "#FFD400", border: "2px solid #111110", borderRadius: 10, fontSize: 12, fontWeight: 800, cursor: "pointer", fontFamily: "inherit", color: "#111110", boxShadow: "2px 2px 0 #111110" }}>
+                      <Plus size={13} strokeWidth={3} /> Add your first artwork
                     </button>
                   </Link>
                 </div>
               )}
             </div>
 
-            {/* Quick Navigation */}
+            {/* Quick Nav */}
             <div className="ripe-in" style={{ animationDelay: "0.2s" }}>
               <div style={{ fontSize: 11, fontWeight: 800, color: "#9B8F7A", textTransform: "uppercase", letterSpacing: "0.15em", marginBottom: 12, paddingLeft: 4 }}>Quick Access</div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
+              {/* className="dash-quick-nav" → 2-col on mobile */}
+              <div className="dash-quick-nav" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
                 {QUICK_NAV.map((item) => {
                   const Icon = item.icon;
                   return (
@@ -640,10 +562,10 @@ export default function DashboardPage() {
             )}
           </div>
 
-          {/* ── RIGHT COLUMN (Sidebar) ──────────────────────────── */}
-          <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+          {/* ── RIGHT COLUMN (Sidebar) — className="dash-sidebar" ── */}
+          <div className="dash-sidebar" style={{ display: "flex", flexDirection: "column", gap: 20 }}>
 
-            {/* ── NOTIFICATION CENTER ──────────────────────────── */}
+            {/* Notification Center */}
             <div className="ripe-card-static ripe-in" style={{ animationDelay: "0.12s" }}>
               <div className="sec-header" style={{ background: unreadCount > 0 ? "#FFFBEA" : "#FAF7F3" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -659,10 +581,17 @@ export default function DashboardPage() {
                 </div>
                 <div style={{ display: "flex", gap: 6 }}>
                   {unreadCount > 0 && (
-                    <button onClick={markAllRead} style={{ fontSize: 11, fontWeight: 700, color: "#9B8F7A", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", transition: "color 0.15s" }}
+                    <button onClick={markAllRead} style={{ fontSize: 11, fontWeight: 700, color: "#9B8F7A", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit" }}
                       onMouseEnter={e => (e.currentTarget.style.color = "#111110")}
                       onMouseLeave={e => (e.currentTarget.style.color = "#9B8F7A")}>
                       Mark all read
+                    </button>
+                  )}
+                  {notifications.length > 0 && (
+                    <button onClick={clearAll} style={{ fontSize: 11, fontWeight: 700, color: "#C0B8A8", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit" }}
+                      onMouseEnter={e => (e.currentTarget.style.color = "#FF6B6B")}
+                      onMouseLeave={e => (e.currentTarget.style.color = "#C0B8A8")}>
+                      Clear
                     </button>
                   )}
                 </div>
@@ -670,40 +599,24 @@ export default function DashboardPage() {
 
               {/* Tabs */}
               <div style={{ display: "flex", gap: 6, padding: "12px 18px", borderBottom: "1px solid #F5F0E8" }}>
-                <button className={`notif-tab${notifTab === "all" ? " active" : ""}`} onClick={() => setNotifTab("all")}>
-                  All {notifications.length > 0 && `(${notifications.length})`}
-                </button>
+                <button className={`notif-tab${notifTab === "all" ? " active" : ""}`} onClick={() => setNotifTab("all")}>All</button>
                 <button className={`notif-tab${notifTab === "unread" ? " active" : ""}`} onClick={() => setNotifTab("unread")}>
                   Unread {unreadCount > 0 && `(${unreadCount})`}
                 </button>
-                {notifications.length > 0 && (
-                  <button onClick={clearAll} style={{ marginLeft: "auto", background: "none", border: "none", cursor: "pointer", color: "#C0B8A8", padding: 0, display: "flex", alignItems: "center", fontSize: 11, fontWeight: 600, fontFamily: "inherit", transition: "color 0.15s" }}
-                    onMouseEnter={e => (e.currentTarget.style.color = "#FF6B6B")}
-                    onMouseLeave={e => (e.currentTarget.style.color = "#C0B8A8")}>
-                    Clear all
-                  </button>
-                )}
               </div>
 
-              {/* Notification list */}
-              <div style={{ maxHeight: 360, overflowY: "auto" }}>
+              <div style={{ maxHeight: 340, overflowY: "auto" }}>
                 {filteredNotifs.length === 0 ? (
-                  <div style={{ padding: "36px 20px", textAlign: "center" }}>
-                    <BellOff size={28} color="#D4C9A8" style={{ marginBottom: 8 }} />
-                    <div style={{ fontSize: 13, fontWeight: 700, color: "#9B8F7A" }}>
-                      {notifTab === "unread" ? "All caught up!" : "No notifications yet"}
-                    </div>
-                    <div style={{ fontSize: 11, color: "#C0B8A8", marginTop: 4 }}>
-                      {notifTab === "unread" ? "You've read everything" : "Activity will show up here"}
-                    </div>
+                  <div style={{ padding: "32px 20px", textAlign: "center" }}>
+                    <div style={{ fontSize: 28, marginBottom: 8 }}>🔔</div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: "#9B8F7A" }}>{notifTab === "unread" ? "All caught up!" : "No notifications yet"}</div>
                   </div>
                 ) : (
-                  filteredNotifs.map((notif) => {
+                  filteredNotifs.map(notif => {
                     const cfg = NOTIF_CFG[notif.type] || NOTIF_CFG.system;
                     const Icon = cfg.icon;
                     return (
-                      <div key={notif.id} className="notif-item"
-                        onClick={() => !notif.read && markRead(notif.id)}
+                      <div key={notif.id} className="notif-item" onClick={() => markRead(notif.id)}
                         style={{ background: notif.read ? "transparent" : "#FFFEF5" }}>
                         <div className="notif-dot" style={{ background: cfg.bg }}>
                           <Icon size={16} color={cfg.color} />
@@ -713,9 +626,7 @@ export default function DashboardPage() {
                             <span style={{ fontSize: 13, fontWeight: notif.read ? 600 : 800, color: "#111110" }}>{notif.title}</span>
                             {!notif.read && <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#FF6B6B", flexShrink: 0 }} />}
                           </div>
-                          {notif.body && (
-                            <div style={{ fontSize: 12, color: "#9B8F7A", fontWeight: 500, lineHeight: 1.4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{notif.body}</div>
-                          )}
+                          {notif.body && <div style={{ fontSize: 12, color: "#9B8F7A", fontWeight: 500, lineHeight: 1.4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{notif.body}</div>}
                           <div style={{ fontSize: 10, color: "#C0B8A8", fontWeight: 600, marginTop: 4 }}>{timeAgo(notif.created_at)}</div>
                         </div>
                         <button className="notif-del" onClick={(e) => { e.stopPropagation(); deleteNotification(notif.id); }}>
@@ -728,7 +639,7 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            {/* ── UPCOMING EVENTS ──────────────────────────────── */}
+            {/* Upcoming Events */}
             <div className="ripe-card-static ripe-in" style={{ animationDelay: "0.18s" }}>
               <div className="sec-header">
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -741,21 +652,17 @@ export default function DashboardPage() {
               </div>
               <div style={{ padding: "4px 18px 12px" }}>
                 {events.length === 0 ? (
-                  <div style={{ padding: "24px 0", textAlign: "center" }}>
-                    <Calendar size={22} color="#D4C9A8" style={{ marginBottom: 6 }} />
-                    <div style={{ fontSize: 12, color: "#9B8F7A", fontWeight: 600 }}>No upcoming events</div>
-                    <Link href="/dashboard/exhibitions" style={{ fontSize: 11, fontWeight: 700, color: "#4ECDC4", textDecoration: "none" }}>
-                      + Create an event
-                    </Link>
+                  <div style={{ padding: "20px 0", textAlign: "center" }}>
+                    <div style={{ fontSize: 24, marginBottom: 6 }}>📅</div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: "#9B8F7A" }}>No upcoming events</div>
                   </div>
                 ) : (
-                  events.map((ev) => {
-                    const statusColors: Record<string, string> = { planning: "#9B8F7A", upcoming: "#8B5CF6", current: "#16A34A" };
-                    const sc = statusColors[ev.status.toLowerCase()] || "#9B8F7A";
+                  events.map(ev => {
+                    const sc = ev.status === "Active" ? "#16A34A" : ev.status === "Planning" ? "#CA8A04" : "#9B8F7A";
                     return (
                       <div key={ev.id} className="event-row">
-                        <div style={{ width: 40, height: 40, borderRadius: 10, background: sc + "18", border: `1.5px solid ${sc}40`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                          <Calendar size={16} color={sc} />
+                        <div style={{ width: 40, height: 40, borderRadius: 12, background: "#F5F0E8", border: "1.5px solid #E0D8CA", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                          <CalendarDays size={16} color="#9B8F7A" />
                         </div>
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ fontSize: 13, fontWeight: 700, color: "#111110", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ev.title}</div>
@@ -772,7 +679,7 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            {/* ── TASKS PROGRESS ───────────────────────────────── */}
+            {/* Active Tasks */}
             <div className="ripe-card-static ripe-in" style={{ animationDelay: "0.22s" }}>
               <div className="sec-header">
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -785,26 +692,21 @@ export default function DashboardPage() {
               </div>
               <div style={{ padding: "4px 18px 12px" }}>
                 {tasks.length === 0 ? (
-                  <div style={{ padding: "24px 0", textAlign: "center" }}>
-                    <CheckSquare size={22} color="#D4C9A8" style={{ marginBottom: 6 }} />
-                    <div style={{ fontSize: 12, color: "#9B8F7A", fontWeight: 600 }}>No active tasks</div>
-                    <Link href="/dashboard/tasks" style={{ fontSize: 11, fontWeight: 700, color: "#8B5CF6", textDecoration: "none" }}>
-                      + Add a task
-                    </Link>
+                  <div style={{ padding: "20px 0", textAlign: "center" }}>
+                    <div style={{ fontSize: 24, marginBottom: 6 }}>✅</div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: "#9B8F7A" }}>No active tasks</div>
                   </div>
                 ) : (
-                  tasks.map((task) => {
-                    const pc = PRIORITY_COLOR[task.priority] || "#FFD400";
+                  tasks.map(task => {
+                    const pc = PRIORITY_COLOR[task.priority] || "#9B8F7A";
                     return (
                       <div key={task.id} className="task-row">
-                        <div style={{ width: 10, height: 10, borderRadius: "50%", background: pc, border: "1.5px solid #111110", flexShrink: 0 }} />
+                        <div style={{ width: 4, height: 36, borderRadius: 2, background: pc, flexShrink: 0 }} />
                         <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: 13, fontWeight: 700, color: "#111110", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginBottom: 4 }}>{task.title}</div>
-                          <div style={{ height: 4, background: "#E8E0D0", borderRadius: 2, overflow: "hidden" }}>
-                            <div style={{ height: "100%", background: pc, borderRadius: 2, width: `${task.progress}%`, transition: "width 0.5s cubic-bezier(0.16,1,0.3,1)" }} />
-                          </div>
+                          <div style={{ fontSize: 13, fontWeight: 700, color: "#111110", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{task.title}</div>
+                          {task.due_date && <div style={{ fontSize: 10, color: "#9B8F7A", fontWeight: 600, marginTop: 2 }}>Due {fmtDate(task.due_date)}</div>}
                         </div>
-                        <span style={{ fontSize: 11, fontWeight: 700, color: "#9B8F7A", flexShrink: 0, fontFamily: "monospace" }}>{task.progress}%</span>
+                        <div style={{ fontSize: 10, fontWeight: 800, color: pc, background: pc + "20", padding: "2px 8px", borderRadius: 6, flexShrink: 0, textTransform: "uppercase" }}>{task.priority}</div>
                       </div>
                     );
                   })

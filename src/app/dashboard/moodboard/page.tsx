@@ -531,7 +531,7 @@ export default function MoodboardPage() {
 
   // Stats
   const publicCount  = boards.filter(b => b.is_public).length;
-  const providers    = [...new Set(boards.map(b => b.provider))];
+  const providers    = Array.from(new Set(boards.map(b => b.provider)));
 
   // Filtered
   const filtered = boards.filter(b => {

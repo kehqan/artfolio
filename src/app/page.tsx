@@ -643,7 +643,10 @@ export default function HomePage() {
       {/* ── NAV ── */}
       <nav className="nav">
         <div className="nav-pill">
-          <a href="/" className="nav-logo">🥭<span className="nav-logo-text">artomango</span></a>
+          <a href="/" className="nav-logo">
+            <img src="/logo.png" alt="artomango" style={{width:28,height:28,objectFit:"contain"}} />
+            <span className="nav-logo-text">artomango</span>
+          </a>
           <div className="nav-div"/>
           <div className="nav-links">
             <a href="#why"     className="nav-link">Features</a>
@@ -668,7 +671,10 @@ export default function HomePage() {
         <div className="hero-inner">
           {/* LEFT — text */}
           <div>
-            <div className="hero-eyebrow">🥭 artomango · art platform</div>
+            <div className="hero-eyebrow" style={{display:"flex",alignItems:"center",gap:6}}>
+              <img src="/logo.png" alt="" style={{width:20,height:20,objectFit:"contain"}} />
+              artomango · art platform
+            </div>
             <h1 className="hero-title">ARTOMANGO</h1>
             <span className="hero-title-line2">Manage. Exhibit.<br/>Collaborate.</span>
             <p className="hero-sub">
@@ -1099,7 +1105,7 @@ export default function HomePage() {
         <div className="footer-inner">
           <div className="footer-top">
             <div>
-              <span className="footer-logo">🥭</span>
+              <img src="/logo.png" alt="artomango" className="footer-logo" style={{width:32,height:32,objectFit:"contain"}} />
               <span className="footer-brand-name">artomango</span>
               <span className="footer-tagline">Manage, Exhibit, Collab.<br/>The platform for artists and venues.</span>
             </div>
@@ -1123,7 +1129,10 @@ export default function HomePage() {
             </div>
           </div>
           <div className="footer-bottom">
-            <span className="footer-copy">🥭 artomango · © 2026 · Manage, Exhibit, Collab</span>
+            <span className="footer-copy" style={{display:"flex",alignItems:"center",gap:6}}>
+              <img src="/logo.png" alt="" style={{width:18,height:18,objectFit:"contain"}} />
+              artomango · © 2026 · Manage, Exhibit, Collab
+            </span>
             <div style={{display:"flex",gap:20}}>
               <a href="#" className="footer-link" style={{marginBottom:0,fontSize:11}}>Privacy</a>
               <a href="#" className="footer-link" style={{marginBottom:0,fontSize:11}}>Support</a>

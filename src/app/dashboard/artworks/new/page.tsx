@@ -263,7 +263,7 @@ export default function NewArtworkPage() {
 
     if (!error && data) {
       if (collectionId) {
-        await sb.from("collection_artworks").insert({ collection_id: collectionId, artwork_id: data.id }).catch(() => {});
+        try { await sb.from("collection_artworks").insert({ collection_id: collectionId, artwork_id: data.id }); } catch { /* ignore */ }
       }
       setUploadPct(100);
       router.push(`/dashboard/artworks/${data.id}`);

@@ -196,7 +196,7 @@ export default function ArtworkDetailPage() {
           )}
           <img src={images[lightbox]} alt="" style={{ maxWidth: "90vw", maxHeight: "90vh", objectFit: "contain", borderRadius: 4 }} onClick={e => e.stopPropagation()} />
           <div style={{ position: "absolute", bottom: 16, left: "50%", transform: "translateX(-50%)", display: "flex", gap: 6 }}>
-            {images.map((_, i) => (
+            {images.map((_: string, i: number) => (
               <div key={i} onClick={e => { e.stopPropagation(); setLightbox(i); }} style={{ width: i === lightbox ? 20 : 7, height: 7, borderRadius: 99, background: i === lightbox ? "#FFD400" : "rgba(255,255,255,.35)", cursor: "pointer", transition: "all .2s" }} />
             ))}
           </div>

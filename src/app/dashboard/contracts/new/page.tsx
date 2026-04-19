@@ -351,7 +351,7 @@ export default function NewContractPage() {
 
   const sf = (k: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
     setForm(p => ({ ...p, [k]: e.target.value }));
-  const sb2 = (k: string) => () => setForm(p => ({ ...p, [k]: !(p as any)[k] });
+  const sb2 = (k: string) => () => setForm(p => ({ ...p, [k]: !(p as any)[k] }));
 
   useEffect(() => {
     const sb = createClient();
@@ -752,7 +752,7 @@ export default function NewContractPage() {
                 : "A unique signing link is generated for the external party",
               "Both parties review and sign with their full name",
               "When both have signed, the contract is sealed and saved",
-              start_date || end_date ? "Key dates are added to both calendars" : "Key dates will be added to calendars",
+              "Key dates will be added to both calendars when signed",
               showArtworks && linkedArtworks.length > 0
                 ? `${linkedArtworks.length} artwork${linkedArtworks.length > 1 ? "s" : ""} will be noted in their passport`
                 : null,
@@ -782,9 +782,6 @@ export default function NewContractPage() {
     </>
   );
 }
-
-const start_date = ""; // placeholder to avoid reference error in template literal
-const end_date = "";
 
 const CSS = `
   @import url('https://fonts.googleapis.com/css2?family=Darker+Grotesque:wght@500;600;700;800;900&display=swap');

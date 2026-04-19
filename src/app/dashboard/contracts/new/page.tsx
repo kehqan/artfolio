@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
@@ -295,7 +295,7 @@ function ArtworkPicker({ artworks, selected, onChange }: {
 // ══════════════════════════════════════════════════════════════════
 // MAIN PAGE
 // ══════════════════════════════════════════════════════════════════
-export default function NewContractPage() {
+function NewContractInner() {
   const router     = useRouter();
   const params     = useSearchParams();
 
@@ -802,3 +802,16 @@ const CSS = `
     .cn-grid-2 { grid-template-columns:1fr !important; }
   }
 `;
+
+export default function NewContractPage() {
+  return (
+    <Suspense fallback={
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "60vh", flexDirection: "column", gap: 12 }}>
+        <div style={{ width: 36, height: 36, borderRadius: "50%", border: "3px solid #FFD400", borderTopColor: "transparent", animation: "spin .7s linear infinite" }} />
+        <div style={{ fontSize: 13, fontWeight: 700, color: "#9B8F7A" }}>Loading…</div>
+      </div>
+    }>
+      <NewContractInner />
+    </Suspense>
+  );
+}

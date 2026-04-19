@@ -61,7 +61,7 @@ const NAV_SECTIONS = [
 ];
 
 const ALL_NAV_ITEMS = [
-  { href: "/dashboard",          label: "Dashboard", icon: LayoutDashboard },
+  { href: "/dashboard",          label: "Home", icon: LayoutDashboard },
   { href: "/dashboard/messages", label: "Messages",  icon: MessageSquare   },
   { href: "/dashboard/moodboard",label: "Moodboard", icon: Layers          },
   { href: "/dashboard/contracts",label: "Contracts", icon: FileText         },

@@ -9,7 +9,7 @@ import {
   CalendarDays, LogOut, Bell, Search, X,
   ChevronDown, Handshake, TrendingUp, CheckSquare,
   MapPin, CalendarRange, Menu, Globe, ShoppingBag,
-  BellOff, MessageSquare, Plus, Layers,
+  BellOff, MessageSquare, Plus, Layers, FileText,
 } from "lucide-react";
 
 // ── Nav structure ──────────────────────────────────────────────────
@@ -44,6 +44,7 @@ const NAV_SECTIONS = [
     items: [
       { href: "/dashboard/sales",     label: "Sales",     icon: BarChart3,  desc: "Track your artwork sales",  emoji: "💰", color: "#16A34A", bg: "#DCFCE7" },
       { href: "/dashboard/clients",   label: "Clients",   icon: Users,      desc: "Collector relationships",   emoji: "👥", color: "#8B5CF6", bg: "#EDE9FE" },
+      { href: "/dashboard/contracts", label: "Contracts", icon: FileText,   desc: "Agreements & signings",     emoji: "📋", color: "#CA8A04", bg: "#FEF9C3" },
       { href: "/dashboard/analytics", label: "Analytics", icon: TrendingUp, desc: "Performance insights",      emoji: "📈", color: "#0EA5E9", bg: "#E0F2FE" },
     ],
   },
@@ -63,6 +64,7 @@ const ALL_NAV_ITEMS = [
   { href: "/dashboard",          label: "Dashboard", icon: LayoutDashboard },
   { href: "/dashboard/messages", label: "Messages",  icon: MessageSquare   },
   { href: "/dashboard/moodboard",label: "Moodboard", icon: Layers          },
+  { href: "/dashboard/contracts",label: "Contracts", icon: FileText         },
   ...NAV_SECTIONS.flatMap(s => s.items),
 ];
 
@@ -378,8 +380,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <div className="am-nav-pill" style={{ display: "flex", alignItems: "center", gap: 4, padding: "5px 6px 5px 10px", position: "relative" }}>
 
             {/* Logo */}
-            <Link href="/dashboard" style={{ display: "flex", alignItems: "center", textDecoration: "none", flexShrink: 0, padding: "2px 2px" }}>
-              <img src="/logo.png" alt="artomango" style={{width:28,height:28,objectFit:"contain"}} />
+            <Link href="/dashboard" style={{ display: "flex", alignItems: "center", textDecoration: "none", flexShrink: 0, fontSize: 24, lineHeight: 1, padding: "2px 2px" }}>
+              🥭
             </Link>
             <div className="am-divider" />
 

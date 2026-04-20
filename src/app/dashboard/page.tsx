@@ -1,1283 +1,1257 @@
 "use client";
-import React, { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import {
-  ImageIcon, CalendarDays, Users, Plus, ArrowRight, DollarSign,
-  Bell, Check, Sparkles, X, Palette, Building2, Brush, Frame,
-  Megaphone, PencilLine, Coffee, Handshake, ShoppingBag, CheckSquare,
-  HandHeart,
+  ImageIcon, Bell, X, ArrowRight, Plus, ExternalLink,
+  Package, Eye, Users, CheckSquare, DollarSign, Handshake,
+  BarChart3, CalendarDays, MapPin, Sparkles, ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 
 /* ══════════════════════════════════════════════════════════════════
-   THE ATELIER — Dashboard as an artist's desk
-   Ripe design system · 60/30/10 (cream / ink / mango)
+   THE ATELIER — Focus Mode by default, classic dashboard beneath
+   Ripe design system · 60/30/10 (cream/ink/mango) with a lightened
+   nearly-white Focus canvas
    ══════════════════════════════════════════════════════════════════ */
 
-/* ── Types ─────────────────────────────────────────────────────── */
-type Stats = {
-  artworks: number; available: number; sold: number; in_progress: number;
-  exhibitions: number; sales_total: number; sales_month: number;
-  tasks_pending: number; followers: number;
-};
-type Notif = {
-  id: string; type: string; title: string; body?: string;
-  read: boolean; data?: any; created_at: string;
-};
-type Artwork = {
-  id: string; title: string; status: string; images?: string[];
-  price?: number; medium?: string; year?: number;
-  width_cm?: number; height_cm?: number;
-  created_at: string; updated_at?: string;
-};
-type UpcomingEvent = {
-  id: string; title: string; start_date?: string; venue?: string; status: string;
-};
-type Task = {
-  id: string; title: string; status: string; priority: string;
-  due_date?: string; progress: number;
-};
-type Sale = {
-  id: string; sale_price: number; sale_date?: string;
-  status: string; artwork_id?: string; artwork_title?: string;
-};
-
-/* ── The helper's one question: 5 visual intent cards ────────── */
-type Intent = "create" | "sell" | "show" | "plan" | "collab";
-const INTENT_CARDS: {
-  key: Intent;
-  label: string;
-  blurb: string;
-  href: string;
-  icon: any;
-  color: string;
-  banner: string;
-}[] = [
-  {
-    key: "create",
-    label: "Create",
-    blurb: "Start a new piece.",
-    href: "/dashboard/artworks/new",
-    icon: Brush,
-    color: "#FFD400",
-    banner: "Let's make something. Heading to the new-artwork canvas.",
-  },
-  {
-    key: "sell",
-    label: "Sell",
-    blurb: "List work & track sales.",
-    href: "/dashboard/mystore",
-    icon: ShoppingBag,
-    color: "#4ECDC4",
-    banner: "Time to sell. Opening MyStore to list or edit your works.",
-  },
-  {
-    key: "show",
-    label: "Show",
-    blurb: "Events & exhibitions.",
-    href: "/dashboard/exhibitions",
-    icon: Building2,
-    color: "#FF6B6B",
-    banner: "Let's put you in the room. Opening Events & Exhibitions.",
-  },
-  {
-    key: "plan",
-    label: "Plan",
-    blurb: "Tasks, calendar, deadlines.",
-    href: "/dashboard/tasks",
-    icon: CheckSquare,
-    color: "#8B5CF6",
-    banner: "Planning mode. Opening your tasks and deadlines.",
-  },
-  {
-    key: "collab",
-    label: "Collab",
-    blurb: "Find & respond to collabs.",
-    href: "/dashboard/pool",
-    icon: Handshake,
-    color: "#95E1D3",
-    banner: "Let's collaborate. Opening the collab pool.",
-  },
-];
-
-/* ── Helpers ──────────────────────────────────────────────── */
-function daysAgo(date?: string) {
-  if (!date) return 0;
-  return Math.floor((Date.now() - new Date(date).getTime()) / 86400000);
+/* ── Helpers (shared across modes) ─────────────────────────────── */
+function AnimNum({ target }: { target: number }) {
+  const [val, setVal] = useState(0);
+  const ref = useRef<HTMLDivElement>(null);
+  const started = useRef(false);
+  useEffect(() => {
+    const el = ref.current; if (!el) return;
+    const obs = new IntersectionObserver(([e]) => {
+      if (e.isIntersecting && !started.current) {
+        started.current = true;
+        const start = performance.now();
+        const dur = 900;
+        const step = (now: number) => {
+          const p = Math.min((now - start) / dur, 1);
+          const ease = 1 - Math.pow(1 - p, 3);
+          setVal(Math.round(ease * target));
+          if (p < 1) requestAnimationFrame(step);
+        };
+        requestAnimationFrame(step);
+        obs.disconnect();
+      }
+    }, { threshold: 0.5 });
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [target]);
+  return <div ref={ref}>{val}</div>;
 }
+
 function timeAgo(date: string) {
   const s = Math.floor((Date.now() - new Date(date).getTime()) / 1000);
   if (s < 60) return "just now";
   if (s < 3600) return `${Math.floor(s / 60)}m ago`;
   if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
-  if (s < 604800) return `${Math.floor(s / 86400)}d ago`;
+  return `${Math.floor(s / 86400)}d ago`;
+}
+function fmtDate(date: string) {
   return new Date(date).toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
-function formatDay(d?: string) {
-  if (!d) return "No date";
-  return new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric" });
-}
 
-const NOTIF_CFG: Record<string, { icon: any; color: string }> = {
-  follow:  { icon: Users,      color: "#4ECDC4" },
-  sale:    { icon: DollarSign, color: "#16A34A" },
-  collab:  { icon: Handshake,  color: "#CA8A04" },
-  system:  { icon: Sparkles,   color: "#8B5CF6" },
-  artwork: { icon: ImageIcon,  color: "#FF6B6B" },
+/* ── Config ────────────────────────────────────────────────────── */
+const NOTIF_CFG: Record<string, { icon: any; color: string; bg: string }> = {
+  follow:  { icon: Users,      color: "#4ECDC4", bg: "#F0FDF4" },
+  sale:    { icon: DollarSign, color: "#16A34A", bg: "#DCFCE7" },
+  collab:  { icon: Handshake,  color: "#CA8A04", bg: "#FEF9C3" },
+  system:  { icon: Sparkles,   color: "#8B5CF6", bg: "#EDE9FE" },
+  artwork: { icon: ImageIcon,  color: "#FF6B6B", bg: "#FFE4E6" },
 };
-
 const STATUS_DOT: Record<string, string> = {
   available: "#16A34A", sold: "#111110", reserved: "#D97706",
   "in progress": "#8B5CF6", "in_progress": "#8B5CF6",
   concept: "#9B8F7A", complete: "#0EA5E9",
 };
+const PRIORITY_COLOR: Record<string, string> = {
+  low: "#4ECDC4", medium: "#FFD400", high: "#FF6B6B",
+};
+const QUICK_NAV = [
+  { href: "/dashboard/artworks",    label: "Artworks",  icon: ImageIcon,    color: "#FFD400", desc: "Manage inventory" },
+  { href: "/dashboard/exhibitions", label: "Events",    icon: CalendarDays, color: "#4ECDC4", desc: "Shows & exhibitions" },
+  { href: "/dashboard/pool",        label: "Collabs",   icon: Handshake,    color: "#FF6B6B", desc: "Discovery pool" },
+  { href: "/dashboard/sales",       label: "Sales",     icon: BarChart3,    color: "#8B5CF6", desc: "Track revenue" },
+  { href: "/dashboard/tasks",       label: "Tasks",     icon: CheckSquare,  color: "#95E1D3", desc: "To-dos & planning" },
+  { href: "/dashboard/map",         label: "Map",       icon: MapPin,       color: "#FF6B6B", desc: "Art scene map" },
+];
+
+/* ══════════════════════════════════════════════════════════════════
+   FOCUS MODE: Palette + sub-menu chips
+   ══════════════════════════════════════════════════════════════════ */
+
+type WellKey = "studio" | "scene" | "money" | "planning" | "messages";
+
+type SubItem = { label: string; q: string; href: string };
+type Well = {
+  key: WellKey;
+  emoji: string;
+  label: string;
+  answer: string;          // casual answer inside the hole
+  color: string;           // ripe-system section color (hover state)
+  href?: string;           // direct nav if no sub-menu
+  subs?: SubItem[];
+};
+
+const WELLS: Well[] = [
+  {
+    key: "studio",
+    emoji: "🎨",
+    label: "My Studio",
+    answer: "I'm here to organize my art.",
+    color: "#FFD400",
+    subs: [
+      { label: "My Works",      q: "The living record of every piece created.",       href: "/dashboard/artworks"  },
+      { label: "My Front Door", q: "Show my shop. The one strangers can see from.",   href: "/dashboard/mystore"   },
+      { label: "Moodboard",     q: "Visual notes and creative daydreams.",            href: "/dashboard/moodboard" },
+    ],
+  },
+  {
+    key: "scene",
+    emoji: "🗺️",
+    label: "The Scene",
+    answer: "I want to see what's happening out there.",
+    color: "#4ECDC4",
+    subs: [
+      { label: "Events & Education", q: "What's on? Shows, workshops, deadlines.",                    href: "/dashboard/exhibitions" },
+      { label: "Collabs",            q: "Open requests from artists and venues — find your next collab.", href: "/dashboard/pool"        },
+      { label: "Map",                q: "Show me the Prague art scene on a map.",                      href: "/dashboard/map"         },
+    ],
+  },
+  {
+    key: "money",
+    emoji: "💰",
+    label: "Deals & Money",
+    answer: "Let's talk numbers.",
+    color: "#8B5CF6",
+    subs: [
+      { label: "My Sales",      q: "Track what I've sold.",                      href: "/dashboard/sales"     },
+      { label: "My Collectors", q: "Who follow my work?",                        href: "/dashboard/clients"   },
+      { label: "My Papers",     q: "Agreements & deals — easy paperwork.",       href: "/dashboard/contracts" },
+      { label: "My Reach",      q: "How am I actually doing?",                   href: "/dashboard/analytics" },
+    ],
+  },
+  {
+    key: "planning",
+    emoji: "📅",
+    label: "Planning",
+    answer: "I need to get organized.",
+    color: "#FF6B6B",
+    subs: [
+      { label: "Tasks",       q: "My to-do list.",                  href: "/dashboard/tasks"    },
+      { label: "My Schedule", q: "Everything on a calendar.",       href: "/dashboard/calendar" },
+    ],
+  },
+  {
+    key: "messages",
+    emoji: "💬",
+    label: "Messages",
+    answer: "Anyone write to me?",
+    color: "#95E1D3",
+    href: "/dashboard/messages", // direct, no sub-menu
+  },
+];
+
+/* ── Custom palette SVG positions (percent of viewBox 720×520) ── */
+/* Designed organically: big well top-center (My Studio), 4 smaller
+   wells scattered, thumbhole on the right. */
+const WELL_POSITIONS: Record<WellKey, { cx: number; cy: number; r: number }> = {
+  studio:   { cx: 320, cy: 170, r: 74 },  // biggest, slightly left-center
+  scene:    { cx: 150, cy: 240, r: 48 },  // left
+  money:    { cx: 470, cy: 280, r: 52 },  // right-center
+  planning: { cx: 240, cy: 370, r: 46 },  // bottom-left
+  messages: { cx: 430, cy: 410, r: 44 },  // bottom-right (smallest)
+};
+
+function PaletteSVG({
+  hoverKey,
+  onHover,
+  onLeave,
+  onPick,
+}: {
+  hoverKey: WellKey | null;
+  onHover: (k: WellKey) => void;
+  onLeave: () => void;
+  onPick: (k: WellKey) => void;
+}) {
+  return (
+    <svg viewBox="0 0 720 520" xmlns="http://www.w3.org/2000/svg"
+         style={{ width: "100%", height: "auto", maxWidth: 620, display: "block", margin: "0 auto" }}>
+      <defs>
+        {/* Palette body shadow */}
+        <filter id="pal-shadow" x="-10%" y="-10%" width="120%" height="120%">
+          <feDropShadow dx="6" dy="8" stdDeviation="0" floodColor="#111110" floodOpacity="1" />
+        </filter>
+        {/* Each well gets a subtle highlight */}
+        <radialGradient id="well-gloss" cx="30%" cy="25%" r="70%">
+          <stop offset="0%" stopColor="#fff" stopOpacity="0.6" />
+          <stop offset="40%" stopColor="#fff" stopOpacity="0.1" />
+          <stop offset="100%" stopColor="#fff" stopOpacity="0" />
+        </radialGradient>
+      </defs>
+
+      {/* ── Palette body — organic kidney shape with thumbhole ── */}
+      <g filter="url(#pal-shadow)">
+        <path
+          d="
+            M 140 110
+            C 200 70, 330 55, 420 70
+            C 540 90, 620 150, 630 240
+            C 638 300, 610 350, 580 360
+            C 560 365, 555 380, 560 400
+            C 568 430, 560 450, 530 455
+            C 510 458, 500 445, 500 425
+            C 500 405, 490 395, 470 398
+            C 430 405, 380 440, 320 450
+            C 220 465, 120 430, 80 350
+            C 40 260, 70 160, 140 110
+            Z
+          "
+          fill="#FFFBEF"
+          stroke="#111110"
+          strokeWidth="3"
+          strokeLinejoin="round"
+        />
+      </g>
+
+      {/* ── 5 paint wells ── */}
+      {WELLS.map(well => {
+        const pos = WELL_POSITIONS[well.key];
+        const isHover = hoverKey === well.key;
+        const fillColor = isHover ? well.color : "#FAF5E8";
+
+        return (
+          <g
+            key={well.key}
+            onClick={() => onPick(well.key)}
+            onMouseEnter={() => onHover(well.key)}
+            onMouseLeave={onLeave}
+            onFocus={() => onHover(well.key)}
+            onBlur={onLeave}
+            tabIndex={0}
+            role="button"
+            aria-label={`${well.label} — ${well.answer}`}
+            style={{
+              cursor: "pointer",
+              outline: "none",
+              transformOrigin: `${pos.cx}px ${pos.cy}px`,
+              transform: isHover ? "translateY(-4px) scale(1.05)" : "none",
+              transition: "transform 0.28s cubic-bezier(0.16,1,0.3,1)",
+            }}
+          >
+            {/* Well inner shadow ring */}
+            <circle cx={pos.cx} cy={pos.cy + 2} r={pos.r} fill="rgba(17,17,16,0.15)" />
+            {/* Paint fill */}
+            <circle
+              cx={pos.cx}
+              cy={pos.cy}
+              r={pos.r}
+              fill={fillColor}
+              stroke="#111110"
+              strokeWidth="2.5"
+              style={{ transition: "fill 0.3s ease" }}
+            />
+            {/* Gloss */}
+            <circle cx={pos.cx} cy={pos.cy} r={pos.r - 2} fill="url(#well-gloss)" pointerEvents="none" />
+
+            {/* Emoji — big, centered */}
+            <text
+              x={pos.cx}
+              y={pos.cy + pos.r * 0.18}
+              textAnchor="middle"
+              fontSize={pos.r * 0.95}
+              style={{ userSelect: "none", pointerEvents: "none" }}
+            >
+              {well.emoji}
+            </text>
+
+            {/* Invisible hit pad for easier tapping */}
+            <circle cx={pos.cx} cy={pos.cy} r={pos.r + 6} fill="transparent" />
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   CLASSIC DASHBOARD (original, unchanged visually — just extracted)
+   ══════════════════════════════════════════════════════════════════ */
+function ClassicDashboard({
+  profile, artworks, stats, tasks, events, recentSales, notifications,
+  loaded, notifTab, setNotifTab,
+  markRead, markAllRead, deleteNotification, clearAll,
+  fname, unreadCount, filteredNotifs, initials, today, greeting, greetEmoji,
+}: any) {
+  return (
+    <div>
+      {/* HEADER */}
+      <div className="ripe-in dash-header" style={{ marginBottom: 28, display: "flex", alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap", gap: 16 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+          <div className="dash-avatar" style={{ width: 56, height: 56, borderRadius: 18, border: "2.5px solid #111110", background: "#FFD400", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, fontWeight: 900, color: "#111110", overflow: "hidden", boxShadow: "3px 3px 0 #111110", flexShrink: 0 }}>
+            {profile?.avatar_url
+              ? <img src={profile.avatar_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+              : initials}
+          </div>
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "#9B8F7A", textTransform: "uppercase", letterSpacing: "0.15em", marginBottom: 2 }}>
+              {today.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
+            </div>
+            <h1 style={{ fontSize: "clamp(20px, 3vw, 34px)", fontWeight: 900, color: "#111110", letterSpacing: "-0.8px", margin: 0, lineHeight: 1.1 }}>
+              {greetEmoji} {greeting}, {fname}
+            </h1>
+          </div>
+        </div>
+        <div className="dash-header-actions" style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+          {profile?.username && (
+            <Link href={`/${profile.username}`} style={{ textDecoration: "none" }}>
+              <button style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 16px", border: "2px solid #E8E0D0", borderRadius: 12, background: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", transition: "all 0.15s", fontFamily: "inherit", color: "#111110" }}
+                onMouseEnter={e => { const el = e.currentTarget; el.style.borderColor = "#111110"; el.style.boxShadow = "2px 2px 0 #111110"; }}
+                onMouseLeave={e => { const el = e.currentTarget; el.style.borderColor = "#E8E0D0"; el.style.boxShadow = "none"; }}>
+                <ExternalLink size={13} /> Portfolio
+              </button>
+            </Link>
+          )}
+          <Link href="/dashboard/artworks/new" style={{ textDecoration: "none" }}>
+            <button style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 18px", background: "#FFD400", border: "2.5px solid #111110", borderRadius: 12, fontSize: 13, fontWeight: 800, cursor: "pointer", boxShadow: "3px 3px 0 #111110", transition: "all 0.15s cubic-bezier(0.16,1,0.3,1)", fontFamily: "inherit", color: "#111110" }}
+              onMouseEnter={e => { const el = e.currentTarget; el.style.transform = "translate(-1px,-1px)"; el.style.boxShadow = "4px 4px 0 #111110"; }}
+              onMouseLeave={e => { const el = e.currentTarget; el.style.transform = ""; el.style.boxShadow = "3px 3px 0 #111110"; }}>
+              <Plus size={14} strokeWidth={3} /> Add Artwork
+            </button>
+          </Link>
+        </div>
+      </div>
+
+      {/* STATS */}
+      <div className="ripe-in dash-stats" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14, marginBottom: 24, animationDelay: "0.08s" }}>
+        {[
+          { label: "Total Works",  value: stats.artworks,      icon: Package,     color: "#FFD400" },
+          { label: "Available",    value: stats.available,     icon: Eye,         color: "#4ECDC4" },
+          { label: "Followers",    value: stats.followers,     icon: Users,       color: "#FF6B6B" },
+          { label: "Active Tasks", value: stats.tasks_pending, icon: CheckSquare, color: "#8B5CF6" },
+        ].map((stat, i) => {
+          const Icon = stat.icon;
+          return (
+            <div key={stat.label} className="stat-card" style={{ animationDelay: `${0.1 + i * 0.05}s` }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+                <div style={{ width: 36, height: 36, borderRadius: 11, background: stat.color, border: "2px solid #111110", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <Icon size={16} color="#111110" />
+                </div>
+                <span style={{ fontSize: 10, fontWeight: 800, color: "#9B8F7A", textTransform: "uppercase", letterSpacing: "0.12em" }}>{stat.label}</span>
+              </div>
+              <div style={{ fontSize: 32, fontWeight: 900, color: "#111110", lineHeight: 1, letterSpacing: "-1px" }}>
+                {loaded ? <AnimNum target={stat.value} /> : "—"}
+              </div>
+              <div className="stat-accent" style={{ background: stat.color }} />
+            </div>
+          );
+        })}
+      </div>
+
+      {/* MAIN GRID */}
+      <div className="dash-main-grid" style={{ display: "grid", gridTemplateColumns: "1fr 380px", gap: 20, marginBottom: 28, alignItems: "start" }}>
+        {/* LEFT */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+          {/* Recent Artworks */}
+          <div className="ripe-card-static ripe-in" style={{ animationDelay: "0.15s" }}>
+            <div className="sec-header">
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <div style={{ width: 8, height: 8, borderRadius: 3, background: "#FFD400", border: "1.5px solid #111110" }} />
+                <span style={{ fontSize: 14, fontWeight: 900, color: "#111110" }}>Recent Artworks</span>
+              </div>
+              <Link href="/dashboard/artworks" style={{ textDecoration: "none", display: "flex", alignItems: "center", gap: 4, fontSize: 12, fontWeight: 700, color: "#9B8F7A", transition: "color 0.15s" }}>
+                View all <ArrowRight size={12} />
+              </Link>
+            </div>
+            {artworks.length > 0 ? (
+              <div className="dash-artworks-grid" style={{ padding: 16, display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12 }}>
+                {artworks.slice(0, 8).map((aw: any) => {
+                  const img = Array.isArray(aw.images) ? aw.images[0] : null;
+                  const sc = STATUS_DOT[String(aw.status).toLowerCase()] || "#9B8F7A";
+                  return (
+                    <Link key={aw.id} href={`/dashboard/artworks/${aw.id}`} className="aw-mini">
+                      <div style={{ aspectRatio: "1/1", background: "#FAF7F3", position: "relative", overflow: "hidden" }}>
+                        {img
+                          ? <img src={img} alt={aw.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                          : <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}><ImageIcon size={24} color="#D4C9A8" /></div>}
+                        <div style={{ position: "absolute", top: 6, right: 6, width: 8, height: 8, borderRadius: "50%", background: sc, border: "1.5px solid #fff", boxShadow: "0 1px 3px rgba(0,0,0,0.2)" }} />
+                      </div>
+                      <div style={{ padding: "7px 9px 9px" }}>
+                        <div style={{ fontSize: 11, fontWeight: 700, color: "#111110", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{aw.title}</div>
+                        {aw.price && <div style={{ fontSize: 10, color: "#9B8F7A", fontWeight: 600 }}>${aw.price.toLocaleString()}</div>}
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
+            ) : (
+              <div style={{ padding: "32px 20px", textAlign: "center" }}>
+                <div style={{ fontSize: 32, marginBottom: 8 }}>🖼️</div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "#9B8F7A", marginBottom: 12 }}>No artworks yet</div>
+                <Link href="/dashboard/artworks/new" style={{ textDecoration: "none" }}>
+                  <button style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 16px", background: "#FFD400", border: "2px solid #111110", borderRadius: 10, fontSize: 12, fontWeight: 800, cursor: "pointer", fontFamily: "inherit", color: "#111110", boxShadow: "2px 2px 0 #111110" }}>
+                    <Plus size={13} strokeWidth={3} /> Add your first artwork
+                  </button>
+                </Link>
+              </div>
+            )}
+          </div>
+
+          {/* Quick Nav */}
+          <div className="ripe-in" style={{ animationDelay: "0.2s" }}>
+            <div style={{ fontSize: 11, fontWeight: 800, color: "#9B8F7A", textTransform: "uppercase", letterSpacing: "0.15em", marginBottom: 12, paddingLeft: 4 }}>Quick Access</div>
+            <div className="dash-quick-nav" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
+              {QUICK_NAV.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <Link key={item.href} href={item.href} style={{ textDecoration: "none" }}>
+                    <div className="qnav-card">
+                      <div className="qnav-icon" style={{ background: item.color }}>
+                        <Icon size={18} color="#111110" />
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 14, fontWeight: 800, color: "#111110", letterSpacing: "-0.2px" }}>{item.label}</div>
+                        <div style={{ fontSize: 11, fontWeight: 600, color: "#9B8F7A" }}>{item.desc}</div>
+                      </div>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Recent Sales */}
+          {recentSales.length > 0 && (
+            <div className="ripe-card-static ripe-in" style={{ animationDelay: "0.25s" }}>
+              <div className="sec-header">
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <div style={{ width: 8, height: 8, borderRadius: 3, background: "#16A34A", border: "1.5px solid #111110" }} />
+                  <span style={{ fontSize: 14, fontWeight: 900, color: "#111110" }}>Recent Sales</span>
+                </div>
+                <Link href="/dashboard/sales" style={{ textDecoration: "none", display: "flex", alignItems: "center", gap: 4, fontSize: 12, fontWeight: 700, color: "#9B8F7A" }}>
+                  All sales <ArrowRight size={12} />
+                </Link>
+              </div>
+              <div style={{ padding: "8px 18px" }}>
+                {recentSales.map((sale: any) => (
+                  <div key={sale.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 0", borderBottom: "1px solid #F5F0E8" }}>
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: "#111110" }}>{sale.artwork_title || "Artwork"}</div>
+                      <div style={{ fontSize: 11, color: "#9B8F7A", fontWeight: 600 }}>
+                        {sale.sale_date ? new Date(sale.sale_date).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "—"}
+                      </div>
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <span style={{ fontSize: 15, fontWeight: 900, color: "#111110", fontFamily: "monospace" }}>${sale.sale_price?.toLocaleString()}</span>
+                      <span style={{ padding: "2px 8px", borderRadius: 8, background: sale.status?.toLowerCase() === "completed" ? "#DCFCE7" : "#FEF9C3", color: sale.status?.toLowerCase() === "completed" ? "#16A34A" : "#CA8A04", fontSize: 10, fontWeight: 800, textTransform: "uppercase" }}>{sale.status}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* RIGHT */}
+        <div className="dash-sidebar" style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+          {/* Notifications */}
+          <div className="ripe-card-static ripe-in" style={{ animationDelay: "0.12s" }}>
+            <div className="sec-header" style={{ background: unreadCount > 0 ? "#FFFBEA" : "#FAF7F3" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <div style={{ position: "relative" }}>
+                  <Bell size={16} color="#111110" />
+                  {unreadCount > 0 && (
+                    <div style={{ position: "absolute", top: -5, right: -6, width: 16, height: 16, borderRadius: "50%", background: "#FF6B6B", border: "2px solid #fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 8, fontWeight: 900, color: "#fff" }}>
+                      {unreadCount}
+                    </div>
+                  )}
+                </div>
+                <span style={{ fontSize: 14, fontWeight: 900, color: "#111110" }}>Notifications</span>
+              </div>
+              <div style={{ display: "flex", gap: 6 }}>
+                {unreadCount > 0 && (
+                  <button onClick={markAllRead} style={{ fontSize: 11, fontWeight: 700, color: "#9B8F7A", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit" }}>Mark all read</button>
+                )}
+                {notifications.length > 0 && (
+                  <button onClick={clearAll} style={{ fontSize: 11, fontWeight: 700, color: "#C0B8A8", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit" }}>Clear</button>
+                )}
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: 6, padding: "12px 18px", borderBottom: "1px solid #F5F0E8" }}>
+              <button className={`notif-tab${notifTab === "all" ? " active" : ""}`} onClick={() => setNotifTab("all")}>All</button>
+              <button className={`notif-tab${notifTab === "unread" ? " active" : ""}`} onClick={() => setNotifTab("unread")}>
+                Unread {unreadCount > 0 && `(${unreadCount})`}
+              </button>
+            </div>
+            <div style={{ maxHeight: 340, overflowY: "auto" }}>
+              {filteredNotifs.length === 0 ? (
+                <div style={{ padding: "32px 20px", textAlign: "center" }}>
+                  <div style={{ fontSize: 28, marginBottom: 8 }}>🔔</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "#9B8F7A" }}>{notifTab === "unread" ? "All caught up!" : "No notifications yet"}</div>
+                </div>
+              ) : (
+                filteredNotifs.map((notif: any) => {
+                  const cfg = NOTIF_CFG[notif.type] || NOTIF_CFG.system;
+                  const Icon = cfg.icon;
+                  return (
+                    <div key={notif.id} className="notif-item" onClick={() => markRead(notif.id)}
+                      style={{ background: notif.read ? "transparent" : "#FFFEF5" }}>
+                      <div className="notif-dot" style={{ background: cfg.bg }}>
+                        <Icon size={16} color={cfg.color} />
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
+                          <span style={{ fontSize: 13, fontWeight: notif.read ? 600 : 800, color: "#111110" }}>{notif.title}</span>
+                          {!notif.read && <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#FF6B6B", flexShrink: 0 }} />}
+                        </div>
+                        {notif.body && <div style={{ fontSize: 12, color: "#9B8F7A", fontWeight: 500, lineHeight: 1.4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{notif.body}</div>}
+                        <div style={{ fontSize: 10, color: "#C0B8A8", fontWeight: 600, marginTop: 4 }}>{timeAgo(notif.created_at)}</div>
+                      </div>
+                      <button className="notif-del" onClick={(e) => { e.stopPropagation(); deleteNotification(notif.id); }}>
+                        <X size={12} />
+                      </button>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+
+          {/* Events */}
+          <div className="ripe-card-static ripe-in" style={{ animationDelay: "0.18s" }}>
+            <div className="sec-header">
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <div style={{ width: 8, height: 8, borderRadius: 3, background: "#4ECDC4", border: "1.5px solid #111110" }} />
+                <span style={{ fontSize: 14, fontWeight: 900, color: "#111110" }}>Upcoming Events</span>
+              </div>
+              <Link href="/dashboard/exhibitions" style={{ textDecoration: "none", display: "flex", alignItems: "center", gap: 4, fontSize: 12, fontWeight: 700, color: "#9B8F7A" }}>
+                All <ArrowRight size={12} />
+              </Link>
+            </div>
+            <div style={{ padding: "4px 18px 12px" }}>
+              {events.length === 0 ? (
+                <div style={{ padding: "20px 0", textAlign: "center" }}>
+                  <div style={{ fontSize: 24, marginBottom: 6 }}>📅</div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: "#9B8F7A" }}>No upcoming events</div>
+                </div>
+              ) : (
+                events.map((ev: any) => {
+                  const sc = ev.status === "Active" ? "#16A34A" : ev.status === "Planning" ? "#CA8A04" : "#9B8F7A";
+                  return (
+                    <div key={ev.id} className="event-row">
+                      <div style={{ width: 40, height: 40, borderRadius: 12, background: "#F5F0E8", border: "1.5px solid #E0D8CA", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                        <CalendarDays size={16} color="#9B8F7A" />
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: "#111110", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ev.title}</div>
+                        <div style={{ fontSize: 11, color: "#9B8F7A", fontWeight: 600 }}>
+                          {ev.venue ? `${ev.venue} · ` : ""}
+                          {ev.start_date ? new Date(ev.start_date).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "No date"}
+                        </div>
+                      </div>
+                      <div style={{ padding: "2px 8px", borderRadius: 8, background: sc + "18", color: sc, fontSize: 9, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.06em", flexShrink: 0 }}>{ev.status}</div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+
+          {/* Tasks */}
+          <div className="ripe-card-static ripe-in" style={{ animationDelay: "0.22s" }}>
+            <div className="sec-header">
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <div style={{ width: 8, height: 8, borderRadius: 3, background: "#8B5CF6", border: "1.5px solid #111110" }} />
+                <span style={{ fontSize: 14, fontWeight: 900, color: "#111110" }}>Active Tasks</span>
+              </div>
+              <Link href="/dashboard/tasks" style={{ textDecoration: "none", display: "flex", alignItems: "center", gap: 4, fontSize: 12, fontWeight: 700, color: "#9B8F7A" }}>
+                All <ArrowRight size={12} />
+              </Link>
+            </div>
+            <div style={{ padding: "4px 18px 12px" }}>
+              {tasks.length === 0 ? (
+                <div style={{ padding: "20px 0", textAlign: "center" }}>
+                  <div style={{ fontSize: 24, marginBottom: 6 }}>✅</div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: "#9B8F7A" }}>No active tasks</div>
+                </div>
+              ) : (
+                tasks.map((task: any) => {
+                  const pc = PRIORITY_COLOR[task.priority] || "#9B8F7A";
+                  return (
+                    <div key={task.id} className="task-row">
+                      <div style={{ width: 4, height: 36, borderRadius: 2, background: pc, flexShrink: 0 }} />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: "#111110", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{task.title}</div>
+                        {task.due_date && <div style={{ fontSize: 10, color: "#9B8F7A", fontWeight: 600, marginTop: 2 }}>Due {fmtDate(task.due_date)}</div>}
+                      </div>
+                      <div style={{ fontSize: 10, fontWeight: 800, color: pc, background: pc + "20", padding: "2px 8px", borderRadius: 6, flexShrink: 0, textTransform: "uppercase" }}>{task.priority}</div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 /* ══════════════════════════════════════════════════════════════════
    MAIN
    ══════════════════════════════════════════════════════════════════ */
-export default function AtelierPage() {
-  const [profile, setProfile] = useState<{ full_name?: string; username?: string; avatar_url?: string } | null>(null);
-  const [artworks, setArtworks] = useState<Artwork[]>([]);
-  const [stats, setStats] = useState<Stats>({
-    artworks:0, available:0, sold:0, in_progress:0,
-    exhibitions:0, sales_total:0, sales_month:0,
-    tasks_pending:0, followers:0,
-  });
-  const [events, setEvents] = useState<UpcomingEvent[]>([]);
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [notifs, setNotifs] = useState<Notif[]>([]);
-  const [recentSales, setRecentSales] = useState<Sale[]>([]);
+export default function DashboardPage() {
+  const router = useRouter();
 
-  /* Helper badge state */
-  const [helperOpen, setHelperOpen] = useState(false);
-  const [pickedIntent, setPickedIntent] = useState<Intent | null>(null);
-  const [bannerDismissed, setBannerDismissed] = useState(false);
-  const helperRef = useRef<HTMLDivElement>(null);
+  /* Data */
+  const [profile, setProfile] = useState<any>(null);
+  const [artworks, setArtworks] = useState<any[]>([]);
+  const [stats, setStats] = useState({ artworks: 0, available: 0, sold: 0, exhibitions: 0, collabs: 0, sales_total: 0, tasks_pending: 0, followers: 0 });
+  const [tasks, setTasks] = useState<any[]>([]);
+  const [events, setEvents] = useState<any[]>([]);
+  const [recentSales, setRecentSales] = useState<any[]>([]);
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [loaded, setLoaded] = useState(false);
+  const [notifTab, setNotifTab] = useState<"all" | "unread">("all");
 
-  /* Greeting */
-  const [greeting, setGreeting] = useState("Good morning");
-  useEffect(() => {
-    const h = new Date().getHours();
-    if (h >= 5 && h < 12) setGreeting("Good morning");
-    else if (h >= 12 && h < 17) setGreeting("Good afternoon");
-    else setGreeting("Good evening");
-  }, []);
+  /* Focus Mode */
+  const [focusDefault, setFocusDefault] = useState(true); // per-user preference
+  const [preferenceLoaded, setPreferenceLoaded] = useState(false);
+  const [hoverWell, setHoverWell] = useState<WellKey | null>(null);
+  const [pickedWell, setPickedWell] = useState<WellKey | null>(null);
+  const [expandedClassic, setExpandedClassic] = useState(false);
 
-  /* Click outside to close helper */
-  useEffect(() => {
-    function onDown(e: MouseEvent) {
-      if (helperRef.current && !helperRef.current.contains(e.target as Node)) {
-        setHelperOpen(false);
-      }
-    }
-    if (helperOpen) document.addEventListener("mousedown", onDown);
-    return () => document.removeEventListener("mousedown", onDown);
-  }, [helperOpen]);
+  const today = new Date();
+  const hour = today.getHours();
+  const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
+  const greetEmoji = hour < 12 ? "☀️" : hour < 18 ? "🌤️" : "🌙";
 
-  /* Escape closes helper */
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") setHelperOpen(false);
-    }
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, []);
-
-  /* ── Load everything ─────────────────────────────────────── */
+  /* Load everything */
   useEffect(() => {
     const supabase = createClient();
-    supabase.auth.getUser().then(async ({ data: { user } }: { data: { user: any } }) => {
+    supabase.auth.getUser().then(async ({ data: { user } }: any) => {
       if (!user) return;
-
-      const now = new Date();
-      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
 
       const [
         { data: prof },
-        { data: awAll },
+        { data: aw },
         { data: tk },
-        { data: notifData },
-        { data: salesData },
         { data: eventsData },
+        { data: salesData },
+        { count: ex },
+        { count: co },
         { count: followerCount },
+        { data: notifs },
       ] = await Promise.all([
-        supabase.from("profiles").select("full_name,username,avatar_url").eq("id", user.id).single(),
-        supabase.from("artworks").select("id,title,status,images,price,medium,year,width_cm,height_cm,created_at,updated_at").eq("user_id", user.id).order("updated_at", { ascending: false }),
-        supabase.from("tasks").select("id,title,status,priority,due_date,progress").eq("user_id", user.id).in("status", ["pending","in_progress"]).order("created_at", { ascending: false }).limit(6),
-        supabase.from("notifications").select("*").eq("user_id", user.id).order("created_at", { ascending: false }).limit(8),
-        supabase.from("sales").select("id,sale_price,sale_date,status,artwork_id,created_at").eq("user_id", user.id).order("created_at", { ascending: false }).limit(10),
-        supabase.from("exhibitions").select("id,title,start_date,venue,status").eq("user_id", user.id).in("status", ["planning","upcoming","current","Planning","Upcoming","Current"]).order("start_date", { ascending: true }).limit(3),
-        supabase.from("follows").select("*", { count: "exact", head: true }).eq("following_id", user.id),
+        // Request focus_mode_default too — will be undefined if column doesn't exist yet
+        supabase.from("profiles").select("full_name,role,username,avatar_url,focus_mode_default").eq("id", user.id).single(),
+        supabase.from("artworks").select("id,title,images,status,price").eq("user_id", user.id).order("created_at", { ascending: false }).limit(8),
+        supabase.from("tasks").select("*").eq("user_id", user.id).neq("status", "done").order("due_date", { ascending: true }).limit(5),
+        supabase.from("exhibitions").select("*").eq("user_id", user.id).gte("end_date", new Date().toISOString().split("T")[0]).order("start_date").limit(3),
+        supabase.from("sales").select("*").eq("user_id", user.id).order("created_at", { ascending: false }).limit(3),
+        supabase.from("exhibitions").select("id", { count: "exact", head: true }).eq("user_id", user.id),
+        supabase.from("collaborations").select("id", { count: "exact", head: true }).eq("user_id", user.id),
+        supabase.from("follows").select("id", { count: "exact", head: true }).eq("following_id", user.id),
+        supabase.from("notifications").select("*").eq("user_id", user.id).order("created_at", { ascending: false }).limit(20),
       ]);
 
       setProfile(prof);
-      setArtworks(awAll || []);
-      setTasks((tk || []).map((t: any) => ({ ...t, progress: t.progress || 0 })));
-      setNotifs(notifData || []);
+
+      // Focus Mode default: column may not exist yet → treat undefined as true
+      // TODO: add `focus_mode_default BOOLEAN DEFAULT true` column to `profiles` table,
+      //       and expose a toggle in /dashboard/profile.
+      const pref = prof?.focus_mode_default;
+      setFocusDefault(pref === false ? false : true);
+      setPreferenceLoaded(true);
+
+      setArtworks(aw || []);
+      setTasks(tk || []);
       setEvents(eventsData || []);
+      setNotifications(notifs || []);
 
-      let enrichedSales: Sale[] = salesData || [];
       if (salesData?.length) {
-        const ids = salesData.map((s: any) => s.artwork_id).filter(Boolean);
-        if (ids.length) {
-          const { data: sa } = await supabase.from("artworks").select("id,title").in("id", ids);
-          const map: Record<string, string> = {};
-          sa?.forEach((a: any) => { map[a.id] = a.title; });
-          enrichedSales = salesData.map((s: any) => ({ ...s, artwork_title: map[s.artwork_id] }));
-        }
+        const artIds = salesData.map((s: any) => s.artwork_id).filter(Boolean);
+        const { data: saleArtworks } = await supabase.from("artworks").select("id,title").in("id", artIds);
+        const am: Record<string, string> = {};
+        saleArtworks?.forEach((a: any) => { am[a.id] = a.title; });
+        setRecentSales(salesData.map((s: any) => ({ ...s, artwork_title: am[s.artwork_id] })));
       }
-      setRecentSales(enrichedSales);
 
-      const list = awAll || [];
-      const completedSales = enrichedSales.filter(s => s.status?.toLowerCase() === "completed");
-      const totalRev = completedSales.reduce((a, s) => a + (s.sale_price || 0), 0);
-      const monthSales = completedSales.filter(s => s.sale_date && new Date(s.sale_date) >= new Date(monthStart));
-      const monthRev = monthSales.reduce((a, s) => a + (s.sale_price || 0), 0);
+      const awList = aw || [];
+      const completedSales = (salesData || []).filter((s: any) => s.status?.toLowerCase() === "completed");
+      const totalRev = completedSales.reduce((sum: number, s: any) => sum + (s.sale_price || 0), 0);
 
       setStats({
-        artworks: list.length,
-        available: list.filter((a: any) => String(a.status).toLowerCase() === "available").length,
-        sold: list.filter((a: any) => String(a.status).toLowerCase() === "sold").length,
-        in_progress: list.filter((a: any) => String(a.status).toLowerCase().replace(/ /g,"_") === "in_progress").length,
-        exhibitions: eventsData?.length || 0,
+        artworks: awList.length,
+        available: awList.filter((a: any) => String(a.status).toLowerCase() === "available").length,
+        sold: awList.filter((a: any) => String(a.status).toLowerCase() === "sold").length,
+        exhibitions: (ex as any) || 0,
+        collabs: (co as any) || 0,
         sales_total: totalRev,
-        sales_month: monthRev,
         tasks_pending: (tk || []).length,
         followers: followerCount || 0,
       });
+
+      setLoaded(true);
     });
   }, []);
 
-  /* ── Easel piece ─────────────────────────────────────── */
-  const easelPiece = (() => {
-    if (!artworks.length) return null;
-    const ip = artworks.filter(a => String(a.status).toLowerCase().replace(/ /g,"_") === "in_progress");
-    if (ip.length) return ip[0];
-    return artworks[0];
-  })();
+  /* Session-scoped classic expansion memory */
+  useEffect(() => {
+    try {
+      const stored = sessionStorage.getItem("atelier_expanded_classic");
+      if (stored === "1") setExpandedClassic(true);
+    } catch {}
+  }, []);
+  useEffect(() => {
+    try { sessionStorage.setItem("atelier_expanded_classic", expandedClassic ? "1" : "0"); } catch {}
+  }, [expandedClassic]);
 
-  const fname = profile?.full_name?.split(" ")[0] || "there";
-  const initials = profile?.full_name
-    ? profile.full_name.split(" ").map(w => w[0]).join("").slice(0,2).toUpperCase()
-    : "A";
-
+  async function markRead(id: string) {
+    const supabase = createClient();
+    await supabase.from("notifications").update({ read: true }).eq("id", id);
+    setNotifications(p => p.map(n => n.id === id ? { ...n, read: true } : n));
+  }
   async function markAllRead() {
     const supabase = createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
     await supabase.from("notifications").update({ read: true }).eq("user_id", user.id).eq("read", false);
-    setNotifs(p => p.map(n => ({ ...n, read: true })));
+    setNotifications(p => p.map(n => ({ ...n, read: true })));
+  }
+  async function deleteNotification(id: string) {
+    const supabase = createClient();
+    await supabase.from("notifications").delete().eq("id", id);
+    setNotifications(p => p.filter(n => n.id !== id));
+  }
+  async function clearAll() {
+    if (!confirm("Clear all notifications?")) return;
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    await supabase.from("notifications").delete().eq("user_id", user.id);
+    setNotifications([]);
   }
 
-  function handlePick(intent: Intent) {
-    setPickedIntent(intent);
-    setBannerDismissed(false);
+  const fname = profile?.full_name?.split(" ")[0] || "Artist";
+  const unreadCount = notifications.filter(n => !n.read).length;
+  const filteredNotifs = notifTab === "unread" ? notifications.filter(n => !n.read) : notifications;
+  const initials = profile?.full_name
+    ? profile.full_name.split(" ").map((w: string) => w[0]).join("").slice(0, 2).toUpperCase()
+    : "A";
+
+  /* ── Classic-only path (user's preference) ─────────────────── */
+  if (preferenceLoaded && !focusDefault) {
+    return (
+      <>
+        <ClassicStyles />
+        <ClassicDashboard
+          profile={profile} artworks={artworks} stats={stats} tasks={tasks}
+          events={events} recentSales={recentSales} notifications={notifications}
+          loaded={loaded} notifTab={notifTab} setNotifTab={setNotifTab}
+          markRead={markRead} markAllRead={markAllRead}
+          deleteNotification={deleteNotification} clearAll={clearAll}
+          fname={fname} unreadCount={unreadCount} filteredNotifs={filteredNotifs}
+          initials={initials} today={today} greeting={greeting} greetEmoji={greetEmoji}
+        />
+      </>
+    );
   }
 
-  const pickedCard = pickedIntent ? INTENT_CARDS.find(c => c.key === pickedIntent) : null;
+  /* Well handling */
+  function pickWell(k: WellKey) {
+    const well = WELLS.find(w => w.key === k);
+    if (!well) return;
+    // Direct navigation (Messages)
+    if (well.href) {
+      router.push(well.href);
+      return;
+    }
+    setPickedWell(k);
+  }
+  const picked = pickedWell ? WELLS.find(w => w.key === pickedWell) : null;
 
   /* ══════════════════════════════════════════════════════════════════
-     RENDER
+     FOCUS MODE RENDER
      ══════════════════════════════════════════════════════════════════ */
   return (
     <>
-      <style>{`
-        /* ══ SECTION CARDS ══ */
-        .atl-section {
-          background: #fff;
-          border: 2.5px solid #111110;
-          border-radius: 18px;
-          box-shadow: 4px 5px 0 #D4C9A8;
-          padding: 18px 20px 20px;
-          position: relative;
-          transition: box-shadow 0.35s cubic-bezier(0.16,1,0.3,1), transform 0.35s cubic-bezier(0.16,1,0.3,1);
-        }
-        .atl-section:hover {
-          box-shadow: 6px 7px 0 #111110;
-          transform: translate(-1px, -2px) rotate(0deg) !important;
-        }
+      <FocusStyles />
+      <ClassicStyles />
 
-        .atl-tape {
-          position: absolute;
-          width: 56px; height: 18px;
-          background: rgba(255, 212, 0, 0.55);
-          border: 1px solid rgba(17,17,16,0.1);
-          z-index: 2;
-          pointer-events: none;
-          top: -8px;
-          left: 26px;
-          transform: rotate(-6deg);
-          box-shadow: 0 1px 3px rgba(0,0,0,0.08);
-        }
-
-        .atl-section-head {
-          display: flex;
-          align-items: flex-start;
-          justify-content: space-between;
-          gap: 12px;
-          margin-bottom: 14px;
-        }
-        .atl-icon-badge {
-          width: 32px; height: 32px; border-radius: 10px;
-          border: 2px solid #111110;
-          display: flex; align-items: center; justify-content: center;
-          box-shadow: 2px 2px 0 #111110;
-          flex-shrink: 0;
-        }
-        .atl-section-title {
-          font-size: 17px; font-weight: 900; color: #111110;
-          letter-spacing: -0.4px; line-height: 1.1;
-        }
-        .atl-section-why {
-          font-size: 11.5px; font-weight: 600; color: #9B8F7A;
-          font-style: italic; margin-top: 2px; line-height: 1.3;
-        }
-        .atl-section-cta {
-          display: inline-flex; align-items: center; gap: 4px;
-          font-size: 11px; font-weight: 800; color: #9B8F7A;
-          text-decoration: none; text-transform: uppercase;
-          letter-spacing: 0.1em; padding: 4px 8px; border-radius: 6px;
-          transition: color 0.15s, background 0.15s;
-          flex-shrink: 0;
-        }
-        .atl-section-cta:hover { color: #111110; background: #FFFBEA; }
-
-        /* ══ HELPER BADGE ══ */
-        .atl-helper-wrap { position: relative; }
-
-        .atl-helper-btn {
-          display: inline-flex;
-          align-items: center;
-          gap: 10px;
-          padding: 10px 14px 10px 10px;
-          background: #FFFBEA;
-          border: 2.5px solid #111110;
-          border-radius: 9999px;
-          cursor: pointer;
-          font-family: inherit;
-          box-shadow: 3px 3px 0 #111110;
-          transition: transform 0.15s, box-shadow 0.15s, background 0.15s;
-          position: relative;
-          color: #111110;
-        }
-        .atl-helper-btn:hover {
-          transform: translate(-1px, -1px);
-          box-shadow: 4px 4px 0 #111110;
-          background: #fff;
-        }
-        .atl-helper-btn.open {
-          background: #111110;
-          color: #FFD400;
-          transform: translate(-1px, -1px);
-          box-shadow: 4px 4px 0 #FFD400;
-        }
-
-        .atl-helper-face {
-          width: 32px; height: 32px; border-radius: 50%;
-          background: #FFD400;
-          border: 2px solid #111110;
-          display: flex; align-items: center; justify-content: center;
-          flex-shrink: 0;
-          position: relative;
-        }
-        .atl-helper-face::after {
-          content: "";
-          position: absolute;
-          top: -3px; right: -3px;
-          width: 9px; height: 9px;
-          border-radius: 50%;
-          background: #FF6B6B;
-          border: 1.5px solid #111110;
-        }
-        .atl-helper-btn.open .atl-helper-face::after { display: none; }
-
-        .atl-helper-text {
-          display: flex; flex-direction: column; line-height: 1;
-          text-align: left; padding-right: 4px;
-        }
-        .atl-helper-text small {
-          font-size: 9px;
-          font-weight: 800;
-          color: #9B8F7A;
-          text-transform: uppercase;
-          letter-spacing: 0.16em;
-          margin-bottom: 3px;
-        }
-        .atl-helper-btn.open .atl-helper-text small {
-          color: rgba(255, 212, 0, 0.7);
-        }
-        .atl-helper-text strong {
-          font-size: 13px;
-          font-weight: 900;
-          color: inherit;
-          letter-spacing: -0.2px;
-        }
-
-        @keyframes atl-helper-wiggle {
-          0%, 90%, 100% { transform: rotate(0deg); }
-          93% { transform: rotate(-8deg); }
-          96% { transform: rotate(8deg); }
-        }
-        .atl-helper-btn .atl-helper-face {
-          animation: atl-helper-wiggle 3.5s ease-in-out 1.2s 2;
-          transform-origin: center;
-        }
-
-        /* ── HELPER PANEL ── */
-        .atl-helper-panel {
-          position: absolute;
-          top: calc(100% + 12px);
-          right: 0;
-          width: 540px;
-          max-width: calc(100vw - 32px);
-          background: #fff;
-          border: 2.5px solid #111110;
-          border-radius: 20px;
-          box-shadow: 6px 7px 0 #111110;
-          z-index: 80;
-          padding: 20px 22px 22px;
-          animation: atl-panel-in 0.25s cubic-bezier(0.16,1,0.3,1) both;
-        }
-        @keyframes atl-panel-in {
-          from { opacity: 0; transform: translateY(-8px) scale(0.97); }
-          to   { opacity: 1; transform: none; }
-        }
-
-        /* Speech-bubble tail */
-        .atl-helper-panel::before,
-        .atl-helper-panel::after {
-          content: "";
-          position: absolute;
-          top: -12px;
-          right: 32px;
-          width: 0; height: 0;
-          border-left: 10px solid transparent;
-          border-right: 10px solid transparent;
-          border-bottom: 11px solid #111110;
-        }
-        .atl-helper-panel::after {
-          top: -9px;
-          border-bottom-color: #fff;
-        }
-
-        .atl-helper-heading {
-          display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
-          margin-bottom: 16px;
-        }
-        .atl-helper-q {
-          font-size: 18px; font-weight: 900; color: #111110;
-          letter-spacing: -0.5px; line-height: 1.2;
-          margin: 0;
-        }
-        .atl-helper-sub {
-          font-size: 12px; font-weight: 600; color: #9B8F7A;
-          font-style: italic; margin-top: 4px;
-        }
-        .atl-helper-close {
-          background: none; border: none; cursor: pointer;
-          width: 28px; height: 28px; border-radius: 8px;
-          display: flex; align-items: center; justify-content: center;
-          color: #9B8F7A;
-          transition: background 0.15s, color 0.15s;
-          flex-shrink: 0;
-        }
-        .atl-helper-close:hover { background: #FAF7F3; color: #111110; }
-
-        /* Intent grid */
-        .atl-intent-grid {
-          display: grid;
-          grid-template-columns: repeat(5, 1fr);
-          gap: 8px;
-        }
-        .atl-intent-card {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          gap: 8px;
-          padding: 14px 8px 12px;
-          background: #FAF7F3;
-          border: 2px solid #E8E0D0;
-          border-radius: 14px;
-          cursor: pointer;
-          font-family: inherit;
-          text-align: center;
-          transition: all 0.18s cubic-bezier(0.16,1,0.3,1);
-          position: relative;
-        }
-        .atl-intent-card:hover {
-          border-color: #111110;
-          background: #fff;
-          transform: translateY(-2px);
-          box-shadow: 2px 3px 0 #111110;
-        }
-        .atl-intent-card.picked {
-          border-color: #111110;
-          background: #fff;
-          box-shadow: 2px 3px 0 #111110;
-        }
-        .atl-intent-card.dimmed { opacity: 0.42; }
-        .atl-intent-card.dimmed:hover { opacity: 1; }
-
-        .atl-intent-icon {
-          width: 44px; height: 44px; border-radius: 12px;
-          border: 2px solid #111110;
-          display: flex; align-items: center; justify-content: center;
-          box-shadow: 2px 2px 0 #111110;
-          transition: transform 0.18s;
-        }
-        .atl-intent-card:hover .atl-intent-icon { transform: scale(1.06) rotate(-3deg); }
-        .atl-intent-card.picked .atl-intent-icon { transform: scale(1.06); }
-
-        .atl-intent-label {
-          font-size: 13px; font-weight: 900; color: #111110;
-          letter-spacing: -0.2px; line-height: 1;
-        }
-        .atl-intent-blurb {
-          font-size: 10px; font-weight: 600; color: #9B8F7A;
-          line-height: 1.25;
-        }
-
-        /* Pick result inside panel */
-        .atl-pick-result {
-          margin-top: 14px;
-          padding: 12px 14px;
-          background: #FFFBEA;
-          border: 2px dashed #111110;
-          border-radius: 12px;
-          display: flex;
-          align-items: center;
-          gap: 12px;
-          animation: atl-panel-in 0.3s cubic-bezier(0.16,1,0.3,1) both;
-        }
-        .atl-pick-msg {
-          flex: 1;
-          font-size: 12px;
-          font-weight: 700;
-          color: #111110;
-          line-height: 1.35;
-        }
-        .atl-pick-go {
-          display: inline-flex;
-          align-items: center;
-          gap: 5px;
-          padding: 8px 14px;
-          background: #111110;
-          color: #FFD400;
-          border-radius: 9px;
-          font-size: 12px;
-          font-weight: 800;
-          text-decoration: none;
-          box-shadow: 2px 2px 0 #FFD400;
-          transition: transform 0.15s, box-shadow 0.15s;
-          border: none;
-          cursor: pointer;
-          font-family: inherit;
-          flex-shrink: 0;
-        }
-        .atl-pick-go:hover {
-          transform: translate(-1px, -1px);
-          box-shadow: 3px 3px 0 #FFD400;
-        }
-
-        /* ══ DIRECTIONAL BANNER ══ */
-        .atl-banner {
-          display: flex;
-          align-items: center;
-          gap: 14px;
-          padding: 14px 18px;
-          background: #FFD400;
-          border: 2.5px solid #111110;
-          border-radius: 14px;
-          box-shadow: 3px 4px 0 #111110;
-          margin-bottom: 20px;
-          animation: atl-panel-in 0.35s cubic-bezier(0.16,1,0.3,1) both;
-        }
-        .atl-banner-icon {
-          width: 40px; height: 40px; border-radius: 11px;
-          background: #111110;
-          display: flex; align-items: center; justify-content: center;
-          flex-shrink: 0;
-        }
-        .atl-banner-text { flex: 1; min-width: 0; }
-        .atl-banner-label {
-          font-size: 10px;
-          font-weight: 800;
-          color: #111110;
-          text-transform: uppercase;
-          letter-spacing: 0.14em;
-          opacity: 0.65;
-          margin-bottom: 2px;
-        }
-        .atl-banner-msg {
-          font-size: 15px;
-          font-weight: 800;
-          color: #111110;
-          letter-spacing: -0.3px;
-          line-height: 1.3;
-        }
-        .atl-banner-cta {
-          display: inline-flex;
-          align-items: center;
-          gap: 6px;
-          padding: 10px 16px;
-          background: #111110;
-          color: #FFD400;
-          border-radius: 10px;
-          font-size: 13px;
-          font-weight: 800;
-          text-decoration: none;
-          box-shadow: 2px 2px 0 rgba(17,17,16,0.3);
-          transition: transform 0.15s, box-shadow 0.15s;
-          flex-shrink: 0;
-        }
-        .atl-banner-cta:hover {
-          transform: translate(-1px, -1px);
-          box-shadow: 3px 3px 0 rgba(17,17,16,0.4);
-        }
-        .atl-banner-close {
-          background: none; border: none; cursor: pointer;
-          width: 32px; height: 32px; border-radius: 9px;
-          display: flex; align-items: center; justify-content: center;
-          color: #111110;
-          transition: background 0.15s;
-          flex-shrink: 0;
-        }
-        .atl-banner-close:hover { background: rgba(17,17,16,0.1); }
-
-        /* ══ OTHER SECTIONS ══ */
-        .atl-easel-card {
-          display: grid;
-          grid-template-columns: 180px 1fr;
-          gap: 16px;
-          align-items: stretch;
-          padding: 4px;
-          border-radius: 14px;
-          transition: background 0.15s;
-        }
-        .atl-easel-card:hover { background: #FFFBEA; }
-        .atl-easel-img {
-          aspect-ratio: 1/1;
-          border: 2px solid #111110;
-          border-radius: 12px;
-          overflow: hidden;
-          background: #F5F0E8;
-          box-shadow: 3px 3px 0 #D4C9A8;
-        }
-        .atl-easel-meta {
-          display: flex; flex-direction: column; justify-content: space-between;
-          padding: 6px 0;
-        }
-        .atl-easel-action {
-          display: inline-flex; align-items: center; gap: 6px;
-          padding: 9px 16px; background: #111110; color: #FFD400;
-          border-radius: 10px; font-size: 12px; font-weight: 800;
-          letter-spacing: -0.1px; align-self: flex-start;
-          box-shadow: 2px 2px 0 #FFD400;
-          transition: transform 0.15s, box-shadow 0.15s;
-        }
-        .atl-easel-card:hover .atl-easel-action {
-          transform: translate(-1px, -1px);
-          box-shadow: 3px 3px 0 #FFD400;
-        }
-
-        .atl-wall-grid {
-          display: grid;
-          grid-template-columns: repeat(3, 1fr);
-          gap: 12px 10px;
-        }
-        .atl-wall-tile {
-          text-decoration: none; display: block;
-          transition: transform 0.2s cubic-bezier(0.16,1,0.3,1);
-        }
-        .atl-wall-tile:hover { transform: translateY(-3px) rotate(0deg) !important; }
-        .atl-wall-img {
-          position: relative;
-          aspect-ratio: 1/1;
-          background: #F5F0E8;
-          border: 2px solid #111110;
-          border-radius: 10px;
-          overflow: hidden;
-          box-shadow: 2px 2px 0 #D4C9A8;
-          transition: box-shadow 0.2s;
-        }
-        .atl-wall-tile:hover .atl-wall-img { box-shadow: 3px 3px 0 #111110; }
-        .atl-wall-dot {
-          position: absolute; top: 6px; right: 6px;
-          width: 8px; height: 8px; border-radius: 50%;
-          border: 1.5px solid #111110;
-        }
-        .atl-wall-label {
-          font-size: 11px; font-weight: 700; color: #5C5346;
-          margin-top: 6px; text-align: center;
-          overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-          padding: 0 2px;
-        }
-
-        .atl-add-row {
-          display: flex; align-items: center; gap: 8px; justify-content: center;
-          padding: 10px;
-          border: 2px dashed #D4C9A8;
-          border-radius: 10px;
-          color: #9B8F7A;
-          font-size: 12px; font-weight: 800;
-          background: #FAF7F3;
-          transition: all 0.15s;
-        }
-        .atl-add-row:hover {
-          border-color: #111110;
-          color: #111110;
-          background: #FFFBEA;
-        }
-
-        .atl-big-num {
-          font-size: 38px; font-weight: 900; color: #111110;
-          letter-spacing: -1.5px; line-height: 1;
-          margin-bottom: 2px;
-        }
-        .atl-ledger-row {
-          display: flex; align-items: center; gap: 10px;
-          padding: 10px;
-          background: #FAFAF8;
-          border: 1.5px solid #E8E0D0;
-          border-radius: 10px;
-        }
-
-        .atl-doorway-row {
-          display: flex; align-items: center; gap: 12px;
-          padding: 10px 0;
-          transition: background 0.15s;
-        }
-        .atl-doorway-row:hover { background: #FFFBEA; border-radius: 8px; }
-
-        .atl-notebook {
-          background:
-            linear-gradient(#fff, #fff),
-            repeating-linear-gradient(to bottom, transparent 0, transparent 27px, #F0E8D4 27px, #F0E8D4 28px);
-          background-blend-mode: multiply;
-        }
-        .atl-note-row {
-          display: flex; align-items: center; gap: 10px;
-          padding: 7px 0;
-          border-bottom: 1px dashed #E8E0D0;
-          transition: background 0.15s;
-        }
-        .atl-note-row:hover { background: #FFFBEA; }
-        .atl-note-row:last-child { border-bottom: none; }
-        .atl-checkbox {
-          width: 15px; height: 15px;
-          border: 2px solid #111110;
-          border-radius: 4px;
-          background: #fff;
-          flex-shrink: 0;
-        }
-
-        .atl-empty {
-          display: flex; align-items: center; gap: 12px;
-          padding: 18px;
-          border: 2px dashed #E8E0D0;
-          border-radius: 12px;
-          background: #FAF7F3;
-        }
-        .atl-empty-cta { cursor: pointer; transition: all 0.15s; }
-        .atl-empty-cta:hover { border-color: #111110; background: #FFFBEA; }
-
-        .atl-grid {
-          display: grid;
-          grid-template-columns: repeat(2, 1fr);
-          gap: 20px;
-        }
-
-        @keyframes atl-in {
-          from { opacity: 0; transform: translateY(16px); }
-          to { opacity: 1; }
-        }
-        .atl-in { animation: atl-in 0.5s cubic-bezier(0.16,1,0.3,1) both; }
-
-        @media (max-width: 900px) {
-          .atl-intent-grid { grid-template-columns: repeat(3, 1fr); }
-          .atl-helper-panel { width: 440px; }
-        }
-        @media (max-width: 768px) {
-          .atl-grid { grid-template-columns: 1fr; }
-          .atl-section[style*="grid-column"] { grid-column: span 1 !important; }
-          .atl-easel-card { grid-template-columns: 1fr; }
-          .atl-easel-img { aspect-ratio: 4/3; }
-          .atl-wall-grid { grid-template-columns: repeat(3, 1fr); }
-          .atl-helper-panel {
-            width: calc(100vw - 32px);
-            right: -8px;
-          }
-          .atl-helper-panel::before, .atl-helper-panel::after { right: 44px; }
-          .atl-helper-text { display: none; }
-          .atl-helper-btn { padding: 6px; }
-          .atl-intent-grid { grid-template-columns: repeat(2, 1fr); }
-          .atl-banner { flex-wrap: wrap; }
-        }
-      `}</style>
-
-      <div>
-        {/* ═══════════════════════════════════════════════════════
-            HEADER — Greeting + Helper badge
-            ═══════════════════════════════════════════════════════ */}
-        <div className="atl-in" style={{ marginBottom: 20, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-            <div style={{ width: 52, height: 52, borderRadius: 16, border: "2.5px solid #111110", background: "#FFD400", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, fontWeight: 900, color: "#111110", overflow: "hidden", boxShadow: "3px 3px 0 #111110", flexShrink: 0 }}>
-              {profile?.avatar_url
-                ? <img src={profile.avatar_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                : initials}
-            </div>
-            <div>
-              <h1 style={{ fontSize: 26, fontWeight: 900, color: "#111110", letterSpacing: "-0.8px", margin: 0, lineHeight: 1.05 }}>
-                {greeting}, {fname}.
-              </h1>
-              <p style={{ fontSize: 13, color: "#9B8F7A", margin: "3px 0 0", fontWeight: 600, fontStyle: "italic" }}>
-                Welcome back to your atelier.
-              </p>
-            </div>
+      <div className="focus-root">
+        {/* ═══ GREETING + QUESTION + EXPLAINER ═══ */}
+        <div className="focus-hero">
+          <div className="focus-greet">
+            {greeting}, <span className="focus-name">{fname}</span>.
           </div>
-
-          {/* ── HELPER BADGE ── */}
-          <div className="atl-helper-wrap" ref={helperRef}>
-            <button
-              className={`atl-helper-btn ${helperOpen ? "open" : ""}`}
-              onClick={() => setHelperOpen(o => !o)}
-              aria-label="Open the helper"
-              aria-expanded={helperOpen}
-            >
-              <div className="atl-helper-face">
-                <HandHeart size={16} color="#111110" strokeWidth={2.3} />
-              </div>
-              <div className="atl-helper-text">
-                <small>Not sure where to go?</small>
-                <strong>Need a hand?</strong>
-              </div>
-            </button>
-
-            {helperOpen && (
-              <div className="atl-helper-panel" role="dialog" aria-label="Helper">
-                <div className="atl-helper-heading">
-                  <div>
-                    <h2 className="atl-helper-q">What do you want to do today?</h2>
-                    <div className="atl-helper-sub">Pick one — I'll take you there.</div>
-                  </div>
-                  <button className="atl-helper-close" onClick={() => setHelperOpen(false)} aria-label="Close">
-                    <X size={15} />
-                  </button>
-                </div>
-
-                <div className="atl-intent-grid">
-                  {INTENT_CARDS.map(card => {
-                    const Icon = card.icon;
-                    const isPicked = pickedIntent === card.key;
-                    const isDimmed = pickedIntent !== null && !isPicked;
-                    return (
-                      <button
-                        key={card.key}
-                        className={`atl-intent-card ${isPicked ? "picked" : ""} ${isDimmed ? "dimmed" : ""}`}
-                        onClick={() => handlePick(card.key)}
-                      >
-                        <div className="atl-intent-icon" style={{ background: card.color }}>
-                          <Icon size={20} color="#111110" strokeWidth={2.3} />
-                        </div>
-                        <div className="atl-intent-label">{card.label}</div>
-                        <div className="atl-intent-blurb">{card.blurb}</div>
-                      </button>
-                    );
-                  })}
-                </div>
-
-                {pickedCard && (
-                  <div className="atl-pick-result">
-                    <Sparkles size={16} color="#111110" strokeWidth={2.3} style={{ flexShrink: 0 }} />
-                    <div className="atl-pick-msg">{pickedCard.banner}</div>
-                    <Link href={pickedCard.href} className="atl-pick-go"
-                      onClick={() => setHelperOpen(false)}>
-                      Go there <ArrowRight size={12} strokeWidth={2.5} />
-                    </Link>
-                  </div>
-                )}
-              </div>
-            )}
+          <div className="focus-question">
+            What brings you to the studio today?
+          </div>
+          <div className="focus-explainer">
+            Your atelier is resting in <strong>Focus Mode</strong> — one question, five choices, nothing else pulling at you.
+            <br />
+            <span className="focus-explainer-sub">The full dashboard is folded away below, waiting only if you need it.</span>
           </div>
         </div>
 
-        {/* ═══════════════════════════════════════════════════════
-            DIRECTIONAL BANNER — shown after pick, dismissible
-            ═══════════════════════════════════════════════════════ */}
-        {pickedCard && !bannerDismissed && (
-          <div className="atl-banner">
-            <div className="atl-banner-icon">
-              {(() => {
-                const Icon = pickedCard.icon;
-                return <Icon size={18} color="#FFD400" strokeWidth={2.3} />;
-              })()}
+        {/* ═══ PALETTE or SUB-MENU ═══ */}
+        {!picked ? (
+          <div className="focus-palette-wrap">
+            <PaletteSVG
+              hoverKey={hoverWell}
+              onHover={setHoverWell}
+              onLeave={() => setHoverWell(null)}
+              onPick={pickWell}
+            />
+            <div className="focus-palette-hint">
+              {hoverWell
+                ? <span className="focus-palette-hint-active">&ldquo;{WELLS.find(w => w.key === hoverWell)?.answer}&rdquo;</span>
+                : <>Tap a color to begin.</>}
             </div>
-            <div className="atl-banner-text">
-              <div className="atl-banner-label">You picked · {pickedCard.label}</div>
-              <div className="atl-banner-msg">{pickedCard.banner}</div>
-            </div>
-            <Link href={pickedCard.href} className="atl-banner-cta">
-              Go there <ArrowRight size={14} strokeWidth={2.5} />
-            </Link>
-            <button className="atl-banner-close" onClick={() => setBannerDismissed(true)} aria-label="Dismiss">
-              <X size={16} strokeWidth={2.3} />
+          </div>
+        ) : (
+          <div className="focus-submenu">
+            <button className="focus-back" onClick={() => setPickedWell(null)}>
+              ← Back to palette
             </button>
+            <div className="focus-submenu-title">
+              <span className="focus-submenu-emoji">{picked.emoji}</span>
+              {picked.label}
+            </div>
+            <div className="focus-submenu-sub">&ldquo;{picked.answer}&rdquo;</div>
+
+            <div className="focus-chips">
+              {picked.subs?.map(sub => (
+                <Link key={sub.href} href={sub.href} className="focus-chip"
+                  style={{ ["--chip-color" as any]: picked.color }}>
+                  <div className="focus-chip-label">{sub.label}</div>
+                  <div className="focus-chip-q">&ldquo;{sub.q}&rdquo;</div>
+                  <ArrowRight size={14} className="focus-chip-arrow" />
+                </Link>
+              ))}
+            </div>
           </div>
         )}
 
-        {/* ═══════════════════════════════════════════════════════
-            THE DESK — stable order, no reshuffling
-            ═══════════════════════════════════════════════════════ */}
-        <div className="atl-grid atl-in" style={{ animationDelay: "0.08s" }}>
-
-          {/* ── ON THE EASEL ── */}
-          <section className="atl-section" style={{ gridColumn: "span 2", transform: "rotate(-0.25deg)" }}>
-            <div className="atl-tape" />
-            <div className="atl-section-head">
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <div className="atl-icon-badge" style={{ background: "#FFD400" }}>
-                  <Palette size={15} color="#111110" strokeWidth={2.3} />
-                </div>
-                <div>
-                  <div className="atl-section-title">On the easel</div>
-                  <div className="atl-section-why">
-                    {!easelPiece
-                      ? "Nothing here yet — start a new piece."
-                      : (() => {
-                          const d = easelPiece.updated_at ? daysAgo(easelPiece.updated_at) : 0;
-                          if (d === 0) return "You worked on this today.";
-                          if (d === 1) return "One day since you last touched it.";
-                          return `${d} days since you last touched it.`;
-                        })()}
-                  </div>
-                </div>
-              </div>
-              <Link href="/dashboard/artworks" className="atl-section-cta">
-                All works <ArrowRight size={12} />
-              </Link>
-            </div>
-
-            {easelPiece ? (
-              <Link href={`/dashboard/artworks/${easelPiece.id}`} style={{ textDecoration: "none", display: "block" }}>
-                <div className="atl-easel-card">
-                  <div className="atl-easel-img">
-                    {Array.isArray(easelPiece.images) && easelPiece.images[0] ? (
-                      <img src={easelPiece.images[0]} alt={easelPiece.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                    ) : (
-                      <div style={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 6 }}>
-                        <Brush size={36} color="#D4C9A8" />
-                        <span style={{ fontSize: 11, color: "#9B8F7A", fontWeight: 600 }}>No image yet</span>
-                      </div>
-                    )}
-                  </div>
-                  <div className="atl-easel-meta">
-                    <div>
-                      <div style={{ fontSize: 11, fontWeight: 800, color: "#9B8F7A", textTransform: "uppercase", letterSpacing: "0.14em", marginBottom: 6 }}>
-                        {easelPiece.status?.replace(/_/g, " ") || "In progress"}
-                      </div>
-                      <h3 style={{ fontSize: 22, fontWeight: 900, color: "#111110", margin: "0 0 6px", letterSpacing: "-0.5px", lineHeight: 1.1 }}>
-                        {easelPiece.title || "Untitled"}
-                      </h3>
-                      <div style={{ fontSize: 13, color: "#5C5346", fontWeight: 600 }}>
-                        {[easelPiece.medium, easelPiece.year,
-                          easelPiece.width_cm && easelPiece.height_cm ? `${easelPiece.width_cm}×${easelPiece.height_cm} cm` : null
-                        ].filter(Boolean).join(" · ")}
-                      </div>
-                    </div>
-                    <div className="atl-easel-action">
-                      Open this piece <ArrowRight size={14} strokeWidth={2.5} />
-                    </div>
-                  </div>
-                </div>
-              </Link>
-            ) : (
-              <Link href="/dashboard/artworks/new" style={{ textDecoration: "none" }}>
-                <div className="atl-empty atl-empty-cta">
-                  <Plus size={22} color="#111110" strokeWidth={2.5} />
-                  <div>
-                    <div style={{ fontSize: 15, fontWeight: 900, color: "#111110" }}>Start a new piece</div>
-                    <div style={{ fontSize: 12, color: "#5C5346", fontWeight: 600 }}>Every atelier begins with one mark.</div>
-                  </div>
-                </div>
-              </Link>
-            )}
-          </section>
-
-          {/* ── THE WALL ── */}
-          <section className="atl-section" style={{ gridColumn: "span 2", transform: "rotate(0.15deg)" }}>
-            <div className="atl-section-head">
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <div className="atl-icon-badge" style={{ background: "#4ECDC4" }}>
-                  <Frame size={15} color="#111110" strokeWidth={2.3} />
-                </div>
-                <div>
-                  <div className="atl-section-title">The wall</div>
-                  <div className="atl-section-why">
-                    {stats.artworks === 0 ? "Empty wall. Hang your first piece." :
-                     `${stats.artworks} works · ${stats.available} available · ${stats.in_progress} in progress`}
-                  </div>
-                </div>
-              </div>
-              <Link href="/dashboard/artworks" className="atl-section-cta">See all <ArrowRight size={12} /></Link>
-            </div>
-
-            {artworks.length === 0 ? (
-              <Link href="/dashboard/artworks/new" style={{ textDecoration: "none" }}>
-                <div className="atl-empty">
-                  <ImageIcon size={22} color="#9B8F7A" />
-                  <div>
-                    <div style={{ fontSize: 14, fontWeight: 800, color: "#111110" }}>No artworks yet</div>
-                    <div style={{ fontSize: 12, color: "#9B8F7A", fontWeight: 600 }}>Add your first work to begin.</div>
-                  </div>
-                </div>
-              </Link>
-            ) : (
-              <div className="atl-wall-grid">
-                {artworks.slice(0, 6).map((aw, i) => {
-                  const img = Array.isArray(aw.images) ? aw.images[0] : null;
-                  const dot = STATUS_DOT[String(aw.status).toLowerCase()] || "#9B8F7A";
-                  return (
-                    <Link key={aw.id} href={`/dashboard/artworks/${aw.id}`} className="atl-wall-tile"
-                      style={{ transform: `rotate(${(i % 2 === 0 ? -1 : 1) * (0.2 + (i % 3) * 0.15)}deg)` }}>
-                      <div className="atl-wall-img">
-                        {img ? <img src={img} alt={aw.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                          : <div style={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                              <ImageIcon size={20} color="#D4C9A8" /></div>}
-                        <div className="atl-wall-dot" style={{ background: dot }} />
-                      </div>
-                      <div className="atl-wall-label">{aw.title || "Untitled"}</div>
-                    </Link>
-                  );
-                })}
-              </div>
-            )}
-
-            <Link href="/dashboard/artworks/new" style={{ textDecoration: "none", display: "block", marginTop: 12 }}>
-              <div className="atl-add-row">
-                <Plus size={14} strokeWidth={2.5} /> Add a new piece to the wall
-              </div>
-            </Link>
-          </section>
-
-          {/* ── THE LEDGER ── */}
-          <section className="atl-section">
-            <div className="atl-section-head">
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <div className="atl-icon-badge" style={{ background: "#FFD400" }}>
-                  <DollarSign size={15} color="#111110" strokeWidth={2.3} />
-                </div>
-                <div>
-                  <div className="atl-section-title">The ledger</div>
-                  <div className="atl-section-why">
-                    {(() => {
-                      const completed = recentSales.filter(s => s.status?.toLowerCase() === "completed");
-                      if (stats.sales_month > 0) return `$${stats.sales_month.toLocaleString()} this month`;
-                      if (completed.length > 0) return `${completed.length} sales to date`;
-                      return "Quiet ledger. First sale coming.";
-                    })()}
-                  </div>
-                </div>
-              </div>
-              <Link href="/dashboard/sales" className="atl-section-cta">Open <ArrowRight size={12} /></Link>
-            </div>
-
-            <div style={{ padding: "4px 0" }}>
-              <div className="atl-big-num">${stats.sales_total.toLocaleString()}</div>
-              <div style={{ fontSize: 11, fontWeight: 700, color: "#9B8F7A", textTransform: "uppercase", letterSpacing: "0.14em", marginBottom: 14 }}>
-                Total earned · all time
-              </div>
-
-              {(() => {
-                const last = recentSales.filter(s => s.status?.toLowerCase() === "completed")[0];
-                if (!last) return (
-                  <div style={{ fontSize: 12, color: "#9B8F7A", fontWeight: 600, padding: "8px 0" }}>
-                    No sales recorded yet.
-                  </div>
-                );
-                return (
-                  <div className="atl-ledger-row">
-                    <div style={{ width: 4, height: 32, borderRadius: 2, background: "#16A34A" }} />
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 13, fontWeight: 800, color: "#111110", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                        {last.artwork_title || "Artwork"} · ${last.sale_price?.toLocaleString()}
-                      </div>
-                      <div style={{ fontSize: 11, color: "#9B8F7A", fontWeight: 600 }}>
-                        Last sale · {last.sale_date ? formatDay(last.sale_date) : "—"}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })()}
-            </div>
-          </section>
-
-          {/* ── THE DOORWAY ── */}
-          <section className="atl-section" style={{ transform: "rotate(-0.2deg)" }}>
-            <div className="atl-section-head">
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <div className="atl-icon-badge" style={{ background: "#FF6B6B" }}>
-                  <CalendarDays size={15} color="#111110" strokeWidth={2.3} />
-                </div>
-                <div>
-                  <div className="atl-section-title">The doorway</div>
-                  <div className="atl-section-why">
-                    {events[0] ? `Next: ${events[0].title}` : "No events planned. Open the door."}
-                  </div>
-                </div>
-              </div>
-              <Link href="/dashboard/exhibitions" className="atl-section-cta">All <ArrowRight size={12} /></Link>
-            </div>
-
-            {events.length === 0 ? (
-              <Link href="/dashboard/exhibitions/new" style={{ textDecoration: "none" }}>
-                <div className="atl-empty">
-                  <Building2 size={22} color="#9B8F7A" />
-                  <div>
-                    <div style={{ fontSize: 13, fontWeight: 800, color: "#111110" }}>Plan your next show</div>
-                    <div style={{ fontSize: 11, color: "#9B8F7A", fontWeight: 600 }}>Add an exhibition or event.</div>
-                  </div>
-                </div>
-              </Link>
-            ) : (
-              <div>
-                {events.map((ev, i) => (
-                  <Link key={ev.id} href="/dashboard/exhibitions" style={{ textDecoration: "none" }}>
-                    <div className="atl-doorway-row" style={{ borderBottom: i < events.length - 1 ? "1px dashed #E8E0D0" : "none" }}>
-                      <div style={{ width: 40, height: 40, borderRadius: 10, background: "#FFF8E1", border: "2px solid #111110", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                        <div style={{ fontSize: 9, fontWeight: 800, color: "#9B8F7A", textTransform: "uppercase", letterSpacing: "0.1em", lineHeight: 1 }}>
-                          {ev.start_date ? new Date(ev.start_date).toLocaleDateString("en-US", { month: "short" }) : "TBD"}
-                        </div>
-                        <div style={{ fontSize: 14, fontWeight: 900, color: "#111110", lineHeight: 1, marginTop: 2 }}>
-                          {ev.start_date ? new Date(ev.start_date).getDate() : "—"}
-                        </div>
-                      </div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 13, fontWeight: 800, color: "#111110", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ev.title}</div>
-                        <div style={{ fontSize: 11, color: "#9B8F7A", fontWeight: 600 }}>{ev.venue || "No venue"}</div>
-                      </div>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            )}
-          </section>
-
-          {/* ── THE NOTEBOOK (tasks) ── */}
-          <section className="atl-section atl-notebook" style={{ transform: "rotate(0.3deg)" }}>
-            <div className="atl-section-head">
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <div className="atl-icon-badge" style={{ background: "#8B5CF6" }}>
-                  <PencilLine size={15} color="#111110" strokeWidth={2.3} />
-                </div>
-                <div>
-                  <div className="atl-section-title">The notebook</div>
-                  <div className="atl-section-why">
-                    {tasks.length === 0 ? "Nothing scribbled here." : `${tasks.length} open · the day's list`}
-                  </div>
-                </div>
-              </div>
-              <Link href="/dashboard/tasks" className="atl-section-cta">All <ArrowRight size={12} /></Link>
-            </div>
-
-            {tasks.length === 0 ? (
-              <Link href="/dashboard/tasks" style={{ textDecoration: "none" }}>
-                <div className="atl-empty">
-                  <Coffee size={22} color="#9B8F7A" />
-                  <div>
-                    <div style={{ fontSize: 13, fontWeight: 800, color: "#111110" }}>An empty page</div>
-                    <div style={{ fontSize: 11, color: "#9B8F7A", fontWeight: 600 }}>Jot down what today needs.</div>
-                  </div>
-                </div>
-              </Link>
-            ) : (
-              <div>
-                {tasks.slice(0, 5).map((t) => (
-                  <Link key={t.id} href="/dashboard/tasks" style={{ textDecoration: "none" }}>
-                    <div className="atl-note-row">
-                      <div className="atl-checkbox" />
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 13, fontWeight: 700, color: "#111110", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                          {t.title}
-                        </div>
-                        {t.due_date && (
-                          <div style={{ fontSize: 10, color: "#9B8F7A", fontWeight: 600 }}>
-                            due {formatDay(t.due_date)}
-                          </div>
-                        )}
-                      </div>
-                      {t.priority === "high" && <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#FF6B6B" }} />}
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            )}
-          </section>
-
-          {/* ── THE LETTERBOX ── */}
-          <section className="atl-section" style={{ transform: "rotate(-0.15deg)" }}>
-            <div className="atl-section-head">
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <div className="atl-icon-badge" style={{ background: "#95E1D3" }}>
-                  <Bell size={15} color="#111110" strokeWidth={2.3} />
-                </div>
-                <div>
-                  <div className="atl-section-title">The letterbox</div>
-                  <div className="atl-section-why">
-                    {(() => {
-                      const unread = notifs.filter(n => !n.read).length;
-                      return unread > 0 ? `${unread} new letter${unread > 1 ? "s" : ""}` : "All letters opened.";
-                    })()}
-                  </div>
-                </div>
-              </div>
-              {notifs.filter(n => !n.read).length > 0 && (
-                <button onClick={markAllRead} className="atl-section-cta" style={{ border: "none", background: "none", cursor: "pointer", fontFamily: "inherit" }}>
-                  <Check size={12} /> Mark read
-                </button>
-              )}
-            </div>
-
-            {notifs.slice(0, 4).length === 0 ? (
-              <div className="atl-empty">
-                <Megaphone size={20} color="#9B8F7A" />
-                <div style={{ fontSize: 12, fontWeight: 700, color: "#9B8F7A" }}>Nothing new. Quiet day.</div>
-              </div>
-            ) : (
-              <div>
-                {notifs.slice(0, 4).map((n, i, arr) => {
-                  const cfg = NOTIF_CFG[n.type] || { icon: Sparkles, color: "#9B8F7A" };
-                  const Icon = cfg.icon;
-                  return (
-                    <div key={n.id} style={{
-                      display: "flex", alignItems: "flex-start", gap: 10,
-                      padding: "10px 0",
-                      borderBottom: i < arr.length - 1 ? "1px dashed #E8E0D0" : "none",
-                      opacity: n.read ? 0.62 : 1,
-                    }}>
-                      <div style={{ width: 28, height: 28, borderRadius: 8, background: cfg.color + "22", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, border: `1.5px solid ${cfg.color}` }}>
-                        <Icon size={12} color={cfg.color} />
-                      </div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                          <span style={{ fontSize: 12, fontWeight: n.read ? 600 : 800, color: "#111110" }}>{n.title}</span>
-                          {!n.read && <div style={{ width: 5, height: 5, borderRadius: "50%", background: "#FF6B6B", flexShrink: 0 }} />}
-                        </div>
-                        {n.body && <div style={{ fontSize: 11, color: "#9B8F7A", marginTop: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{n.body}</div>}
-                        <div style={{ fontSize: 10, color: "#C0B8A8", marginTop: 2, fontWeight: 600 }}>{timeAgo(n.created_at)}</div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </section>
+        {/* ═══ EXPAND DASHBOARD LINK ═══ */}
+        <div className="focus-expand-zone">
+          {!expandedClassic ? (
+            <>
+              <div className="focus-expand-preamble">Been here a while? Skip the calm.</div>
+              <button className="focus-expand-link" onClick={() => setExpandedClassic(true)}>
+                Or show me everything <ChevronDown size={14} strokeWidth={2.5} />
+              </button>
+            </>
+          ) : (
+            <button className="focus-expand-link" onClick={() => setExpandedClassic(false)}>
+              Fold it back up <ChevronUp size={14} strokeWidth={2.5} />
+            </button>
+          )}
         </div>
 
-        {/* Footer line */}
-        <div style={{ textAlign: "center", marginTop: 32, marginBottom: 16, fontSize: 11, fontWeight: 600, color: "#C0B8A8", fontStyle: "italic", letterSpacing: "0.04em" }}>
-          — The atelier is always here when you need it. —
-        </div>
+        {/* ═══ CLASSIC DASHBOARD — INLINE EXPANSION ═══ */}
+        {expandedClassic && (
+          <div className="focus-classic-wrap">
+            <ClassicDashboard
+              profile={profile} artworks={artworks} stats={stats} tasks={tasks}
+              events={events} recentSales={recentSales} notifications={notifications}
+              loaded={loaded} notifTab={notifTab} setNotifTab={setNotifTab}
+              markRead={markRead} markAllRead={markAllRead}
+              deleteNotification={deleteNotification} clearAll={clearAll}
+              fname={fname} unreadCount={unreadCount} filteredNotifs={filteredNotifs}
+              initials={initials} today={today} greeting={greeting} greetEmoji={greetEmoji}
+            />
+          </div>
+        )}
       </div>
     </>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   STYLES — separated so they can be loaded conditionally
+   ══════════════════════════════════════════════════════════════════ */
+
+function FocusStyles() {
+  return (
+    <style>{`
+      /* Focus canvas — near-white, replaces the FFFBEA of the nav shell */
+      .focus-root {
+        background: #FDFCFA;
+        margin: -28px -20px 0; /* bleed to edges of am-content padding */
+        padding: 40px 20px 32px;
+        min-height: calc(100vh - 60px);
+      }
+
+      .focus-hero {
+        max-width: 640px;
+        margin: 0 auto 28px;
+        text-align: center;
+        animation: focusIn 0.6s cubic-bezier(0.16,1,0.3,1) both;
+      }
+      .focus-greet {
+        font-size: clamp(26px, 4vw, 38px);
+        font-weight: 900;
+        color: #111110;
+        letter-spacing: -1px;
+        line-height: 1.05;
+        margin-bottom: 14px;
+      }
+      .focus-name {
+        background: #FFD400;
+        padding: 0 8px;
+        border-radius: 6px;
+        box-decoration-break: clone;
+        -webkit-box-decoration-break: clone;
+      }
+      .focus-question {
+        font-size: clamp(16px, 2.2vw, 20px);
+        font-weight: 600;
+        color: #5C5346;
+        font-style: italic;
+        margin-bottom: 14px;
+        line-height: 1.4;
+      }
+      .focus-explainer {
+        font-size: 12.5px;
+        font-weight: 500;
+        color: #9B8F7A;
+        line-height: 1.55;
+        max-width: 480px;
+        margin: 0 auto;
+      }
+      .focus-explainer strong {
+        color: #111110;
+        font-weight: 800;
+      }
+      .focus-explainer-sub {
+        color: #B8AE9C;
+        font-size: 11.5px;
+      }
+
+      .focus-palette-wrap {
+        max-width: 620px;
+        margin: 0 auto 28px;
+        animation: focusIn 0.8s cubic-bezier(0.16,1,0.3,1) 0.15s both;
+      }
+      .focus-palette-hint {
+        text-align: center;
+        margin-top: 18px;
+        font-size: 13px;
+        font-weight: 600;
+        color: #9B8F7A;
+        font-style: italic;
+        min-height: 22px;
+        transition: color 0.2s;
+      }
+      .focus-palette-hint-active {
+        color: #111110;
+        font-weight: 700;
+      }
+
+      /* Sub-menu */
+      .focus-submenu {
+        max-width: 720px;
+        margin: 0 auto 28px;
+        animation: focusIn 0.45s cubic-bezier(0.16,1,0.3,1) both;
+      }
+      .focus-back {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 7px 14px;
+        background: transparent;
+        border: 2px solid #E8E0D0;
+        border-radius: 9999px;
+        font-family: inherit;
+        font-size: 12px;
+        font-weight: 700;
+        color: #5C5346;
+        cursor: pointer;
+        margin-bottom: 20px;
+        transition: all 0.15s;
+      }
+      .focus-back:hover {
+        border-color: #111110;
+        color: #111110;
+        background: #fff;
+      }
+      .focus-submenu-title {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        justify-content: center;
+        font-size: clamp(22px, 3vw, 30px);
+        font-weight: 900;
+        color: #111110;
+        letter-spacing: -0.6px;
+        line-height: 1;
+      }
+      .focus-submenu-emoji {
+        font-size: 0.85em;
+      }
+      .focus-submenu-sub {
+        text-align: center;
+        font-size: 13px;
+        font-weight: 600;
+        color: #9B8F7A;
+        font-style: italic;
+        margin: 8px 0 26px;
+      }
+      .focus-chips {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        gap: 12px;
+      }
+      .focus-chip {
+        --chip-color: #FFD400;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 16px 18px;
+        background: #fff;
+        border: 2px solid #E8E0D0;
+        border-radius: 14px;
+        text-decoration: none;
+        color: inherit;
+        cursor: pointer;
+        transition: all 0.2s cubic-bezier(0.16,1,0.3,1);
+        position: relative;
+      }
+      .focus-chip::before {
+        content: "";
+        position: absolute;
+        left: -2px; top: -2px; bottom: -2px;
+        width: 5px;
+        background: var(--chip-color);
+        border-radius: 14px 0 0 14px;
+        opacity: 0;
+        transition: opacity 0.15s;
+      }
+      .focus-chip:hover {
+        border-color: #111110;
+        transform: translate(-1px, -2px);
+        box-shadow: 3px 4px 0 #111110;
+      }
+      .focus-chip:hover::before {
+        opacity: 1;
+      }
+      .focus-chip-label {
+        font-size: 14px;
+        font-weight: 900;
+        color: #111110;
+        letter-spacing: -0.2px;
+        margin-bottom: 3px;
+      }
+      .focus-chip-q {
+        font-size: 12px;
+        font-weight: 500;
+        color: #9B8F7A;
+        font-style: italic;
+        line-height: 1.35;
+      }
+      .focus-chip-arrow {
+        color: #C0B8A8;
+        margin-left: auto;
+        flex-shrink: 0;
+        transition: transform 0.2s, color 0.15s;
+      }
+      .focus-chip:hover .focus-chip-arrow {
+        color: #111110;
+        transform: translateX(3px);
+      }
+      .focus-chip > div:first-of-type {
+        flex: 1;
+        min-width: 0;
+      }
+
+      /* Expand zone */
+      .focus-expand-zone {
+        max-width: 640px;
+        margin: 16px auto 0;
+        text-align: center;
+        padding-top: 22px;
+        border-top: 1px dashed #E8E0D0;
+        animation: focusIn 0.8s cubic-bezier(0.16,1,0.3,1) 0.3s both;
+      }
+      .focus-expand-preamble {
+        font-size: 12px;
+        font-weight: 500;
+        color: #B8AE9C;
+        font-style: italic;
+        margin-bottom: 10px;
+      }
+      .focus-expand-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 9px 18px;
+        background: transparent;
+        border: 2px dashed #D4C9A8;
+        border-radius: 9999px;
+        font-family: inherit;
+        font-size: 13px;
+        font-weight: 700;
+        color: #5C5346;
+        cursor: pointer;
+        transition: all 0.18s;
+      }
+      .focus-expand-link:hover {
+        border-color: #111110;
+        border-style: solid;
+        color: #111110;
+        background: #FFFBEA;
+      }
+
+      /* Classic expansion — add breathing room */
+      .focus-classic-wrap {
+        margin-top: 40px;
+        padding-top: 32px;
+        border-top: 2px solid #111110;
+        animation: focusIn 0.5s cubic-bezier(0.16,1,0.3,1) both;
+      }
+
+      @keyframes focusIn {
+        from { opacity: 0; transform: translateY(12px); }
+        to { opacity: 1; transform: none; }
+      }
+
+      @media (max-width: 640px) {
+        .focus-root {
+          margin: -28px -20px 0;
+          padding: 28px 16px 24px;
+        }
+        .focus-chips {
+          grid-template-columns: 1fr;
+        }
+      }
+    `}</style>
+  );
+}
+
+function ClassicStyles() {
+  return (
+    <style>{`
+      /* ── Base cards ── */
+      .ripe-card {
+        background: #fff; border: 2.5px solid #111110; border-radius: 20px;
+        box-shadow: 4px 5px 0 #D4C9A8; overflow: hidden;
+        transition: box-shadow 0.25s cubic-bezier(0.16,1,0.3,1), transform 0.25s cubic-bezier(0.16,1,0.3,1);
+      }
+      .ripe-card:hover { box-shadow: 6px 7px 0 #111110; transform: translate(-1px,-2px); }
+      .ripe-card-static {
+        background: #fff; border: 2.5px solid #111110; border-radius: 20px;
+        box-shadow: 4px 5px 0 #D4C9A8; overflow: hidden;
+      }
+
+      .stat-card {
+        background: #fff; border: 2.5px solid #111110; border-radius: 18px;
+        padding: 20px 22px; box-shadow: 3px 4px 0 #D4C9A8;
+        position: relative; overflow: hidden;
+        transition: all 0.25s cubic-bezier(0.16,1,0.3,1);
+      }
+      .stat-card:hover { box-shadow: 5px 6px 0 #111110; transform: translate(-1px,-1px); }
+      .stat-accent {
+        position: absolute; bottom: -8px; right: -8px;
+        width: 56px; height: 56px; border-radius: 50%;
+        opacity: 0.12; transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1);
+      }
+      .stat-card:hover .stat-accent { transform: scale(1.3); }
+
+      .qnav-card {
+        display: flex; align-items: center; gap: 14px; padding: 14px 18px;
+        background: #fff; border: 2px solid #E8E0D0; border-radius: 16px;
+        text-decoration: none; color: #111110;
+        transition: all 0.2s cubic-bezier(0.16,1,0.3,1); cursor: pointer;
+      }
+      .qnav-card:hover { border-color: #111110; box-shadow: 3px 4px 0 #111110; transform: translate(-1px,-1px); background: #FFFBEA; }
+      .qnav-icon {
+        width: 40px; height: 40px; border-radius: 12px; border: 2px solid #111110;
+        display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+        transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1);
+      }
+      .qnav-card:hover .qnav-icon { transform: scale(1.08) rotate(-3deg); }
+
+      .notif-item {
+        display: flex; align-items: flex-start; gap: 12px; padding: 14px 18px;
+        border-bottom: 1px solid #F5F0E8; transition: background 0.15s;
+        cursor: pointer; position: relative;
+      }
+      .notif-item:hover { background: #FFFBEA; }
+      .notif-item:last-child { border-bottom: none; }
+      .notif-dot {
+        width: 36px; height: 36px; border-radius: 12px;
+        display: flex; align-items: center; justify-content: center;
+        flex-shrink: 0; transition: transform 0.2s;
+      }
+      .notif-item:hover .notif-dot { transform: scale(1.08); }
+      .notif-del {
+        position: absolute; top: 14px; right: 14px; opacity: 0;
+        transition: opacity 0.15s; background: none; border: none;
+        cursor: pointer; color: #C0B8A8; padding: 2px;
+      }
+      .notif-item:hover .notif-del { opacity: 1; }
+      .notif-del:hover { color: #FF6B6B; }
+
+      .aw-mini {
+        border-radius: 16px; border: 2px solid #E8E0D0; overflow: hidden;
+        background: #fff; transition: all 0.25s cubic-bezier(0.16,1,0.3,1);
+        cursor: pointer; text-decoration: none; display: block; color: inherit;
+      }
+      .aw-mini:hover { border-color: #111110; box-shadow: 4px 5px 0 #111110; transform: translate(-2px,-2px); }
+      .aw-mini:hover img { transform: scale(1.06); }
+      .aw-mini img { transition: transform 0.4s cubic-bezier(0.16,1,0.3,1); }
+
+      .event-row { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid #F5F0E8; transition: background 0.15s; }
+      .event-row:last-child { border-bottom: none; }
+      .task-row { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid #F5F0E8; }
+      .task-row:last-child { border-bottom: none; }
+
+      .sec-header {
+        display: flex; align-items: center; justify-content: space-between;
+        padding: 16px 20px; border-bottom: 2px solid #111110;
+        background: #FAF7F3; border-radius: 20px 20px 0 0;
+      }
+
+      .notif-tab {
+        padding: 6px 14px; border-radius: 9999px; border: 2px solid #E8E0D0;
+        background: #fff; font-family: inherit; font-size: 12px; font-weight: 700;
+        color: #9B8F7A; cursor: pointer; transition: all 0.15s;
+      }
+      .notif-tab.active { background: #111110; border-color: #111110; color: #FFD400; }
+      .notif-tab:not(.active):hover { border-color: #111110; color: #111110; }
+
+      @keyframes ripeIn { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
+      .ripe-in { animation: ripeIn 0.5s cubic-bezier(0.16,1,0.3,1) both; }
+
+      @media (max-width: 900px) {
+        .dash-main-grid { grid-template-columns: 1fr !important; }
+      }
+      @media (max-width: 640px) {
+        .dash-header { flex-direction: column !important; align-items: flex-start !important; gap: 14px !important; margin-bottom: 20px !important; }
+        .dash-header-actions { width: 100%; display: flex !important; flex-wrap: wrap; gap: 8px; }
+        .dash-header-actions a, .dash-header-actions button { flex: 1; min-width: 130px; justify-content: center !important; }
+        .dash-avatar { width: 44px !important; height: 44px !important; border-radius: 14px !important; font-size: 16px !important; }
+        .dash-stats { grid-template-columns: repeat(2, 1fr) !important; gap: 10px !important; margin-bottom: 18px !important; }
+        .stat-card { padding: 14px 16px !important; }
+        .stat-card div[style*="font-size: 32"] { font-size: 24px !important; }
+        .dash-artworks-grid { grid-template-columns: repeat(2, 1fr) !important; gap: 8px !important; padding: 10px !important; }
+        .dash-quick-nav { grid-template-columns: repeat(2, 1fr) !important; gap: 8px !important; }
+        .qnav-card { padding: 11px 13px !important; gap: 10px !important; }
+        .qnav-icon { width: 34px !important; height: 34px !important; }
+        .ripe-card-static, .ripe-card { border-radius: 16px !important; }
+        .sec-header { padding: 12px 14px !important; border-radius: 14px 14px 0 0 !important; }
+        .notif-item { padding: 10px 14px !important; gap: 9px !important; }
+        .notif-dot { width: 30px !important; height: 30px !important; border-radius: 9px !important; }
+        .notif-del { top: 10px !important; right: 10px !important; }
+        .event-row { padding: 10px 0 !important; gap: 9px !important; }
+        .task-row  { padding: 8px 0 !important; gap: 8px !important; }
+      }
+    `}</style>
   );
 }

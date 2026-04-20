@@ -16,52 +16,47 @@ import {
 const NAV_SECTIONS = [
   {
     key: "studio",
-    label: "Studio",
-    emoji: "🎨",
+    label: "My Work",
     icon: ImageIcon,
     items: [
-      { href: "/dashboard/artworks", label: "Artworks",  icon: ImageIcon,   desc: "Manage your artwork inventory", emoji: "🖼️", color: "#7C3AED", bg: "#EDE9FE" },
-      { href: "/dashboard/mystore",  label: "MyStore",   icon: ShoppingBag, desc: "Your public storefront",        emoji: "🛍️", color: "#0EA5E9", bg: "#E0F2FE" },
-      { href: "/dashboard/moodboard",label: "Moodboard", icon: Layers,      desc: "Visual boards & references",   emoji: "🗂️", color: "#EC4899", bg: "#FCE7F3" },
+      { href: "/dashboard/artworks",   label: "My Works",      icon: ImageIcon,    desc: "All your works in one place"    },
+      { href: "/dashboard/mystore",    label: "My Shop",       icon: ShoppingBag,  desc: "Where people buy your art"      },
+      { href: "/dashboard/portfolio",  label: "My Front Door", icon: Globe,        desc: "How the world sees you"         },
     ],
   },
   {
     key: "scene",
-    label: "Scene",
-    emoji: "🗺️",
+    label: "The Scene",
     icon: CalendarRange,
     items: [
-      { href: "/dashboard/exhibitions", label: "Events & Education", icon: CalendarRange, desc: "Events, workshops & resources",  emoji: "🎪", color: "#EC4899", bg: "#FCE7F3" },
-      { href: "/dashboard/pool",        label: "Collabs",            icon: Handshake,     desc: "Collaboration requests",        emoji: "🤝", color: "#CA8A04", bg: "#FEF9C3" },
-      { href: "/dashboard/map",         label: "Map",                icon: MapPin,        desc: "Prague art scene map",          emoji: "📍", color: "#EF4444", bg: "#FEE2E2" },
+      { href: "/dashboard/exhibitions", label: "Shows & Events", icon: CalendarRange, desc: "Events, workshops & resources"   },
+      { href: "/dashboard/pool",        label: "Find Collabs",   icon: Handshake,     desc: "Collaboration requests"         },
+      { href: "/dashboard/map",         label: "Art Scene Map",  icon: MapPin,        desc: "What's happening around you"   },
     ],
   },
   {
     key: "business",
-    label: "Business",
-    emoji: "📊",
+    label: "Money & Sales",
     icon: BarChart3,
     items: [
-      { href: "/dashboard/sales",     label: "Sales",     icon: BarChart3,  desc: "Track your artwork sales",  emoji: "💰", color: "#16A34A", bg: "#DCFCE7" },
-      { href: "/dashboard/clients",   label: "Clients",   icon: Users,      desc: "Collector relationships",   emoji: "👥", color: "#8B5CF6", bg: "#EDE9FE" },
-      { href: "/dashboard/contracts", label: "Contracts", icon: FileText,   desc: "Agreements & signings",     emoji: "📋", color: "#CA8A04", bg: "#FEF9C3" },
-      { href: "/dashboard/analytics", label: "Analytics", icon: TrendingUp, desc: "Performance insights",      emoji: "📈", color: "#0EA5E9", bg: "#E0F2FE" },
+      { href: "/dashboard/sales",     label: "My Sales",        icon: BarChart3,  desc: "Money you've made"              },
+      { href: "/dashboard/clients",   label: "My Collectors",   icon: Users,      desc: "People who love your work"      },
+      { href: "/dashboard/analytics", label: "My Reach",        icon: TrendingUp, desc: "See how you're doing"           },
     ],
   },
   {
     key: "planner",
-    label: "Planner",
-    emoji: "📅",
+    label: "Planning",
     icon: CalendarDays,
     items: [
-      { href: "/dashboard/tasks",    label: "Tasks",    icon: CheckSquare,  desc: "To-do & task management", emoji: "✅", color: "#16A34A", bg: "#DCFCE7" },
-      { href: "/dashboard/calendar", label: "Calendar", icon: CalendarDays, desc: "Schedule & deadlines",    emoji: "📆", color: "#8B5CF6", bg: "#EDE9FE" },
+      { href: "/dashboard/tasks",    label: "My To-Dos",    icon: CheckSquare,  desc: "Tasks & to-do list"             },
+      { href: "/dashboard/calendar", label: "My Schedule",  icon: CalendarDays, desc: "Schedule & deadlines"           },
     ],
   },
 ];
 
 const ALL_NAV_ITEMS = [
-  { href: "/dashboard",          label: "Home", icon: LayoutDashboard },
+  { href: "/dashboard", label: "The Atelier", icon: LayoutDashboard },
   { href: "/dashboard/messages", label: "Messages",  icon: MessageSquare   },
   { href: "/dashboard/moodboard",label: "Moodboard", icon: Layers          },
   { href: "/dashboard/contracts",label: "Contracts", icon: FileText         },
@@ -270,7 +265,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         .am-nav-btn.active { background: #FFD400; font-weight: 800; box-shadow: 2px 2px 0 #111110; }
         .am-nav-btn.open { background: #111110; color: #FFD400; }
 
-        /* Dashboard btn */
+        /* The Atelier btn */
         .am-dashboard-btn {
           display: flex; align-items: center; gap: 6px;
           padding: 8px 14px; border-radius: 9999px;
@@ -566,7 +561,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <Link href="/dashboard" style={{ textDecoration: "none" }} onClick={() => setMobileOpen(false)}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", borderRadius: 10, background: isActive("/dashboard") ? "#FFD400" : "transparent", marginBottom: 4 }}>
                 <LayoutDashboard size={16} />
-                <span style={{ fontSize: 15, fontWeight: 800, color: "#111110" }}>Dashboard</span>
+                <span style={{ fontSize: 15, fontWeight: 800, color: "#111110" }}>The Atelier</span>
               </div>
             </Link>
             <Link href="/dashboard/messages" style={{ textDecoration: "none" }} onClick={() => setMobileOpen(false)}>
@@ -607,7 +602,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <div style={{ marginTop: 8, paddingTop: 12, borderTop: "1px solid #E0D8CA" }}>
               <button onClick={handleLogout} style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", background: "none", border: "none", cursor: "pointer", borderRadius: 10, fontFamily: "inherit" }}>
                 <LogOut size={15} color="#9B8F7A" />
-                <span style={{ fontSize: 14, fontWeight: 600, color: "#9B8F7A" }}>Sign out</span>
+                <span style={{ fontSize: 14, fontWeight: 600, color: "#9B8F7A" }}>Log out</span>
               </button>
             </div>
           </div>

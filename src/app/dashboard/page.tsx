@@ -1,49 +1,20 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import {
-  ImageIcon, Bell, X, ArrowRight, Plus, ExternalLink,
-  Package, Eye, Users, CheckSquare, DollarSign, Handshake,
-  BarChart3, CalendarDays, MapPin, Sparkles, ChevronDown,
-  ChevronUp,
+  ImageIcon, Bell, X, ArrowRight, Plus, Check, Mail,
+  MapPin, DollarSign, Users, FileText, TrendingUp,
+  Handshake, Sparkles, Palette, Store, Layout as LayoutIcon,
+  CheckSquare, CalendarDays,
 } from "lucide-react";
 
 /* ══════════════════════════════════════════════════════════════════
-   THE ATELIER — Focus Mode by default, classic dashboard beneath
-   Ripe design system · 60/30/10 (cream/ink/mango) with a lightened
-   nearly-white Focus canvas
+   THE ATELIER — Bento Dashboard
+   Ripe design system · Neo-brutalism × warm cream
    ══════════════════════════════════════════════════════════════════ */
 
-/* ── Helpers (shared across modes) ─────────────────────────────── */
-function AnimNum({ target }: { target: number }) {
-  const [val, setVal] = useState(0);
-  const ref = useRef<HTMLDivElement>(null);
-  const started = useRef(false);
-  useEffect(() => {
-    const el = ref.current; if (!el) return;
-    const obs = new IntersectionObserver(([e]) => {
-      if (e.isIntersecting && !started.current) {
-        started.current = true;
-        const start = performance.now();
-        const dur = 900;
-        const step = (now: number) => {
-          const p = Math.min((now - start) / dur, 1);
-          const ease = 1 - Math.pow(1 - p, 3);
-          setVal(Math.round(ease * target));
-          if (p < 1) requestAnimationFrame(step);
-        };
-        requestAnimationFrame(step);
-        obs.disconnect();
-      }
-    }, { threshold: 0.5 });
-    obs.observe(el);
-    return () => obs.disconnect();
-  }, [target]);
-  return <div ref={ref}>{val}</div>;
-}
-
+/* ── Helpers ───────────────────────────────────────────────────── */
 function timeAgo(date: string) {
   const s = Math.floor((Date.now() - new Date(date).getTime()) / 1000);
   if (s < 60) return "just now";
@@ -51,11 +22,17 @@ function timeAgo(date: string) {
   if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
   return `${Math.floor(s / 86400)}d ago`;
 }
-function fmtDate(date: string) {
-  return new Date(date).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+
+function dateMonth(d?: string) {
+  if (!d) return { month: "—", day: "—" };
+  const dt = new Date(d);
+  return {
+    month: dt.toLocaleDateString("en-US", { month: "short" }),
+    day: String(dt.getDate()),
+  };
 }
 
-/* ── Config ────────────────────────────────────────────────────── */
+/* ── Notification config (used in bell dropdown) ───────────────── */
 const NOTIF_CFG: Record<string, { icon: any; color: string; bg: string }> = {
   follow:  { icon: Users,      color: "#4ECDC4", bg: "#F0FDF4" },
   sale:    { icon: DollarSign, color: "#16A34A", bg: "#DCFCE7" },
@@ -63,654 +40,148 @@ const NOTIF_CFG: Record<string, { icon: any; color: string; bg: string }> = {
   system:  { icon: Sparkles,   color: "#8B5CF6", bg: "#EDE9FE" },
   artwork: { icon: ImageIcon,  color: "#FF6B6B", bg: "#FFE4E6" },
 };
-const STATUS_DOT: Record<string, string> = {
-  available: "#16A34A", sold: "#111110", reserved: "#D97706",
-  "in progress": "#8B5CF6", "in_progress": "#8B5CF6",
-  concept: "#9B8F7A", complete: "#0EA5E9",
-};
-const PRIORITY_COLOR: Record<string, string> = {
-  low: "#4ECDC4", medium: "#FFD400", high: "#FF6B6B",
-};
-const QUICK_NAV = [
-  { href: "/dashboard/artworks",    label: "Artworks",  icon: ImageIcon,    color: "#FFD400", desc: "Manage inventory" },
-  { href: "/dashboard/exhibitions", label: "Events",    icon: CalendarDays, color: "#4ECDC4", desc: "Shows & exhibitions" },
-  { href: "/dashboard/pool",        label: "Collabs",   icon: Handshake,    color: "#FF6B6B", desc: "Discovery pool" },
-  { href: "/dashboard/sales",       label: "Sales",     icon: BarChart3,    color: "#8B5CF6", desc: "Track revenue" },
-  { href: "/dashboard/tasks",       label: "Tasks",     icon: CheckSquare,  color: "#95E1D3", desc: "To-dos & planning" },
-  { href: "/dashboard/map",         label: "Map",       icon: MapPin,       color: "#FF6B6B", desc: "Art scene map" },
-];
-
-/* ══════════════════════════════════════════════════════════════════
-   FOCUS MODE: Palette + sub-menu chips
-   ══════════════════════════════════════════════════════════════════ */
-
-type WellKey = "studio" | "scene" | "money" | "planning" | "messages";
-
-type SubItem = { label: string; q: string; href: string };
-type Well = {
-  key: WellKey;
-  emoji: string;
-  label: string;
-  answer: string;          // casual answer inside the hole
-  color: string;           // ripe-system section color (hover state)
-  href?: string;           // direct nav if no sub-menu
-  subs?: SubItem[];
-};
-
-const WELLS: Well[] = [
-  {
-    key: "studio",
-    emoji: "🎨",
-    label: "My Studio",
-    answer: "I'm here to organize my art.",
-    color: "#FFD400",
-    subs: [
-      { label: "My Works",      q: "The living record of every piece created.",       href: "/dashboard/artworks"  },
-      { label: "My Front Door", q: "Show my shop. The one strangers can see from.",   href: "/dashboard/mystore"   },
-      { label: "Moodboard",     q: "Visual notes and creative daydreams.",            href: "/dashboard/moodboard" },
-    ],
-  },
-  {
-    key: "scene",
-    emoji: "🗺️",
-    label: "The Scene",
-    answer: "I want to see what's happening out there.",
-    color: "#4ECDC4",
-    subs: [
-      { label: "Events & Education", q: "What's on? Shows, workshops, deadlines.",                    href: "/dashboard/exhibitions" },
-      { label: "Collabs",            q: "Open requests from artists and venues — find your next collab.", href: "/dashboard/pool"        },
-      { label: "Map",                q: "Show me the Prague art scene on a map.",                      href: "/dashboard/map"         },
-    ],
-  },
-  {
-    key: "money",
-    emoji: "💰",
-    label: "Deals & Money",
-    answer: "Let's talk numbers.",
-    color: "#8B5CF6",
-    subs: [
-      { label: "My Sales",      q: "Track what I've sold.",                      href: "/dashboard/sales"     },
-      { label: "My Collectors", q: "Who follow my work?",                        href: "/dashboard/clients"   },
-      { label: "My Papers",     q: "Agreements & deals — easy paperwork.",       href: "/dashboard/contracts" },
-      { label: "My Reach",      q: "How am I actually doing?",                   href: "/dashboard/analytics" },
-    ],
-  },
-  {
-    key: "planning",
-    emoji: "📅",
-    label: "Planning",
-    answer: "I need to get organized.",
-    color: "#FF6B6B",
-    subs: [
-      { label: "Tasks",       q: "My to-do list.",                  href: "/dashboard/tasks"    },
-      { label: "My Schedule", q: "Everything on a calendar.",       href: "/dashboard/calendar" },
-    ],
-  },
-  {
-    key: "messages",
-    emoji: "💬",
-    label: "Messages",
-    answer: "Anyone write to me?",
-    color: "#95E1D3",
-    href: "/dashboard/messages", // direct, no sub-menu
-  },
-];
-
-/* ── Custom palette SVG positions (percent of viewBox 720×520) ── */
-/* Designed organically: big well top-center (My Studio), 4 smaller
-   wells scattered, thumbhole on the right. */
-const WELL_POSITIONS: Record<WellKey, { cx: number; cy: number; r: number }> = {
-  studio:   { cx: 320, cy: 170, r: 74 },  // biggest, slightly left-center
-  scene:    { cx: 150, cy: 240, r: 48 },  // left
-  money:    { cx: 470, cy: 280, r: 52 },  // right-center
-  planning: { cx: 240, cy: 370, r: 46 },  // bottom-left
-  messages: { cx: 430, cy: 410, r: 44 },  // bottom-right (smallest)
-};
-
-function PaletteSVG({
-  hoverKey,
-  onHover,
-  onLeave,
-  onPick,
-}: {
-  hoverKey: WellKey | null;
-  onHover: (k: WellKey) => void;
-  onLeave: () => void;
-  onPick: (k: WellKey) => void;
-}) {
-  return (
-    <svg viewBox="0 0 720 520" xmlns="http://www.w3.org/2000/svg"
-         style={{ width: "100%", height: "auto", maxWidth: 620, display: "block", margin: "0 auto" }}>
-      <defs>
-        {/* Palette body shadow */}
-        <filter id="pal-shadow" x="-10%" y="-10%" width="120%" height="120%">
-          <feDropShadow dx="6" dy="8" stdDeviation="0" floodColor="#111110" floodOpacity="1" />
-        </filter>
-        {/* Each well gets a subtle highlight */}
-        <radialGradient id="well-gloss" cx="30%" cy="25%" r="70%">
-          <stop offset="0%" stopColor="#fff" stopOpacity="0.6" />
-          <stop offset="40%" stopColor="#fff" stopOpacity="0.1" />
-          <stop offset="100%" stopColor="#fff" stopOpacity="0" />
-        </radialGradient>
-      </defs>
-
-      {/* ── Palette body — organic kidney shape with thumbhole ── */}
-      <g filter="url(#pal-shadow)">
-        <path
-          d="
-            M 140 110
-            C 200 70, 330 55, 420 70
-            C 540 90, 620 150, 630 240
-            C 638 300, 610 350, 580 360
-            C 560 365, 555 380, 560 400
-            C 568 430, 560 450, 530 455
-            C 510 458, 500 445, 500 425
-            C 500 405, 490 395, 470 398
-            C 430 405, 380 440, 320 450
-            C 220 465, 120 430, 80 350
-            C 40 260, 70 160, 140 110
-            Z
-          "
-          fill="#FFFBEF"
-          stroke="#111110"
-          strokeWidth="3"
-          strokeLinejoin="round"
-        />
-      </g>
-
-      {/* ── 5 paint wells ── */}
-      {WELLS.map(well => {
-        const pos = WELL_POSITIONS[well.key];
-        const isHover = hoverKey === well.key;
-        const fillColor = isHover ? well.color : "#FAF5E8";
-
-        return (
-          <g
-            key={well.key}
-            onClick={() => onPick(well.key)}
-            onMouseEnter={() => onHover(well.key)}
-            onMouseLeave={onLeave}
-            onFocus={() => onHover(well.key)}
-            onBlur={onLeave}
-            tabIndex={0}
-            role="button"
-            aria-label={`${well.label} — ${well.answer}`}
-            style={{
-              cursor: "pointer",
-              outline: "none",
-              transformOrigin: `${pos.cx}px ${pos.cy}px`,
-              transform: isHover ? "translateY(-4px) scale(1.05)" : "none",
-              transition: "transform 0.28s cubic-bezier(0.16,1,0.3,1)",
-            }}
-          >
-            {/* Well inner shadow ring */}
-            <circle cx={pos.cx} cy={pos.cy + 2} r={pos.r} fill="rgba(17,17,16,0.15)" />
-            {/* Paint fill */}
-            <circle
-              cx={pos.cx}
-              cy={pos.cy}
-              r={pos.r}
-              fill={fillColor}
-              stroke="#111110"
-              strokeWidth="2.5"
-              style={{ transition: "fill 0.3s ease" }}
-            />
-            {/* Gloss */}
-            <circle cx={pos.cx} cy={pos.cy} r={pos.r - 2} fill="url(#well-gloss)" pointerEvents="none" />
-
-            {/* Emoji — big, centered */}
-            <text
-              x={pos.cx}
-              y={pos.cy + pos.r * 0.18}
-              textAnchor="middle"
-              fontSize={pos.r * 0.95}
-              style={{ userSelect: "none", pointerEvents: "none" }}
-            >
-              {well.emoji}
-            </text>
-
-            {/* Invisible hit pad for easier tapping */}
-            <circle cx={pos.cx} cy={pos.cy} r={pos.r + 6} fill="transparent" />
-          </g>
-        );
-      })}
-    </svg>
-  );
-}
-
-/* ══════════════════════════════════════════════════════════════════
-   CLASSIC DASHBOARD (original, unchanged visually — just extracted)
-   ══════════════════════════════════════════════════════════════════ */
-function ClassicDashboard({
-  profile, artworks, stats, tasks, events, recentSales, notifications,
-  loaded, notifTab, setNotifTab,
-  markRead, markAllRead, deleteNotification, clearAll,
-  fname, unreadCount, filteredNotifs, initials, today, greeting, greetEmoji,
-}: any) {
-  return (
-    <div>
-      {/* HEADER */}
-      <div className="ripe-in dash-header" style={{ marginBottom: 28, display: "flex", alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap", gap: 16 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-          <div className="dash-avatar" style={{ width: 56, height: 56, borderRadius: 18, border: "2.5px solid #111110", background: "#FFD400", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, fontWeight: 900, color: "#111110", overflow: "hidden", boxShadow: "3px 3px 0 #111110", flexShrink: 0 }}>
-            {profile?.avatar_url
-              ? <img src={profile.avatar_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-              : initials}
-          </div>
-          <div>
-            <div style={{ fontSize: 11, fontWeight: 700, color: "#9B8F7A", textTransform: "uppercase", letterSpacing: "0.15em", marginBottom: 2 }}>
-              {today.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
-            </div>
-            <h1 style={{ fontSize: "clamp(20px, 3vw, 34px)", fontWeight: 900, color: "#111110", letterSpacing: "-0.8px", margin: 0, lineHeight: 1.1 }}>
-              {greetEmoji} {greeting}, {fname}
-            </h1>
-          </div>
-        </div>
-        <div className="dash-header-actions" style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-          {profile?.username && (
-            <Link href={`/${profile.username}`} style={{ textDecoration: "none" }}>
-              <button style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 16px", border: "2px solid #E8E0D0", borderRadius: 12, background: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", transition: "all 0.15s", fontFamily: "inherit", color: "#111110" }}
-                onMouseEnter={e => { const el = e.currentTarget; el.style.borderColor = "#111110"; el.style.boxShadow = "2px 2px 0 #111110"; }}
-                onMouseLeave={e => { const el = e.currentTarget; el.style.borderColor = "#E8E0D0"; el.style.boxShadow = "none"; }}>
-                <ExternalLink size={13} /> Portfolio
-              </button>
-            </Link>
-          )}
-          <Link href="/dashboard/artworks/new" style={{ textDecoration: "none" }}>
-            <button style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 18px", background: "#FFD400", border: "2.5px solid #111110", borderRadius: 12, fontSize: 13, fontWeight: 800, cursor: "pointer", boxShadow: "3px 3px 0 #111110", transition: "all 0.15s cubic-bezier(0.16,1,0.3,1)", fontFamily: "inherit", color: "#111110" }}
-              onMouseEnter={e => { const el = e.currentTarget; el.style.transform = "translate(-1px,-1px)"; el.style.boxShadow = "4px 4px 0 #111110"; }}
-              onMouseLeave={e => { const el = e.currentTarget; el.style.transform = ""; el.style.boxShadow = "3px 3px 0 #111110"; }}>
-              <Plus size={14} strokeWidth={3} /> Add Artwork
-            </button>
-          </Link>
-        </div>
-      </div>
-
-      {/* STATS */}
-      <div className="ripe-in dash-stats" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14, marginBottom: 24, animationDelay: "0.08s" }}>
-        {[
-          { label: "Total Works",  value: stats.artworks,      icon: Package,     color: "#FFD400" },
-          { label: "Available",    value: stats.available,     icon: Eye,         color: "#4ECDC4" },
-          { label: "Followers",    value: stats.followers,     icon: Users,       color: "#FF6B6B" },
-          { label: "Active Tasks", value: stats.tasks_pending, icon: CheckSquare, color: "#8B5CF6" },
-        ].map((stat, i) => {
-          const Icon = stat.icon;
-          return (
-            <div key={stat.label} className="stat-card" style={{ animationDelay: `${0.1 + i * 0.05}s` }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-                <div style={{ width: 36, height: 36, borderRadius: 11, background: stat.color, border: "2px solid #111110", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  <Icon size={16} color="#111110" />
-                </div>
-                <span style={{ fontSize: 10, fontWeight: 800, color: "#9B8F7A", textTransform: "uppercase", letterSpacing: "0.12em" }}>{stat.label}</span>
-              </div>
-              <div style={{ fontSize: 32, fontWeight: 900, color: "#111110", lineHeight: 1, letterSpacing: "-1px" }}>
-                {loaded ? <AnimNum target={stat.value} /> : "—"}
-              </div>
-              <div className="stat-accent" style={{ background: stat.color }} />
-            </div>
-          );
-        })}
-      </div>
-
-      {/* MAIN GRID */}
-      <div className="dash-main-grid" style={{ display: "grid", gridTemplateColumns: "1fr 380px", gap: 20, marginBottom: 28, alignItems: "start" }}>
-        {/* LEFT */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-          {/* Recent Artworks */}
-          <div className="ripe-card-static ripe-in" style={{ animationDelay: "0.15s" }}>
-            <div className="sec-header">
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <div style={{ width: 8, height: 8, borderRadius: 3, background: "#FFD400", border: "1.5px solid #111110" }} />
-                <span style={{ fontSize: 14, fontWeight: 900, color: "#111110" }}>Recent Artworks</span>
-              </div>
-              <Link href="/dashboard/artworks" style={{ textDecoration: "none", display: "flex", alignItems: "center", gap: 4, fontSize: 12, fontWeight: 700, color: "#9B8F7A", transition: "color 0.15s" }}>
-                View all <ArrowRight size={12} />
-              </Link>
-            </div>
-            {artworks.length > 0 ? (
-              <div className="dash-artworks-grid" style={{ padding: 16, display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12 }}>
-                {artworks.slice(0, 8).map((aw: any) => {
-                  const img = Array.isArray(aw.images) ? aw.images[0] : null;
-                  const sc = STATUS_DOT[String(aw.status).toLowerCase()] || "#9B8F7A";
-                  return (
-                    <Link key={aw.id} href={`/dashboard/artworks/${aw.id}`} className="aw-mini">
-                      <div style={{ aspectRatio: "1/1", background: "#FAF7F3", position: "relative", overflow: "hidden" }}>
-                        {img
-                          ? <img src={img} alt={aw.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                          : <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}><ImageIcon size={24} color="#D4C9A8" /></div>}
-                        <div style={{ position: "absolute", top: 6, right: 6, width: 8, height: 8, borderRadius: "50%", background: sc, border: "1.5px solid #fff", boxShadow: "0 1px 3px rgba(0,0,0,0.2)" }} />
-                      </div>
-                      <div style={{ padding: "7px 9px 9px" }}>
-                        <div style={{ fontSize: 11, fontWeight: 700, color: "#111110", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{aw.title}</div>
-                        {aw.price && <div style={{ fontSize: 10, color: "#9B8F7A", fontWeight: 600 }}>${aw.price.toLocaleString()}</div>}
-                      </div>
-                    </Link>
-                  );
-                })}
-              </div>
-            ) : (
-              <div style={{ padding: "32px 20px", textAlign: "center" }}>
-                <div style={{ fontSize: 32, marginBottom: 8 }}>🖼️</div>
-                <div style={{ fontSize: 13, fontWeight: 700, color: "#9B8F7A", marginBottom: 12 }}>No artworks yet</div>
-                <Link href="/dashboard/artworks/new" style={{ textDecoration: "none" }}>
-                  <button style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 16px", background: "#FFD400", border: "2px solid #111110", borderRadius: 10, fontSize: 12, fontWeight: 800, cursor: "pointer", fontFamily: "inherit", color: "#111110", boxShadow: "2px 2px 0 #111110" }}>
-                    <Plus size={13} strokeWidth={3} /> Add your first artwork
-                  </button>
-                </Link>
-              </div>
-            )}
-          </div>
-
-          {/* Quick Nav */}
-          <div className="ripe-in" style={{ animationDelay: "0.2s" }}>
-            <div style={{ fontSize: 11, fontWeight: 800, color: "#9B8F7A", textTransform: "uppercase", letterSpacing: "0.15em", marginBottom: 12, paddingLeft: 4 }}>Quick Access</div>
-            <div className="dash-quick-nav" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
-              {QUICK_NAV.map((item) => {
-                const Icon = item.icon;
-                return (
-                  <Link key={item.href} href={item.href} style={{ textDecoration: "none" }}>
-                    <div className="qnav-card">
-                      <div className="qnav-icon" style={{ background: item.color }}>
-                        <Icon size={18} color="#111110" />
-                      </div>
-                      <div>
-                        <div style={{ fontSize: 14, fontWeight: 800, color: "#111110", letterSpacing: "-0.2px" }}>{item.label}</div>
-                        <div style={{ fontSize: 11, fontWeight: 600, color: "#9B8F7A" }}>{item.desc}</div>
-                      </div>
-                    </div>
-                  </Link>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Recent Sales */}
-          {recentSales.length > 0 && (
-            <div className="ripe-card-static ripe-in" style={{ animationDelay: "0.25s" }}>
-              <div className="sec-header">
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <div style={{ width: 8, height: 8, borderRadius: 3, background: "#16A34A", border: "1.5px solid #111110" }} />
-                  <span style={{ fontSize: 14, fontWeight: 900, color: "#111110" }}>Recent Sales</span>
-                </div>
-                <Link href="/dashboard/sales" style={{ textDecoration: "none", display: "flex", alignItems: "center", gap: 4, fontSize: 12, fontWeight: 700, color: "#9B8F7A" }}>
-                  All sales <ArrowRight size={12} />
-                </Link>
-              </div>
-              <div style={{ padding: "8px 18px" }}>
-                {recentSales.map((sale: any) => (
-                  <div key={sale.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 0", borderBottom: "1px solid #F5F0E8" }}>
-                    <div>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: "#111110" }}>{sale.artwork_title || "Artwork"}</div>
-                      <div style={{ fontSize: 11, color: "#9B8F7A", fontWeight: 600 }}>
-                        {sale.sale_date ? new Date(sale.sale_date).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "—"}
-                      </div>
-                    </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <span style={{ fontSize: 15, fontWeight: 900, color: "#111110", fontFamily: "monospace" }}>${sale.sale_price?.toLocaleString()}</span>
-                      <span style={{ padding: "2px 8px", borderRadius: 8, background: sale.status?.toLowerCase() === "completed" ? "#DCFCE7" : "#FEF9C3", color: sale.status?.toLowerCase() === "completed" ? "#16A34A" : "#CA8A04", fontSize: 10, fontWeight: 800, textTransform: "uppercase" }}>{sale.status}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* RIGHT */}
-        <div className="dash-sidebar" style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-          {/* Notifications */}
-          <div className="ripe-card-static ripe-in" style={{ animationDelay: "0.12s" }}>
-            <div className="sec-header" style={{ background: unreadCount > 0 ? "#FFFBEA" : "#FAF7F3" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <div style={{ position: "relative" }}>
-                  <Bell size={16} color="#111110" />
-                  {unreadCount > 0 && (
-                    <div style={{ position: "absolute", top: -5, right: -6, width: 16, height: 16, borderRadius: "50%", background: "#FF6B6B", border: "2px solid #fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 8, fontWeight: 900, color: "#fff" }}>
-                      {unreadCount}
-                    </div>
-                  )}
-                </div>
-                <span style={{ fontSize: 14, fontWeight: 900, color: "#111110" }}>Notifications</span>
-              </div>
-              <div style={{ display: "flex", gap: 6 }}>
-                {unreadCount > 0 && (
-                  <button onClick={markAllRead} style={{ fontSize: 11, fontWeight: 700, color: "#9B8F7A", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit" }}>Mark all read</button>
-                )}
-                {notifications.length > 0 && (
-                  <button onClick={clearAll} style={{ fontSize: 11, fontWeight: 700, color: "#C0B8A8", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit" }}>Clear</button>
-                )}
-              </div>
-            </div>
-            <div style={{ display: "flex", gap: 6, padding: "12px 18px", borderBottom: "1px solid #F5F0E8" }}>
-              <button className={`notif-tab${notifTab === "all" ? " active" : ""}`} onClick={() => setNotifTab("all")}>All</button>
-              <button className={`notif-tab${notifTab === "unread" ? " active" : ""}`} onClick={() => setNotifTab("unread")}>
-                Unread {unreadCount > 0 && `(${unreadCount})`}
-              </button>
-            </div>
-            <div style={{ maxHeight: 340, overflowY: "auto" }}>
-              {filteredNotifs.length === 0 ? (
-                <div style={{ padding: "32px 20px", textAlign: "center" }}>
-                  <div style={{ fontSize: 28, marginBottom: 8 }}>🔔</div>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: "#9B8F7A" }}>{notifTab === "unread" ? "All caught up!" : "No notifications yet"}</div>
-                </div>
-              ) : (
-                filteredNotifs.map((notif: any) => {
-                  const cfg = NOTIF_CFG[notif.type] || NOTIF_CFG.system;
-                  const Icon = cfg.icon;
-                  return (
-                    <div key={notif.id} className="notif-item" onClick={() => markRead(notif.id)}
-                      style={{ background: notif.read ? "transparent" : "#FFFEF5" }}>
-                      <div className="notif-dot" style={{ background: cfg.bg }}>
-                        <Icon size={16} color={cfg.color} />
-                      </div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
-                          <span style={{ fontSize: 13, fontWeight: notif.read ? 600 : 800, color: "#111110" }}>{notif.title}</span>
-                          {!notif.read && <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#FF6B6B", flexShrink: 0 }} />}
-                        </div>
-                        {notif.body && <div style={{ fontSize: 12, color: "#9B8F7A", fontWeight: 500, lineHeight: 1.4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{notif.body}</div>}
-                        <div style={{ fontSize: 10, color: "#C0B8A8", fontWeight: 600, marginTop: 4 }}>{timeAgo(notif.created_at)}</div>
-                      </div>
-                      <button className="notif-del" onClick={(e) => { e.stopPropagation(); deleteNotification(notif.id); }}>
-                        <X size={12} />
-                      </button>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-          </div>
-
-          {/* Events */}
-          <div className="ripe-card-static ripe-in" style={{ animationDelay: "0.18s" }}>
-            <div className="sec-header">
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <div style={{ width: 8, height: 8, borderRadius: 3, background: "#4ECDC4", border: "1.5px solid #111110" }} />
-                <span style={{ fontSize: 14, fontWeight: 900, color: "#111110" }}>Upcoming Events</span>
-              </div>
-              <Link href="/dashboard/exhibitions" style={{ textDecoration: "none", display: "flex", alignItems: "center", gap: 4, fontSize: 12, fontWeight: 700, color: "#9B8F7A" }}>
-                All <ArrowRight size={12} />
-              </Link>
-            </div>
-            <div style={{ padding: "4px 18px 12px" }}>
-              {events.length === 0 ? (
-                <div style={{ padding: "20px 0", textAlign: "center" }}>
-                  <div style={{ fontSize: 24, marginBottom: 6 }}>📅</div>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: "#9B8F7A" }}>No upcoming events</div>
-                </div>
-              ) : (
-                events.map((ev: any) => {
-                  const sc = ev.status === "Active" ? "#16A34A" : ev.status === "Planning" ? "#CA8A04" : "#9B8F7A";
-                  return (
-                    <div key={ev.id} className="event-row">
-                      <div style={{ width: 40, height: 40, borderRadius: 12, background: "#F5F0E8", border: "1.5px solid #E0D8CA", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                        <CalendarDays size={16} color="#9B8F7A" />
-                      </div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 13, fontWeight: 700, color: "#111110", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ev.title}</div>
-                        <div style={{ fontSize: 11, color: "#9B8F7A", fontWeight: 600 }}>
-                          {ev.venue ? `${ev.venue} · ` : ""}
-                          {ev.start_date ? new Date(ev.start_date).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "No date"}
-                        </div>
-                      </div>
-                      <div style={{ padding: "2px 8px", borderRadius: 8, background: sc + "18", color: sc, fontSize: 9, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.06em", flexShrink: 0 }}>{ev.status}</div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-          </div>
-
-          {/* Tasks */}
-          <div className="ripe-card-static ripe-in" style={{ animationDelay: "0.22s" }}>
-            <div className="sec-header">
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <div style={{ width: 8, height: 8, borderRadius: 3, background: "#8B5CF6", border: "1.5px solid #111110" }} />
-                <span style={{ fontSize: 14, fontWeight: 900, color: "#111110" }}>Active Tasks</span>
-              </div>
-              <Link href="/dashboard/tasks" style={{ textDecoration: "none", display: "flex", alignItems: "center", gap: 4, fontSize: 12, fontWeight: 700, color: "#9B8F7A" }}>
-                All <ArrowRight size={12} />
-              </Link>
-            </div>
-            <div style={{ padding: "4px 18px 12px" }}>
-              {tasks.length === 0 ? (
-                <div style={{ padding: "20px 0", textAlign: "center" }}>
-                  <div style={{ fontSize: 24, marginBottom: 6 }}>✅</div>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: "#9B8F7A" }}>No active tasks</div>
-                </div>
-              ) : (
-                tasks.map((task: any) => {
-                  const pc = PRIORITY_COLOR[task.priority] || "#9B8F7A";
-                  return (
-                    <div key={task.id} className="task-row">
-                      <div style={{ width: 4, height: 36, borderRadius: 2, background: pc, flexShrink: 0 }} />
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 13, fontWeight: 700, color: "#111110", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{task.title}</div>
-                        {task.due_date && <div style={{ fontSize: 10, color: "#9B8F7A", fontWeight: 600, marginTop: 2 }}>Due {fmtDate(task.due_date)}</div>}
-                      </div>
-                      <div style={{ fontSize: 10, fontWeight: 800, color: pc, background: pc + "20", padding: "2px 8px", borderRadius: 6, flexShrink: 0, textTransform: "uppercase" }}>{task.priority}</div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 /* ══════════════════════════════════════════════════════════════════
    MAIN
    ══════════════════════════════════════════════════════════════════ */
 export default function DashboardPage() {
-  const router = useRouter();
-
-  /* Data */
-  const [profile, setProfile] = useState<any>(null);
+  /* ── Data state ─────────────────────────────────────────────── */
+  const [profile, setProfile] = useState<{ full_name?: string; username?: string; avatar_url?: string } | null>(null);
   const [artworks, setArtworks] = useState<any[]>([]);
-  const [stats, setStats] = useState({ artworks: 0, available: 0, sold: 0, exhibitions: 0, collabs: 0, sales_total: 0, tasks_pending: 0, followers: 0 });
+  const [moodboards, setMoodboards] = useState<any[]>([]);
+  const [stats, setStats] = useState({
+    total: 0, available: 0, in_progress: 0, sold: 0,
+    sales_month: 0, sales_total: 0, followers: 0,
+  });
   const [tasks, setTasks] = useState<any[]>([]);
   const [events, setEvents] = useState<any[]>([]);
-  const [recentSales, setRecentSales] = useState<any[]>([]);
+  const [nextEvent, setNextEvent] = useState<any>(null);
+  const [collabs, setCollabs] = useState<any[]>([]);
   const [notifications, setNotifications] = useState<any[]>([]);
+  const [unreadMessages, setUnreadMessages] = useState(0);
   const [loaded, setLoaded] = useState(false);
-  const [notifTab, setNotifTab] = useState<"all" | "unread">("all");
 
-  /* Focus Mode */
-  const [focusDefault, setFocusDefault] = useState(true); // per-user preference
-  const [preferenceLoaded, setPreferenceLoaded] = useState(false);
-  const [hoverWell, setHoverWell] = useState<WellKey | null>(null);
-  const [pickedWell, setPickedWell] = useState<WellKey | null>(null);
-  const [expandedClassic, setExpandedClassic] = useState(false);
+  /* ── UI state ───────────────────────────────────────────────── */
+  const [todoFilter, setTodoFilter] = useState<"important" | "upcoming">("important");
+  const [bellOpen, setBellOpen] = useState(false);
+  const bellRef = useRef<HTMLDivElement>(null);
 
   const today = new Date();
   const hour = today.getHours();
   const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
-  const greetEmoji = hour < 12 ? "☀️" : hour < 18 ? "🌤️" : "🌙";
 
-  /* Load everything */
+  /* ── Load everything ────────────────────────────────────────── */
   useEffect(() => {
     const supabase = createClient();
     supabase.auth.getUser().then(async ({ data: { user } }: any) => {
       if (!user) return;
 
+      const now = new Date();
+      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+
       const [
         { data: prof },
-        { data: aw },
+        { data: awAll },
+        { data: awRecent },
+        { data: mb },
         { data: tk },
-        { data: eventsData },
-        { data: salesData },
-        { count: ex },
-        { count: co },
-        { count: followerCount },
+        { data: evAll },
+        { data: evNext },
+        { data: co },
         { data: notifs },
+        { data: salesAll },
+        { count: followerCount },
       ] = await Promise.all([
-        // Request focus_mode_default too — will be undefined if column doesn't exist yet
-        supabase.from("profiles").select("full_name,role,username,avatar_url,focus_mode_default").eq("id", user.id).single(),
-        supabase.from("artworks").select("id,title,images,status,price").eq("user_id", user.id).order("created_at", { ascending: false }).limit(8),
-        supabase.from("tasks").select("*").eq("user_id", user.id).neq("status", "done").order("due_date", { ascending: true }).limit(5),
-        supabase.from("exhibitions").select("*").eq("user_id", user.id).gte("end_date", new Date().toISOString().split("T")[0]).order("start_date").limit(3),
-        supabase.from("sales").select("*").eq("user_id", user.id).order("created_at", { ascending: false }).limit(3),
-        supabase.from("exhibitions").select("id", { count: "exact", head: true }).eq("user_id", user.id),
-        supabase.from("collaborations").select("id", { count: "exact", head: true }).eq("user_id", user.id),
+        supabase.from("profiles").select("full_name,username,avatar_url").eq("id", user.id).single(),
+        // Full list for stats
+        supabase.from("artworks").select("id,status").eq("user_id", user.id),
+        // 3 most recent for display
+        supabase.from("artworks").select("id,title,images,status,price").eq("user_id", user.id).order("created_at", { ascending: false }).limit(3),
+        // Moodboards — 2 recent. Assumes a `moodboards` table with cover_image column.
+        // If table/columns differ, query silently returns empty and cell shows its empty state.
+        supabase.from("moodboards").select("id,title,cover_image,created_at").eq("user_id", user.id).order("created_at", { ascending: false }).limit(2),
+        supabase.from("tasks").select("*").eq("user_id", user.id).neq("status", "done").order("due_date", { ascending: true }).limit(4),
+        // Upcoming events (list of 2 for the events card)
+        supabase.from("exhibitions").select("*").eq("user_id", user.id).gte("end_date", new Date().toISOString().split("T")[0]).order("start_date", { ascending: true }).limit(2),
+        // Single next event (for the schedule panel)
+        supabase.from("exhibitions").select("*").eq("user_id", user.id).gte("end_date", new Date().toISOString().split("T")[0]).order("start_date", { ascending: true }).limit(1).single(),
+        // Open collabs from ANY user (community feed) — newest first
+        supabase.from("collaborations").select("id,title,description,type,user_id,status,created_at").eq("status", "Open").order("created_at", { ascending: false }).limit(3),
+        // Notifications for bell dropdown
+        supabase.from("notifications").select("*").eq("user_id", user.id).order("created_at", { ascending: false }).limit(10),
+        // Sales for Studio stats + Money tile
+        supabase.from("sales").select("sale_price,sale_date,status").eq("user_id", user.id),
         supabase.from("follows").select("id", { count: "exact", head: true }).eq("following_id", user.id),
-        supabase.from("notifications").select("*").eq("user_id", user.id).order("created_at", { ascending: false }).limit(20),
       ]);
 
       setProfile(prof);
-
-      // Focus Mode default: column may not exist yet → treat undefined as true
-      // TODO: add `focus_mode_default BOOLEAN DEFAULT true` column to `profiles` table,
-      //       and expose a toggle in /dashboard/profile.
-      const pref = prof?.focus_mode_default;
-      setFocusDefault(pref === false ? false : true);
-      setPreferenceLoaded(true);
-
-      setArtworks(aw || []);
+      setArtworks(awRecent || []);
+      setMoodboards(mb || []);
       setTasks(tk || []);
-      setEvents(eventsData || []);
+      setEvents(evAll || []);
+      setNextEvent(evNext);
       setNotifications(notifs || []);
 
-      if (salesData?.length) {
-        const artIds = salesData.map((s: any) => s.artwork_id).filter(Boolean);
-        const { data: saleArtworks } = await supabase.from("artworks").select("id,title").in("id", artIds);
-        const am: Record<string, string> = {};
-        saleArtworks?.forEach((a: any) => { am[a.id] = a.title; });
-        setRecentSales(salesData.map((s: any) => ({ ...s, artwork_title: am[s.artwork_id] })));
+      // Enrich collabs with poster profile (for avatars)
+      const enrichedCollabs = co || [];
+      if (enrichedCollabs.length) {
+        const uids = enrichedCollabs.map((c: any) => c.user_id).filter(Boolean);
+        if (uids.length) {
+          const { data: posters } = await supabase.from("profiles").select("id,full_name,avatar_url").in("id", uids);
+          const map: Record<string, any> = {};
+          posters?.forEach((p: any) => { map[p.id] = p; });
+          enrichedCollabs.forEach((c: any) => { c.poster = map[c.user_id]; });
+        }
       }
+      setCollabs(enrichedCollabs);
 
-      const awList = aw || [];
-      const completedSales = (salesData || []).filter((s: any) => s.status?.toLowerCase() === "completed");
-      const totalRev = completedSales.reduce((sum: number, s: any) => sum + (s.sale_price || 0), 0);
+      // Compute stats
+      const list = awAll || [];
+      const completed = (salesAll || []).filter((s: any) => s.status?.toLowerCase() === "completed");
+      const totalRev = completed.reduce((a: number, s: any) => a + (s.sale_price || 0), 0);
+      const monthRev = completed
+        .filter((s: any) => s.sale_date && new Date(s.sale_date) >= new Date(monthStart))
+        .reduce((a: number, s: any) => a + (s.sale_price || 0), 0);
 
       setStats({
-        artworks: awList.length,
-        available: awList.filter((a: any) => String(a.status).toLowerCase() === "available").length,
-        sold: awList.filter((a: any) => String(a.status).toLowerCase() === "sold").length,
-        exhibitions: (ex as any) || 0,
-        collabs: (co as any) || 0,
+        total: list.length,
+        available: list.filter((a: any) => String(a.status).toLowerCase() === "available").length,
+        in_progress: list.filter((a: any) => {
+          const s = String(a.status).toLowerCase().replace(/ /g, "_");
+          return s === "in_progress";
+        }).length,
+        sold: list.filter((a: any) => String(a.status).toLowerCase() === "sold").length,
+        sales_month: monthRev,
         sales_total: totalRev,
-        tasks_pending: (tk || []).length,
         followers: followerCount || 0,
       });
+
+      // Unread message count — messages table may not exist yet; treat errors as 0.
+      try {
+        const { count } = await supabase
+          .from("messages")
+          .select("id", { count: "exact", head: true })
+          .eq("recipient_id", user.id)
+          .eq("read", false);
+        setUnreadMessages(count || 0);
+      } catch {
+        setUnreadMessages(0);
+      }
 
       setLoaded(true);
     });
   }, []);
 
-  /* Session-scoped classic expansion memory */
+  /* ── Close bell dropdown on outside click ──────────────────── */
   useEffect(() => {
-    try {
-      const stored = sessionStorage.getItem("atelier_expanded_classic");
-      if (stored === "1") setExpandedClassic(true);
-    } catch {}
-  }, []);
-  useEffect(() => {
-    try { sessionStorage.setItem("atelier_expanded_classic", expandedClassic ? "1" : "0"); } catch {}
-  }, [expandedClassic]);
+    function onDown(e: MouseEvent) {
+      if (bellRef.current && !bellRef.current.contains(e.target as Node)) setBellOpen(false);
+    }
+    if (bellOpen) document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [bellOpen]);
 
+  /* ── Notification actions ──────────────────────────────────── */
   async function markRead(id: string) {
     const supabase = createClient();
     await supabase.from("notifications").update({ read: true }).eq("id", id);
@@ -723,535 +194,1262 @@ export default function DashboardPage() {
     await supabase.from("notifications").update({ read: true }).eq("user_id", user.id).eq("read", false);
     setNotifications(p => p.map(n => ({ ...n, read: true })));
   }
-  async function deleteNotification(id: string) {
-    const supabase = createClient();
-    await supabase.from("notifications").delete().eq("id", id);
-    setNotifications(p => p.filter(n => n.id !== id));
-  }
-  async function clearAll() {
-    if (!confirm("Clear all notifications?")) return;
-    const supabase = createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-    await supabase.from("notifications").delete().eq("user_id", user.id);
-    setNotifications([]);
-  }
 
+  /* ── Computed ─────────────────────────────────────────────── */
   const fname = profile?.full_name?.split(" ")[0] || "Artist";
-  const unreadCount = notifications.filter(n => !n.read).length;
-  const filteredNotifs = notifTab === "unread" ? notifications.filter(n => !n.read) : notifications;
   const initials = profile?.full_name
     ? profile.full_name.split(" ").map((w: string) => w[0]).join("").slice(0, 2).toUpperCase()
     : "A";
+  const unreadNotifs = notifications.filter(n => !n.read).length;
+  const storeUrl = profile?.username ? `/${profile.username}` : null;
 
-  /* ── Classic-only path (user's preference) ─────────────────── */
-  if (preferenceLoaded && !focusDefault) {
-    return (
-      <>
-        <ClassicStyles />
-        <ClassicDashboard
-          profile={profile} artworks={artworks} stats={stats} tasks={tasks}
-          events={events} recentSales={recentSales} notifications={notifications}
-          loaded={loaded} notifTab={notifTab} setNotifTab={setNotifTab}
-          markRead={markRead} markAllRead={markAllRead}
-          deleteNotification={deleteNotification} clearAll={clearAll}
-          fname={fname} unreadCount={unreadCount} filteredNotifs={filteredNotifs}
-          initials={initials} today={today} greeting={greeting} greetEmoji={greetEmoji}
-        />
-      </>
-    );
-  }
+  // Todos filter: important = high priority, upcoming = has due date
+  const filteredTasks = tasks.filter(t => {
+    if (todoFilter === "important") return t.priority === "high";
+    return !!t.due_date;
+  }).slice(0, 3);
 
-  /* Well handling */
-  function pickWell(k: WellKey) {
-    const well = WELLS.find(w => w.key === k);
-    if (!well) return;
-    // Direct navigation (Messages)
-    if (well.href) {
-      router.push(well.href);
-      return;
-    }
-    setPickedWell(k);
-  }
-  const picked = pickedWell ? WELLS.find(w => w.key === pickedWell) : null;
+  const addWorkTileCount = Math.max(0, 3 - artworks.length); // pad work grid to show at least the add tile
 
-  /* ══════════════════════════════════════════════════════════════════
-     FOCUS MODE RENDER
-     ══════════════════════════════════════════════════════════════════ */
   return (
     <>
-      <FocusStyles />
-      <ClassicStyles />
+      <style>{`
+        /* ══ SHARED CELL CHASSIS ══ */
+        .cell {
+          background: #fff;
+          border: 2.5px solid #111110;
+          border-radius: 18px;
+          box-shadow: 4px 5px 0 #D4C9A8;
+          padding: 18px 20px 20px;
+          overflow: hidden;
+          position: relative;
+          transition: box-shadow 0.25s, transform 0.25s;
+        }
+        .cell-title {
+          font-size: 15px;
+          font-weight: 900;
+          color: #111110;
+          letter-spacing: -0.3px;
+          margin: 0 0 4px;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          line-height: 1.1;
+        }
+        .cell-title::before {
+          content: "";
+          width: 8px; height: 8px; border-radius: 3px;
+          border: 1.5px solid #111110;
+          background: var(--dot, #FFD400);
+          flex-shrink: 0;
+        }
+        .cell-meta {
+          font-size: 11px; font-weight: 600;
+          color: #9B8F7A;
+          margin-bottom: 14px;
+          font-style: italic;
+        }
 
-      <div className="focus-root">
-        {/* ═══ GREETING + QUESTION + EXPLAINER ═══ */}
-        <div className="focus-hero">
-          <div className="focus-greet">
-            {greeting}, <span className="focus-name">{fname}</span>.
+        /* ══ HEADER ══ */
+        .db-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 16px;
+          flex-wrap: wrap;
+          margin-bottom: 22px;
+        }
+        .db-hello { display: flex; align-items: center; gap: 14px; }
+        .db-avatar {
+          width: 52px; height: 52px;
+          border-radius: 16px;
+          border: 2.5px solid #111110;
+          background: #FFD400;
+          display: flex; align-items: center; justify-content: center;
+          font-size: 20px; font-weight: 900; color: #111110;
+          box-shadow: 3px 3px 0 #111110;
+          flex-shrink: 0;
+          overflow: hidden;
+        }
+        .db-date {
+          font-size: 11px; font-weight: 800;
+          color: #9B8F7A;
+          text-transform: uppercase;
+          letter-spacing: 0.14em;
+          margin-bottom: 2px;
+        }
+        .db-h1 {
+          font-size: 28px; font-weight: 900;
+          letter-spacing: -0.8px;
+          margin: 0; line-height: 1.05;
+          color: #111110;
+        }
+        .db-add-btn {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          padding: 10px 18px;
+          background: #FFD400;
+          border: 2.5px solid #111110;
+          border-radius: 12px;
+          font-size: 13px; font-weight: 800;
+          box-shadow: 3px 3px 0 #111110;
+          cursor: pointer;
+          font-family: inherit;
+          color: #111110;
+          text-decoration: none;
+          transition: transform 0.15s, box-shadow 0.15s;
+        }
+        .db-add-btn:hover {
+          transform: translate(-1px, -1px);
+          box-shadow: 4px 4px 0 #111110;
+        }
+
+        /* ══ BENTO GRID ══ */
+        .bento {
+          display: grid;
+          grid-template-columns: 1.35fr 0.95fr 0.7fr;
+          grid-template-rows: auto auto;
+          gap: 16px;
+        }
+
+        /* ── My Studio (big, top-left) ── */
+        .c-studio { grid-column: 1; grid-row: 1; }
+        .c-studio .cell-title { --dot: #FFD400; }
+        .studio-stats {
+          display: flex;
+          gap: 20px;
+          padding: 10px 14px;
+          background: #FFFBEA;
+          border: 2px solid #111110;
+          border-radius: 12px;
+          margin-bottom: 18px;
+          overflow-x: auto;
+        }
+        .studio-stat {
+          display: flex;
+          flex-direction: column;
+          min-width: 0;
+          padding-right: 20px;
+          border-right: 1.5px dashed #E8E0D0;
+        }
+        .studio-stat:last-child { border-right: none; padding-right: 0; }
+        .studio-stat-label {
+          font-size: 9.5px; font-weight: 800; color: #9B8F7A;
+          text-transform: uppercase; letter-spacing: 0.12em;
+          margin-bottom: 2px; white-space: nowrap;
+        }
+        .studio-stat-value {
+          font-size: 20px; font-weight: 900; color: #111110;
+          letter-spacing: -0.5px; line-height: 1; white-space: nowrap;
+        }
+        .studio-sub {
+          font-size: 11px; font-weight: 800; color: #5C5346;
+          text-transform: uppercase; letter-spacing: 0.12em;
+          margin: 2px 0 10px;
+          display: flex; align-items: center; justify-content: space-between;
+        }
+        .view-all {
+          font-size: 10.5px; color: #9B8F7A;
+          font-weight: 700;
+          letter-spacing: 0.06em;
+          text-transform: none;
+          display: inline-flex; align-items: center; gap: 3px;
+          text-decoration: none;
+          transition: color 0.15s;
+        }
+        .view-all:hover { color: #111110; }
+
+        .works-grid {
+          display: grid;
+          grid-template-columns: repeat(4, 1fr);
+          gap: 10px;
+          margin-bottom: 16px;
+        }
+        .work-tile {
+          aspect-ratio: 1 / 1;
+          border: 2px solid #111110;
+          border-radius: 12px;
+          background: #FAF7F3;
+          overflow: hidden;
+          position: relative;
+          box-shadow: 2px 2px 0 #D4C9A8;
+          transition: all 0.2s;
+          cursor: pointer;
+          text-decoration: none;
+          color: inherit;
+          display: block;
+        }
+        .work-tile:hover {
+          border-color: #111110;
+          box-shadow: 3px 3px 0 #111110;
+          transform: translate(-1px, -1px);
+        }
+        .work-tile img {
+          width: 100%; height: 100%; object-fit: cover; display: block;
+        }
+        .work-tile-empty {
+          width: 100%; height: 100%;
+          display: flex; align-items: center; justify-content: center;
+          color: #D4C9A8;
+        }
+        .work-tile-title {
+          position: absolute;
+          left: 8px; right: 8px; bottom: 8px;
+          background: rgba(17,17,16,0.82);
+          color: #fff;
+          font-size: 10px; font-weight: 800;
+          padding: 3px 7px;
+          border-radius: 6px;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+        .work-tile-add {
+          background: #FAF7F3;
+          border: 2px dashed #9B8F7A;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex-direction: column;
+          gap: 4px;
+          box-shadow: none;
+        }
+        .work-tile-add:hover { border-color: #111110; border-style: solid; background: #FFFBEA; }
+        .work-tile-add-plus {
+          width: 30px; height: 30px;
+          border-radius: 50%;
+          border: 2px solid #111110;
+          background: #fff;
+          display: flex; align-items: center; justify-content: center;
+          font-size: 20px; font-weight: 900; color: #111110;
+          line-height: 1;
+        }
+        .work-tile-add-lbl {
+          font-size: 10px; font-weight: 800;
+          color: #5C5346;
+          text-transform: uppercase;
+          letter-spacing: 0.1em;
+          margin-top: 2px;
+        }
+
+        .studio-bottom {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 14px;
+          padding-top: 16px;
+          border-top: 1.5px dashed #E8E0D0;
+        }
+        .studio-subcell-title {
+          font-size: 12px; font-weight: 800; color: #111110;
+          text-transform: uppercase; letter-spacing: 0.1em;
+          margin-bottom: 8px;
+          display: flex; align-items: center; gap: 6px;
+        }
+        .studio-subcell-title::before {
+          content: "";
+          width: 6px; height: 6px; border-radius: 2px;
+          border: 1.5px solid #111110;
+        }
+        .front-door-title::before { background: #FF6B6B; }
+        .moodboard-title::before { background: #95E1D3; }
+        .front-door-row { display: flex; gap: 8px; align-items: center; }
+        .front-door-btn {
+          padding: 7px 12px;
+          background: #111110;
+          color: #FFD400;
+          border: 2px solid #111110;
+          border-radius: 9px;
+          font-size: 11.5px; font-weight: 800;
+          cursor: pointer; font-family: inherit;
+          box-shadow: 2px 2px 0 #FFD400;
+          white-space: nowrap;
+          text-decoration: none;
+          transition: transform 0.15s, box-shadow 0.15s;
+        }
+        .front-door-btn:hover { transform: translate(-1px, -1px); box-shadow: 3px 3px 0 #FFD400; }
+        .front-door-url {
+          flex: 1; min-width: 0;
+          padding: 7px 10px;
+          background: #FAF7F3;
+          border: 2px dashed #D4C9A8;
+          border-radius: 9px;
+          font-size: 11px;
+          color: #5C5346;
+          font-family: monospace;
+          font-weight: 700;
+          overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+          display: flex; align-items: center; gap: 6px;
+          text-decoration: none;
+          transition: border-color 0.15s, background 0.15s;
+        }
+        .front-door-url:hover { border-color: #111110; background: #FFFBEA; }
+        .moodboard-row {
+          display: grid;
+          grid-template-columns: 1fr 1fr auto;
+          gap: 6px;
+          align-items: stretch;
+        }
+        .moodboard-tile {
+          aspect-ratio: 1 / 1;
+          border: 2px solid #111110;
+          border-radius: 10px;
+          background: #F0EDFF;
+          overflow: hidden;
+          position: relative;
+          box-shadow: 2px 2px 0 #D4C9A8;
+          text-decoration: none;
+          transition: all 0.2s;
+          display: block;
+        }
+        .moodboard-tile:hover { box-shadow: 3px 3px 0 #111110; transform: translate(-1px, -1px); }
+        .moodboard-tile:nth-of-type(2) { background: #FFF4D6; }
+        .moodboard-tile img { width: 100%; height: 100%; object-fit: cover; }
+        .moodboard-tile-add {
+          width: 36px;
+          aspect-ratio: 1 / 1;
+          background: #FAF7F3;
+          border: 2px dashed #9B8F7A;
+          border-radius: 10px;
+          display: flex; align-items: center; justify-content: center;
+          font-size: 18px; font-weight: 900;
+          color: #111110;
+          align-self: stretch;
+          text-decoration: none;
+          transition: all 0.15s;
+        }
+        .moodboard-tile-add:hover { border-color: #111110; border-style: solid; background: #FFFBEA; }
+
+        /* ── The Scene (cols 2+3 row 1) ── */
+        .c-scene { grid-column: 2 / 4; grid-row: 1; }
+        .c-scene .cell-title { --dot: #FF6B6B; }
+        .scene-inner {
+          display: grid;
+          grid-template-columns: 1.2fr 1fr;
+          gap: 14px;
+          height: calc(100% - 44px);
+        }
+
+        /* Collabs column */
+        .collabs-feed {
+          background: #FFFBEA;
+          border: 2px solid #E8E0D0;
+          border-radius: 12px;
+          padding: 12px 14px;
+        }
+        .collabs-header {
+          display: flex; align-items: center; justify-content: space-between;
+          margin-bottom: 10px;
+        }
+        .collabs-header-label {
+          font-size: 10px; font-weight: 800; color: #9B8F7A;
+          text-transform: uppercase; letter-spacing: 0.12em;
+        }
+        .collabs-post-btn {
+          padding: 5px 10px;
+          background: #111110; color: #FFD400;
+          border: 1.5px solid #111110;
+          border-radius: 8px;
+          font-size: 10px; font-weight: 800;
+          cursor: pointer; font-family: inherit;
+          display: inline-flex; align-items: center; gap: 4px;
+          text-decoration: none;
+          transition: transform 0.15s;
+        }
+        .collabs-post-btn:hover { transform: translate(-1px, -1px); }
+        .collab-item {
+          display: flex; align-items: center; gap: 10px;
+          padding: 8px 0;
+          border-bottom: 1px dashed #E8E0D0;
+          text-decoration: none;
+          color: inherit;
+        }
+        .collab-item:last-child { border-bottom: none; }
+        .collab-item:hover .collab-name { color: #8B5CF6; }
+        .collab-avatar {
+          width: 28px; height: 28px;
+          border-radius: 50%;
+          border: 1.5px solid #111110;
+          display: flex; align-items: center; justify-content: center;
+          font-size: 11px; font-weight: 900;
+          flex-shrink: 0;
+          overflow: hidden;
+        }
+        .collab-body { flex: 1; min-width: 0; }
+        .collab-name {
+          font-size: 11.5px; font-weight: 800;
+          color: #111110;
+          overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+          transition: color 0.15s;
+        }
+        .collab-desc {
+          font-size: 10.5px; color: #9B8F7A;
+          font-weight: 600;
+          overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        }
+
+        /* Events card + map — right column of Scene */
+        .scene-side {
+          display: flex; flex-direction: column; gap: 10px;
+          min-height: 0;
+        }
+        .events-card {
+          background: #FFFBEA;
+          border: 2px solid #E8E0D0;
+          border-radius: 12px;
+          padding: 12px 14px;
+        }
+        .events-header {
+          font-size: 10px; font-weight: 800;
+          color: #9B8F7A;
+          text-transform: uppercase;
+          letter-spacing: 0.12em;
+          margin-bottom: 8px;
+        }
+        .event-item {
+          display: flex; gap: 10px;
+          padding: 6px 0;
+          border-bottom: 1px dashed #E8E0D0;
+          text-decoration: none;
+          color: inherit;
+        }
+        .event-item:last-child { border-bottom: none; }
+        .event-item:hover .event-title { color: #4ECDC4; }
+        .event-date {
+          width: 34px;
+          border: 1.5px solid #111110;
+          border-radius: 7px;
+          background: #fff;
+          display: flex; flex-direction: column;
+          align-items: center; justify-content: center;
+          flex-shrink: 0;
+          padding: 2px 0;
+        }
+        .event-date-month {
+          font-size: 8px; font-weight: 800;
+          color: #9B8F7A;
+          text-transform: uppercase;
+          letter-spacing: 0.06em;
+          line-height: 1;
+        }
+        .event-date-day {
+          font-size: 13px; font-weight: 900;
+          color: #111110;
+          line-height: 1;
+          margin-top: 1px;
+        }
+        .event-body { flex: 1; min-width: 0; }
+        .event-title {
+          font-size: 11.5px; font-weight: 800;
+          color: #111110;
+          overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+          transition: color 0.15s;
+        }
+        .event-venue {
+          font-size: 10px; color: #9B8F7A;
+          font-weight: 600;
+          overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        }
+
+        /* Prague map preview */
+        .scene-map {
+          position: relative;
+          border: 2px solid #111110;
+          border-radius: 12px;
+          overflow: hidden;
+          box-shadow: 2px 2px 0 #D4C9A8;
+          cursor: pointer;
+          min-height: 150px;
+          flex: 1;
+          display: flex;
+          align-items: flex-end;
+          background: #E8E4D8;
+          transition: all 0.2s;
+          text-decoration: none;
+        }
+        .scene-map:hover {
+          box-shadow: 3px 3px 0 #111110;
+          transform: translate(-1px, -1px);
+        }
+        .scene-map-svg {
+          position: absolute; inset: 0;
+          width: 100%; height: 100%;
+        }
+        .scene-map-label {
+          position: relative; z-index: 2;
+          background: rgba(17,17,16,0.92);
+          color: #FFD400;
+          padding: 9px 12px;
+          margin: 10px;
+          border-radius: 9px;
+          border: 1.5px solid #111110;
+          display: flex; align-items: center; gap: 8px;
+          width: calc(100% - 20px);
+        }
+        .scene-map-label-text { flex: 1; min-width: 0; }
+        .scene-map-title {
+          font-size: 12px; font-weight: 900;
+          line-height: 1.1;
+        }
+        .scene-map-sub {
+          font-size: 9.5px; font-weight: 700;
+          color: rgba(255, 212, 0, 0.7);
+          text-transform: uppercase;
+          letter-spacing: 0.1em;
+          margin-top: 2px;
+        }
+        .scene-map-arrow { font-size: 14px; font-weight: 900; color: #FFD400; flex-shrink: 0; }
+
+        /* ── Planning (row 2 col 1) ── */
+        .c-planning { grid-column: 1; grid-row: 2; }
+        .c-planning .cell-title { --dot: #8B5CF6; }
+        .planning-row {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 12px;
+        }
+        .planning-col { display: flex; flex-direction: column; gap: 8px; }
+        .planning-col-title {
+          font-size: 11px; font-weight: 800;
+          color: #9B8F7A;
+          text-transform: uppercase;
+          letter-spacing: 0.12em;
+          display: flex; align-items: center; gap: 6px;
+          margin-bottom: 2px;
+        }
+        .planning-col-title-count {
+          background: #8B5CF6; color: #fff;
+          font-size: 9.5px;
+          padding: 1px 6px;
+          border-radius: 10px;
+          font-weight: 900;
+        }
+        .todo-pills {
+          display: flex; gap: 4px; margin-bottom: 4px;
+        }
+        .todo-pill {
+          padding: 3px 10px;
+          background: #fff;
+          border: 1.5px solid #E8E0D0;
+          border-radius: 9999px;
+          font-size: 10px; font-weight: 800;
+          color: #9B8F7A;
+          cursor: pointer;
+          font-family: inherit;
+          transition: all 0.15s;
+        }
+        .todo-pill:hover { border-color: #111110; color: #111110; }
+        .todo-pill.active {
+          background: #111110;
+          border-color: #111110;
+          color: #FFD400;
+        }
+        .todo-item {
+          display: flex; align-items: center; gap: 8px;
+          padding: 7px 10px;
+          background: #FFFBEA;
+          border: 1.5px solid #E8E0D0;
+          border-radius: 9px;
+          font-size: 11.5px;
+          color: #111110;
+          font-weight: 700;
+          text-decoration: none;
+          overflow: hidden;
+        }
+        .todo-item:hover { border-color: #111110; }
+        .todo-item-text {
+          flex: 1; min-width: 0;
+          overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        }
+        .todo-check {
+          width: 13px; height: 13px;
+          border: 1.5px solid #111110;
+          border-radius: 3px;
+          background: #fff;
+          flex-shrink: 0;
+        }
+        .todo-add {
+          padding: 7px 10px;
+          border: 1.5px dashed #9B8F7A;
+          border-radius: 9px;
+          font-size: 11.5px;
+          font-weight: 800;
+          color: #5C5346;
+          text-align: left;
+          background: transparent;
+          cursor: pointer;
+          font-family: inherit;
+          display: flex; align-items: center; gap: 6px;
+          text-decoration: none;
+          transition: all 0.15s;
+        }
+        .todo-add:hover { border-color: #111110; border-style: solid; color: #111110; background: #FFFBEA; }
+
+        .schedule-card {
+          background: #FFFBEA;
+          border: 1.5px solid #E8E0D0;
+          border-radius: 12px;
+          padding: 14px 14px;
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+          height: 100%;
+        }
+        .schedule-date {
+          font-size: 32px; font-weight: 900;
+          color: #111110;
+          letter-spacing: -1.2px;
+          line-height: 1;
+        }
+        .schedule-date-month {
+          font-size: 10px; font-weight: 800;
+          color: #9B8F7A;
+          text-transform: uppercase;
+          letter-spacing: 0.14em;
+          margin-bottom: 2px;
+        }
+        .schedule-next {
+          font-size: 11px; font-weight: 700;
+          color: #5C5346;
+          line-height: 1.4;
+        }
+        .schedule-btn {
+          margin-top: auto;
+          padding: 7px 12px;
+          background: #111110; color: #FFD400;
+          border: 2px solid #111110;
+          border-radius: 9px;
+          font-size: 11px; font-weight: 800;
+          cursor: pointer; font-family: inherit;
+          align-self: flex-start;
+          box-shadow: 2px 2px 0 #FFD400;
+          text-decoration: none;
+          display: inline-flex;
+          transition: transform 0.15s, box-shadow 0.15s;
+        }
+        .schedule-btn:hover { transform: translate(-1px, -1px); box-shadow: 3px 3px 0 #FFD400; }
+
+        /* ── Deals & Money (row 2 col 2) ── */
+        .c-money { grid-column: 2; grid-row: 2; }
+        .c-money .cell-title { --dot: #16A34A; }
+        .money-grid {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 10px;
+        }
+        .money-tile {
+          background: #FFFBEA;
+          border: 2px solid #E8E0D0;
+          border-radius: 12px;
+          padding: 12px 14px;
+          cursor: pointer;
+          transition: all 0.2s;
+          position: relative;
+          text-decoration: none;
+          color: inherit;
+          display: block;
+        }
+        .money-tile:hover {
+          border-color: #111110;
+          box-shadow: 2px 2px 0 #111110;
+          transform: translate(-1px, -1px);
+        }
+        .money-tile-icon {
+          width: 30px; height: 30px;
+          border-radius: 9px;
+          background: #fff;
+          border: 2px solid #111110;
+          display: flex; align-items: center; justify-content: center;
+          margin-bottom: 8px;
+        }
+        .money-tile.sales .money-tile-icon { background: #FFD400; }
+        .money-tile.collectors .money-tile-icon { background: #4ECDC4; }
+        .money-tile.papers .money-tile-icon { background: #FFE4E6; }
+        .money-tile.reach .money-tile-icon { background: #8B5CF6; }
+        .money-tile-name {
+          font-size: 13px; font-weight: 900;
+          color: #111110;
+          letter-spacing: -0.2px;
+          margin-bottom: 2px;
+        }
+        .money-tile-desc {
+          font-size: 10.5px; color: #9B8F7A;
+          font-weight: 600;
+          line-height: 1.3;
+        }
+        .money-tile-num {
+          font-size: 15px; font-weight: 900;
+          color: #111110;
+          letter-spacing: -0.4px;
+          font-family: monospace;
+          margin-top: 4px;
+        }
+
+        /* ── Inbox (row 2 col 3) ── */
+        .c-msgs { grid-column: 3; grid-row: 2; }
+        .c-msgs .cell-title { --dot: #4ECDC4; }
+        .msgs-row {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 10px;
+        }
+        .msg-btn {
+          position: relative;
+          background: #FFFBEA;
+          border: 2px solid #111110;
+          border-radius: 12px;
+          padding: 16px 12px 12px;
+          text-align: center;
+          cursor: pointer;
+          box-shadow: 2px 2px 0 #111110;
+          transition: all 0.2s;
+          text-decoration: none;
+          color: inherit;
+          display: block;
+          font-family: inherit;
+        }
+        .msg-btn:hover {
+          transform: translate(-1px, -1px);
+          box-shadow: 3px 3px 0 #111110;
+        }
+        .msg-btn-icon {
+          display: flex; align-items: center; justify-content: center;
+          margin-bottom: 6px;
+        }
+        .msg-btn-label {
+          font-size: 11px; font-weight: 900;
+          color: #111110;
+          text-transform: uppercase;
+          letter-spacing: 0.08em;
+        }
+        .msg-btn-badge {
+          position: absolute;
+          top: -6px; right: -6px;
+          background: #FF6B6B;
+          color: #fff;
+          font-size: 10px;
+          font-weight: 900;
+          padding: 2px 7px;
+          border-radius: 10px;
+          border: 1.5px solid #111110;
+          min-width: 20px;
+          line-height: 1.3;
+        }
+
+        /* ── Bell dropdown ── */
+        .bell-dropdown {
+          position: absolute;
+          top: calc(100% + 8px);
+          right: 0;
+          width: 320px;
+          max-width: calc(100vw - 32px);
+          background: #fff;
+          border: 2.5px solid #111110;
+          border-radius: 16px;
+          box-shadow: 5px 6px 0 #111110;
+          z-index: 40;
+          overflow: hidden;
+          animation: dropdownIn 0.2s cubic-bezier(0.16,1,0.3,1) both;
+        }
+        @keyframes dropdownIn {
+          from { opacity: 0; transform: translateY(-6px) scale(0.98); }
+          to { opacity: 1; transform: none; }
+        }
+        .bell-drop-head {
+          display: flex; align-items: center; justify-content: space-between;
+          padding: 12px 14px;
+          border-bottom: 2px solid #111110;
+          background: #FFFBEA;
+        }
+        .bell-drop-title {
+          font-size: 13px; font-weight: 900; color: #111110;
+        }
+        .bell-drop-clear {
+          font-size: 10px; font-weight: 800;
+          color: #9B8F7A;
+          background: none; border: none;
+          cursor: pointer; font-family: inherit;
+        }
+        .bell-drop-clear:hover { color: #111110; }
+        .bell-drop-list {
+          max-height: 320px; overflow-y: auto;
+        }
+        .bell-notif-item {
+          display: flex; gap: 10px;
+          padding: 10px 14px;
+          border-bottom: 1px solid #F5F0E8;
+          cursor: pointer;
+          transition: background 0.15s;
+        }
+        .bell-notif-item:hover { background: #FFFBEA; }
+        .bell-notif-item:last-child { border-bottom: none; }
+        .bell-notif-dot {
+          width: 30px; height: 30px;
+          border-radius: 9px;
+          display: flex; align-items: center; justify-content: center;
+          flex-shrink: 0;
+        }
+        .bell-notif-body { flex: 1; min-width: 0; }
+        .bell-notif-title {
+          font-size: 12px; font-weight: 800;
+          color: #111110;
+          display: flex; align-items: center; gap: 5px;
+        }
+        .bell-notif-sub {
+          font-size: 10.5px; color: #9B8F7A;
+          font-weight: 600;
+          overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+          margin-top: 1px;
+        }
+        .bell-notif-time {
+          font-size: 9.5px; color: #C0B8A8;
+          font-weight: 600;
+          margin-top: 3px;
+        }
+        .bell-empty {
+          padding: 32px 20px;
+          text-align: center;
+          color: #9B8F7A;
+          font-size: 13px;
+          font-weight: 700;
+        }
+
+        /* ══ Responsive ══ */
+        @media (max-width: 1100px) {
+          .bento {
+            grid-template-columns: 1fr 1fr;
+          }
+          .c-studio { grid-column: 1 / 3; grid-row: 1; }
+          .c-scene  { grid-column: 1 / 3; grid-row: 2; }
+          .c-planning { grid-column: 1; grid-row: 3; }
+          .c-money    { grid-column: 2; grid-row: 3; }
+          .c-msgs     { grid-column: 1 / 3; grid-row: 4; }
+        }
+        @media (max-width: 680px) {
+          .bento { grid-template-columns: 1fr; }
+          .c-studio, .c-scene, .c-planning, .c-money, .c-msgs {
+            grid-column: 1; grid-row: auto;
+          }
+          .works-grid { grid-template-columns: repeat(2, 1fr); }
+          .studio-bottom { grid-template-columns: 1fr; }
+          .scene-inner { grid-template-columns: 1fr; height: auto; }
+          .planning-row { grid-template-columns: 1fr; }
+          .money-grid { grid-template-columns: 1fr 1fr; }
+          .db-h1 { font-size: 22px; }
+        }
+      `}</style>
+
+      <div>
+        {/* ═══ HEADER ═══ */}
+        <div className="db-header">
+          <div className="db-hello">
+            <div className="db-avatar">
+              {profile?.avatar_url
+                ? <img src={profile.avatar_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                : initials}
+            </div>
+            <div>
+              <div className="db-date">{today.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}</div>
+              <h1 className="db-h1">{greeting}, {fname}</h1>
+            </div>
           </div>
-          <div className="focus-question">
-            What brings you to the studio today?
-          </div>
-          <div className="focus-explainer">
-            Your atelier is resting in <strong>Focus Mode</strong> — one question, five choices, nothing else pulling at you.
-            <br />
-            <span className="focus-explainer-sub">The full dashboard is folded away below, waiting only if you need it.</span>
-          </div>
+          <Link href="/dashboard/artworks/new" className="db-add-btn">
+            <Plus size={14} strokeWidth={3} /> Add Artwork
+          </Link>
         </div>
 
-        {/* ═══ PALETTE or SUB-MENU ═══ */}
-        {!picked ? (
-          <div className="focus-palette-wrap">
-            <PaletteSVG
-              hoverKey={hoverWell}
-              onHover={setHoverWell}
-              onLeave={() => setHoverWell(null)}
-              onPick={pickWell}
-            />
-            <div className="focus-palette-hint">
-              {hoverWell
-                ? <span className="focus-palette-hint-active">&ldquo;{WELLS.find(w => w.key === hoverWell)?.answer}&rdquo;</span>
-                : <>Tap a color to begin.</>}
-            </div>
-          </div>
-        ) : (
-          <div className="focus-submenu">
-            <button className="focus-back" onClick={() => setPickedWell(null)}>
-              ← Back to palette
-            </button>
-            <div className="focus-submenu-title">
-              <span className="focus-submenu-emoji">{picked.emoji}</span>
-              {picked.label}
-            </div>
-            <div className="focus-submenu-sub">&ldquo;{picked.answer}&rdquo;</div>
+        {/* ═══ BENTO ═══ */}
+        <div className="bento">
 
-            <div className="focus-chips">
-              {picked.subs?.map(sub => (
-                <Link key={sub.href} href={sub.href} className="focus-chip"
-                  style={{ ["--chip-color" as any]: picked.color }}>
-                  <div className="focus-chip-label">{sub.label}</div>
-                  <div className="focus-chip-q">&ldquo;{sub.q}&rdquo;</div>
-                  <ArrowRight size={14} className="focus-chip-arrow" />
-                </Link>
+          {/* ━━ MY STUDIO ━━ */}
+          <section className="cell c-studio">
+            <h2 className="cell-title">My Studio</h2>
+
+            {/* Stats strip */}
+            <div className="studio-stats">
+              <div className="studio-stat">
+                <div className="studio-stat-label">Total works</div>
+                <div className="studio-stat-value">{loaded ? stats.total : "—"}</div>
+              </div>
+              <div className="studio-stat">
+                <div className="studio-stat-label">Available</div>
+                <div className="studio-stat-value">{loaded ? stats.available : "—"}</div>
+              </div>
+              <div className="studio-stat">
+                <div className="studio-stat-label">In progress</div>
+                <div className="studio-stat-value">{loaded ? stats.in_progress : "—"}</div>
+              </div>
+              <div className="studio-stat">
+                <div className="studio-stat-label">Sold</div>
+                <div className="studio-stat-value">{loaded ? stats.sold : "—"}</div>
+              </div>
+              <div className="studio-stat">
+                <div className="studio-stat-label">This month</div>
+                <div className="studio-stat-value">${loaded ? stats.sales_month.toLocaleString() : "—"}</div>
+              </div>
+            </div>
+
+            {/* My Works */}
+            <div className="studio-sub">
+              <span>My Works</span>
+              <Link href="/dashboard/artworks" className="view-all">
+                View all <ArrowRight size={11} />
+              </Link>
+            </div>
+
+            <div className="works-grid">
+              {artworks.map(aw => {
+                const img = Array.isArray(aw.images) ? aw.images[0] : null;
+                return (
+                  <Link key={aw.id} href={`/dashboard/artworks/${aw.id}`} className="work-tile">
+                    {img ? (
+                      <img src={img} alt={aw.title} />
+                    ) : (
+                      <div className="work-tile-empty">
+                        <ImageIcon size={28} />
+                      </div>
+                    )}
+                    <div className="work-tile-title">{aw.title || "Untitled"}</div>
+                  </Link>
+                );
+              })}
+              {/* Pad with empty placeholders only if we have fewer than 3 real works, so grid stays visually full */}
+              {Array.from({ length: addWorkTileCount }).map((_, i) => (
+                <div key={`ph-${i}`} className="work-tile" style={{ boxShadow: "none", opacity: 0.5 }}>
+                  <div className="work-tile-empty">
+                    <ImageIcon size={24} />
+                  </div>
+                </div>
               ))}
+              <Link href="/dashboard/artworks/new" className="work-tile work-tile-add">
+                <div className="work-tile-add-plus">+</div>
+                <div className="work-tile-add-lbl">Add artwork</div>
+              </Link>
             </div>
-          </div>
-        )}
 
-        {/* ═══ EXPAND DASHBOARD LINK ═══ */}
-        <div className="focus-expand-zone">
-          {!expandedClassic ? (
-            <>
-              <div className="focus-expand-preamble">Been here a while? Skip the calm.</div>
-              <button className="focus-expand-link" onClick={() => setExpandedClassic(true)}>
-                Or show me everything <ChevronDown size={14} strokeWidth={2.5} />
-              </button>
-            </>
-          ) : (
-            <button className="focus-expand-link" onClick={() => setExpandedClassic(false)}>
-              Fold it back up <ChevronUp size={14} strokeWidth={2.5} />
-            </button>
-          )}
+            {/* Front Door + Moodboard */}
+            <div className="studio-bottom">
+              <div>
+                <div className="studio-subcell-title front-door-title">My Front Door</div>
+                <div className="front-door-row">
+                  <Link href="/dashboard/mystore" className="front-door-btn">Edit store</Link>
+                  {storeUrl ? (
+                    <a href={storeUrl} target="_blank" rel="noopener noreferrer" className="front-door-url">
+                      <span style={{ fontSize: 12, flexShrink: 0 }}>↗</span>
+                      {storeUrl}
+                    </a>
+                  ) : (
+                    <div className="front-door-url" style={{ color: "#C0B8A8" }}>No username set</div>
+                  )}
+                </div>
+              </div>
+              <div>
+                <div className="studio-subcell-title moodboard-title">Moodboard</div>
+                <div className="moodboard-row">
+                  {moodboards.slice(0, 2).map(mb => (
+                    <Link key={mb.id} href={`/dashboard/moodboard/${mb.id}`} className="moodboard-tile">
+                      {mb.cover_image && <img src={mb.cover_image} alt={mb.title} />}
+                    </Link>
+                  ))}
+                  {/* Pad with empty tiles if we have fewer than 2 */}
+                  {Array.from({ length: Math.max(0, 2 - moodboards.length) }).map((_, i) => (
+                    <Link key={`mb-ph-${i}`} href="/dashboard/moodboard" className="moodboard-tile" style={{ opacity: 0.5 }} />
+                  ))}
+                  <Link href="/dashboard/moodboard" className="moodboard-tile-add">+</Link>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* ━━ THE SCENE ━━ */}
+          <section className="cell c-scene">
+            <h2 className="cell-title">The Scene</h2>
+            <div className="cell-meta">What's happening in the community</div>
+
+            <div className="scene-inner">
+              {/* Collabs */}
+              <div className="collabs-feed">
+                <div className="collabs-header">
+                  <div className="collabs-header-label">Open collabs · {collabs.length}</div>
+                  <Link href="/dashboard/pool" className="collabs-post-btn">
+                    <Plus size={10} strokeWidth={3} /> Post
+                  </Link>
+                </div>
+                {collabs.length === 0 ? (
+                  <div style={{ padding: "12px 0", fontSize: 11, color: "#9B8F7A", fontWeight: 600, textAlign: "center" }}>
+                    No open collabs right now.
+                  </div>
+                ) : (
+                  collabs.map((c, i) => {
+                    const colors = ["#FFD400", "#4ECDC4", "#FF6B6B"];
+                    const poster = c.poster;
+                    const initials = poster?.full_name
+                      ? poster.full_name.split(" ").map((w: string) => w[0]).join("").slice(0, 2).toUpperCase()
+                      : "??";
+                    return (
+                      <Link key={c.id} href="/dashboard/pool" className="collab-item">
+                        <div className="collab-avatar" style={{ background: colors[i % colors.length], color: i === 2 ? "#fff" : "#111110" }}>
+                          {poster?.avatar_url
+                            ? <img src={poster.avatar_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                            : initials}
+                        </div>
+                        <div className="collab-body">
+                          <div className="collab-name">{poster?.full_name || "Anonymous"}</div>
+                          <div className="collab-desc">{c.title}{c.type ? ` · ${c.type}` : ""}</div>
+                        </div>
+                      </Link>
+                    );
+                  })
+                )}
+              </div>
+
+              {/* Events + Map stack */}
+              <div className="scene-side">
+                <div className="events-card">
+                  <div className="events-header">Events · Next {events.length || 0}</div>
+                  {events.length === 0 ? (
+                    <div style={{ padding: "8px 0", fontSize: 11, color: "#9B8F7A", fontWeight: 600 }}>
+                      No upcoming events.
+                    </div>
+                  ) : (
+                    events.map(ev => {
+                      const d = dateMonth(ev.start_date);
+                      return (
+                        <Link key={ev.id} href="/dashboard/exhibitions" className="event-item">
+                          <div className="event-date">
+                            <div className="event-date-month">{d.month}</div>
+                            <div className="event-date-day">{d.day}</div>
+                          </div>
+                          <div className="event-body">
+                            <div className="event-title">{ev.title}</div>
+                            <div className="event-venue">{ev.venue || "No venue"}</div>
+                          </div>
+                        </Link>
+                      );
+                    })
+                  )}
+                </div>
+
+                {/* Prague map preview */}
+                <Link href="/dashboard/map" className="scene-map">
+                  <svg className="scene-map-svg" viewBox="0 0 400 240" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
+                    <rect width="400" height="240" fill="#F0E8D0"/>
+                    <rect width="400" height="240" fill="#EBE1C5" opacity="0.5"/>
+                    <path d="M 50 -10 Q 130 70 100 130 Q 85 190 180 230 Q 220 250 260 270" stroke="#A5D3E8" strokeWidth="18" fill="none" strokeLinecap="round"/>
+                    <path d="M 50 -10 Q 130 70 100 130 Q 85 190 180 230 Q 220 250 260 270" stroke="#7FB8D1" strokeWidth="18" fill="none" strokeLinecap="round" opacity="0.3"/>
+                    <g stroke="#D4C9A8" strokeWidth="2.5" fill="none" opacity="0.7">
+                      <path d="M 0 60 L 400 90"/>
+                      <path d="M 0 160 L 400 130"/>
+                      <path d="M 60 0 L 90 240"/>
+                      <path d="M 220 0 L 250 240"/>
+                      <path d="M 310 0 L 340 240"/>
+                    </g>
+                    <g stroke="#D4C9A8" strokeWidth="1.2" fill="none" opacity="0.5">
+                      <path d="M 0 110 L 400 125"/>
+                      <path d="M 0 200 L 400 195"/>
+                      <path d="M 140 0 L 160 240"/>
+                      <path d="M 370 0 L 385 240"/>
+                    </g>
+                    <path d="M 160 30 Q 200 20 230 45 Q 240 75 210 85 Q 175 90 160 60 Z" fill="#C6D9A8" opacity="0.65"/>
+                    <path d="M 290 150 Q 330 140 350 170 Q 345 200 310 200 Q 280 185 290 150 Z" fill="#C6D9A8" opacity="0.65"/>
+                    <rect x="188" y="100" width="34" height="26" fill="#E5D5A8" stroke="#9B8F7A" strokeWidth="0.8" opacity="0.7"/>
+                    <g>
+                      <circle cx="140" cy="95" r="9" fill="#111110"/>
+                      <circle cx="140" cy="95" r="5" fill="#FFD400"/>
+                      <circle cx="260" cy="155" r="9" fill="#111110"/>
+                      <circle cx="260" cy="155" r="5" fill="#FF6B6B"/>
+                      <circle cx="330" cy="75" r="9" fill="#111110"/>
+                      <circle cx="330" cy="75" r="5" fill="#4ECDC4"/>
+                      <circle cx="90" cy="180" r="9" fill="#111110"/>
+                      <circle cx="90" cy="180" r="5" fill="#8B5CF6"/>
+                    </g>
+                  </svg>
+                  <div className="scene-map-label">
+                    <MapPin size={14} color="#FFD400" strokeWidth={2.4} style={{ flexShrink: 0 }} />
+                    <div className="scene-map-label-text">
+                      <div className="scene-map-title">Prague art scene</div>
+                      <div className="scene-map-sub">Open the map</div>
+                    </div>
+                    <span className="scene-map-arrow">→</span>
+                  </div>
+                </Link>
+              </div>
+            </div>
+          </section>
+
+          {/* ━━ PLANNING ━━ */}
+          <section className="cell c-planning">
+            <h2 className="cell-title">Planning</h2>
+            <div className="cell-meta">Your to-dos and what's ahead</div>
+
+            <div className="planning-row">
+              {/* To-do column */}
+              <div className="planning-col">
+                <div className="planning-col-title">
+                  To-do list
+                  {tasks.length > 0 && <span className="planning-col-title-count">{tasks.length}</span>}
+                </div>
+                <div className="todo-pills">
+                  <button
+                    className={`todo-pill ${todoFilter === "important" ? "active" : ""}`}
+                    onClick={() => setTodoFilter("important")}>
+                    Important
+                  </button>
+                  <button
+                    className={`todo-pill ${todoFilter === "upcoming" ? "active" : ""}`}
+                    onClick={() => setTodoFilter("upcoming")}>
+                    Upcoming
+                  </button>
+                </div>
+                {filteredTasks.length === 0 ? (
+                  <div style={{ padding: "10px 0", fontSize: 11, color: "#9B8F7A", fontWeight: 600, fontStyle: "italic" }}>
+                    {todoFilter === "important" ? "Nothing marked important." : "Nothing scheduled."}
+                  </div>
+                ) : (
+                  filteredTasks.map(t => (
+                    <Link key={t.id} href="/dashboard/tasks" className="todo-item">
+                      <div className="todo-check" />
+                      <div className="todo-item-text">{t.title}</div>
+                    </Link>
+                  ))
+                )}
+                <Link href="/dashboard/tasks" className="todo-add">
+                  <Plus size={12} strokeWidth={2.5} /> New task
+                </Link>
+              </div>
+
+              {/* Schedule column */}
+              <div className="planning-col">
+                <div className="planning-col-title">My schedule</div>
+                <div className="schedule-card">
+                  {nextEvent ? (
+                    <>
+                      <div>
+                        <div className="schedule-date-month">{dateMonth(nextEvent.start_date).month} · Next event</div>
+                        <div className="schedule-date">{dateMonth(nextEvent.start_date).day}</div>
+                      </div>
+                      <div className="schedule-next">
+                        {nextEvent.title}<br />
+                        <span style={{ color: "#9B8F7A" }}>{nextEvent.venue || "No venue"}</span>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div>
+                        <div className="schedule-date-month">Nothing scheduled</div>
+                        <div className="schedule-date" style={{ color: "#C0B8A8" }}>—</div>
+                      </div>
+                      <div className="schedule-next" style={{ color: "#9B8F7A", fontStyle: "italic" }}>
+                        Your calendar is clear.
+                      </div>
+                    </>
+                  )}
+                  <Link href="/dashboard/calendar" className="schedule-btn">View calendar</Link>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* ━━ DEALS & MONEY ━━ */}
+          <section className="cell c-money">
+            <h2 className="cell-title">Deals &amp; Money</h2>
+            <div className="cell-meta">Sales, collectors, papers, reach</div>
+
+            <div className="money-grid">
+              <Link href="/dashboard/sales" className="money-tile sales">
+                <div className="money-tile-icon"><DollarSign size={15} color="#111110" strokeWidth={2.5} /></div>
+                <div className="money-tile-name">My Sales</div>
+                <div className="money-tile-desc">Track what I've sold</div>
+                <div className="money-tile-num">${loaded ? stats.sales_total.toLocaleString() : "—"}</div>
+              </Link>
+
+              <Link href="/dashboard/clients" className="money-tile collectors">
+                <div className="money-tile-icon"><Users size={15} color="#111110" strokeWidth={2.4} /></div>
+                <div className="money-tile-name">My Collectors</div>
+                <div className="money-tile-desc">People who love your work</div>
+              </Link>
+
+              <Link href="/dashboard/contracts" className="money-tile papers">
+                <div className="money-tile-icon"><FileText size={14} color="#111110" strokeWidth={2.4} /></div>
+                <div className="money-tile-name">My Papers</div>
+                <div className="money-tile-desc">Agreements &amp; deals</div>
+              </Link>
+
+              <Link href="/dashboard/analytics" className="money-tile reach">
+                <div className="money-tile-icon"><TrendingUp size={15} color="#111110" strokeWidth={2.4} /></div>
+                <div className="money-tile-name">My Reach</div>
+                <div className="money-tile-desc">How am I doing?</div>
+                <div className="money-tile-num">{loaded ? `${stats.followers}` : "—"}</div>
+              </Link>
+            </div>
+          </section>
+
+          {/* ━━ INBOX ━━ */}
+          <section className="cell c-msgs">
+            <h2 className="cell-title">Inbox</h2>
+            <div className="cell-meta">Messages &amp; notifications</div>
+
+            <div className="msgs-row">
+              <Link href="/dashboard/messages" className="msg-btn">
+                {unreadMessages > 0 && <div className="msg-btn-badge">{unreadMessages}</div>}
+                <div className="msg-btn-icon"><Mail size={22} color="#111110" strokeWidth={2.2} /></div>
+                <div className="msg-btn-label">Messages</div>
+              </Link>
+
+              <div ref={bellRef} style={{ position: "relative" }}>
+                <button className="msg-btn" onClick={() => setBellOpen(o => !o)}>
+                  {unreadNotifs > 0 && <div className="msg-btn-badge">{unreadNotifs}</div>}
+                  <div className="msg-btn-icon"><Bell size={22} color="#111110" strokeWidth={2.2} /></div>
+                  <div className="msg-btn-label">Alerts</div>
+                </button>
+
+                {bellOpen && (
+                  <div className="bell-dropdown">
+                    <div className="bell-drop-head">
+                      <div className="bell-drop-title">
+                        Notifications {unreadNotifs > 0 && <span style={{ color: "#FF6B6B" }}>· {unreadNotifs} new</span>}
+                      </div>
+                      {unreadNotifs > 0 && (
+                        <button className="bell-drop-clear" onClick={markAllRead}>Mark all read</button>
+                      )}
+                    </div>
+                    <div className="bell-drop-list">
+                      {notifications.length === 0 ? (
+                        <div className="bell-empty">
+                          <div style={{ fontSize: 22, marginBottom: 6 }}>🔔</div>
+                          All quiet.
+                        </div>
+                      ) : (
+                        notifications.map(n => {
+                          const cfg = NOTIF_CFG[n.type] || NOTIF_CFG.system;
+                          const Icon = cfg.icon;
+                          return (
+                            <div key={n.id} className="bell-notif-item" onClick={() => markRead(n.id)}
+                              style={{ background: n.read ? "transparent" : "#FFFEF5" }}>
+                              <div className="bell-notif-dot" style={{ background: cfg.bg, border: `1.5px solid ${cfg.color}` }}>
+                                <Icon size={14} color={cfg.color} />
+                              </div>
+                              <div className="bell-notif-body">
+                                <div className="bell-notif-title">
+                                  {n.title}
+                                  {!n.read && <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#FF6B6B" }} />}
+                                </div>
+                                {n.body && <div className="bell-notif-sub">{n.body}</div>}
+                                <div className="bell-notif-time">{timeAgo(n.created_at)}</div>
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </section>
+
         </div>
-
-        {/* ═══ CLASSIC DASHBOARD — INLINE EXPANSION ═══ */}
-        {expandedClassic && (
-          <div className="focus-classic-wrap">
-            <ClassicDashboard
-              profile={profile} artworks={artworks} stats={stats} tasks={tasks}
-              events={events} recentSales={recentSales} notifications={notifications}
-              loaded={loaded} notifTab={notifTab} setNotifTab={setNotifTab}
-              markRead={markRead} markAllRead={markAllRead}
-              deleteNotification={deleteNotification} clearAll={clearAll}
-              fname={fname} unreadCount={unreadCount} filteredNotifs={filteredNotifs}
-              initials={initials} today={today} greeting={greeting} greetEmoji={greetEmoji}
-            />
-          </div>
-        )}
       </div>
     </>
-  );
-}
-
-/* ══════════════════════════════════════════════════════════════════
-   STYLES — separated so they can be loaded conditionally
-   ══════════════════════════════════════════════════════════════════ */
-
-function FocusStyles() {
-  return (
-    <style>{`
-      /* Focus canvas — near-white, replaces the FFFBEA of the nav shell */
-      .focus-root {
-        background: #FDFCFA;
-        margin: -28px -20px 0; /* bleed to edges of am-content padding */
-        padding: 40px 20px 32px;
-        min-height: calc(100vh - 60px);
-      }
-
-      .focus-hero {
-        max-width: 640px;
-        margin: 0 auto 28px;
-        text-align: center;
-        animation: focusIn 0.6s cubic-bezier(0.16,1,0.3,1) both;
-      }
-      .focus-greet {
-        font-size: clamp(26px, 4vw, 38px);
-        font-weight: 900;
-        color: #111110;
-        letter-spacing: -1px;
-        line-height: 1.05;
-        margin-bottom: 14px;
-      }
-      .focus-name {
-        background: #FFD400;
-        padding: 0 8px;
-        border-radius: 6px;
-        box-decoration-break: clone;
-        -webkit-box-decoration-break: clone;
-      }
-      .focus-question {
-        font-size: clamp(16px, 2.2vw, 20px);
-        font-weight: 600;
-        color: #5C5346;
-        font-style: italic;
-        margin-bottom: 14px;
-        line-height: 1.4;
-      }
-      .focus-explainer {
-        font-size: 12.5px;
-        font-weight: 500;
-        color: #9B8F7A;
-        line-height: 1.55;
-        max-width: 480px;
-        margin: 0 auto;
-      }
-      .focus-explainer strong {
-        color: #111110;
-        font-weight: 800;
-      }
-      .focus-explainer-sub {
-        color: #B8AE9C;
-        font-size: 11.5px;
-      }
-
-      .focus-palette-wrap {
-        max-width: 620px;
-        margin: 0 auto 28px;
-        animation: focusIn 0.8s cubic-bezier(0.16,1,0.3,1) 0.15s both;
-      }
-      .focus-palette-hint {
-        text-align: center;
-        margin-top: 18px;
-        font-size: 13px;
-        font-weight: 600;
-        color: #9B8F7A;
-        font-style: italic;
-        min-height: 22px;
-        transition: color 0.2s;
-      }
-      .focus-palette-hint-active {
-        color: #111110;
-        font-weight: 700;
-      }
-
-      /* Sub-menu */
-      .focus-submenu {
-        max-width: 720px;
-        margin: 0 auto 28px;
-        animation: focusIn 0.45s cubic-bezier(0.16,1,0.3,1) both;
-      }
-      .focus-back {
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        padding: 7px 14px;
-        background: transparent;
-        border: 2px solid #E8E0D0;
-        border-radius: 9999px;
-        font-family: inherit;
-        font-size: 12px;
-        font-weight: 700;
-        color: #5C5346;
-        cursor: pointer;
-        margin-bottom: 20px;
-        transition: all 0.15s;
-      }
-      .focus-back:hover {
-        border-color: #111110;
-        color: #111110;
-        background: #fff;
-      }
-      .focus-submenu-title {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        justify-content: center;
-        font-size: clamp(22px, 3vw, 30px);
-        font-weight: 900;
-        color: #111110;
-        letter-spacing: -0.6px;
-        line-height: 1;
-      }
-      .focus-submenu-emoji {
-        font-size: 0.85em;
-      }
-      .focus-submenu-sub {
-        text-align: center;
-        font-size: 13px;
-        font-weight: 600;
-        color: #9B8F7A;
-        font-style: italic;
-        margin: 8px 0 26px;
-      }
-      .focus-chips {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-        gap: 12px;
-      }
-      .focus-chip {
-        --chip-color: #FFD400;
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        padding: 16px 18px;
-        background: #fff;
-        border: 2px solid #E8E0D0;
-        border-radius: 14px;
-        text-decoration: none;
-        color: inherit;
-        cursor: pointer;
-        transition: all 0.2s cubic-bezier(0.16,1,0.3,1);
-        position: relative;
-      }
-      .focus-chip::before {
-        content: "";
-        position: absolute;
-        left: -2px; top: -2px; bottom: -2px;
-        width: 5px;
-        background: var(--chip-color);
-        border-radius: 14px 0 0 14px;
-        opacity: 0;
-        transition: opacity 0.15s;
-      }
-      .focus-chip:hover {
-        border-color: #111110;
-        transform: translate(-1px, -2px);
-        box-shadow: 3px 4px 0 #111110;
-      }
-      .focus-chip:hover::before {
-        opacity: 1;
-      }
-      .focus-chip-label {
-        font-size: 14px;
-        font-weight: 900;
-        color: #111110;
-        letter-spacing: -0.2px;
-        margin-bottom: 3px;
-      }
-      .focus-chip-q {
-        font-size: 12px;
-        font-weight: 500;
-        color: #9B8F7A;
-        font-style: italic;
-        line-height: 1.35;
-      }
-      .focus-chip-arrow {
-        color: #C0B8A8;
-        margin-left: auto;
-        flex-shrink: 0;
-        transition: transform 0.2s, color 0.15s;
-      }
-      .focus-chip:hover .focus-chip-arrow {
-        color: #111110;
-        transform: translateX(3px);
-      }
-      .focus-chip > div:first-of-type {
-        flex: 1;
-        min-width: 0;
-      }
-
-      /* Expand zone */
-      .focus-expand-zone {
-        max-width: 640px;
-        margin: 16px auto 0;
-        text-align: center;
-        padding-top: 22px;
-        border-top: 1px dashed #E8E0D0;
-        animation: focusIn 0.8s cubic-bezier(0.16,1,0.3,1) 0.3s both;
-      }
-      .focus-expand-preamble {
-        font-size: 12px;
-        font-weight: 500;
-        color: #B8AE9C;
-        font-style: italic;
-        margin-bottom: 10px;
-      }
-      .focus-expand-link {
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        padding: 9px 18px;
-        background: transparent;
-        border: 2px dashed #D4C9A8;
-        border-radius: 9999px;
-        font-family: inherit;
-        font-size: 13px;
-        font-weight: 700;
-        color: #5C5346;
-        cursor: pointer;
-        transition: all 0.18s;
-      }
-      .focus-expand-link:hover {
-        border-color: #111110;
-        border-style: solid;
-        color: #111110;
-        background: #FFFBEA;
-      }
-
-      /* Classic expansion — add breathing room */
-      .focus-classic-wrap {
-        margin-top: 40px;
-        padding-top: 32px;
-        border-top: 2px solid #111110;
-        animation: focusIn 0.5s cubic-bezier(0.16,1,0.3,1) both;
-      }
-
-      @keyframes focusIn {
-        from { opacity: 0; transform: translateY(12px); }
-        to { opacity: 1; transform: none; }
-      }
-
-      @media (max-width: 640px) {
-        .focus-root {
-          margin: -28px -20px 0;
-          padding: 28px 16px 24px;
-        }
-        .focus-chips {
-          grid-template-columns: 1fr;
-        }
-      }
-    `}</style>
-  );
-}
-
-function ClassicStyles() {
-  return (
-    <style>{`
-      /* ── Base cards ── */
-      .ripe-card {
-        background: #fff; border: 2.5px solid #111110; border-radius: 20px;
-        box-shadow: 4px 5px 0 #D4C9A8; overflow: hidden;
-        transition: box-shadow 0.25s cubic-bezier(0.16,1,0.3,1), transform 0.25s cubic-bezier(0.16,1,0.3,1);
-      }
-      .ripe-card:hover { box-shadow: 6px 7px 0 #111110; transform: translate(-1px,-2px); }
-      .ripe-card-static {
-        background: #fff; border: 2.5px solid #111110; border-radius: 20px;
-        box-shadow: 4px 5px 0 #D4C9A8; overflow: hidden;
-      }
-
-      .stat-card {
-        background: #fff; border: 2.5px solid #111110; border-radius: 18px;
-        padding: 20px 22px; box-shadow: 3px 4px 0 #D4C9A8;
-        position: relative; overflow: hidden;
-        transition: all 0.25s cubic-bezier(0.16,1,0.3,1);
-      }
-      .stat-card:hover { box-shadow: 5px 6px 0 #111110; transform: translate(-1px,-1px); }
-      .stat-accent {
-        position: absolute; bottom: -8px; right: -8px;
-        width: 56px; height: 56px; border-radius: 50%;
-        opacity: 0.12; transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1);
-      }
-      .stat-card:hover .stat-accent { transform: scale(1.3); }
-
-      .qnav-card {
-        display: flex; align-items: center; gap: 14px; padding: 14px 18px;
-        background: #fff; border: 2px solid #E8E0D0; border-radius: 16px;
-        text-decoration: none; color: #111110;
-        transition: all 0.2s cubic-bezier(0.16,1,0.3,1); cursor: pointer;
-      }
-      .qnav-card:hover { border-color: #111110; box-shadow: 3px 4px 0 #111110; transform: translate(-1px,-1px); background: #FFFBEA; }
-      .qnav-icon {
-        width: 40px; height: 40px; border-radius: 12px; border: 2px solid #111110;
-        display: flex; align-items: center; justify-content: center; flex-shrink: 0;
-        transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1);
-      }
-      .qnav-card:hover .qnav-icon { transform: scale(1.08) rotate(-3deg); }
-
-      .notif-item {
-        display: flex; align-items: flex-start; gap: 12px; padding: 14px 18px;
-        border-bottom: 1px solid #F5F0E8; transition: background 0.15s;
-        cursor: pointer; position: relative;
-      }
-      .notif-item:hover { background: #FFFBEA; }
-      .notif-item:last-child { border-bottom: none; }
-      .notif-dot {
-        width: 36px; height: 36px; border-radius: 12px;
-        display: flex; align-items: center; justify-content: center;
-        flex-shrink: 0; transition: transform 0.2s;
-      }
-      .notif-item:hover .notif-dot { transform: scale(1.08); }
-      .notif-del {
-        position: absolute; top: 14px; right: 14px; opacity: 0;
-        transition: opacity 0.15s; background: none; border: none;
-        cursor: pointer; color: #C0B8A8; padding: 2px;
-      }
-      .notif-item:hover .notif-del { opacity: 1; }
-      .notif-del:hover { color: #FF6B6B; }
-
-      .aw-mini {
-        border-radius: 16px; border: 2px solid #E8E0D0; overflow: hidden;
-        background: #fff; transition: all 0.25s cubic-bezier(0.16,1,0.3,1);
-        cursor: pointer; text-decoration: none; display: block; color: inherit;
-      }
-      .aw-mini:hover { border-color: #111110; box-shadow: 4px 5px 0 #111110; transform: translate(-2px,-2px); }
-      .aw-mini:hover img { transform: scale(1.06); }
-      .aw-mini img { transition: transform 0.4s cubic-bezier(0.16,1,0.3,1); }
-
-      .event-row { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid #F5F0E8; transition: background 0.15s; }
-      .event-row:last-child { border-bottom: none; }
-      .task-row { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid #F5F0E8; }
-      .task-row:last-child { border-bottom: none; }
-
-      .sec-header {
-        display: flex; align-items: center; justify-content: space-between;
-        padding: 16px 20px; border-bottom: 2px solid #111110;
-        background: #FAF7F3; border-radius: 20px 20px 0 0;
-      }
-
-      .notif-tab {
-        padding: 6px 14px; border-radius: 9999px; border: 2px solid #E8E0D0;
-        background: #fff; font-family: inherit; font-size: 12px; font-weight: 700;
-        color: #9B8F7A; cursor: pointer; transition: all 0.15s;
-      }
-      .notif-tab.active { background: #111110; border-color: #111110; color: #FFD400; }
-      .notif-tab:not(.active):hover { border-color: #111110; color: #111110; }
-
-      @keyframes ripeIn { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
-      .ripe-in { animation: ripeIn 0.5s cubic-bezier(0.16,1,0.3,1) both; }
-
-      @media (max-width: 900px) {
-        .dash-main-grid { grid-template-columns: 1fr !important; }
-      }
-      @media (max-width: 640px) {
-        .dash-header { flex-direction: column !important; align-items: flex-start !important; gap: 14px !important; margin-bottom: 20px !important; }
-        .dash-header-actions { width: 100%; display: flex !important; flex-wrap: wrap; gap: 8px; }
-        .dash-header-actions a, .dash-header-actions button { flex: 1; min-width: 130px; justify-content: center !important; }
-        .dash-avatar { width: 44px !important; height: 44px !important; border-radius: 14px !important; font-size: 16px !important; }
-        .dash-stats { grid-template-columns: repeat(2, 1fr) !important; gap: 10px !important; margin-bottom: 18px !important; }
-        .stat-card { padding: 14px 16px !important; }
-        .stat-card div[style*="font-size: 32"] { font-size: 24px !important; }
-        .dash-artworks-grid { grid-template-columns: repeat(2, 1fr) !important; gap: 8px !important; padding: 10px !important; }
-        .dash-quick-nav { grid-template-columns: repeat(2, 1fr) !important; gap: 8px !important; }
-        .qnav-card { padding: 11px 13px !important; gap: 10px !important; }
-        .qnav-icon { width: 34px !important; height: 34px !important; }
-        .ripe-card-static, .ripe-card { border-radius: 16px !important; }
-        .sec-header { padding: 12px 14px !important; border-radius: 14px 14px 0 0 !important; }
-        .notif-item { padding: 10px 14px !important; gap: 9px !important; }
-        .notif-dot { width: 30px !important; height: 30px !important; border-radius: 9px !important; }
-        .notif-del { top: 10px !important; right: 10px !important; }
-        .event-row { padding: 10px 0 !important; gap: 9px !important; }
-        .task-row  { padding: 8px 0 !important; gap: 8px !important; }
-      }
-    `}</style>
   );
 }

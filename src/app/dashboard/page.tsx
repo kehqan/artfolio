@@ -1,24 +1,24 @@
 "use client";
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import {
   ImageIcon, CalendarDays, Users, Plus, ArrowRight, DollarSign,
-  Bell, Check, Sparkles, X, Palette, Building2, Compass, Brush,
-  Megaphone, PencilLine, Coffee, Frame, Handshake,
+  Bell, Check, Sparkles, X, Palette, Building2, Brush, Frame,
+  Megaphone, PencilLine, Coffee, Handshake, ShoppingBag, CheckSquare,
+  HandHeart,
 } from "lucide-react";
 
 /* ══════════════════════════════════════════════════════════════════
-   THE ATELIER — Dashboard reimagined as an artist's desk
+   THE ATELIER — Dashboard as an artist's desk
    Ripe design system · 60/30/10 (cream / ink / mango)
    ══════════════════════════════════════════════════════════════════ */
 
 /* ── Types ─────────────────────────────────────────────────────── */
 type Stats = {
   artworks: number; available: number; sold: number; in_progress: number;
-  exhibitions: number; collabs: number;
-  sales_total: number; sales_month: number; tasks_pending: number;
-  followers: number;
+  exhibitions: number; sales_total: number; sales_month: number;
+  tasks_pending: number; followers: number;
 };
 type Notif = {
   id: string; type: string; title: string; body?: string;
@@ -42,25 +42,63 @@ type Sale = {
   status: string; artwork_id?: string; artwork_title?: string;
 };
 
-/* ── Compass answers → which sections light up ──────────────── */
-const INTENT_MAP: Record<string, string[]> = {
-  create: ["easel", "wall", "tasks"],
-  sell:   ["ledger", "wall", "store"],
-  show:   ["doorway", "wall", "events"],
-  plan:   ["tasks", "calendar", "doorway"],
-  collab: ["doorway", "letterbox"],
-};
-const FOCUS_MAP: Record<string, string[]> = {
-  work:     ["easel", "wall", "tasks"],
-  business: ["ledger", "store", "sales"],
-  world:    ["doorway", "letterbox", "events"],
-};
-const MIND_MAP: Record<string, string[]> = {
-  piece:       ["easel", "wall"],
-  buyer:       ["ledger", "letterbox", "store"],
-  opportunity: ["doorway", "letterbox"],
-  nothing:     [],
-};
+/* ── The helper's one question: 5 visual intent cards ────────── */
+type Intent = "create" | "sell" | "show" | "plan" | "collab";
+const INTENT_CARDS: {
+  key: Intent;
+  label: string;
+  blurb: string;
+  href: string;
+  icon: any;
+  color: string;
+  banner: string;
+}[] = [
+  {
+    key: "create",
+    label: "Create",
+    blurb: "Start a new piece.",
+    href: "/dashboard/artworks/new",
+    icon: Brush,
+    color: "#FFD400",
+    banner: "Let's make something. Heading to the new-artwork canvas.",
+  },
+  {
+    key: "sell",
+    label: "Sell",
+    blurb: "List work & track sales.",
+    href: "/dashboard/mystore",
+    icon: ShoppingBag,
+    color: "#4ECDC4",
+    banner: "Time to sell. Opening MyStore to list or edit your works.",
+  },
+  {
+    key: "show",
+    label: "Show",
+    blurb: "Events & exhibitions.",
+    href: "/dashboard/exhibitions",
+    icon: Building2,
+    color: "#FF6B6B",
+    banner: "Let's put you in the room. Opening Events & Exhibitions.",
+  },
+  {
+    key: "plan",
+    label: "Plan",
+    blurb: "Tasks, calendar, deadlines.",
+    href: "/dashboard/tasks",
+    icon: CheckSquare,
+    color: "#8B5CF6",
+    banner: "Planning mode. Opening your tasks and deadlines.",
+  },
+  {
+    key: "collab",
+    label: "Collab",
+    blurb: "Find & respond to collabs.",
+    href: "/dashboard/pool",
+    icon: Handshake,
+    color: "#95E1D3",
+    banner: "Let's collaborate. Opening the collab pool.",
+  },
+];
 
 /* ── Helpers ──────────────────────────────────────────────── */
 function daysAgo(date?: string) {
@@ -80,7 +118,6 @@ function formatDay(d?: string) {
   return new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
-/* ── Notification icon/color (kept minimal, signal-only) ─── */
 const NOTIF_CFG: Record<string, { icon: any; color: string }> = {
   follow:  { icon: Users,      color: "#4ECDC4" },
   sale:    { icon: DollarSign, color: "#16A34A" },
@@ -103,19 +140,19 @@ export default function AtelierPage() {
   const [artworks, setArtworks] = useState<Artwork[]>([]);
   const [stats, setStats] = useState<Stats>({
     artworks:0, available:0, sold:0, in_progress:0,
-    exhibitions:0, collabs:0, sales_total:0, sales_month:0,
+    exhibitions:0, sales_total:0, sales_month:0,
     tasks_pending:0, followers:0,
   });
   const [events, setEvents] = useState<UpcomingEvent[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [notifs, setNotifs] = useState<Notif[]>([]);
   const [recentSales, setRecentSales] = useState<Sale[]>([]);
-  const [loaded, setLoaded] = useState(false);
 
-  /* Compass — always reset on visit */
-  const [q1, setQ1] = useState<string | null>(null); // today
-  const [q2, setQ2] = useState<string | null>(null); // focus
-  const [q3, setQ3] = useState<string | null>(null); // on your mind
+  /* Helper badge state */
+  const [helperOpen, setHelperOpen] = useState(false);
+  const [pickedIntent, setPickedIntent] = useState<Intent | null>(null);
+  const [bannerDismissed, setBannerDismissed] = useState(false);
+  const helperRef = useRef<HTMLDivElement>(null);
 
   /* Greeting */
   const [greeting, setGreeting] = useState("Good morning");
@@ -124,6 +161,26 @@ export default function AtelierPage() {
     if (h >= 5 && h < 12) setGreeting("Good morning");
     else if (h >= 12 && h < 17) setGreeting("Good afternoon");
     else setGreeting("Good evening");
+  }, []);
+
+  /* Click outside to close helper */
+  useEffect(() => {
+    function onDown(e: MouseEvent) {
+      if (helperRef.current && !helperRef.current.contains(e.target as Node)) {
+        setHelperOpen(false);
+      }
+    }
+    if (helperOpen) document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [helperOpen]);
+
+  /* Escape closes helper */
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setHelperOpen(false);
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
   }, []);
 
   /* ── Load everything ─────────────────────────────────────── */
@@ -159,7 +216,6 @@ export default function AtelierPage() {
       setNotifs(notifData || []);
       setEvents(eventsData || []);
 
-      // Enrich sales with artwork title
       let enrichedSales: Sale[] = salesData || [];
       if (salesData?.length) {
         const ids = salesData.map((s: any) => s.artwork_id).filter(Boolean);
@@ -184,46 +240,21 @@ export default function AtelierPage() {
         sold: list.filter((a: any) => String(a.status).toLowerCase() === "sold").length,
         in_progress: list.filter((a: any) => String(a.status).toLowerCase().replace(/ /g,"_") === "in_progress").length,
         exhibitions: eventsData?.length || 0,
-        collabs: 0,
         sales_total: totalRev,
         sales_month: monthRev,
         tasks_pending: (tk || []).length,
         followers: followerCount || 0,
       });
-
-      setLoaded(true);
     });
   }, []);
 
-  /* ── Compass → highlighted section keys ─────────────── */
-  const spotlight = useMemo(() => {
-    const s = new Set<string>();
-    if (q1 && INTENT_MAP[q1]) INTENT_MAP[q1].forEach(k => s.add(k));
-    if (q2 && FOCUS_MAP[q2]) FOCUS_MAP[q2].forEach(k => s.add(k));
-    if (q3 && MIND_MAP[q3])  MIND_MAP[q3].forEach(k => s.add(k));
-    return s;
-  }, [q1, q2, q3]);
-
-  const compassActive = q1 || q2 || q3;
-
-  /* ── "On the easel" — pick the piece to attend to ─── */
-  const easelPiece = useMemo(() => {
+  /* ── Easel piece ─────────────────────────────────────── */
+  const easelPiece = (() => {
     if (!artworks.length) return null;
-    // In-progress > most recently updated
     const ip = artworks.filter(a => String(a.status).toLowerCase().replace(/ /g,"_") === "in_progress");
     if (ip.length) return ip[0];
     return artworks[0];
-  }, [artworks]);
-
-  /* ── Section order — matched sections jump to top ─── */
-  const sectionOrder = useMemo(() => {
-    const base = ["easel", "wall", "ledger", "doorway", "tasks", "letterbox"];
-    if (!compassActive) return base;
-    const spot = Array.from(spotlight);
-    const matched = base.filter(k => spot.includes(k));
-    const rest = base.filter(k => !spot.includes(k));
-    return [...matched, ...rest];
-  }, [compassActive, spotlight]);
+  })();
 
   const fname = profile?.full_name?.split(" ")[0] || "there";
   const initials = profile?.full_name
@@ -238,401 +269,12 @@ export default function AtelierPage() {
     setNotifs(p => p.map(n => ({ ...n, read: true })));
   }
 
-  /* ═══════════════════════════════════════════════════════════════
-     SECTION BLUEPRINTS — each renders when called by sectionOrder
-     ═══════════════════════════════════════════════════════════════ */
+  function handlePick(intent: Intent) {
+    setPickedIntent(intent);
+    setBannerDismissed(false);
+  }
 
-  const isHighlighted = (key: string) => compassActive && spotlight.has(key);
-  const isDimmed = (key: string) => compassActive && spotlight.size > 0 && !spotlight.has(key);
-
-  /* ── ON THE EASEL ── */
-  const renderEasel = () => {
-    const img = easelPiece && Array.isArray(easelPiece.images) ? easelPiece.images[0] : null;
-    const d = easelPiece?.updated_at ? daysAgo(easelPiece.updated_at) : 0;
-    const whyLine = !easelPiece
-      ? "Nothing here yet — start a new piece and it'll live on the easel."
-      : d === 0
-        ? "You worked on this today."
-        : d === 1
-          ? "One day since you last touched it."
-          : `${d} days since you last touched it.`;
-
-    return (
-      <section key="easel" data-key="easel"
-        className={`atl-section ${isHighlighted("easel") ? "atl-spot" : ""} ${isDimmed("easel") ? "atl-dim" : ""}`}
-        style={{ gridColumn: "span 2", transform: "rotate(-0.25deg)" }}>
-        {/* Tape corner */}
-        <div className="atl-tape atl-tape-tl" />
-        <div className="atl-section-head">
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <div className="atl-icon-badge" style={{ background: "#FFD400" }}>
-              <Palette size={15} color="#111110" strokeWidth={2.3} />
-            </div>
-            <div>
-              <div className="atl-section-title">On the easel</div>
-              <div className="atl-section-why">{whyLine}</div>
-            </div>
-          </div>
-          <Link href="/dashboard/artworks" className="atl-section-cta">
-            All works <ArrowRight size={12} />
-          </Link>
-        </div>
-
-        {easelPiece ? (
-          <Link href={`/dashboard/artworks/${easelPiece.id}`} style={{ textDecoration: "none", display: "block" }}>
-            <div className="atl-easel-card">
-              <div className="atl-easel-img">
-                {img ? (
-                  <img src={img} alt={easelPiece.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                ) : (
-                  <div style={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 6 }}>
-                    <Brush size={36} color="#D4C9A8" />
-                    <span style={{ fontSize: 11, color: "#9B8F7A", fontWeight: 600 }}>No image yet</span>
-                  </div>
-                )}
-              </div>
-              <div className="atl-easel-meta">
-                <div>
-                  <div style={{ fontSize: 11, fontWeight: 800, color: "#9B8F7A", textTransform: "uppercase", letterSpacing: "0.14em", marginBottom: 6 }}>
-                    {easelPiece.status?.replace(/_/g, " ") || "In progress"}
-                  </div>
-                  <h3 style={{ fontSize: 22, fontWeight: 900, color: "#111110", margin: "0 0 6px", letterSpacing: "-0.5px", lineHeight: 1.1 }}>
-                    {easelPiece.title || "Untitled"}
-                  </h3>
-                  <div style={{ fontSize: 13, color: "#5C5346", fontWeight: 600 }}>
-                    {[easelPiece.medium, easelPiece.year,
-                      easelPiece.width_cm && easelPiece.height_cm ? `${easelPiece.width_cm}×${easelPiece.height_cm} cm` : null
-                    ].filter(Boolean).join(" · ")}
-                  </div>
-                </div>
-                <div className="atl-easel-action">
-                  Open this piece <ArrowRight size={14} strokeWidth={2.5} />
-                </div>
-              </div>
-            </div>
-          </Link>
-        ) : (
-          <Link href="/dashboard/artworks/new" style={{ textDecoration: "none" }}>
-            <div className="atl-empty atl-empty-cta">
-              <Plus size={22} color="#111110" strokeWidth={2.5} />
-              <div>
-                <div style={{ fontSize: 15, fontWeight: 900, color: "#111110" }}>Start a new piece</div>
-                <div style={{ fontSize: 12, color: "#5C5346", fontWeight: 600 }}>Every atelier begins with one mark.</div>
-              </div>
-            </div>
-          </Link>
-        )}
-      </section>
-    );
-  };
-
-  /* ── THE WALL (recent works) ── */
-  const renderWall = () => {
-    const recent = artworks.slice(0, 6);
-    return (
-      <section key="wall" data-key="wall"
-        className={`atl-section ${isHighlighted("wall") ? "atl-spot" : ""} ${isDimmed("wall") ? "atl-dim" : ""}`}
-        style={{ gridColumn: "span 2", transform: "rotate(0.15deg)" }}>
-        <div className="atl-section-head">
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <div className="atl-icon-badge" style={{ background: "#4ECDC4" }}>
-              <Frame size={15} color="#111110" strokeWidth={2.3} />
-            </div>
-            <div>
-              <div className="atl-section-title">The wall</div>
-              <div className="atl-section-why">
-                {stats.artworks === 0 ? "Empty wall. Hang your first piece." :
-                 `${stats.artworks} works · ${stats.available} available · ${stats.in_progress} in progress`}
-              </div>
-            </div>
-          </div>
-          <Link href="/dashboard/artworks" className="atl-section-cta">
-            See all <ArrowRight size={12} />
-          </Link>
-        </div>
-
-        {recent.length === 0 ? (
-          <Link href="/dashboard/artworks/new" style={{ textDecoration: "none" }}>
-            <div className="atl-empty">
-              <ImageIcon size={22} color="#9B8F7A" />
-              <div>
-                <div style={{ fontSize: 14, fontWeight: 800, color: "#111110" }}>No artworks yet</div>
-                <div style={{ fontSize: 12, color: "#9B8F7A", fontWeight: 600 }}>Add your first work to begin.</div>
-              </div>
-            </div>
-          </Link>
-        ) : (
-          <div className="atl-wall-grid">
-            {recent.map((aw, i) => {
-              const img = Array.isArray(aw.images) ? aw.images[0] : null;
-              const dot = STATUS_DOT[String(aw.status).toLowerCase()] || "#9B8F7A";
-              return (
-                <Link key={aw.id} href={`/dashboard/artworks/${aw.id}`} className="atl-wall-tile"
-                  style={{ transform: `rotate(${(i % 2 === 0 ? -1 : 1) * (0.2 + (i % 3) * 0.15)}deg)` }}>
-                  <div className="atl-wall-img">
-                    {img ? <img src={img} alt={aw.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                      : <div style={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                          <ImageIcon size={20} color="#D4C9A8" /></div>}
-                    <div className="atl-wall-dot" style={{ background: dot }} />
-                  </div>
-                  <div className="atl-wall-label">{aw.title || "Untitled"}</div>
-                </Link>
-              );
-            })}
-          </div>
-        )}
-
-        <Link href="/dashboard/artworks/new" style={{ textDecoration: "none", display: "block", marginTop: 12 }}>
-          <div className="atl-add-row">
-            <Plus size={14} strokeWidth={2.5} /> Add a new piece to the wall
-          </div>
-        </Link>
-      </section>
-    );
-  };
-
-  /* ── THE LEDGER (sales) ── */
-  const renderLedger = () => {
-    const completed = recentSales.filter(s => s.status?.toLowerCase() === "completed");
-    const last = completed[0];
-    return (
-      <section key="ledger" data-key="ledger"
-        className={`atl-section ${isHighlighted("ledger") ? "atl-spot" : ""} ${isDimmed("ledger") ? "atl-dim" : ""}`}>
-        <div className="atl-section-head">
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <div className="atl-icon-badge" style={{ background: "#FFD400" }}>
-              <DollarSign size={15} color="#111110" strokeWidth={2.3} />
-            </div>
-            <div>
-              <div className="atl-section-title">The ledger</div>
-              <div className="atl-section-why">
-                {stats.sales_month > 0
-                  ? `$${stats.sales_month.toLocaleString()} this month`
-                  : completed.length > 0 ? `${completed.length} sales to date` : "Quiet ledger. First sale coming."}
-              </div>
-            </div>
-          </div>
-          <Link href="/dashboard/sales" className="atl-section-cta">Open <ArrowRight size={12} /></Link>
-        </div>
-
-        <div style={{ padding: "4px 0" }}>
-          <div className="atl-big-num">
-            ${stats.sales_total.toLocaleString()}
-          </div>
-          <div style={{ fontSize: 11, fontWeight: 700, color: "#9B8F7A", textTransform: "uppercase", letterSpacing: "0.14em", marginBottom: 14 }}>
-            Total earned · all time
-          </div>
-
-          {last ? (
-            <div className="atl-ledger-row">
-              <div style={{ width: 4, height: 32, borderRadius: 2, background: "#16A34A" }} />
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 13, fontWeight: 800, color: "#111110", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {last.artwork_title || "Artwork"} · ${last.sale_price?.toLocaleString()}
-                </div>
-                <div style={{ fontSize: 11, color: "#9B8F7A", fontWeight: 600 }}>
-                  Last sale · {last.sale_date ? formatDay(last.sale_date) : "—"}
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div style={{ fontSize: 12, color: "#9B8F7A", fontWeight: 600, padding: "8px 0" }}>
-              No sales recorded yet.
-            </div>
-          )}
-        </div>
-      </section>
-    );
-  };
-
-  /* ── THE DOORWAY (events + outside world) ── */
-  const renderDoorway = () => {
-    const next = events[0];
-    return (
-      <section key="doorway" data-key="doorway"
-        className={`atl-section ${isHighlighted("doorway") ? "atl-spot" : ""} ${isDimmed("doorway") ? "atl-dim" : ""}`}
-        style={{ transform: "rotate(-0.2deg)" }}>
-        <div className="atl-section-head">
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <div className="atl-icon-badge" style={{ background: "#FF6B6B" }}>
-              <CalendarDays size={15} color="#111110" strokeWidth={2.3} />
-            </div>
-            <div>
-              <div className="atl-section-title">The doorway</div>
-              <div className="atl-section-why">
-                {next ? `Next: ${next.title}` : "No events planned. Open the door."}
-              </div>
-            </div>
-          </div>
-          <Link href="/dashboard/exhibitions" className="atl-section-cta">All <ArrowRight size={12} /></Link>
-        </div>
-
-        {events.length === 0 ? (
-          <Link href="/dashboard/exhibitions/new" style={{ textDecoration: "none" }}>
-            <div className="atl-empty">
-              <Building2 size={22} color="#9B8F7A" />
-              <div>
-                <div style={{ fontSize: 13, fontWeight: 800, color: "#111110" }}>Plan your next show</div>
-                <div style={{ fontSize: 11, color: "#9B8F7A", fontWeight: 600 }}>Add an exhibition or event.</div>
-              </div>
-            </div>
-          </Link>
-        ) : (
-          <div>
-            {events.map((ev, i) => (
-              <Link key={ev.id} href="/dashboard/exhibitions" style={{ textDecoration: "none" }}>
-                <div className="atl-doorway-row" style={{ borderBottom: i < events.length - 1 ? "1px dashed #E8E0D0" : "none" }}>
-                  <div style={{ width: 40, height: 40, borderRadius: 10, background: "#FFF8E1", border: "2px solid #111110", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                    <div style={{ fontSize: 9, fontWeight: 800, color: "#9B8F7A", textTransform: "uppercase", letterSpacing: "0.1em", lineHeight: 1 }}>
-                      {ev.start_date ? new Date(ev.start_date).toLocaleDateString("en-US", { month: "short" }) : "TBD"}
-                    </div>
-                    <div style={{ fontSize: 14, fontWeight: 900, color: "#111110", lineHeight: 1, marginTop: 2 }}>
-                      {ev.start_date ? new Date(ev.start_date).getDate() : "—"}
-                    </div>
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 13, fontWeight: 800, color: "#111110", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ev.title}</div>
-                    <div style={{ fontSize: 11, color: "#9B8F7A", fontWeight: 600 }}>{ev.venue || "No venue"}</div>
-                  </div>
-                </div>
-              </Link>
-            ))}
-          </div>
-        )}
-      </section>
-    );
-  };
-
-  /* ── THE NOTEBOOK (tasks) ── */
-  const renderTasks = () => {
-    const shown = tasks.slice(0, 5);
-    return (
-      <section key="tasks" data-key="tasks"
-        className={`atl-section atl-notebook ${isHighlighted("tasks") ? "atl-spot" : ""} ${isDimmed("tasks") ? "atl-dim" : ""}`}
-        style={{ transform: "rotate(0.3deg)" }}>
-        <div className="atl-section-head">
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <div className="atl-icon-badge" style={{ background: "#8B5CF6" }}>
-              <PencilLine size={15} color="#111110" strokeWidth={2.3} />
-            </div>
-            <div>
-              <div className="atl-section-title">The notebook</div>
-              <div className="atl-section-why">
-                {tasks.length === 0 ? "Nothing scribbled here." : `${tasks.length} open · the day's list`}
-              </div>
-            </div>
-          </div>
-          <Link href="/dashboard/tasks" className="atl-section-cta">All <ArrowRight size={12} /></Link>
-        </div>
-
-        {shown.length === 0 ? (
-          <Link href="/dashboard/tasks" style={{ textDecoration: "none" }}>
-            <div className="atl-empty">
-              <Coffee size={22} color="#9B8F7A" />
-              <div>
-                <div style={{ fontSize: 13, fontWeight: 800, color: "#111110" }}>An empty page</div>
-                <div style={{ fontSize: 11, color: "#9B8F7A", fontWeight: 600 }}>Jot down what today needs.</div>
-              </div>
-            </div>
-          </Link>
-        ) : (
-          <div>
-            {shown.map((t) => (
-              <Link key={t.id} href="/dashboard/tasks" style={{ textDecoration: "none" }}>
-                <div className="atl-note-row">
-                  <div className="atl-checkbox" />
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: "#111110", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      {t.title}
-                    </div>
-                    {t.due_date && (
-                      <div style={{ fontSize: 10, color: "#9B8F7A", fontWeight: 600 }}>
-                        due {formatDay(t.due_date)}
-                      </div>
-                    )}
-                  </div>
-                  {t.priority === "high" && <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#FF6B6B" }} />}
-                </div>
-              </Link>
-            ))}
-          </div>
-        )}
-      </section>
-    );
-  };
-
-  /* ── THE LETTERBOX (notifications) ── */
-  const renderLetterbox = () => {
-    const unread = notifs.filter(n => !n.read).length;
-    const shown = notifs.slice(0, 4);
-    return (
-      <section key="letterbox" data-key="letterbox"
-        className={`atl-section ${isHighlighted("letterbox") ? "atl-spot" : ""} ${isDimmed("letterbox") ? "atl-dim" : ""}`}
-        style={{ transform: "rotate(-0.15deg)" }}>
-        <div className="atl-section-head">
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <div className="atl-icon-badge" style={{ background: "#95E1D3" }}>
-              <Bell size={15} color="#111110" strokeWidth={2.3} />
-            </div>
-            <div>
-              <div className="atl-section-title">The letterbox</div>
-              <div className="atl-section-why">
-                {unread > 0 ? `${unread} new letter${unread > 1 ? "s" : ""}` : "All letters opened."}
-              </div>
-            </div>
-          </div>
-          {unread > 0 && (
-            <button onClick={markAllRead} className="atl-section-cta" style={{ border: "none", background: "none", cursor: "pointer", fontFamily: "inherit" }}>
-              <Check size={12} /> Mark read
-            </button>
-          )}
-        </div>
-
-        {shown.length === 0 ? (
-          <div className="atl-empty">
-            <Megaphone size={20} color="#9B8F7A" />
-            <div style={{ fontSize: 12, fontWeight: 700, color: "#9B8F7A" }}>Nothing new. Quiet day.</div>
-          </div>
-        ) : (
-          <div>
-            {shown.map((n, i) => {
-              const cfg = NOTIF_CFG[n.type] || { icon: Sparkles, color: "#9B8F7A" };
-              const Icon = cfg.icon;
-              return (
-                <div key={n.id} style={{
-                  display: "flex", alignItems: "flex-start", gap: 10,
-                  padding: "10px 0",
-                  borderBottom: i < shown.length - 1 ? "1px dashed #E8E0D0" : "none",
-                  opacity: n.read ? 0.62 : 1,
-                }}>
-                  <div style={{ width: 28, height: 28, borderRadius: 8, background: cfg.color + "22", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, border: `1.5px solid ${cfg.color}` }}>
-                    <Icon size={12} color={cfg.color} />
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                      <span style={{ fontSize: 12, fontWeight: n.read ? 600 : 800, color: "#111110" }}>{n.title}</span>
-                      {!n.read && <div style={{ width: 5, height: 5, borderRadius: "50%", background: "#FF6B6B", flexShrink: 0 }} />}
-                    </div>
-                    {n.body && <div style={{ fontSize: 11, color: "#9B8F7A", marginTop: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{n.body}</div>}
-                    <div style={{ fontSize: 10, color: "#C0B8A8", marginTop: 2, fontWeight: 600 }}>{timeAgo(n.created_at)}</div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </section>
-    );
-  };
-
-  const renderMap: Record<string, () => React.ReactElement> = {
-    easel: renderEasel,
-    wall: renderWall,
-    ledger: renderLedger,
-    doorway: renderDoorway,
-    tasks: renderTasks,
-    letterbox: renderLetterbox,
-  };
+  const pickedCard = pickedIntent ? INTENT_CARDS.find(c => c.key === pickedIntent) : null;
 
   /* ══════════════════════════════════════════════════════════════════
      RENDER
@@ -640,9 +282,7 @@ export default function AtelierPage() {
   return (
     <>
       <style>{`
-        /* ── ATELIER STYLES ── */
-
-        /* Section card — the "object on the desk" */
+        /* ══ SECTION CARDS ══ */
         .atl-section {
           background: #fff;
           border: 2.5px solid #111110;
@@ -650,56 +290,26 @@ export default function AtelierPage() {
           box-shadow: 4px 5px 0 #D4C9A8;
           padding: 18px 20px 20px;
           position: relative;
-          transition: box-shadow 0.35s cubic-bezier(0.16,1,0.3,1),
-                      transform 0.35s cubic-bezier(0.16,1,0.3,1),
-                      opacity 0.3s ease,
-                      border-color 0.25s ease;
+          transition: box-shadow 0.35s cubic-bezier(0.16,1,0.3,1), transform 0.35s cubic-bezier(0.16,1,0.3,1);
         }
         .atl-section:hover {
           box-shadow: 6px 7px 0 #111110;
           transform: translate(-1px, -2px) rotate(0deg) !important;
         }
 
-        /* Spotlight (compass match) */
-        .atl-section.atl-spot {
-          box-shadow: 4px 5px 0 #111110, 0 0 0 3px #FFD400;
-          border-color: #111110;
-          animation: atl-pulse 2.4s ease-in-out infinite;
-        }
-        @keyframes atl-pulse {
-          0%,100% { box-shadow: 4px 5px 0 #111110, 0 0 0 3px #FFD400; }
-          50%     { box-shadow: 4px 5px 0 #111110, 0 0 0 5px #FFD400; }
-        }
-
-        /* Dimmed (non-match) */
-        .atl-section.atl-dim {
-          opacity: 0.46;
-          filter: grayscale(0.18);
-        }
-        .atl-section.atl-dim:hover {
-          opacity: 1;
-          filter: none;
-        }
-
-        /* Tape corner */
         .atl-tape {
           position: absolute;
-          width: 56px;
-          height: 18px;
+          width: 56px; height: 18px;
           background: rgba(255, 212, 0, 0.55);
           border: 1px solid rgba(17,17,16,0.1);
           z-index: 2;
           pointer-events: none;
-        }
-        .atl-tape-tl {
           top: -8px;
           left: 26px;
           transform: rotate(-6deg);
-          border-radius: 1px;
           box-shadow: 0 1px 3px rgba(0,0,0,0.08);
         }
 
-        /* Section header */
         .atl-section-head {
           display: flex;
           align-items: flex-start;
@@ -708,133 +318,333 @@ export default function AtelierPage() {
           margin-bottom: 14px;
         }
         .atl-icon-badge {
-          width: 32px;
-          height: 32px;
-          border-radius: 10px;
+          width: 32px; height: 32px; border-radius: 10px;
           border: 2px solid #111110;
-          display: flex;
-          align-items: center;
-          justify-content: center;
+          display: flex; align-items: center; justify-content: center;
           box-shadow: 2px 2px 0 #111110;
           flex-shrink: 0;
         }
         .atl-section-title {
-          font-size: 17px;
-          font-weight: 900;
-          color: #111110;
-          letter-spacing: -0.4px;
-          line-height: 1.1;
+          font-size: 17px; font-weight: 900; color: #111110;
+          letter-spacing: -0.4px; line-height: 1.1;
         }
         .atl-section-why {
-          font-size: 11.5px;
-          font-weight: 600;
-          color: #9B8F7A;
-          font-style: italic;
-          margin-top: 2px;
-          line-height: 1.3;
+          font-size: 11.5px; font-weight: 600; color: #9B8F7A;
+          font-style: italic; margin-top: 2px; line-height: 1.3;
         }
         .atl-section-cta {
-          display: inline-flex;
-          align-items: center;
-          gap: 4px;
-          font-size: 11px;
-          font-weight: 800;
-          color: #9B8F7A;
-          text-decoration: none;
-          text-transform: uppercase;
-          letter-spacing: 0.1em;
-          padding: 4px 8px;
-          border-radius: 6px;
+          display: inline-flex; align-items: center; gap: 4px;
+          font-size: 11px; font-weight: 800; color: #9B8F7A;
+          text-decoration: none; text-transform: uppercase;
+          letter-spacing: 0.1em; padding: 4px 8px; border-radius: 6px;
           transition: color 0.15s, background 0.15s;
           flex-shrink: 0;
         }
-        .atl-section-cta:hover {
-          color: #111110;
+        .atl-section-cta:hover { color: #111110; background: #FFFBEA; }
+
+        /* ══ HELPER BADGE ══ */
+        .atl-helper-wrap { position: relative; }
+
+        .atl-helper-btn {
+          display: inline-flex;
+          align-items: center;
+          gap: 10px;
+          padding: 10px 14px 10px 10px;
           background: #FFFBEA;
+          border: 2.5px solid #111110;
+          border-radius: 9999px;
+          cursor: pointer;
+          font-family: inherit;
+          box-shadow: 3px 3px 0 #111110;
+          transition: transform 0.15s, box-shadow 0.15s, background 0.15s;
+          position: relative;
+          color: #111110;
+        }
+        .atl-helper-btn:hover {
+          transform: translate(-1px, -1px);
+          box-shadow: 4px 4px 0 #111110;
+          background: #fff;
+        }
+        .atl-helper-btn.open {
+          background: #111110;
+          color: #FFD400;
+          transform: translate(-1px, -1px);
+          box-shadow: 4px 4px 0 #FFD400;
         }
 
-        /* Compass strip */
-        .atl-compass {
+        .atl-helper-face {
+          width: 32px; height: 32px; border-radius: 50%;
+          background: #FFD400;
+          border: 2px solid #111110;
+          display: flex; align-items: center; justify-content: center;
+          flex-shrink: 0;
+          position: relative;
+        }
+        .atl-helper-face::after {
+          content: "";
+          position: absolute;
+          top: -3px; right: -3px;
+          width: 9px; height: 9px;
+          border-radius: 50%;
+          background: #FF6B6B;
+          border: 1.5px solid #111110;
+        }
+        .atl-helper-btn.open .atl-helper-face::after { display: none; }
+
+        .atl-helper-text {
+          display: flex; flex-direction: column; line-height: 1;
+          text-align: left; padding-right: 4px;
+        }
+        .atl-helper-text small {
+          font-size: 9px;
+          font-weight: 800;
+          color: #9B8F7A;
+          text-transform: uppercase;
+          letter-spacing: 0.16em;
+          margin-bottom: 3px;
+        }
+        .atl-helper-btn.open .atl-helper-text small {
+          color: rgba(255, 212, 0, 0.7);
+        }
+        .atl-helper-text strong {
+          font-size: 13px;
+          font-weight: 900;
+          color: inherit;
+          letter-spacing: -0.2px;
+        }
+
+        @keyframes atl-helper-wiggle {
+          0%, 90%, 100% { transform: rotate(0deg); }
+          93% { transform: rotate(-8deg); }
+          96% { transform: rotate(8deg); }
+        }
+        .atl-helper-btn .atl-helper-face {
+          animation: atl-helper-wiggle 3.5s ease-in-out 1.2s 2;
+          transform-origin: center;
+        }
+
+        /* ── HELPER PANEL ── */
+        .atl-helper-panel {
+          position: absolute;
+          top: calc(100% + 12px);
+          right: 0;
+          width: 540px;
+          max-width: calc(100vw - 32px);
           background: #fff;
           border: 2.5px solid #111110;
           border-radius: 20px;
-          box-shadow: 4px 5px 0 #D4C9A8;
-          padding: 18px 22px;
-          margin-bottom: 22px;
+          box-shadow: 6px 7px 0 #111110;
+          z-index: 80;
+          padding: 20px 22px 22px;
+          animation: atl-panel-in 0.25s cubic-bezier(0.16,1,0.3,1) both;
+        }
+        @keyframes atl-panel-in {
+          from { opacity: 0; transform: translateY(-8px) scale(0.97); }
+          to   { opacity: 1; transform: none; }
+        }
+
+        /* Speech-bubble tail */
+        .atl-helper-panel::before,
+        .atl-helper-panel::after {
+          content: "";
+          position: absolute;
+          top: -12px;
+          right: 32px;
+          width: 0; height: 0;
+          border-left: 10px solid transparent;
+          border-right: 10px solid transparent;
+          border-bottom: 11px solid #111110;
+        }
+        .atl-helper-panel::after {
+          top: -9px;
+          border-bottom-color: #fff;
+        }
+
+        .atl-helper-heading {
+          display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
+          margin-bottom: 16px;
+        }
+        .atl-helper-q {
+          font-size: 18px; font-weight: 900; color: #111110;
+          letter-spacing: -0.5px; line-height: 1.2;
+          margin: 0;
+        }
+        .atl-helper-sub {
+          font-size: 12px; font-weight: 600; color: #9B8F7A;
+          font-style: italic; margin-top: 4px;
+        }
+        .atl-helper-close {
+          background: none; border: none; cursor: pointer;
+          width: 28px; height: 28px; border-radius: 8px;
+          display: flex; align-items: center; justify-content: center;
+          color: #9B8F7A;
+          transition: background 0.15s, color 0.15s;
+          flex-shrink: 0;
+        }
+        .atl-helper-close:hover { background: #FAF7F3; color: #111110; }
+
+        /* Intent grid */
+        .atl-intent-grid {
+          display: grid;
+          grid-template-columns: repeat(5, 1fr);
+          gap: 8px;
+        }
+        .atl-intent-card {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 8px;
+          padding: 14px 8px 12px;
+          background: #FAF7F3;
+          border: 2px solid #E8E0D0;
+          border-radius: 14px;
+          cursor: pointer;
+          font-family: inherit;
+          text-align: center;
+          transition: all 0.18s cubic-bezier(0.16,1,0.3,1);
           position: relative;
         }
-        .atl-compass-q {
+        .atl-intent-card:hover {
+          border-color: #111110;
+          background: #fff;
+          transform: translateY(-2px);
+          box-shadow: 2px 3px 0 #111110;
+        }
+        .atl-intent-card.picked {
+          border-color: #111110;
+          background: #fff;
+          box-shadow: 2px 3px 0 #111110;
+        }
+        .atl-intent-card.dimmed { opacity: 0.42; }
+        .atl-intent-card.dimmed:hover { opacity: 1; }
+
+        .atl-intent-icon {
+          width: 44px; height: 44px; border-radius: 12px;
+          border: 2px solid #111110;
+          display: flex; align-items: center; justify-content: center;
+          box-shadow: 2px 2px 0 #111110;
+          transition: transform 0.18s;
+        }
+        .atl-intent-card:hover .atl-intent-icon { transform: scale(1.06) rotate(-3deg); }
+        .atl-intent-card.picked .atl-intent-icon { transform: scale(1.06); }
+
+        .atl-intent-label {
+          font-size: 13px; font-weight: 900; color: #111110;
+          letter-spacing: -0.2px; line-height: 1;
+        }
+        .atl-intent-blurb {
+          font-size: 10px; font-weight: 600; color: #9B8F7A;
+          line-height: 1.25;
+        }
+
+        /* Pick result inside panel */
+        .atl-pick-result {
+          margin-top: 14px;
+          padding: 12px 14px;
+          background: #FFFBEA;
+          border: 2px dashed #111110;
+          border-radius: 12px;
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          animation: atl-panel-in 0.3s cubic-bezier(0.16,1,0.3,1) both;
+        }
+        .atl-pick-msg {
+          flex: 1;
+          font-size: 12px;
+          font-weight: 700;
+          color: #111110;
+          line-height: 1.35;
+        }
+        .atl-pick-go {
+          display: inline-flex;
+          align-items: center;
+          gap: 5px;
+          padding: 8px 14px;
+          background: #111110;
+          color: #FFD400;
+          border-radius: 9px;
+          font-size: 12px;
+          font-weight: 800;
+          text-decoration: none;
+          box-shadow: 2px 2px 0 #FFD400;
+          transition: transform 0.15s, box-shadow 0.15s;
+          border: none;
+          cursor: pointer;
+          font-family: inherit;
+          flex-shrink: 0;
+        }
+        .atl-pick-go:hover {
+          transform: translate(-1px, -1px);
+          box-shadow: 3px 3px 0 #FFD400;
+        }
+
+        /* ══ DIRECTIONAL BANNER ══ */
+        .atl-banner {
           display: flex;
           align-items: center;
           gap: 14px;
-          padding: 10px 0;
-          flex-wrap: wrap;
+          padding: 14px 18px;
+          background: #FFD400;
+          border: 2.5px solid #111110;
+          border-radius: 14px;
+          box-shadow: 3px 4px 0 #111110;
+          margin-bottom: 20px;
+          animation: atl-panel-in 0.35s cubic-bezier(0.16,1,0.3,1) both;
         }
-        .atl-compass-q + .atl-compass-q {
-          border-top: 1px dashed #E8E0D0;
+        .atl-banner-icon {
+          width: 40px; height: 40px; border-radius: 11px;
+          background: #111110;
+          display: flex; align-items: center; justify-content: center;
+          flex-shrink: 0;
         }
-        .atl-compass-label {
-          font-size: 13px;
+        .atl-banner-text { flex: 1; min-width: 0; }
+        .atl-banner-label {
+          font-size: 10px;
           font-weight: 800;
           color: #111110;
-          letter-spacing: -0.2px;
-          min-width: 220px;
-        }
-        .atl-compass-label small {
-          display: block;
-          font-size: 10px;
-          font-weight: 700;
-          color: #9B8F7A;
           text-transform: uppercase;
-          letter-spacing: 0.12em;
+          letter-spacing: 0.14em;
+          opacity: 0.65;
           margin-bottom: 2px;
         }
-        .atl-compass-pills {
-          display: flex;
-          flex-wrap: wrap;
-          gap: 6px;
-          flex: 1;
-        }
-        .atl-pill {
-          padding: 6px 14px;
-          border-radius: 9999px;
-          border: 2px solid #E8E0D0;
-          background: #FAF7F3;
-          font-family: inherit;
-          font-size: 12px;
-          font-weight: 700;
-          color: #5C5346;
-          cursor: pointer;
-          transition: all 0.15s;
-        }
-        .atl-pill:hover {
-          border-color: #111110;
+        .atl-banner-msg {
+          font-size: 15px;
+          font-weight: 800;
           color: #111110;
-          background: #fff;
+          letter-spacing: -0.3px;
+          line-height: 1.3;
         }
-        .atl-pill.active {
-          background: #FFD400;
-          border-color: #111110;
-          color: #111110;
-          box-shadow: 2px 2px 0 #111110;
-        }
-        .atl-compass-clear {
-          font-family: inherit;
-          font-size: 11px;
-          font-weight: 700;
-          color: #9B8F7A;
-          background: none;
-          border: none;
-          cursor: pointer;
-          padding: 4px 8px;
-          border-radius: 6px;
+        .atl-banner-cta {
           display: inline-flex;
           align-items: center;
-          gap: 4px;
+          gap: 6px;
+          padding: 10px 16px;
+          background: #111110;
+          color: #FFD400;
+          border-radius: 10px;
+          font-size: 13px;
+          font-weight: 800;
+          text-decoration: none;
+          box-shadow: 2px 2px 0 rgba(17,17,16,0.3);
+          transition: transform 0.15s, box-shadow 0.15s;
+          flex-shrink: 0;
         }
-        .atl-compass-clear:hover { color: #111110; background: #FAF7F3; }
+        .atl-banner-cta:hover {
+          transform: translate(-1px, -1px);
+          box-shadow: 3px 3px 0 rgba(17,17,16,0.4);
+        }
+        .atl-banner-close {
+          background: none; border: none; cursor: pointer;
+          width: 32px; height: 32px; border-radius: 9px;
+          display: flex; align-items: center; justify-content: center;
+          color: #111110;
+          transition: background 0.15s;
+          flex-shrink: 0;
+        }
+        .atl-banner-close:hover { background: rgba(17,17,16,0.1); }
 
-        /* Easel */
+        /* ══ OTHER SECTIONS ══ */
         .atl-easel-card {
           display: grid;
           grid-template-columns: 180px 1fr;
@@ -854,23 +664,14 @@ export default function AtelierPage() {
           box-shadow: 3px 3px 0 #D4C9A8;
         }
         .atl-easel-meta {
-          display: flex;
-          flex-direction: column;
-          justify-content: space-between;
+          display: flex; flex-direction: column; justify-content: space-between;
           padding: 6px 0;
         }
         .atl-easel-action {
-          display: inline-flex;
-          align-items: center;
-          gap: 6px;
-          padding: 9px 16px;
-          background: #111110;
-          color: #FFD400;
-          border-radius: 10px;
-          font-size: 12px;
-          font-weight: 800;
-          letter-spacing: -0.1px;
-          align-self: flex-start;
+          display: inline-flex; align-items: center; gap: 6px;
+          padding: 9px 16px; background: #111110; color: #FFD400;
+          border-radius: 10px; font-size: 12px; font-weight: 800;
+          letter-spacing: -0.1px; align-self: flex-start;
           box-shadow: 2px 2px 0 #FFD400;
           transition: transform 0.15s, box-shadow 0.15s;
         }
@@ -879,20 +680,16 @@ export default function AtelierPage() {
           box-shadow: 3px 3px 0 #FFD400;
         }
 
-        /* Wall grid */
         .atl-wall-grid {
           display: grid;
           grid-template-columns: repeat(3, 1fr);
           gap: 12px 10px;
         }
         .atl-wall-tile {
-          text-decoration: none;
-          display: block;
+          text-decoration: none; display: block;
           transition: transform 0.2s cubic-bezier(0.16,1,0.3,1);
         }
-        .atl-wall-tile:hover {
-          transform: translateY(-3px) rotate(0deg) !important;
-        }
+        .atl-wall-tile:hover { transform: translateY(-3px) rotate(0deg) !important; }
         .atl-wall-img {
           position: relative;
           aspect-ratio: 1/1;
@@ -903,42 +700,26 @@ export default function AtelierPage() {
           box-shadow: 2px 2px 0 #D4C9A8;
           transition: box-shadow 0.2s;
         }
-        .atl-wall-tile:hover .atl-wall-img {
-          box-shadow: 3px 3px 0 #111110;
-        }
+        .atl-wall-tile:hover .atl-wall-img { box-shadow: 3px 3px 0 #111110; }
         .atl-wall-dot {
-          position: absolute;
-          top: 6px;
-          right: 6px;
-          width: 8px;
-          height: 8px;
-          border-radius: 50%;
+          position: absolute; top: 6px; right: 6px;
+          width: 8px; height: 8px; border-radius: 50%;
           border: 1.5px solid #111110;
         }
         .atl-wall-label {
-          font-size: 11px;
-          font-weight: 700;
-          color: #5C5346;
-          margin-top: 6px;
-          text-align: center;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          white-space: nowrap;
+          font-size: 11px; font-weight: 700; color: #5C5346;
+          margin-top: 6px; text-align: center;
+          overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
           padding: 0 2px;
         }
 
-        /* Add row */
         .atl-add-row {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          justify-content: center;
+          display: flex; align-items: center; gap: 8px; justify-content: center;
           padding: 10px;
           border: 2px dashed #D4C9A8;
           border-radius: 10px;
           color: #9B8F7A;
-          font-size: 12px;
-          font-weight: 800;
+          font-size: 12px; font-weight: 800;
           background: #FAF7F3;
           transition: all 0.15s;
         }
@@ -948,52 +729,34 @@ export default function AtelierPage() {
           background: #FFFBEA;
         }
 
-        /* Ledger */
         .atl-big-num {
-          font-size: 38px;
-          font-weight: 900;
-          color: #111110;
-          letter-spacing: -1.5px;
-          line-height: 1;
+          font-size: 38px; font-weight: 900; color: #111110;
+          letter-spacing: -1.5px; line-height: 1;
           margin-bottom: 2px;
         }
         .atl-ledger-row {
-          display: flex;
-          align-items: center;
-          gap: 10px;
+          display: flex; align-items: center; gap: 10px;
           padding: 10px;
           background: #FAFAF8;
           border: 1.5px solid #E8E0D0;
           border-radius: 10px;
         }
 
-        /* Doorway */
         .atl-doorway-row {
-          display: flex;
-          align-items: center;
-          gap: 12px;
+          display: flex; align-items: center; gap: 12px;
           padding: 10px 0;
           transition: background 0.15s;
         }
         .atl-doorway-row:hover { background: #FFFBEA; border-radius: 8px; }
 
-        /* Notebook (lined paper feel) */
         .atl-notebook {
           background:
             linear-gradient(#fff, #fff),
-            repeating-linear-gradient(
-              to bottom,
-              transparent 0,
-              transparent 27px,
-              #F0E8D4 27px,
-              #F0E8D4 28px
-            );
+            repeating-linear-gradient(to bottom, transparent 0, transparent 27px, #F0E8D4 27px, #F0E8D4 28px);
           background-blend-mode: multiply;
         }
         .atl-note-row {
-          display: flex;
-          align-items: center;
-          gap: 10px;
+          display: flex; align-items: center; gap: 10px;
           padding: 7px 0;
           border-bottom: 1px dashed #E8E0D0;
           transition: background 0.15s;
@@ -1001,61 +764,60 @@ export default function AtelierPage() {
         .atl-note-row:hover { background: #FFFBEA; }
         .atl-note-row:last-child { border-bottom: none; }
         .atl-checkbox {
-          width: 15px;
-          height: 15px;
+          width: 15px; height: 15px;
           border: 2px solid #111110;
           border-radius: 4px;
           background: #fff;
           flex-shrink: 0;
         }
 
-        /* Empty states */
         .atl-empty {
-          display: flex;
-          align-items: center;
-          gap: 12px;
+          display: flex; align-items: center; gap: 12px;
           padding: 18px;
           border: 2px dashed #E8E0D0;
           border-radius: 12px;
           background: #FAF7F3;
         }
-        .atl-empty-cta {
-          cursor: pointer;
-          transition: all 0.15s;
-        }
-        .atl-empty-cta:hover {
-          border-color: #111110;
-          background: #FFFBEA;
-        }
+        .atl-empty-cta { cursor: pointer; transition: all 0.15s; }
+        .atl-empty-cta:hover { border-color: #111110; background: #FFFBEA; }
 
-        /* Grid layout */
         .atl-grid {
           display: grid;
           grid-template-columns: repeat(2, 1fr);
           gap: 20px;
         }
 
-        /* Stagger entry */
         @keyframes atl-in {
           from { opacity: 0; transform: translateY(16px); }
           to { opacity: 1; }
         }
         .atl-in { animation: atl-in 0.5s cubic-bezier(0.16,1,0.3,1) both; }
 
-        /* Responsive */
+        @media (max-width: 900px) {
+          .atl-intent-grid { grid-template-columns: repeat(3, 1fr); }
+          .atl-helper-panel { width: 440px; }
+        }
         @media (max-width: 768px) {
           .atl-grid { grid-template-columns: 1fr; }
           .atl-section[style*="grid-column"] { grid-column: span 1 !important; }
           .atl-easel-card { grid-template-columns: 1fr; }
           .atl-easel-img { aspect-ratio: 4/3; }
           .atl-wall-grid { grid-template-columns: repeat(3, 1fr); }
-          .atl-compass-label { min-width: 100%; }
+          .atl-helper-panel {
+            width: calc(100vw - 32px);
+            right: -8px;
+          }
+          .atl-helper-panel::before, .atl-helper-panel::after { right: 44px; }
+          .atl-helper-text { display: none; }
+          .atl-helper-btn { padding: 6px; }
+          .atl-intent-grid { grid-template-columns: repeat(2, 1fr); }
+          .atl-banner { flex-wrap: wrap; }
         }
       `}</style>
 
       <div>
         {/* ═══════════════════════════════════════════════════════
-            HEADER — Simple greeting
+            HEADER — Greeting + Helper badge
             ═══════════════════════════════════════════════════════ */}
         <div className="atl-in" style={{ marginBottom: 20, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
@@ -1074,115 +836,441 @@ export default function AtelierPage() {
             </div>
           </div>
 
-          <Link href="/dashboard/artworks/new" style={{ textDecoration: "none" }}>
-            <div style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "11px 18px", background: "#111110", color: "#FFD400", borderRadius: 12, fontSize: 13, fontWeight: 800, boxShadow: "3px 3px 0 #FFD400", transition: "transform 0.15s, box-shadow 0.15s", border: "2.5px solid #111110" }}
-              onMouseEnter={e => { (e.currentTarget.style.transform = "translate(-1px,-1px)"); (e.currentTarget.style.boxShadow = "4px 4px 0 #FFD400"); }}
-              onMouseLeave={e => { (e.currentTarget.style.transform = "none"); (e.currentTarget.style.boxShadow = "3px 3px 0 #FFD400"); }}>
-              <Plus size={14} strokeWidth={2.6} /> New piece
-            </div>
-          </Link>
-        </div>
+          {/* ── HELPER BADGE ── */}
+          <div className="atl-helper-wrap" ref={helperRef}>
+            <button
+              className={`atl-helper-btn ${helperOpen ? "open" : ""}`}
+              onClick={() => setHelperOpen(o => !o)}
+              aria-label="Open the helper"
+              aria-expanded={helperOpen}
+            >
+              <div className="atl-helper-face">
+                <HandHeart size={16} color="#111110" strokeWidth={2.3} />
+              </div>
+              <div className="atl-helper-text">
+                <small>Not sure where to go?</small>
+                <strong>Need a hand?</strong>
+              </div>
+            </button>
 
-        {/* ═══════════════════════════════════════════════════════
-            COMPASS — 3 questions, reshuffles + spotlights below
-            ═══════════════════════════════════════════════════════ */}
-        <div className="atl-compass atl-in" style={{ animationDelay: "0.05s" }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4, flexWrap: "wrap", gap: 8 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <Compass size={16} color="#111110" strokeWidth={2.3} />
-              <span style={{ fontSize: 11, fontWeight: 800, color: "#111110", textTransform: "uppercase", letterSpacing: "0.16em" }}>
-                Today's compass
-              </span>
-            </div>
-            {compassActive && (
-              <button className="atl-compass-clear" onClick={() => { setQ1(null); setQ2(null); setQ3(null); }}>
-                <X size={11} /> Clear
-              </button>
+            {helperOpen && (
+              <div className="atl-helper-panel" role="dialog" aria-label="Helper">
+                <div className="atl-helper-heading">
+                  <div>
+                    <h2 className="atl-helper-q">What do you want to do today?</h2>
+                    <div className="atl-helper-sub">Pick one — I'll take you there.</div>
+                  </div>
+                  <button className="atl-helper-close" onClick={() => setHelperOpen(false)} aria-label="Close">
+                    <X size={15} />
+                  </button>
+                </div>
+
+                <div className="atl-intent-grid">
+                  {INTENT_CARDS.map(card => {
+                    const Icon = card.icon;
+                    const isPicked = pickedIntent === card.key;
+                    const isDimmed = pickedIntent !== null && !isPicked;
+                    return (
+                      <button
+                        key={card.key}
+                        className={`atl-intent-card ${isPicked ? "picked" : ""} ${isDimmed ? "dimmed" : ""}`}
+                        onClick={() => handlePick(card.key)}
+                      >
+                        <div className="atl-intent-icon" style={{ background: card.color }}>
+                          <Icon size={20} color="#111110" strokeWidth={2.3} />
+                        </div>
+                        <div className="atl-intent-label">{card.label}</div>
+                        <div className="atl-intent-blurb">{card.blurb}</div>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {pickedCard && (
+                  <div className="atl-pick-result">
+                    <Sparkles size={16} color="#111110" strokeWidth={2.3} style={{ flexShrink: 0 }} />
+                    <div className="atl-pick-msg">{pickedCard.banner}</div>
+                    <Link href={pickedCard.href} className="atl-pick-go"
+                      onClick={() => setHelperOpen(false)}>
+                      Go there <ArrowRight size={12} strokeWidth={2.5} />
+                    </Link>
+                  </div>
+                )}
+              </div>
             )}
           </div>
-
-          {/* Q1 */}
-          <div className="atl-compass-q">
-            <div className="atl-compass-label">
-              <small>Question 1</small>
-              What do you want to do today?
-            </div>
-            <div className="atl-compass-pills">
-              {[
-                { k: "create", label: "Create" },
-                { k: "sell",   label: "Sell" },
-                { k: "show",   label: "Show" },
-                { k: "plan",   label: "Plan" },
-                { k: "collab", label: "Collab" },
-              ].map(opt => (
-                <button key={opt.k}
-                  className={`atl-pill ${q1 === opt.k ? "active" : ""}`}
-                  onClick={() => setQ1(q1 === opt.k ? null : opt.k)}>
-                  {opt.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Q2 */}
-          <div className="atl-compass-q">
-            <div className="atl-compass-label">
-              <small>Question 2</small>
-              What matters most right now?
-            </div>
-            <div className="atl-compass-pills">
-              {[
-                { k: "work",     label: "The work" },
-                { k: "business", label: "The business" },
-                { k: "world",    label: "The world out there" },
-              ].map(opt => (
-                <button key={opt.k}
-                  className={`atl-pill ${q2 === opt.k ? "active" : ""}`}
-                  onClick={() => setQ2(q2 === opt.k ? null : opt.k)}>
-                  {opt.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Q3 */}
-          <div className="atl-compass-q">
-            <div className="atl-compass-label">
-              <small>Question 3</small>
-              What's on your mind?
-            </div>
-            <div className="atl-compass-pills">
-              {[
-                { k: "piece",       label: "A piece" },
-                { k: "buyer",       label: "A buyer" },
-                { k: "opportunity", label: "An opportunity" },
-                { k: "nothing",     label: "Nothing specific" },
-              ].map(opt => (
-                <button key={opt.k}
-                  className={`atl-pill ${q3 === opt.k ? "active" : ""}`}
-                  onClick={() => setQ3(q3 === opt.k ? null : opt.k)}>
-                  {opt.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {compassActive && (
-            <div style={{ marginTop: 10, paddingTop: 10, borderTop: "1px dashed #E8E0D0", fontSize: 11.5, color: "#9B8F7A", fontWeight: 600, fontStyle: "italic", display: "flex", alignItems: "center", gap: 6 }}>
-              <Sparkles size={11} color="#FFD400" /> Your desk is rearranging. What matters is on top.
-            </div>
-          )}
         </div>
 
         {/* ═══════════════════════════════════════════════════════
-            THE DESK — sections reorder based on compass
+            DIRECTIONAL BANNER — shown after pick, dismissible
             ═══════════════════════════════════════════════════════ */}
-        <div className="atl-grid atl-in" style={{ animationDelay: "0.1s" }}>
-          {sectionOrder.map((key, i) => {
-            const fn = renderMap[key];
-            if (!fn) return null;
-            return <div key={key} style={{ animationDelay: `${0.12 + i * 0.04}s` }} className="atl-in">{fn()}</div>;
-          })}
+        {pickedCard && !bannerDismissed && (
+          <div className="atl-banner">
+            <div className="atl-banner-icon">
+              {(() => {
+                const Icon = pickedCard.icon;
+                return <Icon size={18} color="#FFD400" strokeWidth={2.3} />;
+              })()}
+            </div>
+            <div className="atl-banner-text">
+              <div className="atl-banner-label">You picked · {pickedCard.label}</div>
+              <div className="atl-banner-msg">{pickedCard.banner}</div>
+            </div>
+            <Link href={pickedCard.href} className="atl-banner-cta">
+              Go there <ArrowRight size={14} strokeWidth={2.5} />
+            </Link>
+            <button className="atl-banner-close" onClick={() => setBannerDismissed(true)} aria-label="Dismiss">
+              <X size={16} strokeWidth={2.3} />
+            </button>
+          </div>
+        )}
+
+        {/* ═══════════════════════════════════════════════════════
+            THE DESK — stable order, no reshuffling
+            ═══════════════════════════════════════════════════════ */}
+        <div className="atl-grid atl-in" style={{ animationDelay: "0.08s" }}>
+
+          {/* ── ON THE EASEL ── */}
+          <section className="atl-section" style={{ gridColumn: "span 2", transform: "rotate(-0.25deg)" }}>
+            <div className="atl-tape" />
+            <div className="atl-section-head">
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div className="atl-icon-badge" style={{ background: "#FFD400" }}>
+                  <Palette size={15} color="#111110" strokeWidth={2.3} />
+                </div>
+                <div>
+                  <div className="atl-section-title">On the easel</div>
+                  <div className="atl-section-why">
+                    {!easelPiece
+                      ? "Nothing here yet — start a new piece."
+                      : (() => {
+                          const d = easelPiece.updated_at ? daysAgo(easelPiece.updated_at) : 0;
+                          if (d === 0) return "You worked on this today.";
+                          if (d === 1) return "One day since you last touched it.";
+                          return `${d} days since you last touched it.`;
+                        })()}
+                  </div>
+                </div>
+              </div>
+              <Link href="/dashboard/artworks" className="atl-section-cta">
+                All works <ArrowRight size={12} />
+              </Link>
+            </div>
+
+            {easelPiece ? (
+              <Link href={`/dashboard/artworks/${easelPiece.id}`} style={{ textDecoration: "none", display: "block" }}>
+                <div className="atl-easel-card">
+                  <div className="atl-easel-img">
+                    {Array.isArray(easelPiece.images) && easelPiece.images[0] ? (
+                      <img src={easelPiece.images[0]} alt={easelPiece.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                    ) : (
+                      <div style={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 6 }}>
+                        <Brush size={36} color="#D4C9A8" />
+                        <span style={{ fontSize: 11, color: "#9B8F7A", fontWeight: 600 }}>No image yet</span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="atl-easel-meta">
+                    <div>
+                      <div style={{ fontSize: 11, fontWeight: 800, color: "#9B8F7A", textTransform: "uppercase", letterSpacing: "0.14em", marginBottom: 6 }}>
+                        {easelPiece.status?.replace(/_/g, " ") || "In progress"}
+                      </div>
+                      <h3 style={{ fontSize: 22, fontWeight: 900, color: "#111110", margin: "0 0 6px", letterSpacing: "-0.5px", lineHeight: 1.1 }}>
+                        {easelPiece.title || "Untitled"}
+                      </h3>
+                      <div style={{ fontSize: 13, color: "#5C5346", fontWeight: 600 }}>
+                        {[easelPiece.medium, easelPiece.year,
+                          easelPiece.width_cm && easelPiece.height_cm ? `${easelPiece.width_cm}×${easelPiece.height_cm} cm` : null
+                        ].filter(Boolean).join(" · ")}
+                      </div>
+                    </div>
+                    <div className="atl-easel-action">
+                      Open this piece <ArrowRight size={14} strokeWidth={2.5} />
+                    </div>
+                  </div>
+                </div>
+              </Link>
+            ) : (
+              <Link href="/dashboard/artworks/new" style={{ textDecoration: "none" }}>
+                <div className="atl-empty atl-empty-cta">
+                  <Plus size={22} color="#111110" strokeWidth={2.5} />
+                  <div>
+                    <div style={{ fontSize: 15, fontWeight: 900, color: "#111110" }}>Start a new piece</div>
+                    <div style={{ fontSize: 12, color: "#5C5346", fontWeight: 600 }}>Every atelier begins with one mark.</div>
+                  </div>
+                </div>
+              </Link>
+            )}
+          </section>
+
+          {/* ── THE WALL ── */}
+          <section className="atl-section" style={{ gridColumn: "span 2", transform: "rotate(0.15deg)" }}>
+            <div className="atl-section-head">
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div className="atl-icon-badge" style={{ background: "#4ECDC4" }}>
+                  <Frame size={15} color="#111110" strokeWidth={2.3} />
+                </div>
+                <div>
+                  <div className="atl-section-title">The wall</div>
+                  <div className="atl-section-why">
+                    {stats.artworks === 0 ? "Empty wall. Hang your first piece." :
+                     `${stats.artworks} works · ${stats.available} available · ${stats.in_progress} in progress`}
+                  </div>
+                </div>
+              </div>
+              <Link href="/dashboard/artworks" className="atl-section-cta">See all <ArrowRight size={12} /></Link>
+            </div>
+
+            {artworks.length === 0 ? (
+              <Link href="/dashboard/artworks/new" style={{ textDecoration: "none" }}>
+                <div className="atl-empty">
+                  <ImageIcon size={22} color="#9B8F7A" />
+                  <div>
+                    <div style={{ fontSize: 14, fontWeight: 800, color: "#111110" }}>No artworks yet</div>
+                    <div style={{ fontSize: 12, color: "#9B8F7A", fontWeight: 600 }}>Add your first work to begin.</div>
+                  </div>
+                </div>
+              </Link>
+            ) : (
+              <div className="atl-wall-grid">
+                {artworks.slice(0, 6).map((aw, i) => {
+                  const img = Array.isArray(aw.images) ? aw.images[0] : null;
+                  const dot = STATUS_DOT[String(aw.status).toLowerCase()] || "#9B8F7A";
+                  return (
+                    <Link key={aw.id} href={`/dashboard/artworks/${aw.id}`} className="atl-wall-tile"
+                      style={{ transform: `rotate(${(i % 2 === 0 ? -1 : 1) * (0.2 + (i % 3) * 0.15)}deg)` }}>
+                      <div className="atl-wall-img">
+                        {img ? <img src={img} alt={aw.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                          : <div style={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                              <ImageIcon size={20} color="#D4C9A8" /></div>}
+                        <div className="atl-wall-dot" style={{ background: dot }} />
+                      </div>
+                      <div className="atl-wall-label">{aw.title || "Untitled"}</div>
+                    </Link>
+                  );
+                })}
+              </div>
+            )}
+
+            <Link href="/dashboard/artworks/new" style={{ textDecoration: "none", display: "block", marginTop: 12 }}>
+              <div className="atl-add-row">
+                <Plus size={14} strokeWidth={2.5} /> Add a new piece to the wall
+              </div>
+            </Link>
+          </section>
+
+          {/* ── THE LEDGER ── */}
+          <section className="atl-section">
+            <div className="atl-section-head">
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div className="atl-icon-badge" style={{ background: "#FFD400" }}>
+                  <DollarSign size={15} color="#111110" strokeWidth={2.3} />
+                </div>
+                <div>
+                  <div className="atl-section-title">The ledger</div>
+                  <div className="atl-section-why">
+                    {(() => {
+                      const completed = recentSales.filter(s => s.status?.toLowerCase() === "completed");
+                      if (stats.sales_month > 0) return `$${stats.sales_month.toLocaleString()} this month`;
+                      if (completed.length > 0) return `${completed.length} sales to date`;
+                      return "Quiet ledger. First sale coming.";
+                    })()}
+                  </div>
+                </div>
+              </div>
+              <Link href="/dashboard/sales" className="atl-section-cta">Open <ArrowRight size={12} /></Link>
+            </div>
+
+            <div style={{ padding: "4px 0" }}>
+              <div className="atl-big-num">${stats.sales_total.toLocaleString()}</div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "#9B8F7A", textTransform: "uppercase", letterSpacing: "0.14em", marginBottom: 14 }}>
+                Total earned · all time
+              </div>
+
+              {(() => {
+                const last = recentSales.filter(s => s.status?.toLowerCase() === "completed")[0];
+                if (!last) return (
+                  <div style={{ fontSize: 12, color: "#9B8F7A", fontWeight: 600, padding: "8px 0" }}>
+                    No sales recorded yet.
+                  </div>
+                );
+                return (
+                  <div className="atl-ledger-row">
+                    <div style={{ width: 4, height: 32, borderRadius: 2, background: "#16A34A" }} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 800, color: "#111110", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {last.artwork_title || "Artwork"} · ${last.sale_price?.toLocaleString()}
+                      </div>
+                      <div style={{ fontSize: 11, color: "#9B8F7A", fontWeight: 600 }}>
+                        Last sale · {last.sale_date ? formatDay(last.sale_date) : "—"}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+          </section>
+
+          {/* ── THE DOORWAY ── */}
+          <section className="atl-section" style={{ transform: "rotate(-0.2deg)" }}>
+            <div className="atl-section-head">
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div className="atl-icon-badge" style={{ background: "#FF6B6B" }}>
+                  <CalendarDays size={15} color="#111110" strokeWidth={2.3} />
+                </div>
+                <div>
+                  <div className="atl-section-title">The doorway</div>
+                  <div className="atl-section-why">
+                    {events[0] ? `Next: ${events[0].title}` : "No events planned. Open the door."}
+                  </div>
+                </div>
+              </div>
+              <Link href="/dashboard/exhibitions" className="atl-section-cta">All <ArrowRight size={12} /></Link>
+            </div>
+
+            {events.length === 0 ? (
+              <Link href="/dashboard/exhibitions/new" style={{ textDecoration: "none" }}>
+                <div className="atl-empty">
+                  <Building2 size={22} color="#9B8F7A" />
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 800, color: "#111110" }}>Plan your next show</div>
+                    <div style={{ fontSize: 11, color: "#9B8F7A", fontWeight: 600 }}>Add an exhibition or event.</div>
+                  </div>
+                </div>
+              </Link>
+            ) : (
+              <div>
+                {events.map((ev, i) => (
+                  <Link key={ev.id} href="/dashboard/exhibitions" style={{ textDecoration: "none" }}>
+                    <div className="atl-doorway-row" style={{ borderBottom: i < events.length - 1 ? "1px dashed #E8E0D0" : "none" }}>
+                      <div style={{ width: 40, height: 40, borderRadius: 10, background: "#FFF8E1", border: "2px solid #111110", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                        <div style={{ fontSize: 9, fontWeight: 800, color: "#9B8F7A", textTransform: "uppercase", letterSpacing: "0.1em", lineHeight: 1 }}>
+                          {ev.start_date ? new Date(ev.start_date).toLocaleDateString("en-US", { month: "short" }) : "TBD"}
+                        </div>
+                        <div style={{ fontSize: 14, fontWeight: 900, color: "#111110", lineHeight: 1, marginTop: 2 }}>
+                          {ev.start_date ? new Date(ev.start_date).getDate() : "—"}
+                        </div>
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 13, fontWeight: 800, color: "#111110", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ev.title}</div>
+                        <div style={{ fontSize: 11, color: "#9B8F7A", fontWeight: 600 }}>{ev.venue || "No venue"}</div>
+                      </div>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </section>
+
+          {/* ── THE NOTEBOOK (tasks) ── */}
+          <section className="atl-section atl-notebook" style={{ transform: "rotate(0.3deg)" }}>
+            <div className="atl-section-head">
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div className="atl-icon-badge" style={{ background: "#8B5CF6" }}>
+                  <PencilLine size={15} color="#111110" strokeWidth={2.3} />
+                </div>
+                <div>
+                  <div className="atl-section-title">The notebook</div>
+                  <div className="atl-section-why">
+                    {tasks.length === 0 ? "Nothing scribbled here." : `${tasks.length} open · the day's list`}
+                  </div>
+                </div>
+              </div>
+              <Link href="/dashboard/tasks" className="atl-section-cta">All <ArrowRight size={12} /></Link>
+            </div>
+
+            {tasks.length === 0 ? (
+              <Link href="/dashboard/tasks" style={{ textDecoration: "none" }}>
+                <div className="atl-empty">
+                  <Coffee size={22} color="#9B8F7A" />
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 800, color: "#111110" }}>An empty page</div>
+                    <div style={{ fontSize: 11, color: "#9B8F7A", fontWeight: 600 }}>Jot down what today needs.</div>
+                  </div>
+                </div>
+              </Link>
+            ) : (
+              <div>
+                {tasks.slice(0, 5).map((t) => (
+                  <Link key={t.id} href="/dashboard/tasks" style={{ textDecoration: "none" }}>
+                    <div className="atl-note-row">
+                      <div className="atl-checkbox" />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: "#111110", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {t.title}
+                        </div>
+                        {t.due_date && (
+                          <div style={{ fontSize: 10, color: "#9B8F7A", fontWeight: 600 }}>
+                            due {formatDay(t.due_date)}
+                          </div>
+                        )}
+                      </div>
+                      {t.priority === "high" && <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#FF6B6B" }} />}
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </section>
+
+          {/* ── THE LETTERBOX ── */}
+          <section className="atl-section" style={{ transform: "rotate(-0.15deg)" }}>
+            <div className="atl-section-head">
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div className="atl-icon-badge" style={{ background: "#95E1D3" }}>
+                  <Bell size={15} color="#111110" strokeWidth={2.3} />
+                </div>
+                <div>
+                  <div className="atl-section-title">The letterbox</div>
+                  <div className="atl-section-why">
+                    {(() => {
+                      const unread = notifs.filter(n => !n.read).length;
+                      return unread > 0 ? `${unread} new letter${unread > 1 ? "s" : ""}` : "All letters opened.";
+                    })()}
+                  </div>
+                </div>
+              </div>
+              {notifs.filter(n => !n.read).length > 0 && (
+                <button onClick={markAllRead} className="atl-section-cta" style={{ border: "none", background: "none", cursor: "pointer", fontFamily: "inherit" }}>
+                  <Check size={12} /> Mark read
+                </button>
+              )}
+            </div>
+
+            {notifs.slice(0, 4).length === 0 ? (
+              <div className="atl-empty">
+                <Megaphone size={20} color="#9B8F7A" />
+                <div style={{ fontSize: 12, fontWeight: 700, color: "#9B8F7A" }}>Nothing new. Quiet day.</div>
+              </div>
+            ) : (
+              <div>
+                {notifs.slice(0, 4).map((n, i, arr) => {
+                  const cfg = NOTIF_CFG[n.type] || { icon: Sparkles, color: "#9B8F7A" };
+                  const Icon = cfg.icon;
+                  return (
+                    <div key={n.id} style={{
+                      display: "flex", alignItems: "flex-start", gap: 10,
+                      padding: "10px 0",
+                      borderBottom: i < arr.length - 1 ? "1px dashed #E8E0D0" : "none",
+                      opacity: n.read ? 0.62 : 1,
+                    }}>
+                      <div style={{ width: 28, height: 28, borderRadius: 8, background: cfg.color + "22", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, border: `1.5px solid ${cfg.color}` }}>
+                        <Icon size={12} color={cfg.color} />
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                          <span style={{ fontSize: 12, fontWeight: n.read ? 600 : 800, color: "#111110" }}>{n.title}</span>
+                          {!n.read && <div style={{ width: 5, height: 5, borderRadius: "50%", background: "#FF6B6B", flexShrink: 0 }} />}
+                        </div>
+                        {n.body && <div style={{ fontSize: 11, color: "#9B8F7A", marginTop: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{n.body}</div>}
+                        <div style={{ fontSize: 10, color: "#C0B8A8", marginTop: 2, fontWeight: 600 }}>{timeAgo(n.created_at)}</div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </section>
         </div>
 
         {/* Footer line */}

@@ -1,60 +1,92 @@
 "use client";
-import { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import {
-  ImageIcon, Bell, X, ArrowRight, Plus, ExternalLink,
-  Package, Eye, Users, CheckSquare, DollarSign, Handshake,
-  BarChart3, CalendarDays, MapPin, Sparkles,
+  ImageIcon, CalendarDays, Users, Plus, ArrowRight, DollarSign,
+  Bell, Check, Sparkles, X, Palette, Building2, Compass, Brush,
+  Megaphone, PencilLine, Coffee, Frame, Handshake,
 } from "lucide-react";
 
-/* ── Helpers ───────────────────────────────────────────────────── */
-function AnimNum({ target }: { target: number }) {
-  const [val, setVal] = useState(0);
-  const ref = useRef<HTMLDivElement>(null);
-  const started = useRef(false);
-  useEffect(() => {
-    const el = ref.current; if (!el) return;
-    const obs = new IntersectionObserver(([e]) => {
-      if (e.isIntersecting && !started.current) {
-        started.current = true;
-        const start = performance.now();
-        const dur = 900;
-        const step = (now: number) => {
-          const p = Math.min((now - start) / dur, 1);
-          const ease = 1 - Math.pow(1 - p, 3);
-          setVal(Math.round(ease * target));
-          if (p < 1) requestAnimationFrame(step);
-        };
-        requestAnimationFrame(step);
-        obs.disconnect();
-      }
-    }, { threshold: 0.5 });
-    obs.observe(el);
-    return () => obs.disconnect();
-  }, [target]);
-  return <div ref={ref}>{val}</div>;
-}
+/* ══════════════════════════════════════════════════════════════════
+   THE ATELIER — Dashboard reimagined as an artist's desk
+   Ripe design system · 60/30/10 (cream / ink / mango)
+   ══════════════════════════════════════════════════════════════════ */
 
+/* ── Types ─────────────────────────────────────────────────────── */
+type Stats = {
+  artworks: number; available: number; sold: number; in_progress: number;
+  exhibitions: number; collabs: number;
+  sales_total: number; sales_month: number; tasks_pending: number;
+  followers: number;
+};
+type Notif = {
+  id: string; type: string; title: string; body?: string;
+  read: boolean; data?: any; created_at: string;
+};
+type Artwork = {
+  id: string; title: string; status: string; images?: string[];
+  price?: number; medium?: string; year?: number;
+  width_cm?: number; height_cm?: number;
+  created_at: string; updated_at?: string;
+};
+type UpcomingEvent = {
+  id: string; title: string; start_date?: string; venue?: string; status: string;
+};
+type Task = {
+  id: string; title: string; status: string; priority: string;
+  due_date?: string; progress: number;
+};
+type Sale = {
+  id: string; sale_price: number; sale_date?: string;
+  status: string; artwork_id?: string; artwork_title?: string;
+};
+
+/* ── Compass answers → which sections light up ──────────────── */
+const INTENT_MAP: Record<string, string[]> = {
+  create: ["easel", "wall", "tasks"],
+  sell:   ["ledger", "wall", "store"],
+  show:   ["doorway", "wall", "events"],
+  plan:   ["tasks", "calendar", "doorway"],
+  collab: ["doorway", "letterbox"],
+};
+const FOCUS_MAP: Record<string, string[]> = {
+  work:     ["easel", "wall", "tasks"],
+  business: ["ledger", "store", "sales"],
+  world:    ["doorway", "letterbox", "events"],
+};
+const MIND_MAP: Record<string, string[]> = {
+  piece:       ["easel", "wall"],
+  buyer:       ["ledger", "letterbox", "store"],
+  opportunity: ["doorway", "letterbox"],
+  nothing:     [],
+};
+
+/* ── Helpers ──────────────────────────────────────────────── */
+function daysAgo(date?: string) {
+  if (!date) return 0;
+  return Math.floor((Date.now() - new Date(date).getTime()) / 86400000);
+}
 function timeAgo(date: string) {
   const s = Math.floor((Date.now() - new Date(date).getTime()) / 1000);
   if (s < 60) return "just now";
   if (s < 3600) return `${Math.floor(s / 60)}m ago`;
   if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
-  return `${Math.floor(s / 86400)}d ago`;
-}
-
-function fmtDate(date: string) {
+  if (s < 604800) return `${Math.floor(s / 86400)}d ago`;
   return new Date(date).toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
+function formatDay(d?: string) {
+  if (!d) return "No date";
+  return new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
 
-/* ── Config ────────────────────────────────────────────────────── */
-const NOTIF_CFG: Record<string, { icon: any; color: string; bg: string }> = {
-  follow:  { icon: Users,      color: "#4ECDC4", bg: "#F0FDF4" },
-  sale:    { icon: DollarSign, color: "#16A34A", bg: "#DCFCE7" },
-  collab:  { icon: Handshake,  color: "#CA8A04", bg: "#FEF9C3" },
-  system:  { icon: Sparkles,   color: "#8B5CF6", bg: "#EDE9FE" },
-  artwork: { icon: ImageIcon,  color: "#FF6B6B", bg: "#FFE4E6" },
+/* ── Notification icon/color (kept minimal, signal-only) ─── */
+const NOTIF_CFG: Record<string, { icon: any; color: string }> = {
+  follow:  { icon: Users,      color: "#4ECDC4" },
+  sale:    { icon: DollarSign, color: "#16A34A" },
+  collab:  { icon: Handshake,  color: "#CA8A04" },
+  system:  { icon: Sparkles,   color: "#8B5CF6" },
+  artwork: { icon: ImageIcon,  color: "#FF6B6B" },
 };
 
 const STATUS_DOT: Record<string, string> = {
@@ -63,658 +95,1099 @@ const STATUS_DOT: Record<string, string> = {
   concept: "#9B8F7A", complete: "#0EA5E9",
 };
 
-const PRIORITY_COLOR: Record<string, string> = {
-  low: "#4ECDC4", medium: "#FFD400", high: "#FF6B6B",
-};
-
-const QUICK_NAV = [
-  { href: "/dashboard/artworks",    label: "Artworks",  icon: ImageIcon,    color: "#FFD400", desc: "Manage inventory" },
-  { href: "/dashboard/exhibitions", label: "Events",    icon: CalendarDays, color: "#4ECDC4", desc: "Shows & exhibitions" },
-  { href: "/dashboard/pool",        label: "Collabs",   icon: Handshake,    color: "#FF6B6B", desc: "Discovery pool" },
-  { href: "/dashboard/sales",       label: "Sales",     icon: BarChart3,    color: "#8B5CF6", desc: "Track revenue" },
-  { href: "/dashboard/tasks",       label: "Tasks",     icon: CheckSquare,  color: "#95E1D3", desc: "To-dos & planning" },
-  { href: "/dashboard/map",         label: "Map",       icon: MapPin,       color: "#FF6B6B", desc: "Art scene map" },
-];
-
 /* ══════════════════════════════════════════════════════════════════
-   MAIN COMPONENT
+   MAIN
    ══════════════════════════════════════════════════════════════════ */
-export default function DashboardPage() {
-  const [profile, setProfile]           = useState<{ full_name?: string; role?: string; username?: string; avatar_url?: string } | null>(null);
-  const [artworks, setArtworks]         = useState<any[]>([]);
-  const [stats, setStats]               = useState({ artworks: 0, available: 0, sold: 0, exhibitions: 0, collabs: 0, sales_total: 0, tasks_pending: 0, followers: 0 });
-  const [tasks, setTasks]               = useState<any[]>([]);
-  const [events, setEvents]             = useState<any[]>([]);
-  const [recentSales, setRecentSales]   = useState<any[]>([]);
-  const [notifications, setNotifications] = useState<any[]>([]);
-  const [loaded, setLoaded]             = useState(false);
-  const [notifTab, setNotifTab]         = useState<"all" | "unread">("all");
+export default function AtelierPage() {
+  const [profile, setProfile] = useState<{ full_name?: string; username?: string; avatar_url?: string } | null>(null);
+  const [artworks, setArtworks] = useState<Artwork[]>([]);
+  const [stats, setStats] = useState<Stats>({
+    artworks:0, available:0, sold:0, in_progress:0,
+    exhibitions:0, collabs:0, sales_total:0, sales_month:0,
+    tasks_pending:0, followers:0,
+  });
+  const [events, setEvents] = useState<UpcomingEvent[]>([]);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [notifs, setNotifs] = useState<Notif[]>([]);
+  const [recentSales, setRecentSales] = useState<Sale[]>([]);
+  const [loaded, setLoaded] = useState(false);
 
-  const today = new Date();
-  const hour  = today.getHours();
-  const greeting    = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
-  const greetEmoji  = hour < 12 ? "☀️" : hour < 18 ? "🌤️" : "🌙";
+  /* Compass — always reset on visit */
+  const [q1, setQ1] = useState<string | null>(null); // today
+  const [q2, setQ2] = useState<string | null>(null); // focus
+  const [q3, setQ3] = useState<string | null>(null); // on your mind
 
+  /* Greeting */
+  const [greeting, setGreeting] = useState("Good morning");
+  useEffect(() => {
+    const h = new Date().getHours();
+    if (h >= 5 && h < 12) setGreeting("Good morning");
+    else if (h >= 12 && h < 17) setGreeting("Good afternoon");
+    else setGreeting("Good evening");
+  }, []);
+
+  /* ── Load everything ─────────────────────────────────────── */
   useEffect(() => {
     const supabase = createClient();
-    supabase.auth.getUser().then(async ({ data: { user } }) => {
+    supabase.auth.getUser().then(async ({ data: { user } }: { data: { user: any } }) => {
       if (!user) return;
+
+      const now = new Date();
+      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
 
       const [
         { data: prof },
-        { data: aw },
+        { data: awAll },
         { data: tk },
-        { data: eventsData },
+        { data: notifData },
         { data: salesData },
-        { count: ex },
-        { count: co },
+        { data: eventsData },
         { count: followerCount },
-        { data: notifs },
       ] = await Promise.all([
-        supabase.from("profiles").select("full_name,role,username,avatar_url").eq("id", user.id).single(),
-        supabase.from("artworks").select("id,title,images,status,price").eq("user_id", user.id).order("created_at", { ascending: false }).limit(8),
-        supabase.from("tasks").select("*").eq("user_id", user.id).neq("status", "done").order("due_date", { ascending: true }).limit(5),
-        supabase.from("exhibitions").select("*").eq("user_id", user.id).gte("end_date", new Date().toISOString().split("T")[0]).order("start_date").limit(3),
-        supabase.from("sales").select("*").eq("user_id", user.id).order("created_at", { ascending: false }).limit(3),
-        supabase.from("exhibitions").select("id", { count: "exact", head: true }).eq("user_id", user.id),
-        supabase.from("collaborations").select("id", { count: "exact", head: true }).eq("user_id", user.id),
-        supabase.from("follows").select("id", { count: "exact", head: true }).eq("following_id", user.id),
-        supabase.from("notifications").select("*").eq("user_id", user.id).order("created_at", { ascending: false }).limit(20),
+        supabase.from("profiles").select("full_name,username,avatar_url").eq("id", user.id).single(),
+        supabase.from("artworks").select("id,title,status,images,price,medium,year,width_cm,height_cm,created_at,updated_at").eq("user_id", user.id).order("updated_at", { ascending: false }),
+        supabase.from("tasks").select("id,title,status,priority,due_date,progress").eq("user_id", user.id).in("status", ["pending","in_progress"]).order("created_at", { ascending: false }).limit(6),
+        supabase.from("notifications").select("*").eq("user_id", user.id).order("created_at", { ascending: false }).limit(8),
+        supabase.from("sales").select("id,sale_price,sale_date,status,artwork_id,created_at").eq("user_id", user.id).order("created_at", { ascending: false }).limit(10),
+        supabase.from("exhibitions").select("id,title,start_date,venue,status").eq("user_id", user.id).in("status", ["planning","upcoming","current","Planning","Upcoming","Current"]).order("start_date", { ascending: true }).limit(3),
+        supabase.from("follows").select("*", { count: "exact", head: true }).eq("following_id", user.id),
       ]);
 
       setProfile(prof);
-      setArtworks(aw || []);
-      setTasks(tk || []);
+      setArtworks(awAll || []);
+      setTasks((tk || []).map((t: any) => ({ ...t, progress: t.progress || 0 })));
+      setNotifs(notifData || []);
       setEvents(eventsData || []);
-      setNotifications(notifs || []);
 
+      // Enrich sales with artwork title
+      let enrichedSales: Sale[] = salesData || [];
       if (salesData?.length) {
-        const artIds = salesData.map((s: any) => s.artwork_id).filter(Boolean);
-        const { data: saleArtworks } = await supabase.from("artworks").select("id,title").in("id", artIds);
-        const am: Record<string, string> = {};
-        saleArtworks?.forEach((a: any) => { am[a.id] = a.title; });
-        setRecentSales(salesData.map((s: any) => ({ ...s, artwork_title: am[s.artwork_id] })));
+        const ids = salesData.map((s: any) => s.artwork_id).filter(Boolean);
+        if (ids.length) {
+          const { data: sa } = await supabase.from("artworks").select("id,title").in("id", ids);
+          const map: Record<string, string> = {};
+          sa?.forEach((a: any) => { map[a.id] = a.title; });
+          enrichedSales = salesData.map((s: any) => ({ ...s, artwork_title: map[s.artwork_id] }));
+        }
       }
+      setRecentSales(enrichedSales);
 
-      const awList = aw || [];
-      const completedSales = (salesData || []).filter((s: any) => s.status?.toLowerCase() === "completed");
-      const totalRev = completedSales.reduce((sum: number, s: any) => sum + (s.sale_price || 0), 0);
+      const list = awAll || [];
+      const completedSales = enrichedSales.filter(s => s.status?.toLowerCase() === "completed");
+      const totalRev = completedSales.reduce((a, s) => a + (s.sale_price || 0), 0);
+      const monthSales = completedSales.filter(s => s.sale_date && new Date(s.sale_date) >= new Date(monthStart));
+      const monthRev = monthSales.reduce((a, s) => a + (s.sale_price || 0), 0);
 
       setStats({
-        artworks:      awList.length,
-        available:     awList.filter((a: any) => String(a.status).toLowerCase() === "available").length,
-        sold:          awList.filter((a: any) => String(a.status).toLowerCase() === "sold").length,
-        exhibitions:   (ex as any) || 0,
-        collabs:       (co as any) || 0,
-        sales_total:   totalRev,
+        artworks: list.length,
+        available: list.filter((a: any) => String(a.status).toLowerCase() === "available").length,
+        sold: list.filter((a: any) => String(a.status).toLowerCase() === "sold").length,
+        in_progress: list.filter((a: any) => String(a.status).toLowerCase().replace(/ /g,"_") === "in_progress").length,
+        exhibitions: eventsData?.length || 0,
+        collabs: 0,
+        sales_total: totalRev,
+        sales_month: monthRev,
         tasks_pending: (tk || []).length,
-        followers:     followerCount || 0,
+        followers: followerCount || 0,
       });
 
       setLoaded(true);
     });
   }, []);
 
-  async function markRead(id: string) {
-    const supabase = createClient();
-    await supabase.from("notifications").update({ read: true }).eq("id", id);
-    setNotifications(p => p.map(n => n.id === id ? { ...n, read: true } : n));
-  }
+  /* ── Compass → highlighted section keys ─────────────── */
+  const spotlight = useMemo(() => {
+    const s = new Set<string>();
+    if (q1 && INTENT_MAP[q1]) INTENT_MAP[q1].forEach(k => s.add(k));
+    if (q2 && FOCUS_MAP[q2]) FOCUS_MAP[q2].forEach(k => s.add(k));
+    if (q3 && MIND_MAP[q3])  MIND_MAP[q3].forEach(k => s.add(k));
+    return s;
+  }, [q1, q2, q3]);
+
+  const compassActive = q1 || q2 || q3;
+
+  /* ── "On the easel" — pick the piece to attend to ─── */
+  const easelPiece = useMemo(() => {
+    if (!artworks.length) return null;
+    // In-progress > most recently updated
+    const ip = artworks.filter(a => String(a.status).toLowerCase().replace(/ /g,"_") === "in_progress");
+    if (ip.length) return ip[0];
+    return artworks[0];
+  }, [artworks]);
+
+  /* ── Section order — matched sections jump to top ─── */
+  const sectionOrder = useMemo(() => {
+    const base = ["easel", "wall", "ledger", "doorway", "tasks", "letterbox"];
+    if (!compassActive) return base;
+    const spot = Array.from(spotlight);
+    const matched = base.filter(k => spot.includes(k));
+    const rest = base.filter(k => !spot.includes(k));
+    return [...matched, ...rest];
+  }, [compassActive, spotlight]);
+
+  const fname = profile?.full_name?.split(" ")[0] || "there";
+  const initials = profile?.full_name
+    ? profile.full_name.split(" ").map(w => w[0]).join("").slice(0,2).toUpperCase()
+    : "A";
 
   async function markAllRead() {
     const supabase = createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
     await supabase.from("notifications").update({ read: true }).eq("user_id", user.id).eq("read", false);
-    setNotifications(p => p.map(n => ({ ...n, read: true })));
+    setNotifs(p => p.map(n => ({ ...n, read: true })));
   }
 
-  async function deleteNotification(id: string) {
-    const supabase = createClient();
-    await supabase.from("notifications").delete().eq("id", id);
-    setNotifications(p => p.filter(n => n.id !== id));
-  }
+  /* ═══════════════════════════════════════════════════════════════
+     SECTION BLUEPRINTS — each renders when called by sectionOrder
+     ═══════════════════════════════════════════════════════════════ */
 
-  async function clearAll() {
-    if (!confirm("Clear all notifications?")) return;
-    const supabase = createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-    await supabase.from("notifications").delete().eq("user_id", user.id);
-    setNotifications([]);
-  }
+  const isHighlighted = (key: string) => compassActive && spotlight.has(key);
+  const isDimmed = (key: string) => compassActive && spotlight.size > 0 && !spotlight.has(key);
 
-  const fname = profile?.full_name?.split(" ")[0] || "Artist";
-  const unreadCount = notifications.filter(n => !n.read).length;
-  const filteredNotifs = notifTab === "unread" ? notifications.filter(n => !n.read) : notifications;
-  const initials = profile?.full_name
-    ? profile.full_name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase()
-    : "A";
+  /* ── ON THE EASEL ── */
+  const renderEasel = () => {
+    const img = easelPiece && Array.isArray(easelPiece.images) ? easelPiece.images[0] : null;
+    const d = easelPiece?.updated_at ? daysAgo(easelPiece.updated_at) : 0;
+    const whyLine = !easelPiece
+      ? "Nothing here yet — start a new piece and it'll live on the easel."
+      : d === 0
+        ? "You worked on this today."
+        : d === 1
+          ? "One day since you last touched it."
+          : `${d} days since you last touched it.`;
 
+    return (
+      <section key="easel" data-key="easel"
+        className={`atl-section ${isHighlighted("easel") ? "atl-spot" : ""} ${isDimmed("easel") ? "atl-dim" : ""}`}
+        style={{ gridColumn: "span 2", transform: "rotate(-0.25deg)" }}>
+        {/* Tape corner */}
+        <div className="atl-tape atl-tape-tl" />
+        <div className="atl-section-head">
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div className="atl-icon-badge" style={{ background: "#FFD400" }}>
+              <Palette size={15} color="#111110" strokeWidth={2.3} />
+            </div>
+            <div>
+              <div className="atl-section-title">On the easel</div>
+              <div className="atl-section-why">{whyLine}</div>
+            </div>
+          </div>
+          <Link href="/dashboard/artworks" className="atl-section-cta">
+            All works <ArrowRight size={12} />
+          </Link>
+        </div>
+
+        {easelPiece ? (
+          <Link href={`/dashboard/artworks/${easelPiece.id}`} style={{ textDecoration: "none", display: "block" }}>
+            <div className="atl-easel-card">
+              <div className="atl-easel-img">
+                {img ? (
+                  <img src={img} alt={easelPiece.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                ) : (
+                  <div style={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 6 }}>
+                    <Brush size={36} color="#D4C9A8" />
+                    <span style={{ fontSize: 11, color: "#9B8F7A", fontWeight: 600 }}>No image yet</span>
+                  </div>
+                )}
+              </div>
+              <div className="atl-easel-meta">
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 800, color: "#9B8F7A", textTransform: "uppercase", letterSpacing: "0.14em", marginBottom: 6 }}>
+                    {easelPiece.status?.replace(/_/g, " ") || "In progress"}
+                  </div>
+                  <h3 style={{ fontSize: 22, fontWeight: 900, color: "#111110", margin: "0 0 6px", letterSpacing: "-0.5px", lineHeight: 1.1 }}>
+                    {easelPiece.title || "Untitled"}
+                  </h3>
+                  <div style={{ fontSize: 13, color: "#5C5346", fontWeight: 600 }}>
+                    {[easelPiece.medium, easelPiece.year,
+                      easelPiece.width_cm && easelPiece.height_cm ? `${easelPiece.width_cm}×${easelPiece.height_cm} cm` : null
+                    ].filter(Boolean).join(" · ")}
+                  </div>
+                </div>
+                <div className="atl-easel-action">
+                  Open this piece <ArrowRight size={14} strokeWidth={2.5} />
+                </div>
+              </div>
+            </div>
+          </Link>
+        ) : (
+          <Link href="/dashboard/artworks/new" style={{ textDecoration: "none" }}>
+            <div className="atl-empty atl-empty-cta">
+              <Plus size={22} color="#111110" strokeWidth={2.5} />
+              <div>
+                <div style={{ fontSize: 15, fontWeight: 900, color: "#111110" }}>Start a new piece</div>
+                <div style={{ fontSize: 12, color: "#5C5346", fontWeight: 600 }}>Every atelier begins with one mark.</div>
+              </div>
+            </div>
+          </Link>
+        )}
+      </section>
+    );
+  };
+
+  /* ── THE WALL (recent works) ── */
+  const renderWall = () => {
+    const recent = artworks.slice(0, 6);
+    return (
+      <section key="wall" data-key="wall"
+        className={`atl-section ${isHighlighted("wall") ? "atl-spot" : ""} ${isDimmed("wall") ? "atl-dim" : ""}`}
+        style={{ gridColumn: "span 2", transform: "rotate(0.15deg)" }}>
+        <div className="atl-section-head">
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div className="atl-icon-badge" style={{ background: "#4ECDC4" }}>
+              <Frame size={15} color="#111110" strokeWidth={2.3} />
+            </div>
+            <div>
+              <div className="atl-section-title">The wall</div>
+              <div className="atl-section-why">
+                {stats.artworks === 0 ? "Empty wall. Hang your first piece." :
+                 `${stats.artworks} works · ${stats.available} available · ${stats.in_progress} in progress`}
+              </div>
+            </div>
+          </div>
+          <Link href="/dashboard/artworks" className="atl-section-cta">
+            See all <ArrowRight size={12} />
+          </Link>
+        </div>
+
+        {recent.length === 0 ? (
+          <Link href="/dashboard/artworks/new" style={{ textDecoration: "none" }}>
+            <div className="atl-empty">
+              <ImageIcon size={22} color="#9B8F7A" />
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 800, color: "#111110" }}>No artworks yet</div>
+                <div style={{ fontSize: 12, color: "#9B8F7A", fontWeight: 600 }}>Add your first work to begin.</div>
+              </div>
+            </div>
+          </Link>
+        ) : (
+          <div className="atl-wall-grid">
+            {recent.map((aw, i) => {
+              const img = Array.isArray(aw.images) ? aw.images[0] : null;
+              const dot = STATUS_DOT[String(aw.status).toLowerCase()] || "#9B8F7A";
+              return (
+                <Link key={aw.id} href={`/dashboard/artworks/${aw.id}`} className="atl-wall-tile"
+                  style={{ transform: `rotate(${(i % 2 === 0 ? -1 : 1) * (0.2 + (i % 3) * 0.15)}deg)` }}>
+                  <div className="atl-wall-img">
+                    {img ? <img src={img} alt={aw.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                      : <div style={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                          <ImageIcon size={20} color="#D4C9A8" /></div>}
+                    <div className="atl-wall-dot" style={{ background: dot }} />
+                  </div>
+                  <div className="atl-wall-label">{aw.title || "Untitled"}</div>
+                </Link>
+              );
+            })}
+          </div>
+        )}
+
+        <Link href="/dashboard/artworks/new" style={{ textDecoration: "none", display: "block", marginTop: 12 }}>
+          <div className="atl-add-row">
+            <Plus size={14} strokeWidth={2.5} /> Add a new piece to the wall
+          </div>
+        </Link>
+      </section>
+    );
+  };
+
+  /* ── THE LEDGER (sales) ── */
+  const renderLedger = () => {
+    const completed = recentSales.filter(s => s.status?.toLowerCase() === "completed");
+    const last = completed[0];
+    return (
+      <section key="ledger" data-key="ledger"
+        className={`atl-section ${isHighlighted("ledger") ? "atl-spot" : ""} ${isDimmed("ledger") ? "atl-dim" : ""}`}>
+        <div className="atl-section-head">
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div className="atl-icon-badge" style={{ background: "#FFD400" }}>
+              <DollarSign size={15} color="#111110" strokeWidth={2.3} />
+            </div>
+            <div>
+              <div className="atl-section-title">The ledger</div>
+              <div className="atl-section-why">
+                {stats.sales_month > 0
+                  ? `$${stats.sales_month.toLocaleString()} this month`
+                  : completed.length > 0 ? `${completed.length} sales to date` : "Quiet ledger. First sale coming."}
+              </div>
+            </div>
+          </div>
+          <Link href="/dashboard/sales" className="atl-section-cta">Open <ArrowRight size={12} /></Link>
+        </div>
+
+        <div style={{ padding: "4px 0" }}>
+          <div className="atl-big-num">
+            ${stats.sales_total.toLocaleString()}
+          </div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: "#9B8F7A", textTransform: "uppercase", letterSpacing: "0.14em", marginBottom: 14 }}>
+            Total earned · all time
+          </div>
+
+          {last ? (
+            <div className="atl-ledger-row">
+              <div style={{ width: 4, height: 32, borderRadius: 2, background: "#16A34A" }} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 800, color: "#111110", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {last.artwork_title || "Artwork"} · ${last.sale_price?.toLocaleString()}
+                </div>
+                <div style={{ fontSize: 11, color: "#9B8F7A", fontWeight: 600 }}>
+                  Last sale · {last.sale_date ? formatDay(last.sale_date) : "—"}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div style={{ fontSize: 12, color: "#9B8F7A", fontWeight: 600, padding: "8px 0" }}>
+              No sales recorded yet.
+            </div>
+          )}
+        </div>
+      </section>
+    );
+  };
+
+  /* ── THE DOORWAY (events + outside world) ── */
+  const renderDoorway = () => {
+    const next = events[0];
+    return (
+      <section key="doorway" data-key="doorway"
+        className={`atl-section ${isHighlighted("doorway") ? "atl-spot" : ""} ${isDimmed("doorway") ? "atl-dim" : ""}`}
+        style={{ transform: "rotate(-0.2deg)" }}>
+        <div className="atl-section-head">
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div className="atl-icon-badge" style={{ background: "#FF6B6B" }}>
+              <CalendarDays size={15} color="#111110" strokeWidth={2.3} />
+            </div>
+            <div>
+              <div className="atl-section-title">The doorway</div>
+              <div className="atl-section-why">
+                {next ? `Next: ${next.title}` : "No events planned. Open the door."}
+              </div>
+            </div>
+          </div>
+          <Link href="/dashboard/exhibitions" className="atl-section-cta">All <ArrowRight size={12} /></Link>
+        </div>
+
+        {events.length === 0 ? (
+          <Link href="/dashboard/exhibitions/new" style={{ textDecoration: "none" }}>
+            <div className="atl-empty">
+              <Building2 size={22} color="#9B8F7A" />
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 800, color: "#111110" }}>Plan your next show</div>
+                <div style={{ fontSize: 11, color: "#9B8F7A", fontWeight: 600 }}>Add an exhibition or event.</div>
+              </div>
+            </div>
+          </Link>
+        ) : (
+          <div>
+            {events.map((ev, i) => (
+              <Link key={ev.id} href="/dashboard/exhibitions" style={{ textDecoration: "none" }}>
+                <div className="atl-doorway-row" style={{ borderBottom: i < events.length - 1 ? "1px dashed #E8E0D0" : "none" }}>
+                  <div style={{ width: 40, height: 40, borderRadius: 10, background: "#FFF8E1", border: "2px solid #111110", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                    <div style={{ fontSize: 9, fontWeight: 800, color: "#9B8F7A", textTransform: "uppercase", letterSpacing: "0.1em", lineHeight: 1 }}>
+                      {ev.start_date ? new Date(ev.start_date).toLocaleDateString("en-US", { month: "short" }) : "TBD"}
+                    </div>
+                    <div style={{ fontSize: 14, fontWeight: 900, color: "#111110", lineHeight: 1, marginTop: 2 }}>
+                      {ev.start_date ? new Date(ev.start_date).getDate() : "—"}
+                    </div>
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 800, color: "#111110", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ev.title}</div>
+                    <div style={{ fontSize: 11, color: "#9B8F7A", fontWeight: 600 }}>{ev.venue || "No venue"}</div>
+                  </div>
+                </div>
+              </Link>
+            ))}
+          </div>
+        )}
+      </section>
+    );
+  };
+
+  /* ── THE NOTEBOOK (tasks) ── */
+  const renderTasks = () => {
+    const shown = tasks.slice(0, 5);
+    return (
+      <section key="tasks" data-key="tasks"
+        className={`atl-section atl-notebook ${isHighlighted("tasks") ? "atl-spot" : ""} ${isDimmed("tasks") ? "atl-dim" : ""}`}
+        style={{ transform: "rotate(0.3deg)" }}>
+        <div className="atl-section-head">
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div className="atl-icon-badge" style={{ background: "#8B5CF6" }}>
+              <PencilLine size={15} color="#111110" strokeWidth={2.3} />
+            </div>
+            <div>
+              <div className="atl-section-title">The notebook</div>
+              <div className="atl-section-why">
+                {tasks.length === 0 ? "Nothing scribbled here." : `${tasks.length} open · the day's list`}
+              </div>
+            </div>
+          </div>
+          <Link href="/dashboard/tasks" className="atl-section-cta">All <ArrowRight size={12} /></Link>
+        </div>
+
+        {shown.length === 0 ? (
+          <Link href="/dashboard/tasks" style={{ textDecoration: "none" }}>
+            <div className="atl-empty">
+              <Coffee size={22} color="#9B8F7A" />
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 800, color: "#111110" }}>An empty page</div>
+                <div style={{ fontSize: 11, color: "#9B8F7A", fontWeight: 600 }}>Jot down what today needs.</div>
+              </div>
+            </div>
+          </Link>
+        ) : (
+          <div>
+            {shown.map((t) => (
+              <Link key={t.id} href="/dashboard/tasks" style={{ textDecoration: "none" }}>
+                <div className="atl-note-row">
+                  <div className="atl-checkbox" />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: "#111110", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {t.title}
+                    </div>
+                    {t.due_date && (
+                      <div style={{ fontSize: 10, color: "#9B8F7A", fontWeight: 600 }}>
+                        due {formatDay(t.due_date)}
+                      </div>
+                    )}
+                  </div>
+                  {t.priority === "high" && <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#FF6B6B" }} />}
+                </div>
+              </Link>
+            ))}
+          </div>
+        )}
+      </section>
+    );
+  };
+
+  /* ── THE LETTERBOX (notifications) ── */
+  const renderLetterbox = () => {
+    const unread = notifs.filter(n => !n.read).length;
+    const shown = notifs.slice(0, 4);
+    return (
+      <section key="letterbox" data-key="letterbox"
+        className={`atl-section ${isHighlighted("letterbox") ? "atl-spot" : ""} ${isDimmed("letterbox") ? "atl-dim" : ""}`}
+        style={{ transform: "rotate(-0.15deg)" }}>
+        <div className="atl-section-head">
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div className="atl-icon-badge" style={{ background: "#95E1D3" }}>
+              <Bell size={15} color="#111110" strokeWidth={2.3} />
+            </div>
+            <div>
+              <div className="atl-section-title">The letterbox</div>
+              <div className="atl-section-why">
+                {unread > 0 ? `${unread} new letter${unread > 1 ? "s" : ""}` : "All letters opened."}
+              </div>
+            </div>
+          </div>
+          {unread > 0 && (
+            <button onClick={markAllRead} className="atl-section-cta" style={{ border: "none", background: "none", cursor: "pointer", fontFamily: "inherit" }}>
+              <Check size={12} /> Mark read
+            </button>
+          )}
+        </div>
+
+        {shown.length === 0 ? (
+          <div className="atl-empty">
+            <Megaphone size={20} color="#9B8F7A" />
+            <div style={{ fontSize: 12, fontWeight: 700, color: "#9B8F7A" }}>Nothing new. Quiet day.</div>
+          </div>
+        ) : (
+          <div>
+            {shown.map((n, i) => {
+              const cfg = NOTIF_CFG[n.type] || { icon: Sparkles, color: "#9B8F7A" };
+              const Icon = cfg.icon;
+              return (
+                <div key={n.id} style={{
+                  display: "flex", alignItems: "flex-start", gap: 10,
+                  padding: "10px 0",
+                  borderBottom: i < shown.length - 1 ? "1px dashed #E8E0D0" : "none",
+                  opacity: n.read ? 0.62 : 1,
+                }}>
+                  <div style={{ width: 28, height: 28, borderRadius: 8, background: cfg.color + "22", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, border: `1.5px solid ${cfg.color}` }}>
+                    <Icon size={12} color={cfg.color} />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <span style={{ fontSize: 12, fontWeight: n.read ? 600 : 800, color: "#111110" }}>{n.title}</span>
+                      {!n.read && <div style={{ width: 5, height: 5, borderRadius: "50%", background: "#FF6B6B", flexShrink: 0 }} />}
+                    </div>
+                    {n.body && <div style={{ fontSize: 11, color: "#9B8F7A", marginTop: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{n.body}</div>}
+                    <div style={{ fontSize: 10, color: "#C0B8A8", marginTop: 2, fontWeight: 600 }}>{timeAgo(n.created_at)}</div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </section>
+    );
+  };
+
+  const renderMap: Record<string, () => React.ReactElement> = {
+    easel: renderEasel,
+    wall: renderWall,
+    ledger: renderLedger,
+    doorway: renderDoorway,
+    tasks: renderTasks,
+    letterbox: renderLetterbox,
+  };
+
+  /* ══════════════════════════════════════════════════════════════════
+     RENDER
+     ══════════════════════════════════════════════════════════════════ */
   return (
     <>
       <style>{`
-        /* ── Base cards ── */
-        .ripe-card {
-          background: #fff; border: 2.5px solid #111110; border-radius: 20px;
-          box-shadow: 4px 5px 0 #D4C9A8; overflow: hidden;
-          transition: box-shadow 0.25s cubic-bezier(0.16,1,0.3,1), transform 0.25s cubic-bezier(0.16,1,0.3,1);
-        }
-        .ripe-card:hover { box-shadow: 6px 7px 0 #111110; transform: translate(-1px,-2px); }
-        .ripe-card-static {
-          background: #fff; border: 2.5px solid #111110; border-radius: 20px;
-          box-shadow: 4px 5px 0 #D4C9A8; overflow: hidden;
-        }
+        /* ── ATELIER STYLES ── */
 
-        /* ── Stat card ── */
-        .stat-card {
-          background: #fff; border: 2.5px solid #111110; border-radius: 18px;
-          padding: 20px 22px; box-shadow: 3px 4px 0 #D4C9A8;
-          position: relative; overflow: hidden;
-          transition: all 0.25s cubic-bezier(0.16,1,0.3,1);
+        /* Section card — the "object on the desk" */
+        .atl-section {
+          background: #fff;
+          border: 2.5px solid #111110;
+          border-radius: 18px;
+          box-shadow: 4px 5px 0 #D4C9A8;
+          padding: 18px 20px 20px;
+          position: relative;
+          transition: box-shadow 0.35s cubic-bezier(0.16,1,0.3,1),
+                      transform 0.35s cubic-bezier(0.16,1,0.3,1),
+                      opacity 0.3s ease,
+                      border-color 0.25s ease;
         }
-        .stat-card:hover { box-shadow: 5px 6px 0 #111110; transform: translate(-1px,-1px); }
-        .stat-accent {
-          position: absolute; bottom: -8px; right: -8px;
-          width: 56px; height: 56px; border-radius: 50%;
-          opacity: 0.12; transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1);
-        }
-        .stat-card:hover .stat-accent { transform: scale(1.3); }
-
-        /* ── Quick nav card ── */
-        .qnav-card {
-          display: flex; align-items: center; gap: 14px; padding: 14px 18px;
-          background: #fff; border: 2px solid #E8E0D0; border-radius: 16px;
-          text-decoration: none; color: #111110;
-          transition: all 0.2s cubic-bezier(0.16,1,0.3,1); cursor: pointer;
-        }
-        .qnav-card:hover { border-color: #111110; box-shadow: 3px 4px 0 #111110; transform: translate(-1px,-1px); background: #FFFBEA; }
-        .qnav-icon {
-          width: 40px; height: 40px; border-radius: 12px; border: 2px solid #111110;
-          display: flex; align-items: center; justify-content: center; flex-shrink: 0;
-          transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1);
-        }
-        .qnav-card:hover .qnav-icon { transform: scale(1.08) rotate(-3deg); }
-
-        /* ── Notification ── */
-        .notif-item {
-          display: flex; align-items: flex-start; gap: 12px; padding: 14px 18px;
-          border-bottom: 1px solid #F5F0E8; transition: background 0.15s;
-          cursor: pointer; position: relative;
-        }
-        .notif-item:hover { background: #FFFBEA; }
-        .notif-item:last-child { border-bottom: none; }
-        .notif-dot {
-          width: 36px; height: 36px; border-radius: 12px;
-          display: flex; align-items: center; justify-content: center;
-          flex-shrink: 0; transition: transform 0.2s;
-        }
-        .notif-item:hover .notif-dot { transform: scale(1.08); }
-        .notif-del {
-          position: absolute; top: 14px; right: 14px; opacity: 0;
-          transition: opacity 0.15s; background: none; border: none;
-          cursor: pointer; color: #C0B8A8; padding: 2px;
-        }
-        .notif-item:hover .notif-del { opacity: 1; }
-        .notif-del:hover { color: #FF6B6B; }
-
-        /* ── Artwork mini card ── */
-        .aw-mini {
-          border-radius: 16px; border: 2px solid #E8E0D0; overflow: hidden;
-          background: #fff; transition: all 0.25s cubic-bezier(0.16,1,0.3,1);
-          cursor: pointer; text-decoration: none; display: block; color: inherit;
-        }
-        .aw-mini:hover { border-color: #111110; box-shadow: 4px 5px 0 #111110; transform: translate(-2px,-2px); }
-        .aw-mini:hover img { transform: scale(1.06); }
-        .aw-mini img { transition: transform 0.4s cubic-bezier(0.16,1,0.3,1); }
-
-        /* ── Event / task rows ── */
-        .event-row { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid #F5F0E8; transition: background 0.15s; }
-        .event-row:last-child { border-bottom: none; }
-        .task-row { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid #F5F0E8; }
-        .task-row:last-child { border-bottom: none; }
-
-        /* ── Section header ── */
-        .sec-header {
-          display: flex; align-items: center; justify-content: space-between;
-          padding: 16px 20px; border-bottom: 2px solid #111110;
-          background: #FAF7F3; border-radius: 20px 20px 0 0;
+        .atl-section:hover {
+          box-shadow: 6px 7px 0 #111110;
+          transform: translate(-1px, -2px) rotate(0deg) !important;
         }
 
-        /* ── Notif tab ── */
-        .notif-tab {
-          padding: 6px 14px; border-radius: 9999px; border: 2px solid #E8E0D0;
-          background: #fff; font-family: inherit; font-size: 12px; font-weight: 700;
-          color: #9B8F7A; cursor: pointer; transition: all 0.15s;
+        /* Spotlight (compass match) */
+        .atl-section.atl-spot {
+          box-shadow: 4px 5px 0 #111110, 0 0 0 3px #FFD400;
+          border-color: #111110;
+          animation: atl-pulse 2.4s ease-in-out infinite;
         }
-        .notif-tab.active { background: #111110; border-color: #111110; color: #FFD400; }
-        .notif-tab:not(.active):hover { border-color: #111110; color: #111110; }
-
-        /* ── Entry animation ── */
-        @keyframes ripeIn { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
-        .ripe-in { animation: ripeIn 0.5s cubic-bezier(0.16,1,0.3,1) both; }
-
-        /* ══════════════════════════════════════════════════════════
-           RESPONSIVE — TABLET (≤ 900px)
-        ══════════════════════════════════════════════════════════ */
-        @media (max-width: 900px) {
-          .dash-main-grid {
-            grid-template-columns: 1fr !important;
-          }
+        @keyframes atl-pulse {
+          0%,100% { box-shadow: 4px 5px 0 #111110, 0 0 0 3px #FFD400; }
+          50%     { box-shadow: 4px 5px 0 #111110, 0 0 0 5px #FFD400; }
         }
 
-        /* ══════════════════════════════════════════════════════════
-           RESPONSIVE — MOBILE (≤ 640px)
-        ══════════════════════════════════════════════════════════ */
-        @media (max-width: 640px) {
+        /* Dimmed (non-match) */
+        .atl-section.atl-dim {
+          opacity: 0.46;
+          filter: grayscale(0.18);
+        }
+        .atl-section.atl-dim:hover {
+          opacity: 1;
+          filter: none;
+        }
 
-          /* Header: stack vertically */
-          .dash-header {
-            flex-direction: column !important;
-            align-items: flex-start !important;
-            gap: 14px !important;
-            margin-bottom: 20px !important;
-          }
-          .dash-header-actions {
-            width: 100%;
-            display: flex !important;
-            flex-wrap: wrap;
-            gap: 8px;
-          }
-          .dash-header-actions a,
-          .dash-header-actions button {
-            flex: 1;
-            min-width: 130px;
-            justify-content: center !important;
-          }
-          .dash-avatar {
-            width: 44px !important;
-            height: 44px !important;
-            border-radius: 14px !important;
-            font-size: 16px !important;
-          }
+        /* Tape corner */
+        .atl-tape {
+          position: absolute;
+          width: 56px;
+          height: 18px;
+          background: rgba(255, 212, 0, 0.55);
+          border: 1px solid rgba(17,17,16,0.1);
+          z-index: 2;
+          pointer-events: none;
+        }
+        .atl-tape-tl {
+          top: -8px;
+          left: 26px;
+          transform: rotate(-6deg);
+          border-radius: 1px;
+          box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+        }
 
-          /* Stat cards: 4 → 2×2 */
-          .dash-stats {
-            grid-template-columns: repeat(2, 1fr) !important;
-            gap: 10px !important;
-            margin-bottom: 18px !important;
-          }
-          .stat-card { padding: 14px 16px !important; }
-          .stat-card div[style*="font-size: 32"] { font-size: 24px !important; }
+        /* Section header */
+        .atl-section-head {
+          display: flex;
+          align-items: flex-start;
+          justify-content: space-between;
+          gap: 12px;
+          margin-bottom: 14px;
+        }
+        .atl-icon-badge {
+          width: 32px;
+          height: 32px;
+          border-radius: 10px;
+          border: 2px solid #111110;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          box-shadow: 2px 2px 0 #111110;
+          flex-shrink: 0;
+        }
+        .atl-section-title {
+          font-size: 17px;
+          font-weight: 900;
+          color: #111110;
+          letter-spacing: -0.4px;
+          line-height: 1.1;
+        }
+        .atl-section-why {
+          font-size: 11.5px;
+          font-weight: 600;
+          color: #9B8F7A;
+          font-style: italic;
+          margin-top: 2px;
+          line-height: 1.3;
+        }
+        .atl-section-cta {
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+          font-size: 11px;
+          font-weight: 800;
+          color: #9B8F7A;
+          text-decoration: none;
+          text-transform: uppercase;
+          letter-spacing: 0.1em;
+          padding: 4px 8px;
+          border-radius: 6px;
+          transition: color 0.15s, background 0.15s;
+          flex-shrink: 0;
+        }
+        .atl-section-cta:hover {
+          color: #111110;
+          background: #FFFBEA;
+        }
 
-          /* Artwork mini grid: 4 → 2 */
-          .dash-artworks-grid {
-            grid-template-columns: repeat(2, 1fr) !important;
-            gap: 8px !important;
-            padding: 10px !important;
-          }
+        /* Compass strip */
+        .atl-compass {
+          background: #fff;
+          border: 2.5px solid #111110;
+          border-radius: 20px;
+          box-shadow: 4px 5px 0 #D4C9A8;
+          padding: 18px 22px;
+          margin-bottom: 22px;
+          position: relative;
+        }
+        .atl-compass-q {
+          display: flex;
+          align-items: center;
+          gap: 14px;
+          padding: 10px 0;
+          flex-wrap: wrap;
+        }
+        .atl-compass-q + .atl-compass-q {
+          border-top: 1px dashed #E8E0D0;
+        }
+        .atl-compass-label {
+          font-size: 13px;
+          font-weight: 800;
+          color: #111110;
+          letter-spacing: -0.2px;
+          min-width: 220px;
+        }
+        .atl-compass-label small {
+          display: block;
+          font-size: 10px;
+          font-weight: 700;
+          color: #9B8F7A;
+          text-transform: uppercase;
+          letter-spacing: 0.12em;
+          margin-bottom: 2px;
+        }
+        .atl-compass-pills {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 6px;
+          flex: 1;
+        }
+        .atl-pill {
+          padding: 6px 14px;
+          border-radius: 9999px;
+          border: 2px solid #E8E0D0;
+          background: #FAF7F3;
+          font-family: inherit;
+          font-size: 12px;
+          font-weight: 700;
+          color: #5C5346;
+          cursor: pointer;
+          transition: all 0.15s;
+        }
+        .atl-pill:hover {
+          border-color: #111110;
+          color: #111110;
+          background: #fff;
+        }
+        .atl-pill.active {
+          background: #FFD400;
+          border-color: #111110;
+          color: #111110;
+          box-shadow: 2px 2px 0 #111110;
+        }
+        .atl-compass-clear {
+          font-family: inherit;
+          font-size: 11px;
+          font-weight: 700;
+          color: #9B8F7A;
+          background: none;
+          border: none;
+          cursor: pointer;
+          padding: 4px 8px;
+          border-radius: 6px;
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+        }
+        .atl-compass-clear:hover { color: #111110; background: #FAF7F3; }
 
-          /* Quick nav: 3 → 2 */
-          .dash-quick-nav {
-            grid-template-columns: repeat(2, 1fr) !important;
-            gap: 8px !important;
-          }
-          .qnav-card { padding: 11px 13px !important; gap: 10px !important; }
-          .qnav-icon { width: 34px !important; height: 34px !important; }
+        /* Easel */
+        .atl-easel-card {
+          display: grid;
+          grid-template-columns: 180px 1fr;
+          gap: 16px;
+          align-items: stretch;
+          padding: 4px;
+          border-radius: 14px;
+          transition: background 0.15s;
+        }
+        .atl-easel-card:hover { background: #FFFBEA; }
+        .atl-easel-img {
+          aspect-ratio: 1/1;
+          border: 2px solid #111110;
+          border-radius: 12px;
+          overflow: hidden;
+          background: #F5F0E8;
+          box-shadow: 3px 3px 0 #D4C9A8;
+        }
+        .atl-easel-meta {
+          display: flex;
+          flex-direction: column;
+          justify-content: space-between;
+          padding: 6px 0;
+        }
+        .atl-easel-action {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          padding: 9px 16px;
+          background: #111110;
+          color: #FFD400;
+          border-radius: 10px;
+          font-size: 12px;
+          font-weight: 800;
+          letter-spacing: -0.1px;
+          align-self: flex-start;
+          box-shadow: 2px 2px 0 #FFD400;
+          transition: transform 0.15s, box-shadow 0.15s;
+        }
+        .atl-easel-card:hover .atl-easel-action {
+          transform: translate(-1px, -1px);
+          box-shadow: 3px 3px 0 #FFD400;
+        }
 
-          /* Cards */
-          .ripe-card-static, .ripe-card { border-radius: 16px !important; }
-          .sec-header { padding: 12px 14px !important; border-radius: 14px 14px 0 0 !important; }
+        /* Wall grid */
+        .atl-wall-grid {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 12px 10px;
+        }
+        .atl-wall-tile {
+          text-decoration: none;
+          display: block;
+          transition: transform 0.2s cubic-bezier(0.16,1,0.3,1);
+        }
+        .atl-wall-tile:hover {
+          transform: translateY(-3px) rotate(0deg) !important;
+        }
+        .atl-wall-img {
+          position: relative;
+          aspect-ratio: 1/1;
+          background: #F5F0E8;
+          border: 2px solid #111110;
+          border-radius: 10px;
+          overflow: hidden;
+          box-shadow: 2px 2px 0 #D4C9A8;
+          transition: box-shadow 0.2s;
+        }
+        .atl-wall-tile:hover .atl-wall-img {
+          box-shadow: 3px 3px 0 #111110;
+        }
+        .atl-wall-dot {
+          position: absolute;
+          top: 6px;
+          right: 6px;
+          width: 8px;
+          height: 8px;
+          border-radius: 50%;
+          border: 1.5px solid #111110;
+        }
+        .atl-wall-label {
+          font-size: 11px;
+          font-weight: 700;
+          color: #5C5346;
+          margin-top: 6px;
+          text-align: center;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+          padding: 0 2px;
+        }
 
-          /* Notification items */
-          .notif-item { padding: 10px 14px !important; gap: 9px !important; }
-          .notif-dot { width: 30px !important; height: 30px !important; border-radius: 9px !important; }
-          .notif-del { top: 10px !important; right: 10px !important; }
+        /* Add row */
+        .atl-add-row {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          justify-content: center;
+          padding: 10px;
+          border: 2px dashed #D4C9A8;
+          border-radius: 10px;
+          color: #9B8F7A;
+          font-size: 12px;
+          font-weight: 800;
+          background: #FAF7F3;
+          transition: all 0.15s;
+        }
+        .atl-add-row:hover {
+          border-color: #111110;
+          color: #111110;
+          background: #FFFBEA;
+        }
 
-          /* Event / task rows */
-          .event-row { padding: 10px 0 !important; gap: 9px !important; }
-          .task-row  { padding: 8px 0 !important; gap: 8px !important; }
+        /* Ledger */
+        .atl-big-num {
+          font-size: 38px;
+          font-weight: 900;
+          color: #111110;
+          letter-spacing: -1.5px;
+          line-height: 1;
+          margin-bottom: 2px;
+        }
+        .atl-ledger-row {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          padding: 10px;
+          background: #FAFAF8;
+          border: 1.5px solid #E8E0D0;
+          border-radius: 10px;
+        }
+
+        /* Doorway */
+        .atl-doorway-row {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          padding: 10px 0;
+          transition: background 0.15s;
+        }
+        .atl-doorway-row:hover { background: #FFFBEA; border-radius: 8px; }
+
+        /* Notebook (lined paper feel) */
+        .atl-notebook {
+          background:
+            linear-gradient(#fff, #fff),
+            repeating-linear-gradient(
+              to bottom,
+              transparent 0,
+              transparent 27px,
+              #F0E8D4 27px,
+              #F0E8D4 28px
+            );
+          background-blend-mode: multiply;
+        }
+        .atl-note-row {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          padding: 7px 0;
+          border-bottom: 1px dashed #E8E0D0;
+          transition: background 0.15s;
+        }
+        .atl-note-row:hover { background: #FFFBEA; }
+        .atl-note-row:last-child { border-bottom: none; }
+        .atl-checkbox {
+          width: 15px;
+          height: 15px;
+          border: 2px solid #111110;
+          border-radius: 4px;
+          background: #fff;
+          flex-shrink: 0;
+        }
+
+        /* Empty states */
+        .atl-empty {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          padding: 18px;
+          border: 2px dashed #E8E0D0;
+          border-radius: 12px;
+          background: #FAF7F3;
+        }
+        .atl-empty-cta {
+          cursor: pointer;
+          transition: all 0.15s;
+        }
+        .atl-empty-cta:hover {
+          border-color: #111110;
+          background: #FFFBEA;
+        }
+
+        /* Grid layout */
+        .atl-grid {
+          display: grid;
+          grid-template-columns: repeat(2, 1fr);
+          gap: 20px;
+        }
+
+        /* Stagger entry */
+        @keyframes atl-in {
+          from { opacity: 0; transform: translateY(16px); }
+          to { opacity: 1; }
+        }
+        .atl-in { animation: atl-in 0.5s cubic-bezier(0.16,1,0.3,1) both; }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+          .atl-grid { grid-template-columns: 1fr; }
+          .atl-section[style*="grid-column"] { grid-column: span 1 !important; }
+          .atl-easel-card { grid-template-columns: 1fr; }
+          .atl-easel-img { aspect-ratio: 4/3; }
+          .atl-wall-grid { grid-template-columns: repeat(3, 1fr); }
+          .atl-compass-label { min-width: 100%; }
         }
       `}</style>
 
       <div>
-
         {/* ═══════════════════════════════════════════════════════
-            HEADER
-        ═══════════════════════════════════════════════════════ */}
-        {/* className="dash-header" enables mobile stack */}
-        <div className="ripe-in dash-header" style={{ marginBottom: 28, display: "flex", alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap", gap: 16 }}>
-
-          <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-            {/* className="dash-avatar" enables mobile shrink */}
-            <div className="dash-avatar" style={{ width: 56, height: 56, borderRadius: 18, border: "2.5px solid #111110", background: "#FFD400", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, fontWeight: 900, color: "#111110", overflow: "hidden", boxShadow: "3px 3px 0 #111110", flexShrink: 0 }}>
+            HEADER — Simple greeting
+            ═══════════════════════════════════════════════════════ */}
+        <div className="atl-in" style={{ marginBottom: 20, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+            <div style={{ width: 52, height: 52, borderRadius: 16, border: "2.5px solid #111110", background: "#FFD400", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, fontWeight: 900, color: "#111110", overflow: "hidden", boxShadow: "3px 3px 0 #111110", flexShrink: 0 }}>
               {profile?.avatar_url
                 ? <img src={profile.avatar_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                : initials
-              }
+                : initials}
             </div>
             <div>
-              <div style={{ fontSize: 11, fontWeight: 700, color: "#9B8F7A", textTransform: "uppercase", letterSpacing: "0.15em", marginBottom: 2 }}>
-                {today.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
-              </div>
-              <h1 style={{ fontSize: "clamp(20px, 3vw, 34px)", fontWeight: 900, color: "#111110", letterSpacing: "-0.8px", margin: 0, lineHeight: 1.1 }}>
-                {greetEmoji} {greeting}, {fname}
+              <h1 style={{ fontSize: 26, fontWeight: 900, color: "#111110", letterSpacing: "-0.8px", margin: 0, lineHeight: 1.05 }}>
+                {greeting}, {fname}.
               </h1>
+              <p style={{ fontSize: 13, color: "#9B8F7A", margin: "3px 0 0", fontWeight: 600, fontStyle: "italic" }}>
+                Welcome back to your atelier.
+              </p>
             </div>
           </div>
 
-          {/* className="dash-header-actions" enables full-width on mobile */}
-          <div className="dash-header-actions" style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-            {profile?.username && (
-              <Link href={`/${profile.username}`} style={{ textDecoration: "none" }}>
-                <button style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 16px", border: "2px solid #E8E0D0", borderRadius: 12, background: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", transition: "all 0.15s", fontFamily: "inherit", color: "#111110" }}
-                  onMouseEnter={e => { const el = e.currentTarget; el.style.borderColor = "#111110"; el.style.boxShadow = "2px 2px 0 #111110"; }}
-                  onMouseLeave={e => { const el = e.currentTarget; el.style.borderColor = "#E8E0D0"; el.style.boxShadow = "none"; }}>
-                  <ExternalLink size={13} /> Portfolio
-                </button>
-              </Link>
-            )}
-            <Link href="/dashboard/artworks/new" style={{ textDecoration: "none" }}>
-              <button style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 18px", background: "#FFD400", border: "2.5px solid #111110", borderRadius: 12, fontSize: 13, fontWeight: 800, cursor: "pointer", boxShadow: "3px 3px 0 #111110", transition: "all 0.15s cubic-bezier(0.16,1,0.3,1)", fontFamily: "inherit", color: "#111110" }}
-                onMouseEnter={e => { const el = e.currentTarget; el.style.transform = "translate(-1px,-1px)"; el.style.boxShadow = "4px 4px 0 #111110"; }}
-                onMouseLeave={e => { const el = e.currentTarget; el.style.transform = ""; el.style.boxShadow = "3px 3px 0 #111110"; }}>
-                <Plus size={14} strokeWidth={3} /> Add Artwork
-              </button>
-            </Link>
-          </div>
+          <Link href="/dashboard/artworks/new" style={{ textDecoration: "none" }}>
+            <div style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "11px 18px", background: "#111110", color: "#FFD400", borderRadius: 12, fontSize: 13, fontWeight: 800, boxShadow: "3px 3px 0 #FFD400", transition: "transform 0.15s, box-shadow 0.15s", border: "2.5px solid #111110" }}
+              onMouseEnter={e => { (e.currentTarget.style.transform = "translate(-1px,-1px)"); (e.currentTarget.style.boxShadow = "4px 4px 0 #FFD400"); }}
+              onMouseLeave={e => { (e.currentTarget.style.transform = "none"); (e.currentTarget.style.boxShadow = "3px 3px 0 #FFD400"); }}>
+              <Plus size={14} strokeWidth={2.6} /> New piece
+            </div>
+          </Link>
         </div>
 
         {/* ═══════════════════════════════════════════════════════
-            STAT CARDS — className="dash-stats" → 4→2 on mobile
-        ═══════════════════════════════════════════════════════ */}
-        <div className="ripe-in dash-stats" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14, marginBottom: 24, animationDelay: "0.08s" }}>
-          {[
-            { label: "Total Works",  value: stats.artworks,      icon: Package,     color: "#FFD400" },
-            { label: "Available",    value: stats.available,     icon: Eye,         color: "#4ECDC4" },
-            { label: "Followers",    value: stats.followers,     icon: Users,       color: "#FF6B6B" },
-            { label: "Active Tasks", value: stats.tasks_pending, icon: CheckSquare, color: "#8B5CF6" },
-          ].map((stat, i) => {
-            const Icon = stat.icon;
-            return (
-              <div key={stat.label} className="stat-card" style={{ animationDelay: `${0.1 + i * 0.05}s` }}>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-                  <div style={{ width: 36, height: 36, borderRadius: 11, background: stat.color, border: "2px solid #111110", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    <Icon size={16} color="#111110" />
-                  </div>
-                  <span style={{ fontSize: 10, fontWeight: 800, color: "#9B8F7A", textTransform: "uppercase", letterSpacing: "0.12em" }}>{stat.label}</span>
-                </div>
-                <div style={{ fontSize: 32, fontWeight: 900, color: "#111110", lineHeight: 1, letterSpacing: "-1px" }}>
-                  {loaded ? <AnimNum target={stat.value} /> : "—"}
-                </div>
-                <div className="stat-accent" style={{ background: stat.color }} />
-              </div>
-            );
+            COMPASS — 3 questions, reshuffles + spotlights below
+            ═══════════════════════════════════════════════════════ */}
+        <div className="atl-compass atl-in" style={{ animationDelay: "0.05s" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4, flexWrap: "wrap", gap: 8 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <Compass size={16} color="#111110" strokeWidth={2.3} />
+              <span style={{ fontSize: 11, fontWeight: 800, color: "#111110", textTransform: "uppercase", letterSpacing: "0.16em" }}>
+                Today's compass
+              </span>
+            </div>
+            {compassActive && (
+              <button className="atl-compass-clear" onClick={() => { setQ1(null); setQ2(null); setQ3(null); }}>
+                <X size={11} /> Clear
+              </button>
+            )}
+          </div>
+
+          {/* Q1 */}
+          <div className="atl-compass-q">
+            <div className="atl-compass-label">
+              <small>Question 1</small>
+              What do you want to do today?
+            </div>
+            <div className="atl-compass-pills">
+              {[
+                { k: "create", label: "Create" },
+                { k: "sell",   label: "Sell" },
+                { k: "show",   label: "Show" },
+                { k: "plan",   label: "Plan" },
+                { k: "collab", label: "Collab" },
+              ].map(opt => (
+                <button key={opt.k}
+                  className={`atl-pill ${q1 === opt.k ? "active" : ""}`}
+                  onClick={() => setQ1(q1 === opt.k ? null : opt.k)}>
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Q2 */}
+          <div className="atl-compass-q">
+            <div className="atl-compass-label">
+              <small>Question 2</small>
+              What matters most right now?
+            </div>
+            <div className="atl-compass-pills">
+              {[
+                { k: "work",     label: "The work" },
+                { k: "business", label: "The business" },
+                { k: "world",    label: "The world out there" },
+              ].map(opt => (
+                <button key={opt.k}
+                  className={`atl-pill ${q2 === opt.k ? "active" : ""}`}
+                  onClick={() => setQ2(q2 === opt.k ? null : opt.k)}>
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Q3 */}
+          <div className="atl-compass-q">
+            <div className="atl-compass-label">
+              <small>Question 3</small>
+              What's on your mind?
+            </div>
+            <div className="atl-compass-pills">
+              {[
+                { k: "piece",       label: "A piece" },
+                { k: "buyer",       label: "A buyer" },
+                { k: "opportunity", label: "An opportunity" },
+                { k: "nothing",     label: "Nothing specific" },
+              ].map(opt => (
+                <button key={opt.k}
+                  className={`atl-pill ${q3 === opt.k ? "active" : ""}`}
+                  onClick={() => setQ3(q3 === opt.k ? null : opt.k)}>
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {compassActive && (
+            <div style={{ marginTop: 10, paddingTop: 10, borderTop: "1px dashed #E8E0D0", fontSize: 11.5, color: "#9B8F7A", fontWeight: 600, fontStyle: "italic", display: "flex", alignItems: "center", gap: 6 }}>
+              <Sparkles size={11} color="#FFD400" /> Your desk is rearranging. What matters is on top.
+            </div>
+          )}
+        </div>
+
+        {/* ═══════════════════════════════════════════════════════
+            THE DESK — sections reorder based on compass
+            ═══════════════════════════════════════════════════════ */}
+        <div className="atl-grid atl-in" style={{ animationDelay: "0.1s" }}>
+          {sectionOrder.map((key, i) => {
+            const fn = renderMap[key];
+            if (!fn) return null;
+            return <div key={key} style={{ animationDelay: `${0.12 + i * 0.04}s` }} className="atl-in">{fn()}</div>;
           })}
         </div>
 
-        {/* ═══════════════════════════════════════════════════════
-            MAIN GRID — className="dash-main-grid" → 1-col on tablet
-        ═══════════════════════════════════════════════════════ */}
-        <div className="dash-main-grid" style={{ display: "grid", gridTemplateColumns: "1fr 380px", gap: 20, marginBottom: 28, alignItems: "start" }}>
-
-          {/* ── LEFT COLUMN ── */}
-          <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-
-            {/* Recent Artworks */}
-            <div className="ripe-card-static ripe-in" style={{ animationDelay: "0.15s" }}>
-              <div className="sec-header">
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <div style={{ width: 8, height: 8, borderRadius: 3, background: "#FFD400", border: "1.5px solid #111110" }} />
-                  <span style={{ fontSize: 14, fontWeight: 900, color: "#111110" }}>Recent Artworks</span>
-                </div>
-                <Link href="/dashboard/artworks" style={{ textDecoration: "none", display: "flex", alignItems: "center", gap: 4, fontSize: 12, fontWeight: 700, color: "#9B8F7A", transition: "color 0.15s" }}
-                  onMouseEnter={e => (e.currentTarget.style.color = "#111110")}
-                  onMouseLeave={e => (e.currentTarget.style.color = "#9B8F7A")}>
-                  View all <ArrowRight size={12} />
-                </Link>
-              </div>
-
-              {artworks.length > 0 ? (
-                /* className="dash-artworks-grid" → 2-col on mobile */
-                <div className="dash-artworks-grid" style={{ padding: 16, display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12 }}>
-                  {artworks.slice(0, 8).map((aw) => {
-                    const img = Array.isArray(aw.images) ? aw.images[0] : null;
-                    const sc = STATUS_DOT[String(aw.status).toLowerCase()] || "#9B8F7A";
-                    return (
-                      <Link key={aw.id} href={`/dashboard/artworks/${aw.id}`} className="aw-mini">
-                        <div style={{ aspectRatio: "1/1", background: "#FAF7F3", position: "relative", overflow: "hidden" }}>
-                          {img
-                            ? <img src={img} alt={aw.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                            : <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}><ImageIcon size={24} color="#D4C9A8" /></div>
-                          }
-                          <div style={{ position: "absolute", top: 6, right: 6, width: 8, height: 8, borderRadius: "50%", background: sc, border: "1.5px solid #fff", boxShadow: "0 1px 3px rgba(0,0,0,0.2)" }} />
-                        </div>
-                        <div style={{ padding: "7px 9px 9px" }}>
-                          <div style={{ fontSize: 11, fontWeight: 700, color: "#111110", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{aw.title}</div>
-                          {aw.price && <div style={{ fontSize: 10, color: "#9B8F7A", fontWeight: 600 }}>${aw.price.toLocaleString()}</div>}
-                        </div>
-                      </Link>
-                    );
-                  })}
-                </div>
-              ) : (
-                <div style={{ padding: "32px 20px", textAlign: "center" }}>
-                  <div style={{ fontSize: 32, marginBottom: 8 }}>🖼️</div>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: "#9B8F7A", marginBottom: 12 }}>No artworks yet</div>
-                  <Link href="/dashboard/artworks/new" style={{ textDecoration: "none" }}>
-                    <button style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 16px", background: "#FFD400", border: "2px solid #111110", borderRadius: 10, fontSize: 12, fontWeight: 800, cursor: "pointer", fontFamily: "inherit", color: "#111110", boxShadow: "2px 2px 0 #111110" }}>
-                      <Plus size={13} strokeWidth={3} /> Add your first artwork
-                    </button>
-                  </Link>
-                </div>
-              )}
-            </div>
-
-            {/* Quick Nav */}
-            <div className="ripe-in" style={{ animationDelay: "0.2s" }}>
-              <div style={{ fontSize: 11, fontWeight: 800, color: "#9B8F7A", textTransform: "uppercase", letterSpacing: "0.15em", marginBottom: 12, paddingLeft: 4 }}>Quick Access</div>
-              {/* className="dash-quick-nav" → 2-col on mobile */}
-              <div className="dash-quick-nav" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
-                {QUICK_NAV.map((item) => {
-                  const Icon = item.icon;
-                  return (
-                    <Link key={item.href} href={item.href} style={{ textDecoration: "none" }}>
-                      <div className="qnav-card">
-                        <div className="qnav-icon" style={{ background: item.color }}>
-                          <Icon size={18} color="#111110" />
-                        </div>
-                        <div>
-                          <div style={{ fontSize: 14, fontWeight: 800, color: "#111110", letterSpacing: "-0.2px" }}>{item.label}</div>
-                          <div style={{ fontSize: 11, fontWeight: 600, color: "#9B8F7A" }}>{item.desc}</div>
-                        </div>
-                      </div>
-                    </Link>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Recent Sales */}
-            {recentSales.length > 0 && (
-              <div className="ripe-card-static ripe-in" style={{ animationDelay: "0.25s" }}>
-                <div className="sec-header">
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <div style={{ width: 8, height: 8, borderRadius: 3, background: "#16A34A", border: "1.5px solid #111110" }} />
-                    <span style={{ fontSize: 14, fontWeight: 900, color: "#111110" }}>Recent Sales</span>
-                  </div>
-                  <Link href="/dashboard/sales" style={{ textDecoration: "none", display: "flex", alignItems: "center", gap: 4, fontSize: 12, fontWeight: 700, color: "#9B8F7A" }}>
-                    All sales <ArrowRight size={12} />
-                  </Link>
-                </div>
-                <div style={{ padding: "8px 18px" }}>
-                  {recentSales.map((sale) => (
-                    <div key={sale.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 0", borderBottom: "1px solid #F5F0E8" }}>
-                      <div>
-                        <div style={{ fontSize: 13, fontWeight: 700, color: "#111110" }}>{sale.artwork_title || "Artwork"}</div>
-                        <div style={{ fontSize: 11, color: "#9B8F7A", fontWeight: 600 }}>
-                          {sale.sale_date ? new Date(sale.sale_date).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "—"}
-                        </div>
-                      </div>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        <span style={{ fontSize: 15, fontWeight: 900, color: "#111110", fontFamily: "monospace" }}>${sale.sale_price?.toLocaleString()}</span>
-                        <span style={{ padding: "2px 8px", borderRadius: 8, background: sale.status?.toLowerCase() === "completed" ? "#DCFCE7" : "#FEF9C3", color: sale.status?.toLowerCase() === "completed" ? "#16A34A" : "#CA8A04", fontSize: 10, fontWeight: 800, textTransform: "uppercase" }}>{sale.status}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* ── RIGHT COLUMN (Sidebar) — className="dash-sidebar" ── */}
-          <div className="dash-sidebar" style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-
-            {/* Notification Center */}
-            <div className="ripe-card-static ripe-in" style={{ animationDelay: "0.12s" }}>
-              <div className="sec-header" style={{ background: unreadCount > 0 ? "#FFFBEA" : "#FAF7F3" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <div style={{ position: "relative" }}>
-                    <Bell size={16} color="#111110" />
-                    {unreadCount > 0 && (
-                      <div style={{ position: "absolute", top: -5, right: -6, width: 16, height: 16, borderRadius: "50%", background: "#FF6B6B", border: "2px solid #fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 8, fontWeight: 900, color: "#fff" }}>
-                        {unreadCount}
-                      </div>
-                    )}
-                  </div>
-                  <span style={{ fontSize: 14, fontWeight: 900, color: "#111110" }}>Notifications</span>
-                </div>
-                <div style={{ display: "flex", gap: 6 }}>
-                  {unreadCount > 0 && (
-                    <button onClick={markAllRead} style={{ fontSize: 11, fontWeight: 700, color: "#9B8F7A", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit" }}
-                      onMouseEnter={e => (e.currentTarget.style.color = "#111110")}
-                      onMouseLeave={e => (e.currentTarget.style.color = "#9B8F7A")}>
-                      Mark all read
-                    </button>
-                  )}
-                  {notifications.length > 0 && (
-                    <button onClick={clearAll} style={{ fontSize: 11, fontWeight: 700, color: "#C0B8A8", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit" }}
-                      onMouseEnter={e => (e.currentTarget.style.color = "#FF6B6B")}
-                      onMouseLeave={e => (e.currentTarget.style.color = "#C0B8A8")}>
-                      Clear
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {/* Tabs */}
-              <div style={{ display: "flex", gap: 6, padding: "12px 18px", borderBottom: "1px solid #F5F0E8" }}>
-                <button className={`notif-tab${notifTab === "all" ? " active" : ""}`} onClick={() => setNotifTab("all")}>All</button>
-                <button className={`notif-tab${notifTab === "unread" ? " active" : ""}`} onClick={() => setNotifTab("unread")}>
-                  Unread {unreadCount > 0 && `(${unreadCount})`}
-                </button>
-              </div>
-
-              <div style={{ maxHeight: 340, overflowY: "auto" }}>
-                {filteredNotifs.length === 0 ? (
-                  <div style={{ padding: "32px 20px", textAlign: "center" }}>
-                    <div style={{ fontSize: 28, marginBottom: 8 }}>🔔</div>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: "#9B8F7A" }}>{notifTab === "unread" ? "All caught up!" : "No notifications yet"}</div>
-                  </div>
-                ) : (
-                  filteredNotifs.map(notif => {
-                    const cfg = NOTIF_CFG[notif.type] || NOTIF_CFG.system;
-                    const Icon = cfg.icon;
-                    return (
-                      <div key={notif.id} className="notif-item" onClick={() => markRead(notif.id)}
-                        style={{ background: notif.read ? "transparent" : "#FFFEF5" }}>
-                        <div className="notif-dot" style={{ background: cfg.bg }}>
-                          <Icon size={16} color={cfg.color} />
-                        </div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
-                            <span style={{ fontSize: 13, fontWeight: notif.read ? 600 : 800, color: "#111110" }}>{notif.title}</span>
-                            {!notif.read && <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#FF6B6B", flexShrink: 0 }} />}
-                          </div>
-                          {notif.body && <div style={{ fontSize: 12, color: "#9B8F7A", fontWeight: 500, lineHeight: 1.4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{notif.body}</div>}
-                          <div style={{ fontSize: 10, color: "#C0B8A8", fontWeight: 600, marginTop: 4 }}>{timeAgo(notif.created_at)}</div>
-                        </div>
-                        <button className="notif-del" onClick={(e) => { e.stopPropagation(); deleteNotification(notif.id); }}>
-                          <X size={12} />
-                        </button>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            </div>
-
-            {/* Upcoming Events */}
-            <div className="ripe-card-static ripe-in" style={{ animationDelay: "0.18s" }}>
-              <div className="sec-header">
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <div style={{ width: 8, height: 8, borderRadius: 3, background: "#4ECDC4", border: "1.5px solid #111110" }} />
-                  <span style={{ fontSize: 14, fontWeight: 900, color: "#111110" }}>Upcoming Events</span>
-                </div>
-                <Link href="/dashboard/exhibitions" style={{ textDecoration: "none", display: "flex", alignItems: "center", gap: 4, fontSize: 12, fontWeight: 700, color: "#9B8F7A" }}>
-                  All <ArrowRight size={12} />
-                </Link>
-              </div>
-              <div style={{ padding: "4px 18px 12px" }}>
-                {events.length === 0 ? (
-                  <div style={{ padding: "20px 0", textAlign: "center" }}>
-                    <div style={{ fontSize: 24, marginBottom: 6 }}>📅</div>
-                    <div style={{ fontSize: 12, fontWeight: 700, color: "#9B8F7A" }}>No upcoming events</div>
-                  </div>
-                ) : (
-                  events.map(ev => {
-                    const sc = ev.status === "Active" ? "#16A34A" : ev.status === "Planning" ? "#CA8A04" : "#9B8F7A";
-                    return (
-                      <div key={ev.id} className="event-row">
-                        <div style={{ width: 40, height: 40, borderRadius: 12, background: "#F5F0E8", border: "1.5px solid #E0D8CA", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                          <CalendarDays size={16} color="#9B8F7A" />
-                        </div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: 13, fontWeight: 700, color: "#111110", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ev.title}</div>
-                          <div style={{ fontSize: 11, color: "#9B8F7A", fontWeight: 600 }}>
-                            {ev.venue ? `${ev.venue} · ` : ""}
-                            {ev.start_date ? new Date(ev.start_date).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "No date"}
-                          </div>
-                        </div>
-                        <div style={{ padding: "2px 8px", borderRadius: 8, background: sc + "18", color: sc, fontSize: 9, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.06em", flexShrink: 0 }}>{ev.status}</div>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            </div>
-
-            {/* Active Tasks */}
-            <div className="ripe-card-static ripe-in" style={{ animationDelay: "0.22s" }}>
-              <div className="sec-header">
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <div style={{ width: 8, height: 8, borderRadius: 3, background: "#8B5CF6", border: "1.5px solid #111110" }} />
-                  <span style={{ fontSize: 14, fontWeight: 900, color: "#111110" }}>Active Tasks</span>
-                </div>
-                <Link href="/dashboard/tasks" style={{ textDecoration: "none", display: "flex", alignItems: "center", gap: 4, fontSize: 12, fontWeight: 700, color: "#9B8F7A" }}>
-                  All <ArrowRight size={12} />
-                </Link>
-              </div>
-              <div style={{ padding: "4px 18px 12px" }}>
-                {tasks.length === 0 ? (
-                  <div style={{ padding: "20px 0", textAlign: "center" }}>
-                    <div style={{ fontSize: 24, marginBottom: 6 }}>✅</div>
-                    <div style={{ fontSize: 12, fontWeight: 700, color: "#9B8F7A" }}>No active tasks</div>
-                  </div>
-                ) : (
-                  tasks.map(task => {
-                    const pc = PRIORITY_COLOR[task.priority] || "#9B8F7A";
-                    return (
-                      <div key={task.id} className="task-row">
-                        <div style={{ width: 4, height: 36, borderRadius: 2, background: pc, flexShrink: 0 }} />
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: 13, fontWeight: 700, color: "#111110", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{task.title}</div>
-                          {task.due_date && <div style={{ fontSize: 10, color: "#9B8F7A", fontWeight: 600, marginTop: 2 }}>Due {fmtDate(task.due_date)}</div>}
-                        </div>
-                        <div style={{ fontSize: 10, fontWeight: 800, color: pc, background: pc + "20", padding: "2px 8px", borderRadius: 6, flexShrink: 0, textTransform: "uppercase" }}>{task.priority}</div>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            </div>
-
-          </div>
+        {/* Footer line */}
+        <div style={{ textAlign: "center", marginTop: 32, marginBottom: 16, fontSize: 11, fontWeight: 600, color: "#C0B8A8", fontStyle: "italic", letterSpacing: "0.04em" }}>
+          — The atelier is always here when you need it. —
         </div>
       </div>
     </>

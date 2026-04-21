@@ -50,6 +50,7 @@ function dateMonth(d?: string) {
 export default function DashboardHome() {
   const router = useRouter();
   const bellRef = useRef<HTMLDivElement>(null);
+  const focusRef = useRef<HTMLDivElement>(null);
 
   /* ── Data ────────────────────────────────────────────────────── */
   const [profile, setProfile] = useState<{ full_name?: string; username?: string; avatar_url?: string } | null>(null);
@@ -70,6 +71,16 @@ export default function DashboardHome() {
   const [bellOpen, setBellOpen] = useState(false);
   const [hoveredArtwork, setHoveredArtwork] = useState<string | null>(null);
   const [listToggle, setListToggle] = useState<"sales" | "clients">("sales");
+  const [focusMode, setFocusMode] = useState(false);
+  const [focusOpen, setFocusOpen] = useState(false);
+  const [focusSections, setFocusSections] = useState<Record<string, boolean>>({
+    studio: false,
+    scene: false,
+    lists: false,
+    deals: false,
+    planning: false,
+    inbox: false,
+  });
   // Which guided action is "dismissed" for this session
   const [dismissedActions, setDismissedActions] = useState<Set<number>>(new Set());
 
@@ -123,12 +134,22 @@ export default function DashboardHome() {
       setEvents(evAll || []);
       setNotifications(notifs || []);
       setUnreadMessages((msgs || []).length);
-      setStoreUrl(prof?.username ? `/artist/${prof.username}` : null);
+      setStoreUrl(prof?.username ? `/${prof.username}` : null);
 
-      // Extra: recent sales list + recent clients
+      // Extra: recent sales list + recent clients (matching actual DB schema)
       const [{ data: rSales }, { data: rClients }] = await Promise.all([
-        supabase.from("sales").select("id,buyer_name,amount,sale_date,artwork_title").eq("user_id", user.id).order("sale_date", { ascending: false }).limit(5),
-        supabase.from("clients").select("id,full_name,email,created_at").eq("user_id", user.id).order("created_at", { ascending: false }).limit(5),
+        supabase
+          .from("sales")
+          .select("id, buyer_name, amount, sale_date, artwork:artworks(title)")
+          .eq("user_id", user.id)
+          .order("sale_date", { ascending: false })
+          .limit(5),
+        supabase
+          .from("clients")
+          .select("id, full_name, email, created_at")
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false })
+          .limit(5),
       ]);
       setRecentSales(rSales || []);
       setRecentClients(rClients || []);
@@ -155,12 +176,46 @@ export default function DashboardHome() {
     return () => document.removeEventListener("mousedown", fn);
   }, []);
 
+  /* ── Focus panel: close on outside click ──────────────────────── */
+  useEffect(() => {
+    const fn = (e: MouseEvent) => {
+      if (focusRef.current && !focusRef.current.contains(e.target as Node)) setFocusOpen(false);
+    };
+    document.addEventListener("mousedown", fn);
+    return () => document.removeEventListener("mousedown", fn);
+  }, []);
+
+  /* ── Focus Mode: load from localStorage ────────────────────────── */
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("artomango_focus");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (typeof parsed.focusMode === "boolean") setFocusMode(parsed.focusMode);
+        if (parsed.focusSections) setFocusSections(parsed.focusSections);
+      }
+    } catch {}
+  }, []);
+
+  /* ── Focus Mode: save to localStorage ──────────────────────────── */
+  useEffect(() => {
+    try {
+      localStorage.setItem("artomango_focus", JSON.stringify({ focusMode, focusSections }));
+    } catch {}
+  }, [focusMode, focusSections]);
+
   /* ── Derived ─────────────────────────────────────────────────── */
   const fname = (profile?.full_name || "").split(" ")[0] || "Artist";
   const initials = (profile?.full_name || "?").split(" ").map((w: string) => w[0]).join("").slice(0, 2).toUpperCase();
   const unreadNotifs = notifications.filter((n: any) => !n.read).length;
   const priorityTasks = tasks.filter((t: any) => t.priority === "high" || t.priority === "urgent");
   const visibleActions = GUIDED_ACTIONS.filter((_, i) => !dismissedActions.has(i));
+
+  const toggleFocusSection = (key: string) => {
+    setFocusSections(prev => ({ ...prev, [key]: !prev[key] }));
+  };
+  // A cell is "lit" (visible) if focus mode is OFF, or if focus mode is ON and that section is toggled ON
+  const isLit = (key: string) => !focusMode || focusSections[key];
 
   return (
     <>
@@ -719,6 +774,106 @@ export default function DashboardHome() {
         .mb-add-plus { font-size: 24px; font-weight: 900; line-height: 1; }
         .mb-add-lbl { font-size: 10px; font-weight: 700; text-align: center; }
 
+        /* ────────────────────────────────────────────────────────
+           FOCUS MODE
+        ──────────────────────────────────────────────────────── */
+        .focus-wrap { position: relative; }
+
+        /* The toggle pill */
+        .focus-toggle {
+          display: flex; align-items: center; gap: 8px;
+          padding: 7px 12px;
+          border-radius: 99px;
+          border: 2px solid var(--border);
+          background: #fff;
+          cursor: pointer; font-family: inherit;
+          transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
+          white-space: nowrap;
+        }
+        .focus-toggle:hover { border-color: var(--border-dark); }
+        .focus-toggle.focus-on {
+          background: var(--border-dark); border-color: var(--border-dark);
+          box-shadow: 3px 3px 0 var(--yellow);
+        }
+        .focus-toggle-label {
+          font-size: 12px; font-weight: 800;
+          color: var(--muted);
+          transition: color 0.15s;
+        }
+        .focus-toggle.focus-on .focus-toggle-label { color: var(--yellow); }
+
+        /* The switch track */
+        .focus-switch {
+          width: 28px; height: 16px; border-radius: 99px;
+          background: var(--border); position: relative;
+          transition: background 0.2s; flex-shrink: 0;
+        }
+        .focus-toggle.focus-on .focus-switch { background: var(--yellow); }
+        .focus-switch-knob {
+          position: absolute; top: 2px; left: 2px;
+          width: 12px; height: 12px; border-radius: 50%;
+          background: #fff; transition: transform 0.2s;
+          box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+        }
+        .focus-toggle.focus-on .focus-switch-knob { transform: translateX(12px); }
+
+        /* Floating panel */
+        .focus-panel {
+          position: absolute; top: calc(100% + 10px); right: 0;
+          background: #fff; border: 2.5px solid var(--border-dark);
+          border-radius: 18px; box-shadow: 6px 6px 0 var(--border-dark);
+          width: 240px; overflow: hidden; z-index: 300;
+          animation: dropDown 0.18s ease;
+        }
+        .focus-panel-head {
+          padding: 12px 16px;
+          border-bottom: 1.5px solid var(--border);
+          background: var(--border-dark);
+        }
+        .focus-panel-title {
+          font-size: 11px; font-weight: 900; color: var(--yellow);
+          text-transform: uppercase; letter-spacing: 0.12em;
+        }
+        .focus-panel-sub {
+          font-size: 10px; font-weight: 600; color: rgba(255,255,255,0.4);
+          margin-top: 2px;
+        }
+        .focus-panel-list { padding: 8px; display: flex; flex-direction: column; gap: 4px; }
+        .focus-section-row {
+          display: flex; align-items: center; justify-content: space-between;
+          padding: 9px 12px; border-radius: 11px;
+          cursor: pointer; transition: background 0.15s;
+          border: 1.5px solid transparent;
+          font-family: inherit; background: transparent; width: 100%; text-align: left;
+        }
+        .focus-section-row:hover { background: var(--warm-bg); }
+        .focus-section-row.lit { background: #FFFBEA; border-color: var(--yellow); }
+        .focus-section-icon { font-size: 14px; flex-shrink: 0; }
+        .focus-section-label { font-size: 12px; font-weight: 800; color: var(--text); flex: 1; padding: 0 10px; }
+        .focus-mini-switch {
+          width: 24px; height: 14px; border-radius: 99px;
+          background: var(--border); position: relative;
+          transition: background 0.2s; flex-shrink: 0;
+        }
+        .focus-section-row.lit .focus-mini-switch { background: #FFD400; }
+        .focus-mini-knob {
+          position: absolute; top: 2px; left: 2px;
+          width: 10px; height: 10px; border-radius: 50%;
+          background: #fff; transition: transform 0.2s;
+        }
+        .focus-section-row.lit .focus-mini-knob { transform: translateX(10px); }
+
+        /* Cell dim overlay — applied to cells that are "off" in focus mode */
+        .cell-dim-overlay {
+          position: absolute; inset: 0;
+          background: #1a1a18;
+          border-radius: calc(var(--radius-card) - 2px);
+          pointer-events: none;
+          z-index: 10;
+          transition: opacity 0.35s ease;
+        }
+        .cell { position: relative; overflow: hidden; }
+
         /* ── Responsive ── */
         @media (max-width: 1100px) {
           .bento { grid-template-columns: 1fr 1fr; }
@@ -799,10 +954,54 @@ export default function DashboardHome() {
               {unreadMessages > 0 && <div className="db-badge">{unreadMessages}</div>}
             </Link>
 
-            {/* Add artwork */}
-            <Link href="/dashboard/artworks/new" className="db-add-btn">
-              <Plus size={13} strokeWidth={3} /> Add Artwork
-            </Link>
+            {/* Focus Mode toggle */}
+            <div ref={focusRef} className="focus-wrap">
+              <button
+                className={`focus-toggle${focusMode ? " focus-on" : ""}`}
+                onClick={() => {
+                  if (!focusMode) {
+                    setFocusMode(true);
+                    setFocusOpen(true);
+                  } else {
+                    setFocusMode(false);
+                    setFocusOpen(false);
+                  }
+                }}
+              >
+                <span className="focus-toggle-label">Focus</span>
+                <div className="focus-switch"><div className="focus-switch-knob" /></div>
+              </button>
+
+              {/* Floating panel — shown when focus is ON */}
+              {focusMode && focusOpen && (
+                <div className="focus-panel">
+                  <div className="focus-panel-head">
+                    <div className="focus-panel-title">Focus Mode</div>
+                    <div className="focus-panel-sub">Turn on what you need</div>
+                  </div>
+                  <div className="focus-panel-list">
+                    {[
+                      { key: "studio",   icon: "🎨", label: "My Studio"          },
+                      { key: "scene",    icon: "🗺️", label: "The Scene"          },
+                      { key: "lists",    icon: "💰", label: "Recent Activity"    },
+                      { key: "deals",    icon: "📊", label: "Deals & Money"      },
+                      { key: "planning", icon: "✅", label: "Planning"           },
+                      { key: "inbox",    icon: "📬", label: "Messages & Alerts"  },
+                    ].map(s => (
+                      <button
+                        key={s.key}
+                        className={`focus-section-row${focusSections[s.key] ? " lit" : ""}`}
+                        onClick={() => toggleFocusSection(s.key)}
+                      >
+                        <span className="focus-section-icon">{s.icon}</span>
+                        <span className="focus-section-label">{s.label}</span>
+                        <div className="focus-mini-switch"><div className="focus-mini-knob" /></div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
@@ -844,6 +1043,7 @@ export default function DashboardHome() {
 
           {/* ━━━━ MY STUDIO ━━━━ */}
           <section className="cell c-studio" style={{ "--dot": "#FFD400" } as any}>
+            {!isLit("studio") && <div className="cell-dim-overlay" />}
             <h2 className="cell-title">My Studio</h2>
             <div className="cell-meta">Your works, storefront & references</div>
 
@@ -951,6 +1151,7 @@ export default function DashboardHome() {
 
           {/* ━━━━ THE SCENE ━━━━ */}
           <section className="cell c-scene" style={{ "--dot": "#4ECDC4" } as any}>
+            {!isLit("scene") && <div className="cell-dim-overlay" />}
             <h2 className="cell-title">The Scene</h2>
             <div className="cell-meta">Events & collaborations</div>
 
@@ -1009,6 +1210,7 @@ export default function DashboardHome() {
 
           {/* ━━━━ PLANNING ━━━━ */}
           <section className="cell c-planning" style={{ "--dot": "#8B5CF6" } as any}>
+            {!isLit("planning") && <div className="cell-dim-overlay" />}
             <h2 className="cell-title">Planning</h2>
             <div className="cell-meta">Urgent to-dos</div>
 
@@ -1030,6 +1232,7 @@ export default function DashboardHome() {
 
           {/* ━━━━ SALES & CLIENTS LIST ━━━━ */}
           <section className="cell c-lists" style={{ "--dot": "#FFD400", display: "flex", flexDirection: "column" } as any}>
+            {!isLit("lists") && <div className="cell-dim-overlay" />}
             <h2 className="cell-title">Recent Activity</h2>
             <div className="cell-meta">Sales &amp; collectors at a glance</div>
 
@@ -1051,12 +1254,13 @@ export default function DashboardHome() {
                 ) : recentSales.map((s: any) => {
                   const initials2 = (s.buyer_name || "?").split(" ").map((w: string) => w[0]).join("").slice(0, 2).toUpperCase();
                   const dateStr = s.sale_date ? new Date(s.sale_date).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "—";
+                  const artworkTitle = s.artwork?.title || "Artwork";
                   return (
                     <div key={s.id} className="list-row">
                       <div className="list-row-avatar">{initials2}</div>
                       <div className="list-row-body">
                         <div className="list-row-name">{s.buyer_name || "Unknown buyer"}</div>
-                        <div className="list-row-sub">{s.artwork_title || "Artwork"} · {dateStr}</div>
+                        <div className="list-row-sub">{artworkTitle} · {dateStr}</div>
                       </div>
                       <div className="list-row-amount">${(s.amount || 0).toLocaleString()}</div>
                     </div>
@@ -1093,6 +1297,7 @@ export default function DashboardHome() {
 
           {/* ━━━━ DEALS & MONEY ━━━━ */}
           <section className="cell c-money" style={{ "--dot": "#16A34A" } as any}>
+            {!isLit("deals") && <div className="cell-dim-overlay" />}
             <h2 className="cell-title">Deals &amp; Money</h2>
             <div className="cell-meta">Sales, collectors, papers, reach</div>
 
@@ -1127,6 +1332,7 @@ export default function DashboardHome() {
 
           {/* ━━━━ INBOX ━━━━ */}
           <section className="cell c-msgs" style={{ "--dot": "#FF6B6B" } as any}>
+            {!isLit("inbox") && <div className="cell-dim-overlay" />}
             <h2 className="cell-title">Inbox</h2>
             <div className="cell-meta">Messages &amp; alerts</div>
 

@@ -9,7 +9,7 @@ import {
   CalendarDays, LogOut, Bell, Search, X,
   ChevronDown, Handshake, TrendingUp, CheckSquare,
   MapPin, CalendarRange, Menu, Globe, ShoppingBag,
-  BellOff, MessageSquare, Plus, Layers, FileText,
+  BellOff, MessageSquare, Plus, Layers, FileText, BookOpen,
 } from "lucide-react";
 
 // ── Nav structure ──────────────────────────────────────────────────
@@ -31,9 +31,10 @@ const NAV_SECTIONS = [
     emoji: "🗺️",
     icon: CalendarRange,
     items: [
-      { href: "/dashboard/exhibitions", label: "Events & Education", icon: CalendarRange, desc: "Events, workshops & resources",  emoji: "🎪", color: "#EC4899", bg: "#FCE7F3" },
-      { href: "/dashboard/pool",        label: "Find Collabs",            icon: Handshake,     desc: "Collaboration requests",        emoji: "🤝", color: "#CA8A04", bg: "#FEF9C3" },
-      { href: "/dashboard/map",         label: "Art Scene Map",                icon: MapPin,        desc: "Prague art scene map",          emoji: "📍", color: "#EF4444", bg: "#FEE2E2" },
+      { href: "/dashboard/pool",        label: "Find Collabs",   icon: Handshake,     desc: "Collaboration requests",        emoji: "🤝", color: "#CA8A04", bg: "#FEF9C3" },
+      { href: "/dashboard/exhibitions", label: "Events",         icon: CalendarRange, desc: "Shows, workshops & openings",   emoji: "🎪", color: "#EC4899", bg: "#FCE7F3" },
+      { href: "/dashboard/education",   label: "Education Hub",  icon: BookOpen,      desc: "Resources, videos & guides",    emoji: "📚", color: "#0EA5E9", bg: "#E0F2FE" },
+      { href: "/dashboard/map",         label: "Art Scene Map",  icon: MapPin,        desc: "Prague art scene map",          emoji: "📍", color: "#EF4444", bg: "#FEE2E2" },
     ],
   },
   {
@@ -65,6 +66,7 @@ const ALL_NAV_ITEMS = [
   { href: "/dashboard/messages", label: "Messages",  icon: MessageSquare   },
   { href: "/dashboard/moodboard",label: "Moodboard", icon: Layers          },
   { href: "/dashboard/contracts",label: "Contracts", icon: FileText         },
+  { href: "/dashboard/education",  label: "Education Hub", icon: BookOpen        },
   ...NAV_SECTIONS.flatMap(s => s.items),
 ];
 

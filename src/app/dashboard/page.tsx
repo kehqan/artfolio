@@ -63,10 +63,13 @@ export default function DashboardHome() {
   const [unreadMessages, setUnreadMessages] = useState(0);
   const [loaded, setLoaded] = useState(false);
   const [storeUrl, setStoreUrl] = useState<string | null>(null);
+  const [recentSales, setRecentSales] = useState<any[]>([]);
+  const [recentClients, setRecentClients] = useState<any[]>([]);
 
   /* ── UI State ────────────────────────────────────────────────── */
   const [bellOpen, setBellOpen] = useState(false);
   const [hoveredArtwork, setHoveredArtwork] = useState<string | null>(null);
+  const [listToggle, setListToggle] = useState<"sales" | "clients">("sales");
   // Which guided action is "dismissed" for this session
   const [dismissedActions, setDismissedActions] = useState<Set<number>>(new Set());
 
@@ -121,6 +124,14 @@ export default function DashboardHome() {
       setNotifications(notifs || []);
       setUnreadMessages((msgs || []).length);
       setStoreUrl(prof?.username ? `/artist/${prof.username}` : null);
+
+      // Extra: recent sales list + recent clients
+      const [{ data: rSales }, { data: rClients }] = await Promise.all([
+        supabase.from("sales").select("id,buyer_name,amount,sale_date,artwork_title").eq("user_id", user.id).order("sale_date", { ascending: false }).limit(5),
+        supabase.from("clients").select("id,full_name,email,created_at").eq("user_id", user.id).order("created_at", { ascending: false }).limit(5),
+      ]);
+      setRecentSales(rSales || []);
+      setRecentClients(rClients || []);
 
       if (awAll) {
         const total = awAll.length;
@@ -511,6 +522,57 @@ export default function DashboardHome() {
         .task-title { font-size: 12px; font-weight: 700; color: var(--text); line-height: 1.3; flex: 1; }
         .task-empty { font-size: 12px; color: var(--muted); font-weight: 600; text-align: center; padding: 12px 0; }
 
+        /* ── Lists cell (Sales / Clients toggle) ── */
+        .c-lists { grid-column: 1; grid-row: 2; --dot: #FFD400; }
+        .lists-toggle {
+          display: flex; gap: 3px;
+          background: var(--warm-bg); border: 2px solid var(--border);
+          border-radius: 10px; padding: 3px;
+          margin-bottom: 14px;
+        }
+        .lists-toggle-btn {
+          flex: 1; padding: 6px 10px;
+          border-radius: 7px; border: none;
+          font-size: 12px; font-weight: 800;
+          cursor: pointer; font-family: inherit;
+          color: var(--muted); background: transparent;
+          transition: all 0.15s;
+        }
+        .lists-toggle-btn.active {
+          background: #fff; color: var(--text);
+          box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+        }
+        .list-rows { display: flex; flex-direction: column; gap: 6px; flex: 1; }
+        .list-row {
+          display: flex; align-items: center; gap: 10px;
+          padding: 9px 11px; border-radius: 11px;
+          background: var(--cream); border: 1.5px solid var(--border);
+          transition: border-color 0.15s;
+        }
+        .list-row:hover { border-color: var(--border-dark); }
+        .list-row-avatar {
+          width: 28px; height: 28px; border-radius: 50%;
+          background: var(--yellow); border: 2px solid var(--border-dark);
+          display: flex; align-items: center; justify-content: center;
+          font-size: 10px; font-weight: 900; color: var(--text);
+          flex-shrink: 0;
+        }
+        .list-row-body { flex: 1; min-width: 0; }
+        .list-row-name { font-size: 12px; font-weight: 800; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .list-row-sub { font-size: 10px; font-weight: 600; color: var(--muted); margin-top: 1px; }
+        .list-row-amount { font-size: 12px; font-weight: 900; color: var(--text); font-family: monospace; flex-shrink: 0; }
+        .list-empty { font-size: 12px; color: var(--muted); font-weight: 600; text-align: center; padding: 16px 0; }
+        .list-cta {
+          display: flex; align-items: center; justify-content: center; gap: 6px;
+          width: 100%; padding: 9px 14px; margin-top: 10px;
+          background: var(--border-dark); color: var(--yellow);
+          border: 2px solid var(--border-dark); border-radius: 11px;
+          font-size: 12px; font-weight: 800; cursor: pointer;
+          font-family: inherit; text-decoration: none;
+          transition: box-shadow 0.15s, transform 0.15s;
+        }
+        .list-cta:hover { box-shadow: 2px 2px 0 var(--yellow); transform: translate(-1px, -1px); }
+
         /* ── Money cell ── */
         .c-money { grid-column: 2; grid-row: 2; --dot: #16A34A; }
         .money-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
@@ -663,8 +725,9 @@ export default function DashboardHome() {
           .c-studio { grid-column: 1 / 3; grid-row: 1; }
           .c-scene   { grid-column: 1; grid-row: 2; }
           .c-planning{ grid-column: 2; grid-row: 2; }
-          .c-money   { grid-column: 1; grid-row: 3; }
-          .c-msgs    { grid-column: 2; grid-row: 3; }
+          .c-lists   { grid-column: 1; grid-row: 3; }
+          .c-money   { grid-column: 2; grid-row: 3; }
+          .c-msgs    { grid-column: 1 / 3; grid-row: 4; }
           .works-grid { grid-template-columns: repeat(5, 1fr); }
           .mb-grid { grid-template-columns: repeat(2, 1fr); }
           .mb-card:nth-child(2) { border-right: none; }
@@ -672,7 +735,7 @@ export default function DashboardHome() {
         }
         @media (max-width: 700px) {
           .bento { grid-template-columns: 1fr; }
-          .c-studio,.c-scene,.c-planning,.c-money,.c-msgs { grid-column: 1; grid-row: auto; }
+          .c-studio,.c-scene,.c-planning,.c-lists,.c-money,.c-msgs { grid-column: 1; grid-row: auto; }
           .works-grid { grid-template-columns: repeat(3, 1fr); }
           .studio-bottom { grid-template-columns: 1fr; }
           .guided-bar { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 4px; }
@@ -962,6 +1025,69 @@ export default function DashboardHome() {
 
             <Link href="/dashboard/tasks" style={{ display: "flex", alignItems: "center", gap: 5, marginTop: 14, fontSize: 11, fontWeight: 700, color: "var(--muted)", textDecoration: "none" }}>
               <CheckSquare size={12} /> All to-dos <ArrowRight size={10} />
+            </Link>
+          </section>
+
+          {/* ━━━━ SALES & CLIENTS LIST ━━━━ */}
+          <section className="cell c-lists" style={{ "--dot": "#FFD400", display: "flex", flexDirection: "column" } as any}>
+            <h2 className="cell-title">Recent Activity</h2>
+            <div className="cell-meta">Sales &amp; collectors at a glance</div>
+
+            {/* Toggle */}
+            <div className="lists-toggle">
+              <button className={`lists-toggle-btn${listToggle === "sales" ? " active" : ""}`} onClick={() => setListToggle("sales")}>
+                💰 Sales
+              </button>
+              <button className={`lists-toggle-btn${listToggle === "clients" ? " active" : ""}`} onClick={() => setListToggle("clients")}>
+                👥 Collectors
+              </button>
+            </div>
+
+            {/* List */}
+            <div className="list-rows">
+              {listToggle === "sales" ? (
+                recentSales.length === 0 ? (
+                  <div className="list-empty">No sales recorded yet</div>
+                ) : recentSales.map((s: any) => {
+                  const initials2 = (s.buyer_name || "?").split(" ").map((w: string) => w[0]).join("").slice(0, 2).toUpperCase();
+                  const dateStr = s.sale_date ? new Date(s.sale_date).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "—";
+                  return (
+                    <div key={s.id} className="list-row">
+                      <div className="list-row-avatar">{initials2}</div>
+                      <div className="list-row-body">
+                        <div className="list-row-name">{s.buyer_name || "Unknown buyer"}</div>
+                        <div className="list-row-sub">{s.artwork_title || "Artwork"} · {dateStr}</div>
+                      </div>
+                      <div className="list-row-amount">${(s.amount || 0).toLocaleString()}</div>
+                    </div>
+                  );
+                })
+              ) : (
+                recentClients.length === 0 ? (
+                  <div className="list-empty">No collectors added yet</div>
+                ) : recentClients.map((c: any) => {
+                  const initials2 = (c.full_name || "?").split(" ").map((w: string) => w[0]).join("").slice(0, 2).toUpperCase();
+                  const dateStr = c.created_at ? new Date(c.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "—";
+                  return (
+                    <div key={c.id} className="list-row">
+                      <div className="list-row-avatar" style={{ background: "#4ECDC4" }}>{initials2}</div>
+                      <div className="list-row-body">
+                        <div className="list-row-name">{c.full_name || "Unnamed"}</div>
+                        <div className="list-row-sub">{c.email || "No email"} · Added {dateStr}</div>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* CTA */}
+            <Link
+              href={listToggle === "sales" ? "/dashboard/sales" : "/dashboard/clients"}
+              className="list-cta"
+            >
+              <Plus size={13} strokeWidth={3} />
+              {listToggle === "sales" ? "Log a sale" : "Add a collector"}
             </Link>
           </section>
 

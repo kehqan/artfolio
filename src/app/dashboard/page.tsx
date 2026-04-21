@@ -762,7 +762,7 @@ export default function DashboardHome() {
                     onClick={e => {
                       e.preventDefault();
                       e.stopPropagation();
-                      setDismissedActions(prev => new Set([...prev, i]));
+                      setDismissedActions(prev => { const next = new Set(Array.from(prev)); next.add(i); return next; });
                     }}
                     title="Dismiss"
                   >

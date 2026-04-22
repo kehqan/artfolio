@@ -11,6 +11,85 @@ import {
 } from "lucide-react";
 
 /* ─────────────────────────────────────────────────────────────────
+   HERO CARDS — 6 action cards shown as default view
+   2 large (top) + 4 smaller (bottom)
+───────────────────────────────────────────────────────────────── */
+const HERO_CARDS = [
+  {
+    size: "large",
+    q: "Got a new piece to document?",
+    cta: "Add a work",
+    href: "/dashboard/artworks/new",
+    bg: "#111110",
+    accent: "#FFD400",
+    textLight: true,
+    icon: "🖼️",
+    desc: "Upload photos, set your price, track the full lifecycle of every artwork.",
+    stat: "studio",
+  },
+  {
+    size: "large",
+    q: "Ready to sell something?",
+    cta: "Go to my store",
+    href: "/dashboard/mystore",
+    bg: "#FFD400",
+    accent: "#111110",
+    textLight: false,
+    icon: "🛍️",
+    desc: "Your live storefront — curate what the world can discover and buy.",
+    stat: "store",
+  },
+  {
+    size: "small",
+    q: "Planning a show or workshop?",
+    cta: "Create an event",
+    href: "/dashboard/exhibitions",
+    bg: "#FAF7F3",
+    accent: "#EC4899",
+    textLight: false,
+    icon: "🎪",
+    desc: "Schedule shows, manage exhibitions, and share with your audience.",
+    stat: "events",
+  },
+  {
+    size: "small",
+    q: "Looking for a collaborator?",
+    cta: "Browse collabs",
+    href: "/dashboard/pool",
+    bg: "#FAF7F3",
+    accent: "#CA8A04",
+    textLight: false,
+    icon: "🤝",
+    desc: "Connect with artists and venues actively looking to work together.",
+    stat: "collabs",
+  },
+  {
+    size: "small",
+    q: "Collecting references today?",
+    cta: "Open moodboard",
+    href: "/dashboard/moodboard",
+    bg: "#FAF7F3",
+    accent: "#EC4899",
+    textLight: false,
+    icon: "🗂️",
+    desc: "Visual boards for inspiration, project planning, and style references.",
+    stat: "moodboard",
+  },
+  {
+    size: "small",
+    q: "Want to learn something new?",
+    cta: "Education hub",
+    href: "/dashboard/education",
+    bg: "#FAF7F3",
+    accent: "#0EA5E9",
+    textLight: false,
+    icon: "📚",
+    desc: "Videos, articles, and community guides for building a sustainable practice.",
+    stat: "education",
+  },
+];
+
+/* ─────────────────────────────────────────────────────────────────
    GUIDED ACTIONS — contextual question prompts shown at top
    Each maps to an href so clicking takes the user there directly.
 ───────────────────────────────────────────────────────────────── */
@@ -83,6 +162,8 @@ export default function DashboardHome() {
   });
   // Which guided action is "dismissed" for this session
   const [dismissedActions, setDismissedActions] = useState<Set<number>>(new Set());
+  // Quick view — hero cards shown by default, full bento hidden below
+  const [quickView, setQuickView] = useState(true);
 
   const today = new Date();
   const hour = today.getHours();
@@ -874,6 +955,176 @@ export default function DashboardHome() {
         }
         .cell { position: relative; overflow: hidden; }
 
+        /* ────────────────────────────────────────────────────────
+           QUICK / HERO VIEW
+        ──────────────────────────────────────────────────────── */
+        .hero-view {
+          display: flex; flex-direction: column;
+          min-height: calc(100vh - 160px);
+          padding-bottom: 80px;
+        }
+
+        /* 2-large top row */
+        .hero-top {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 14px;
+          margin-bottom: 14px;
+          flex: 0 0 auto;
+        }
+
+        /* 4-small bottom row */
+        .hero-bottom {
+          display: grid;
+          grid-template-columns: repeat(4, 1fr);
+          gap: 14px;
+          flex: 1;
+        }
+
+        /* Base card */
+        .hero-card {
+          border-radius: 22px;
+          border: 2.5px solid var(--border-dark);
+          box-shadow: 5px 6px 0 var(--border-dark);
+          overflow: hidden; position: relative;
+          text-decoration: none; display: flex; flex-direction: column;
+          cursor: pointer;
+          transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .hero-card:hover {
+          transform: translate(-2px, -3px);
+          box-shadow: 8px 9px 0 var(--border-dark);
+        }
+
+        /* Large card inner */
+        .hero-card-large {
+          min-height: 260px;
+          padding: 32px 34px;
+          justify-content: space-between;
+        }
+        .hero-card-large .hc-icon {
+          font-size: 52px; line-height: 1; margin-bottom: 18px;
+          display: block;
+          filter: drop-shadow(0 4px 12px rgba(0,0,0,0.15));
+        }
+        .hero-card-large .hc-q {
+          font-size: 13px; font-weight: 700; opacity: 0.55;
+          margin-bottom: 6px; letter-spacing: 0.02em;
+        }
+        .hero-card-large .hc-cta {
+          font-size: 30px; font-weight: 900;
+          letter-spacing: -1px; line-height: 1.1;
+          margin-bottom: 10px;
+        }
+        .hero-card-large .hc-desc {
+          font-size: 13px; font-weight: 600; opacity: 0.5;
+          line-height: 1.6; max-width: 320px;
+        }
+        .hero-card-large .hc-btn {
+          display: inline-flex; align-items: center; gap: 7px;
+          padding: 10px 20px; border-radius: 12px;
+          font-size: 14px; font-weight: 900;
+          border: 2.5px solid; cursor: pointer;
+          font-family: inherit; text-decoration: none;
+          margin-top: 24px; transition: transform 0.15s;
+          align-self: flex-start;
+        }
+        .hero-card-large .hc-btn:hover { transform: scale(1.04); }
+
+        /* Decorative circle bg element */
+        .hero-card-large::after {
+          content: "";
+          position: absolute; bottom: -60px; right: -60px;
+          width: 220px; height: 220px; border-radius: 50%;
+          background: currentColor; opacity: 0.05;
+          pointer-events: none;
+        }
+
+        /* Small card inner */
+        .hero-card-small {
+          min-height: 170px;
+          padding: 24px 24px 20px;
+        }
+        .hero-card-small .hc-icon {
+          font-size: 30px; line-height: 1; margin-bottom: 12px;
+          display: block;
+        }
+        .hero-card-small .hc-q {
+          font-size: 11px; font-weight: 700; opacity: 0.5;
+          margin-bottom: 4px;
+        }
+        .hero-card-small .hc-cta {
+          font-size: 17px; font-weight: 900;
+          letter-spacing: -0.4px; line-height: 1.2;
+          margin-bottom: 6px;
+        }
+        .hero-card-small .hc-desc {
+          font-size: 11.5px; font-weight: 600; opacity: 0.5;
+          line-height: 1.55;
+        }
+        .hero-card-small .hc-arrow {
+          display: inline-flex; align-items: center; gap: 4px;
+          font-size: 12px; font-weight: 800;
+          margin-top: 14px; opacity: 0.7;
+          transition: opacity 0.15s, transform 0.15s;
+        }
+        .hero-card:hover .hc-arrow { opacity: 1; transform: translateX(3px); }
+
+        /* Accent stripe on small cards */
+        .hero-card-small::before {
+          content: "";
+          position: absolute; top: 0; left: 0; right: 0;
+          height: 3px;
+        }
+
+        /* ── Sticky bottom bar ── */
+        .sticky-bar {
+          position: fixed; bottom: 0; left: 0; right: 0;
+          z-index: 100;
+          background: rgba(250,247,243,0.92);
+          backdrop-filter: blur(12px);
+          -webkit-backdrop-filter: blur(12px);
+          border-top: 2.5px solid var(--border-dark);
+          padding: 14px 32px;
+          display: flex; align-items: center; justify-content: space-between;
+          gap: 16px;
+        }
+        .sticky-bar-hint {
+          font-size: 13px; font-weight: 700; color: var(--muted);
+          display: flex; align-items: center; gap: 8px;
+        }
+        .sticky-bar-hint-dot {
+          width: 8px; height: 8px; border-radius: 50%;
+          background: var(--yellow); border: 2px solid var(--border-dark);
+          flex-shrink: 0;
+        }
+        .sticky-bar-btn {
+          display: flex; align-items: center; gap: 8px;
+          padding: 10px 22px;
+          background: var(--border-dark); color: var(--yellow);
+          border: 2.5px solid var(--border-dark); border-radius: 12px;
+          font-size: 13px; font-weight: 900; cursor: pointer;
+          font-family: inherit;
+          box-shadow: 3px 3px 0 var(--yellow);
+          transition: transform 0.15s, box-shadow 0.15s;
+          white-space: nowrap;
+        }
+        .sticky-bar-btn:hover { transform: translate(-1px, -1px); box-shadow: 4px 4px 0 var(--yellow); }
+
+        /* back-to-top pill shown in full dashboard view */
+        .back-to-hero-pill {
+          display: flex; align-items: center; gap: 6px;
+          padding: 8px 16px; border-radius: 99px;
+          background: var(--border-dark); color: var(--yellow);
+          border: 2px solid var(--border-dark);
+          font-size: 12px; font-weight: 800; cursor: pointer;
+          font-family: inherit; margin-bottom: 20px;
+          box-shadow: 2px 2px 0 var(--yellow);
+          transition: transform 0.15s, box-shadow 0.15s;
+          width: fit-content;
+        }
+        .back-to-hero-pill:hover { transform: translate(-1px, -1px); box-shadow: 3px 3px 0 var(--yellow); }
+
         /* ── Responsive ── */
         @media (max-width: 1100px) {
           .bento { grid-template-columns: 1fr 1fr; }
@@ -887,6 +1138,7 @@ export default function DashboardHome() {
           .mb-grid { grid-template-columns: repeat(2, 1fr); }
           .mb-card:nth-child(2) { border-right: none; }
           .mb-card:nth-child(3) { border-right: 1.5px solid var(--border); }
+          .hero-bottom { grid-template-columns: repeat(2, 1fr); }
         }
         @media (max-width: 700px) {
           .bento { grid-template-columns: 1fr; }
@@ -896,6 +1148,11 @@ export default function DashboardHome() {
           .guided-bar { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 4px; }
           .mb-grid { grid-template-columns: 1fr 1fr; }
           .db-h1 { font-size: 20px; }
+          .hero-top { grid-template-columns: 1fr; }
+          .hero-bottom { grid-template-columns: 1fr 1fr; }
+          .hero-card-large { min-height: 200px; padding: 24px; }
+          .hero-card-large .hc-cta { font-size: 22px; }
+          .sticky-bar { padding: 12px 20px; }
         }
       `}</style>
 
@@ -1006,39 +1263,128 @@ export default function DashboardHome() {
         </div>
 
         {/* ════════════════════════════════════════════
-            GUIDED ACTION PROMPTS
+            QUICK VIEW — Hero 6 cards (default)
         ════════════════════════════════════════════ */}
-        {visibleActions.length > 0 && (
-          <div className="guided-bar">
-            {GUIDED_ACTIONS.map((action, i) => {
-              if (dismissedActions.has(i)) return null;
-              return (
-                <Link key={i} href={action.href} className="guided-pill" style={{ "--pill-color": action.color } as any}>
-                  <div className="guided-pill-emoji">{action.icon}</div>
-                  <div className="guided-pill-text">
-                    <div className="guided-pill-q">{action.q}</div>
-                    <div className="guided-pill-cta">{action.cta} →</div>
-                  </div>
-                  <button
-                    className="guided-pill-dismiss"
-                    onClick={e => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      setDismissedActions(prev => { const next = new Set(Array.from(prev)); next.add(i); return next; });
-                    }}
-                    title="Dismiss"
+        {quickView && (
+          <>
+            <div className="hero-view">
+              {/* Top row — 2 large cards */}
+              <div className="hero-top">
+                {HERO_CARDS.filter(c => c.size === "large").map((card, i) => (
+                  <Link
+                    key={i}
+                    href={card.href}
+                    className="hero-card hero-card-large"
+                    style={{ background: card.bg, color: card.textLight ? "#fff" : "#111110" }}
                   >
-                    <X size={8} />
-                  </button>
-                </Link>
-              );
-            })}
-          </div>
+                    <div>
+                      <span className="hc-icon">{card.icon}</span>
+                      <div className="hc-q" style={{ color: card.textLight ? "rgba(255,255,255,0.6)" : "var(--muted)" }}>
+                        {card.q}
+                      </div>
+                      <div className="hc-cta" style={{ color: card.accent }}>{card.cta}</div>
+                      <div className="hc-desc" style={{ color: card.textLight ? "rgba(255,255,255,0.45)" : "var(--muted)" }}>
+                        {card.desc}
+                      </div>
+                    </div>
+                    <span
+                      className="hc-btn"
+                      style={{
+                        background: card.accent,
+                        color: card.bg,
+                        borderColor: card.accent,
+                      }}
+                    >
+                      {card.cta} →
+                    </span>
+                  </Link>
+                ))}
+              </div>
+
+              {/* Bottom row — 4 small cards */}
+              <div className="hero-bottom">
+                {HERO_CARDS.filter(c => c.size === "small").map((card, i) => (
+                  <Link
+                    key={i}
+                    href={card.href}
+                    className="hero-card hero-card-small"
+                    style={{ background: card.bg }}
+                  >
+                    {/* Accent stripe */}
+                    <div style={{
+                      position: "absolute", top: 0, left: 0, right: 0,
+                      height: "3px", background: card.accent, borderRadius: "20px 20px 0 0",
+                    }} />
+                    <span className="hc-icon">{card.icon}</span>
+                    <div className="hc-q" style={{ color: "var(--muted)" }}>{card.q}</div>
+                    <div className="hc-cta" style={{ color: card.accent }}>{card.cta}</div>
+                    <div className="hc-desc" style={{ color: "var(--muted)" }}>{card.desc}</div>
+                    <div className="hc-arrow" style={{ color: card.accent }}>
+                      {card.cta} <ArrowRight size={13} />
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </div>
+
+            {/* ── Sticky bottom bar ── */}
+            <div className="sticky-bar">
+              <div className="sticky-bar-hint">
+                <div className="sticky-bar-hint-dot" />
+                This is your Focus view — quick access to what matters most.
+              </div>
+              <button className="sticky-bar-btn" onClick={() => setQuickView(false)}>
+                View full dashboard ↓
+              </button>
+            </div>
+          </>
         )}
 
         {/* ════════════════════════════════════════════
-            BENTO GRID
+            FULL DASHBOARD — bento + guided actions
         ════════════════════════════════════════════ */}
+        {!quickView && (
+          <>
+            {/* Back to focus view pill */}
+            <button className="back-to-hero-pill" onClick={() => setQuickView(true)}>
+              ↑ Back to Focus view
+            </button>
+
+            {/* Guided action prompts */}
+            {visibleActions.length > 0 && (
+              <div className="guided-bar">
+                {GUIDED_ACTIONS.map((action, i) => {
+                  if (dismissedActions.has(i)) return null;
+                  return (
+                    <Link key={i} href={action.href} className="guided-pill" style={{ "--pill-color": action.color } as any}>
+                      <div className="guided-pill-emoji">{action.icon}</div>
+                      <div className="guided-pill-text">
+                        <div className="guided-pill-q">{action.q}</div>
+                        <div className="guided-pill-cta">{action.cta} →</div>
+                      </div>
+                      <button
+                        className="guided-pill-dismiss"
+                        onClick={e => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setDismissedActions(prev => { const next = new Set(Array.from(prev)); next.add(i); return next; });
+                        }}
+                        title="Dismiss"
+                      >
+                        <X size={8} />
+                      </button>
+                    </Link>
+                  );
+                })}
+              </div>
+            )}
+          </>
+        )}
+
+        {/* ════════════════════════════════════════════
+            BENTO GRID (only shown in full view)
+        ════════════════════════════════════════════ */}
+        {!quickView && (
         <div className="bento">
 
           {/* ━━━━ MY STUDIO ━━━━ */}
@@ -1351,7 +1697,7 @@ export default function DashboardHome() {
             </div>
           </section>
 
-        </div>
+        </div> {/* end .bento */}
 
         {/* ════════════════════════════════════════════
             MOODBOARD SECTION (below bento)
@@ -1397,6 +1743,8 @@ export default function DashboardHome() {
             </Link>
           </div>
         </div>
+
+        )} {/* end !quickView */}
 
       </div>
     </>

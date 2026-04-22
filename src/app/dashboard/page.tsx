@@ -1384,7 +1384,7 @@ export default function DashboardHome() {
         {/* ════════════════════════════════════════════
             BENTO GRID (only shown in full view)
         ════════════════════════════════════════════ */}
-        {!quickView && (
+        {!quickView && (<>
         <div className="bento">
 
           {/* ━━━━ MY STUDIO ━━━━ */}
@@ -1744,7 +1744,7 @@ export default function DashboardHome() {
           </div>
         </div>
 
-        )} {/* end !quickView */}
+        </>)} {/* end !quickView */}
 
       </div>
     </>

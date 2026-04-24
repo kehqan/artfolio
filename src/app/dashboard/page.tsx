@@ -1093,6 +1093,38 @@ export default function DashboardHome() {
         }
         .back-to-hero-pill:hover { transform: translate(-1px, -1px); box-shadow: 3px 3px 0 var(--yellow); }
 
+        /* ── Journey SVG animations ── */
+        @keyframes artFloat1 {
+          0%, 100% { transform: translateY(0px) rotate(-1deg); }
+          50% { transform: translateY(-7px) rotate(-1deg); }
+        }
+        @keyframes artFloat2 {
+          0%, 100% { transform: translateY(0px) rotate(1.5deg); }
+          50% { transform: translateY(-9px) rotate(1.5deg); }
+        }
+        @keyframes artFloat3 {
+          0%, 100% { transform: translateY(0px) rotate(-0.5deg); }
+          50% { transform: translateY(-6px) rotate(-0.5deg); }
+        }
+        @keyframes flowDash {
+          from { stroke-dashoffset: 120; }
+          to { stroke-dashoffset: 0; }
+        }
+        @keyframes pulseDot {
+          0%, 100% { opacity: 1; r: 3; }
+          50% { opacity: 0.4; r: 5; }
+        }
+        @keyframes badgePop {
+          0% { transform: scale(0.8); opacity: 0; }
+          60% { transform: scale(1.05); opacity: 1; }
+          100% { transform: scale(1); opacity: 1; }
+        }
+        .art-float-1 { animation: artFloat1 4s ease-in-out infinite; }
+        .art-float-2 { animation: artFloat2 5s ease-in-out infinite 0.6s; }
+        .art-float-3 { animation: artFloat3 4.5s ease-in-out infinite 1.2s; }
+        .flow-dash { stroke-dasharray: 8 5; animation: flowDash 2s linear infinite; }
+        .badge-pop { animation: badgePop 0.5s ease-out both; }
+
         /* ── Responsive ── */
         @media (max-width: 1100px) {
           .bento { grid-template-columns: 1fr 1fr; }
@@ -1322,64 +1354,216 @@ export default function DashboardHome() {
                     {/* RIGHT: illustration */}
                     <div style={{
                       flex: 1,
-                      display: "flex", alignItems: "stretch",
+                      display: "flex", alignItems: "center", justifyContent: "center",
                       overflow: "hidden",
-                      borderLeft: isDark ? "1.5px solid rgba(255,255,255,0.08)" : "1.5px solid rgba(0,0,0,0.07)",
+                      borderLeft: isDark ? "1.5px solid rgba(255,255,255,0.08)" : "1.5px solid rgba(0,0,0,0.08)",
                       position: "relative",
+                      padding: "20px 16px",
                     }}>
                       {card.key === "inventory" ? (
-                        <>
-                          <img
-                            src="https://images.unsplash.com/photo-1541961017774-22349e4a1262?w=600&q=80&fit=crop"
-                            alt="Artist studio with artworks organized on wall"
-                            style={{
-                              width: "100%", height: "100%",
-                              objectFit: "cover", objectPosition: "center",
-                              display: "block",
-                            }}
-                          />
-                          {/* Dark overlay with label */}
-                          <div style={{
-                            position: "absolute", inset: 0,
-                            background: "linear-gradient(135deg, rgba(17,17,16,0.55) 0%, rgba(17,17,16,0.1) 100%)",
-                            display: "flex", alignItems: "flex-end", padding: "20px",
-                          }}>
-                            <div style={{
-                              background: "#FFD400", color: "#111110",
-                              padding: "6px 14px", borderRadius: 99,
-                              fontSize: 12, fontWeight: 900,
-                              border: "2px solid #111110",
-                            }}>
-                              6 works in your studio →
-                            </div>
-                          </div>
-                        </>
+
+                        /* ════════════════════════════════════════
+                           JOURNEY SVG — Studio → Artomango → World
+                        ════════════════════════════════════════ */
+                        <svg viewBox="0 0 480 240" fill="none" xmlns="http://www.w3.org/2000/svg"
+                          style={{ width: "100%", maxWidth: 480, height: "auto" }}>
+
+                          {/* ── SECTION LABELS ── */}
+                          <text x="58" y="14" fontFamily="Darker Grotesque, sans-serif" fontSize="8" fill="#FFD400" fontWeight="900" textAnchor="middle" letterSpacing="2">STUDIO</text>
+                          <text x="240" y="14" fontFamily="Darker Grotesque, sans-serif" fontSize="8" fill="#FFD400" fontWeight="900" textAnchor="middle" letterSpacing="2">ARTOMANGO</text>
+                          <text x="422" y="14" fontFamily="Darker Grotesque, sans-serif" fontSize="8" fill="#FFD400" fontWeight="900" textAnchor="middle" letterSpacing="2">THE WORLD</text>
+
+                          {/* ── DIVIDER LINES ── */}
+                          <line x1="130" y1="18" x2="130" y2="228" stroke="rgba(255,212,0,0.15)" strokeWidth="1" strokeDasharray="4 4"/>
+                          <line x1="350" y1="18" x2="350" y2="228" stroke="rgba(255,212,0,0.15)" strokeWidth="1" strokeDasharray="4 4"/>
+
+                          {/* ── LEFT: 3 floating artwork cards ── */}
+                          {/* Artwork 1 — top */}
+                          <g className="art-float-1">
+                            <rect x="12" y="28" width="72" height="56" rx="5" fill="#1C1C1A" stroke="#FFD400" strokeWidth="1.5"/>
+                            <rect x="18" y="34" width="60" height="36" rx="3" fill="#2A2A28"/>
+                            {/* warm abstract fill */}
+                            <rect x="18" y="34" width="60" height="36" rx="3" fill="url(#wg1)"/>
+                            <rect x="18" y="74" width="36" height="4" rx="2" fill="#FFD400" opacity="0.8"/>
+                            <rect x="57" y="72" width="22" height="8" rx="4" fill="#16A34A"/>
+                            <text x="68" y="78" fontFamily="Darker Grotesque, sans-serif" fontSize="5" fill="white" fontWeight="900" textAnchor="middle">Available</text>
+                          </g>
+
+                          {/* Artwork 2 — middle */}
+                          <g className="art-float-2">
+                            <rect x="8" y="100" width="68" height="52" rx="5" fill="#1C1C1A" stroke="#FFD400" strokeWidth="1.5"/>
+                            <rect x="14" y="106" width="56" height="32" rx="3" fill="#2A2A28"/>
+                            <rect x="14" y="106" width="56" height="32" rx="3" fill="url(#wg2)"/>
+                            <rect x="14" y="142" width="32" height="4" rx="2" fill="#FFD400" opacity="0.7"/>
+                            <rect x="49" y="140" width="28" height="8" rx="4" fill="#7C3AED"/>
+                            <text x="63" y="146" fontFamily="Darker Grotesque, sans-serif" fontSize="5" fill="white" fontWeight="900" textAnchor="middle">In Progress</text>
+                          </g>
+
+                          {/* Artwork 3 — bottom */}
+                          <g className="art-float-3">
+                            <rect x="16" y="166" width="76" height="54" rx="5" fill="#1C1C1A" stroke="#FFD400" strokeWidth="1.5"/>
+                            <rect x="22" y="172" width="64" height="34" rx="3" fill="#2A2A28"/>
+                            <rect x="22" y="172" width="64" height="34" rx="3" fill="url(#wg3)"/>
+                            <rect x="22" y="210" width="40" height="4" rx="2" fill="#FFD400" opacity="0.75"/>
+                            <rect x="65" y="208" width="22" height="8" rx="4" fill="#CA8A04"/>
+                            <text x="76" y="214" fontFamily="Darker Grotesque, sans-serif" fontSize="5" fill="white" fontWeight="900" textAnchor="middle">Reserved</text>
+                          </g>
+
+                          {/* ── FLOW ARROWS: Studio → Artomango ── */}
+                          <path d="M 96 55 Q 140 55 160 80" stroke="#FFD400" strokeWidth="1.5" fill="none" className="flow-dash" opacity="0.7"/>
+                          <path d="M 84 126 Q 140 126 160 120" stroke="#FFD400" strokeWidth="1.5" fill="none" className="flow-dash" opacity="0.7" style={{animationDelay:"0.4s"}}/>
+                          <path d="M 100 192 Q 140 195 160 160" stroke="#FFD400" strokeWidth="1.5" fill="none" className="flow-dash" opacity="0.7" style={{animationDelay:"0.8s"}}/>
+                          {/* arrowheads */}
+                          <polygon points="158,77 164,80 158,83" fill="#FFD400" opacity="0.7"/>
+                          <polygon points="158,117 164,120 158,123" fill="#FFD400" opacity="0.7"/>
+                          <polygon points="158,157 164,160 158,163" fill="#FFD400" opacity="0.7"/>
+
+                          {/* ── CENTRE: Artomango platform card ── */}
+                          <rect x="152" y="28" width="176" height="184" rx="10" fill="#1C1C1A" stroke="#FFD400" strokeWidth="2"/>
+                          {/* top bar */}
+                          <rect x="152" y="28" width="176" height="28" rx="10" fill="#111110"/>
+                          <rect x="152" y="42" width="176" height="14" fill="#111110"/>
+                          <circle cx="167" cy="42" r="4" fill="#FFD400"/>
+                          <circle cx="179" cy="42" r="4" fill="rgba(255,212,0,0.4)"/>
+                          <circle cx="191" cy="42" r="4" fill="rgba(255,212,0,0.2)"/>
+                          <text x="240" y="46" fontFamily="Darker Grotesque, sans-serif" fontSize="8" fill="#FFD400" fontWeight="800" textAnchor="middle">artomango.com</text>
+
+                          {/* content rows */}
+                          <text x="168" y="72" fontFamily="Darker Grotesque, sans-serif" fontSize="9" fill="#FFD400" fontWeight="900">MY INVENTORY</text>
+
+                          {/* Mini artwork row 1 */}
+                          <rect x="164" y="80" width="32" height="24" rx="3" fill="url(#wg1)"/>
+                          <rect x="200" y="80" width="80" height="5" rx="2" fill="rgba(255,255,255,0.7)"/>
+                          <rect x="200" y="90" width="44" height="4" rx="2" fill="#16A34A"/>
+                          <text x="222" y="95" fontFamily="Darker Grotesque, sans-serif" fontSize="5" fill="white" fontWeight="800" textAnchor="middle">Available · €1,200</text>
+                          <rect x="200" y="98" width="32" height="3" rx="1.5" fill="rgba(255,255,255,0.2)"/>
+                          <line x1="164" y1="108" x2="308" y2="108" stroke="rgba(255,212,0,0.1)" strokeWidth="1"/>
+
+                          {/* Mini artwork row 2 */}
+                          <rect x="164" y="114" width="32" height="24" rx="3" fill="url(#wg2)"/>
+                          <rect x="200" y="114" width="72" height="5" rx="2" fill="rgba(255,255,255,0.7)"/>
+                          <rect x="200" y="124" width="52" height="4" rx="2" fill="#7C3AED"/>
+                          <text x="226" y="129" fontFamily="Darker Grotesque, sans-serif" fontSize="5" fill="white" fontWeight="800" textAnchor="middle">In Progress · NFS</text>
+                          <rect x="200" y="132" width="40" height="3" rx="1.5" fill="rgba(255,255,255,0.2)"/>
+                          <line x1="164" y1="142" x2="308" y2="142" stroke="rgba(255,212,0,0.1)" strokeWidth="1"/>
+
+                          {/* Mini artwork row 3 */}
+                          <rect x="164" y="148" width="32" height="24" rx="3" fill="url(#wg3)"/>
+                          <rect x="200" y="148" width="68" height="5" rx="2" fill="rgba(255,255,255,0.7)"/>
+                          <rect x="200" y="158" width="40" height="4" rx="2" fill="#CA8A04"/>
+                          <text x="220" y="163" fontFamily="Darker Grotesque, sans-serif" fontSize="5" fill="white" fontWeight="800" textAnchor="middle">Reserved · €800</text>
+                          <rect x="200" y="166" width="28" height="3" rx="1.5" fill="rgba(255,255,255,0.2)"/>
+                          <line x1="164" y1="176" x2="308" y2="176" stroke="rgba(255,212,0,0.1)" strokeWidth="1"/>
+
+                          {/* bottom stats strip */}
+                          <rect x="164" y="184" width="60" height="18" rx="4" fill="rgba(255,212,0,0.1)" stroke="rgba(255,212,0,0.2)" strokeWidth="1"/>
+                          <text x="194" y="196" fontFamily="Darker Grotesque, sans-serif" fontSize="7" fill="#FFD400" fontWeight="800" textAnchor="middle">3 works</text>
+                          <rect x="232" y="184" width="60" height="18" rx="4" fill="rgba(255,212,0,0.1)" stroke="rgba(255,212,0,0.2)" strokeWidth="1"/>
+                          <text x="262" y="196" fontFamily="Darker Grotesque, sans-serif" fontSize="7" fill="#FFD400" fontWeight="800" textAnchor="middle">€2,000</text>
+
+                          {/* ── FLOW ARROWS: Artomango → World ── */}
+                          <path d="M 328 90 Q 360 80 378 100" stroke="#FFD400" strokeWidth="1.5" fill="none" className="flow-dash" opacity="0.7" style={{animationDelay:"0.2s"}}/>
+                          <path d="M 328 140 Q 360 140 378 145" stroke="#FFD400" strokeWidth="1.5" fill="none" className="flow-dash" opacity="0.7" style={{animationDelay:"0.6s"}}/>
+                          <path d="M 328 185 Q 360 185 378 190" stroke="#FFD400" strokeWidth="1.5" fill="none" className="flow-dash" opacity="0.7" style={{animationDelay:"1s"}}/>
+                          <polygon points="376,97 382,100 376,103" fill="#FFD400" opacity="0.7"/>
+                          <polygon points="376,142 382,145 376,148" fill="#FFD400" opacity="0.7"/>
+                          <polygon points="376,187 382,190 376,193" fill="#FFD400" opacity="0.7"/>
+
+                          {/* ── RIGHT: 3 destination cards ── */}
+                          {/* Gallery */}
+                          <rect x="376" y="28" width="90" height="60" rx="6" fill="#1C1C1A" stroke="#FFD400" strokeWidth="1.5"/>
+                          <text x="421" y="48" fontFamily="Darker Grotesque, sans-serif" fontSize="8" fill="#FFD400" fontWeight="900" textAnchor="middle">🏛️</text>
+                          <text x="421" y="60" fontFamily="Darker Grotesque, sans-serif" fontSize="7" fill="#FFD400" fontWeight="800" textAnchor="middle">Gallery</text>
+                          <text x="421" y="72" fontFamily="Darker Grotesque, sans-serif" fontSize="6" fill="rgba(255,255,255,0.5)" textAnchor="middle">Exhibition</text>
+                          {/* badge */}
+                          <rect x="382" y="80" width="78" height="14" rx="7" fill="#16A34A" className="badge-pop"/>
+                          <text x="421" y="90" fontFamily="Darker Grotesque, sans-serif" fontSize="6" fill="white" fontWeight="800" textAnchor="middle">Artwork exhibited ✓</text>
+
+                          {/* Collaboration */}
+                          <rect x="376" y="108" width="90" height="60" rx="6" fill="#1C1C1A" stroke="#FFD400" strokeWidth="1.5"/>
+                          <text x="421" y="128" fontFamily="Darker Grotesque, sans-serif" fontSize="8" fill="#FFD400" fontWeight="900" textAnchor="middle">🤝</text>
+                          <text x="421" y="140" fontFamily="Darker Grotesque, sans-serif" fontSize="7" fill="#FFD400" fontWeight="800" textAnchor="middle">Collaboration</text>
+                          <text x="421" y="152" fontFamily="Darker Grotesque, sans-serif" fontSize="6" fill="rgba(255,255,255,0.5)" textAnchor="middle">New project</text>
+                          <rect x="382" y="161" width="78" height="14" rx="7" fill="#7C3AED" className="badge-pop" style={{animationDelay:"0.3s"}}/>
+                          <text x="421" y="171" fontFamily="Darker Grotesque, sans-serif" fontSize="6" fill="white" fontWeight="800" textAnchor="middle">Collab confirmed ✓</text>
+
+                          {/* Sold */}
+                          <rect x="376" y="188" width="90" height="42" rx="6" fill="#FFD400" stroke="#111110" strokeWidth="2"/>
+                          <text x="421" y="205" fontFamily="Darker Grotesque, sans-serif" fontSize="8" fill="#111110" fontWeight="900" textAnchor="middle">SOLD</text>
+                          <text x="421" y="217" fontFamily="Darker Grotesque, sans-serif" fontSize="7" fill="#111110" fontWeight="800" textAnchor="middle">€1,200 earned</text>
+                          <text x="421" y="227" fontFamily="Darker Grotesque, sans-serif" fontSize="6" fill="rgba(0,0,0,0.5)" textAnchor="middle">via Artomango</text>
+
+                          {/* Gradients */}
+                          <defs>
+                            <linearGradient id="wg1" x1="0" y1="0" x2="1" y2="1">
+                              <stop offset="0%" stopColor="#FF6B6B" stopOpacity="0.8"/>
+                              <stop offset="100%" stopColor="#FF9F43" stopOpacity="0.8"/>
+                            </linearGradient>
+                            <linearGradient id="wg2" x1="0" y1="0" x2="1" y2="1">
+                              <stop offset="0%" stopColor="#4ECDC4" stopOpacity="0.8"/>
+                              <stop offset="100%" stopColor="#3B82F6" stopOpacity="0.8"/>
+                            </linearGradient>
+                            <linearGradient id="wg3" x1="0" y1="0" x2="1" y2="1">
+                              <stop offset="0%" stopColor="#8B5CF6" stopOpacity="0.8"/>
+                              <stop offset="100%" stopColor="#EC4899" stopOpacity="0.8"/>
+                            </linearGradient>
+                          </defs>
+                        </svg>
+
                       ) : (
-                        <>
-                          <img
-                            src="https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=600&q=80&fit=crop"
-                            alt="Artists collaborating together in studio"
-                            style={{
-                              width: "100%", height: "100%",
-                              objectFit: "cover", objectPosition: "center top",
-                              display: "block",
-                            }}
-                          />
-                          <div style={{
-                            position: "absolute", inset: 0,
-                            background: "linear-gradient(135deg, rgba(250,247,243,0.3) 0%, rgba(250,247,243,0.0) 100%)",
-                            display: "flex", alignItems: "flex-end", padding: "20px",
-                          }}>
-                            <div style={{
-                              background: "#111110", color: "#FFD400",
-                              padding: "6px 14px", borderRadius: 99,
-                              fontSize: 12, fontWeight: 900,
-                              border: "2px solid #111110",
-                            }}>
-                              Browse the collab pool →
-                            </div>
-                          </div>
-                        </>
+
+                        /* ════════════════════════════════════════
+                           COLLABS SVG — People connecting
+                        ════════════════════════════════════════ */
+                        <svg viewBox="0 0 380 220" fill="none" xmlns="http://www.w3.org/2000/svg"
+                          style={{ width: "100%", maxWidth: 380, height: "auto" }}>
+
+                          {/* Background grid dots */}
+                          {[60,120,180,240,300,360].map((x) =>
+                            [40,80,120,160,200].map((y) => (
+                              <circle key={`${x}-${y}`} cx={x} cy={y} r="1.5" fill="#CA8A04" opacity="0.15"/>
+                            ))
+                          )}
+
+                          {/* Connection lines */}
+                          <line x1="190" y1="110" x2="80" y2="60" stroke="#CA8A04" strokeWidth="1.5" strokeDasharray="5 4" opacity="0.6" className="flow-dash"/>
+                          <line x1="190" y1="110" x2="300" y2="60" stroke="#CA8A04" strokeWidth="1.5" strokeDasharray="5 4" opacity="0.6" className="flow-dash" style={{animationDelay:"0.5s"}}/>
+                          <line x1="190" y1="110" x2="80" y2="165" stroke="#CA8A04" strokeWidth="1.5" strokeDasharray="5 4" opacity="0.6" className="flow-dash" style={{animationDelay:"1s"}}/>
+                          <line x1="190" y1="110" x2="300" y2="165" stroke="#CA8A04" strokeWidth="1.5" strokeDasharray="5 4" opacity="0.6" className="flow-dash" style={{animationDelay:"1.5s"}}/>
+
+                          {/* Centre — You */}
+                          <circle cx="190" cy="110" r="34" fill="#111110" stroke="#CA8A04" strokeWidth="2.5"/>
+                          <text x="190" y="105" fontFamily="Darker Grotesque, sans-serif" fontSize="18" textAnchor="middle">🎨</text>
+                          <text x="190" y="122" fontFamily="Darker Grotesque, sans-serif" fontSize="9" fill="#CA8A04" fontWeight="900" textAnchor="middle">YOU</text>
+
+                          {/* Node: Painter */}
+                          <circle cx="80" cy="58" r="26" fill="#FAF7F3" stroke="#111110" strokeWidth="2"/>
+                          <text x="80" y="53" fontFamily="Darker Grotesque, sans-serif" fontSize="16" textAnchor="middle">🖼️</text>
+                          <text x="80" y="68" fontFamily="Darker Grotesque, sans-serif" fontSize="8" fill="#111110" fontWeight="800" textAnchor="middle">Painter</text>
+
+                          {/* Node: Gallery */}
+                          <circle cx="300" cy="58" r="26" fill="#FAF7F3" stroke="#111110" strokeWidth="2"/>
+                          <text x="300" y="53" fontFamily="Darker Grotesque, sans-serif" fontSize="16" textAnchor="middle">🏛️</text>
+                          <text x="300" y="68" fontFamily="Darker Grotesque, sans-serif" fontSize="8" fill="#111110" fontWeight="800" textAnchor="middle">Gallery</text>
+
+                          {/* Node: Sculptor */}
+                          <circle cx="80" cy="165" r="26" fill="#FAF7F3" stroke="#111110" strokeWidth="2"/>
+                          <text x="80" y="160" fontFamily="Darker Grotesque, sans-serif" fontSize="16" textAnchor="middle">🗿</text>
+                          <text x="80" y="175" fontFamily="Darker Grotesque, sans-serif" fontSize="8" fill="#111110" fontWeight="800" textAnchor="middle">Sculptor</text>
+
+                          {/* Node: Photographer */}
+                          <circle cx="300" cy="165" r="26" fill="#FAF7F3" stroke="#111110" strokeWidth="2"/>
+                          <text x="300" y="160" fontFamily="Darker Grotesque, sans-serif" fontSize="16" textAnchor="middle">📸</text>
+                          <text x="300" y="175" fontFamily="Darker Grotesque, sans-serif" fontSize="8" fill="#111110" fontWeight="800" textAnchor="middle">Photographer</text>
+
+                          {/* Proposal badge on a connection */}
+                          <rect x="108" y="73" width="70" height="16" rx="8" fill="#CA8A04"/>
+                          <text x="143" y="83" fontFamily="Darker Grotesque, sans-serif" fontSize="7" fill="white" fontWeight="900" textAnchor="middle">Proposal sent ✓</text>
+
+                          {/* Confirmed badge */}
+                          <rect x="202" y="148" width="68" height="16" rx="8" fill="#16A34A"/>
+                          <text x="236" y="158" fontFamily="Darker Grotesque, sans-serif" fontSize="7" fill="white" fontWeight="900" textAnchor="middle">Connected ✓</text>
+                        </svg>
                       )}
                     </div>
                   </Link>

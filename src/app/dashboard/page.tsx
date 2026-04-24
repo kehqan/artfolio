@@ -16,32 +16,30 @@ import {
 ───────────────────────────────────────────────────────────────── */
 const HERO_CARDS_LARGE = [
   {
-    q: "Got a new piece to document?",
-    cta: "Add a work",
+    key: "inventory",
+    q: "Your entire body of work, organised.",
+    cta: "Manage my works",
     href: "/dashboard/artworks/new",
     bg: "#111110",
     accent: "#FFD400",
     textLight: true,
-    icon: "🖼️",
-    desc: "From photo to published in minutes.",
     steps: [
-      { n: "1", label: "Photograph it", sub: "Upload your best shot" },
-      { n: "2", label: "Set your price", sub: "Or mark as NFS" },
-      { n: "3", label: "Publish",        sub: "Live on your storefront" },
+      { n: "1", label: "Upload",       sub: "Photo + metadata" },
+      { n: "2", label: "Track status", sub: "Concept → Sold" },
+      { n: "3", label: "Share",        sub: "Clients & galleries" },
     ],
   },
   {
+    key: "collabs",
     q: "Looking for a collaborator?",
     cta: "Browse collabs",
     href: "/dashboard/pool",
     bg: "#FAF7F3",
     accent: "#CA8A04",
     textLight: false,
-    icon: "🤝",
-    desc: "Find the right artist, venue, or maker.",
     steps: [
-      { n: "1", label: "Browse the pool",  sub: "Artists looking to connect" },
-      { n: "2", label: "Send a proposal",  sub: "Describe your idea" },
+      { n: "1", label: "Browse the pool",  sub: "Artists ready to connect" },
+      { n: "2", label: "Send a proposal",  sub: "Describe your vision" },
       { n: "3", label: "Make it happen",   sub: "Collab confirmed" },
     ],
   },
@@ -1246,48 +1244,217 @@ export default function DashboardHome() {
             <div className="hero-top">
               {HERO_CARDS_LARGE.map((card, i) => {
                 const isDark = card.bg === "#111110";
-                const qColor    = isDark ? "rgba(255,212,0,0.7)"  : "#6B5E3E";
-                const descColor = isDark ? "rgba(255,255,255,0.75)" : "#3D3325";
-                const stepBg    = isDark ? "rgba(255,212,0,0.15)"  : "rgba(0,0,0,0.06)";
-                const stepNumBg = isDark ? "#FFD400"               : "#111110";
-                const stepNumColor = isDark ? "#111110"            : "#FFD400";
-                const stepLabelColor = isDark ? "#fff"             : "#111110";
-                const stepSubColor   = isDark ? "rgba(255,255,255,0.6)" : "#5C4F3A";
-                const stepDivider    = isDark ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.1)";
-                const btnBg    = isDark ? "#FFD400" : "#111110";
-                const btnColor = isDark ? "#111110" : "#FFD400";
-                const btnBorder = isDark ? "#FFD400" : "#111110";
-                const btnShadow = isDark ? "3px 3px 0 rgba(255,255,255,0.2)" : "3px 3px 0 rgba(255,212,0,0.5)";
-                return (
-                  <Link key={i} href={card.href} className="hero-card-large" style={{ background: card.bg }}>
-                    <div className="hc-large-top">
-                      <span className="hc-icon-lg">{card.icon}</span>
-                      <div className="hc-q-lg" style={{ color: qColor }}>{card.q}</div>
-                      <div className="hc-cta-lg" style={{ color: card.accent }}>{card.cta}</div>
-                      <div className="hc-desc-lg" style={{ color: descColor }}>{card.desc}</div>
+                const qColor         = isDark ? "#FFD400"                   : "#6B5E3E";
+                const descColor      = isDark ? "rgba(255,255,255,0.75)"    : "#3D3325";
+                const stepBg         = isDark ? "rgba(255,212,0,0.1)"       : "rgba(0,0,0,0.05)";
+                const stepNumBg      = isDark ? "#FFD400"                   : "#111110";
+                const stepNumColor   = isDark ? "#111110"                   : "#FFD400";
+                const stepLabelColor = isDark ? "#fff"                      : "#111110";
+                const stepSubColor   = isDark ? "rgba(255,255,255,0.6)"     : "#5C4F3A";
+                const stepDivider    = isDark ? "rgba(255,255,255,0.1)"     : "rgba(0,0,0,0.08)";
+                const btnBg          = isDark ? "#FFD400"                   : "#111110";
+                const btnColor       = isDark ? "#111110"                   : "#FFD400";
+                const btnShadow      = isDark ? "3px 3px 0 rgba(255,255,255,0.15)" : "3px 3px 0 rgba(255,212,0,0.4)";
 
-                      {/* Journey steps — pill background */}
-                      <div className="hc-steps" style={{ background: stepBg }}>
+                return (
+                  <Link key={i} href={card.href} className="hero-card-large" style={{
+                    background: card.bg,
+                    display: "flex",
+                    flexDirection: "row",
+                    alignItems: "stretch",
+                    padding: 0,
+                    minHeight: 300,
+                  }}>
+
+                    {/* LEFT: text + steps + CTA */}
+                    <div style={{
+                      flex: "0 0 52%", padding: "36px 32px 32px",
+                      display: "flex", flexDirection: "column", justifyContent: "space-between",
+                    }}>
+                      <div>
+                        <div className="hc-q-lg" style={{ color: qColor, marginBottom: 8 }}>{card.q}</div>
+                        <div className="hc-cta-lg" style={{ color: card.accent }}>{card.cta}</div>
+                      </div>
+
+                      {/* Steps */}
+                      <div style={{
+                        display: "flex", flexDirection: "column", gap: 0,
+                        background: stepBg, borderRadius: 14, overflow: "hidden",
+                        margin: "24px 0",
+                      }}>
                         {card.steps.map((step, si) => (
-                          <div key={si} className="hc-step" style={{
-                            borderRightColor: si < card.steps.length - 1 ? stepDivider : "transparent"
+                          <div key={si} style={{
+                            display: "flex", alignItems: "center", gap: 12,
+                            padding: "11px 16px",
+                            borderBottom: si < card.steps.length - 1 ? `1px solid ${stepDivider}` : "none",
                           }}>
-                            <div className="hc-step-num" style={{ background: stepNumBg, color: stepNumColor }}>
-                              {step.n}
+                            <div style={{
+                              width: 24, height: 24, borderRadius: "50%",
+                              background: stepNumBg, color: stepNumColor,
+                              display: "flex", alignItems: "center", justifyContent: "center",
+                              fontSize: 11, fontWeight: 900, flexShrink: 0,
+                            }}>{step.n}</div>
+                            <div style={{ flex: 1 }}>
+                              <div style={{ fontSize: 13, fontWeight: 900, color: stepLabelColor, lineHeight: 1.2 }}>{step.label}</div>
+                              <div style={{ fontSize: 11, fontWeight: 700, color: stepSubColor, marginTop: 1 }}>{step.sub}</div>
                             </div>
-                            <div className="hc-step-label" style={{ color: stepLabelColor }}>{step.label}</div>
-                            <div className="hc-step-sub" style={{ color: stepSubColor }}>{step.sub}</div>
+                            {si < card.steps.length - 1 && (
+                              <div style={{ fontSize: 14, color: card.accent, fontWeight: 900 }}>→</div>
+                            )}
                           </div>
                         ))}
                       </div>
+
+                      <span style={{
+                        display: "inline-flex", alignItems: "center", gap: 8,
+                        padding: "12px 24px", borderRadius: 12,
+                        fontSize: 14, fontWeight: 900,
+                        background: btnBg, color: btnColor,
+                        border: `2.5px solid ${btnBg}`,
+                        boxShadow: btnShadow,
+                        alignSelf: "flex-start",
+                        transition: "transform 0.15s",
+                      }}>
+                        {card.cta} →
+                      </span>
                     </div>
 
-                    <span className="hc-large-btn" style={{
-                      background: btnBg, color: btnColor,
-                      borderColor: btnBorder, boxShadow: btnShadow,
+                    {/* RIGHT: illustration */}
+                    <div style={{
+                      flex: 1,
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      padding: "24px 24px 24px 0",
+                      borderLeft: isDark ? "1.5px solid rgba(255,255,255,0.08)" : "1.5px solid rgba(0,0,0,0.07)",
                     }}>
-                      {card.cta} →
-                    </span>
+                      {card.key === "inventory" ? (
+                        /* ── SHELF / WALL INVENTORY SVG ── */
+                        <svg viewBox="0 0 320 260" fill="none" xmlns="http://www.w3.org/2000/svg"
+                          style={{ width: "100%", maxWidth: 320, height: "auto" }}>
+
+                          {/* Shelf rail 1 */}
+                          <rect x="10" y="108" width="300" height="6" rx="3" fill="#FFD400" opacity="0.9"/>
+                          {/* Shelf rail 2 */}
+                          <rect x="10" y="218" width="300" height="6" rx="3" fill="#FFD400" opacity="0.9"/>
+
+                          {/* ── ROW 1: 3 artwork cards sitting on shelf 1 ── */}
+
+                          {/* Card 1 — Available (green badge) */}
+                          <rect x="16" y="22" width="82" height="84" rx="8" fill="#1E1E1C" stroke="#FFD400" strokeWidth="1.5"/>
+                          {/* artwork placeholder gradient */}
+                          <rect x="22" y="28" width="70" height="46" rx="5" fill="#2C2C2A"/>
+                          <rect x="22" y="28" width="70" height="46" rx="5" fill="url(#grad1)"/>
+                          {/* title line */}
+                          <rect x="22" y="82" width="44" height="5" rx="2.5" fill="#FFD400" opacity="0.8"/>
+                          {/* status badge — Available */}
+                          <rect x="22" y="92" width="36" height="10" rx="5" fill="#16A34A"/>
+                          <text x="40" y="100" fontSize="6" fill="white" fontWeight="800" textAnchor="middle">Available</text>
+
+                          {/* Card 2 — In Progress */}
+                          <rect x="116" y="22" width="82" height="84" rx="8" fill="#1E1E1C" stroke="#FFD400" strokeWidth="1.5"/>
+                          <rect x="122" y="28" width="70" height="46" rx="5" fill="#2C2C2A"/>
+                          <rect x="122" y="28" width="70" height="46" rx="5" fill="url(#grad2)"/>
+                          <rect x="122" y="82" width="52" height="5" rx="2.5" fill="#FFD400" opacity="0.8"/>
+                          <rect x="122" y="92" width="46" height="10" rx="5" fill="#7C3AED"/>
+                          <text x="145" y="100" fontSize="6" fill="white" fontWeight="800" textAnchor="middle">In Progress</text>
+
+                          {/* Card 3 — Sold */}
+                          <rect x="216" y="22" width="82" height="84" rx="8" fill="#1E1E1C" stroke="#FFD400" strokeWidth="1.5"/>
+                          <rect x="222" y="28" width="70" height="46" rx="5" fill="#2C2C2A"/>
+                          <rect x="222" y="28" width="70" height="46" rx="5" fill="url(#grad3)"/>
+                          <rect x="222" y="82" width="38" height="5" rx="2.5" fill="#FFD400" opacity="0.8"/>
+                          <rect x="222" y="92" width="28" height="10" rx="5" fill="#9B8F7A"/>
+                          <text x="236" y="100" fontSize="6" fill="white" fontWeight="800" textAnchor="middle">Sold</text>
+
+                          {/* ── ROW 2: 3 artwork cards on shelf 2 ── */}
+
+                          {/* Card 4 — Reserved */}
+                          <rect x="16" y="122" width="82" height="84" rx="8" fill="#1E1E1C" stroke="#FFD400" strokeWidth="1.5"/>
+                          <rect x="22" y="128" width="70" height="46" rx="5" fill="#2C2C2A"/>
+                          <rect x="22" y="128" width="70" height="46" rx="5" fill="url(#grad4)"/>
+                          <rect x="22" y="182" width="48" height="5" rx="2.5" fill="#FFD400" opacity="0.8"/>
+                          <rect x="22" y="192" width="36" height="10" rx="5" fill="#CA8A04"/>
+                          <text x="40" y="200" fontSize="6" fill="white" fontWeight="800" textAnchor="middle">Reserved</text>
+
+                          {/* Card 5 — Concept */}
+                          <rect x="116" y="122" width="82" height="84" rx="8" fill="#1E1E1C" stroke="#FFD400" strokeWidth="1.5"/>
+                          <rect x="122" y="128" width="70" height="46" rx="5" fill="#2C2C2A"/>
+                          <rect x="122" y="128" width="70" height="46" rx="5" fill="url(#grad5)"/>
+                          <rect x="122" y="182" width="54" height="5" rx="2.5" fill="#FFD400" opacity="0.8"/>
+                          <rect x="122" y="192" width="36" height="10" rx="5" fill="#4B5563"/>
+                          <text x="140" y="200" fontSize="6" fill="white" fontWeight="800" textAnchor="middle">Concept</text>
+
+                          {/* Card 6 — NFS */}
+                          <rect x="216" y="122" width="82" height="84" rx="8" fill="#1E1E1C" stroke="#FFD400" strokeWidth="1.5"/>
+                          <rect x="222" y="128" width="70" height="46" rx="5" fill="#2C2C2A"/>
+                          <rect x="222" y="128" width="70" height="46" rx="5" fill="url(#grad6)"/>
+                          <rect x="222" y="182" width="42" height="5" rx="2.5" fill="#FFD400" opacity="0.8"/>
+                          <rect x="222" y="192" width="22" height="10" rx="5" fill="#374151"/>
+                          <text x="233" y="200" fontSize="6" fill="white" fontWeight="800" textAnchor="middle">NFS</text>
+
+                          {/* Share icon — top right of illustration */}
+                          <circle cx="292" cy="240" r="14" fill="#FFD400"/>
+                          <text x="292" y="244" fontSize="12" textAnchor="middle" fill="#111110">↗</text>
+                          <text x="262" y="244" fontSize="9" fill="#FFD400" fontWeight="700" opacity="0.7">Share</text>
+
+                          {/* Gradients */}
+                          <defs>
+                            <linearGradient id="grad1" x1="0" y1="0" x2="1" y2="1">
+                              <stop offset="0%" stopColor="#FF6B6B" stopOpacity="0.7"/>
+                              <stop offset="100%" stopColor="#FF9F43" stopOpacity="0.7"/>
+                            </linearGradient>
+                            <linearGradient id="grad2" x1="0" y1="0" x2="1" y2="1">
+                              <stop offset="0%" stopColor="#4ECDC4" stopOpacity="0.7"/>
+                              <stop offset="100%" stopColor="#45B7D1" stopOpacity="0.7"/>
+                            </linearGradient>
+                            <linearGradient id="grad3" x1="0" y1="0" x2="1" y2="1">
+                              <stop offset="0%" stopColor="#8B5CF6" stopOpacity="0.7"/>
+                              <stop offset="100%" stopColor="#EC4899" stopOpacity="0.7"/>
+                            </linearGradient>
+                            <linearGradient id="grad4" x1="0" y1="0" x2="1" y2="1">
+                              <stop offset="0%" stopColor="#F59E0B" stopOpacity="0.7"/>
+                              <stop offset="100%" stopColor="#EF4444" stopOpacity="0.7"/>
+                            </linearGradient>
+                            <linearGradient id="grad5" x1="0" y1="0" x2="1" y2="1">
+                              <stop offset="0%" stopColor="#10B981" stopOpacity="0.7"/>
+                              <stop offset="100%" stopColor="#3B82F6" stopOpacity="0.7"/>
+                            </linearGradient>
+                            <linearGradient id="grad6" x1="0" y1="0" x2="1" y2="1">
+                              <stop offset="0%" stopColor="#F472B6" stopOpacity="0.7"/>
+                              <stop offset="100%" stopColor="#A78BFA" stopOpacity="0.7"/>
+                            </linearGradient>
+                          </defs>
+                        </svg>
+                      ) : (
+                        /* ── COLLABS: simple people network SVG ── */
+                        <svg viewBox="0 0 280 240" fill="none" xmlns="http://www.w3.org/2000/svg"
+                          style={{ width: "100%", maxWidth: 280, height: "auto" }}>
+                          {/* Connection lines */}
+                          <line x1="140" y1="60" x2="60" y2="150" stroke="#CA8A04" strokeWidth="2" strokeDasharray="6 4"/>
+                          <line x1="140" y1="60" x2="220" y2="150" stroke="#CA8A04" strokeWidth="2" strokeDasharray="6 4"/>
+                          <line x1="60" y1="150" x2="140" y2="200" stroke="#CA8A04" strokeWidth="1.5" strokeDasharray="4 4" opacity="0.5"/>
+                          <line x1="220" y1="150" x2="140" y2="200" stroke="#CA8A04" strokeWidth="1.5" strokeDasharray="4 4" opacity="0.5"/>
+                          {/* Centre node — you */}
+                          <circle cx="140" cy="60" r="30" fill="#111110" stroke="#CA8A04" strokeWidth="2.5"/>
+                          <text x="140" y="55" fontSize="18" textAnchor="middle">🎨</text>
+                          <text x="140" y="70" fontSize="8" fill="#CA8A04" fontWeight="800" textAnchor="middle">You</text>
+                          {/* Node 2 */}
+                          <circle cx="60" cy="150" r="26" fill="#FAF7F3" stroke="#111110" strokeWidth="2"/>
+                          <text x="60" y="145" fontSize="16" textAnchor="middle">🖼️</text>
+                          <text x="60" y="162" fontSize="7" fill="#111110" fontWeight="800" textAnchor="middle">Painter</text>
+                          {/* Node 3 */}
+                          <circle cx="220" cy="150" r="26" fill="#FAF7F3" stroke="#111110" strokeWidth="2"/>
+                          <text x="220" y="145" fontSize="16" textAnchor="middle">🏛️</text>
+                          <text x="220" y="162" fontSize="7" fill="#111110" fontWeight="800" textAnchor="middle">Gallery</text>
+                          {/* Node 4 — faded */}
+                          <circle cx="140" cy="210" r="22" fill="#FAF7F3" stroke="#111110" strokeWidth="1.5" opacity="0.6"/>
+                          <text x="140" y="205" fontSize="14" textAnchor="middle" opacity="0.6">📸</text>
+                          <text x="140" y="220" fontSize="7" fill="#111110" fontWeight="800" textAnchor="middle" opacity="0.6">Photographer</text>
+                          {/* Proposal badge */}
+                          <rect x="85" y="88" width="64" height="18" rx="9" fill="#CA8A04"/>
+                          <text x="117" y="100" fontSize="8" fill="white" fontWeight="900" textAnchor="middle">Proposal sent ✓</text>
+                        </svg>
+                      )}
+                    </div>
                   </Link>
                 );
               })}

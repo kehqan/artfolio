@@ -959,108 +959,122 @@ export default function DashboardHome() {
         .hero-card-large:hover { filter: brightness(0.97); }
 
         .hc-large-top { display: flex; flex-direction: column; gap: 0; }
-        .hc-icon-lg { font-size: 40px; line-height: 1; margin-bottom: 16px; display: block; }
+        .hc-icon-lg { font-size: 44px; line-height: 1; margin-bottom: 18px; display: block; }
         .hc-q-lg {
-          font-size: 12px; font-weight: 700; letter-spacing: 0.06em;
-          margin-bottom: 4px; opacity: 0.5;
+          font-size: 13px; font-weight: 800; letter-spacing: 0.04em;
+          margin-bottom: 6px;
+          /* colour set inline per card */
         }
         .hc-cta-lg {
-          font-size: 34px; font-weight: 900; letter-spacing: -1.2px; line-height: 1.05;
-          margin-bottom: 6px;
+          font-size: 36px; font-weight: 900; letter-spacing: -1.4px; line-height: 1.0;
+          margin-bottom: 8px;
+          /* colour set inline per card */
         }
         .hc-desc-lg {
-          font-size: 13px; font-weight: 600; opacity: 0.45; line-height: 1.5;
+          font-size: 14px; font-weight: 700; line-height: 1.55;
+          /* colour set inline per card — never gray-on-dark */
         }
 
         /* Journey steps */
         .hc-steps {
-          display: flex; align-items: center; gap: 0;
-          margin-top: 28px;
+          display: flex; align-items: flex-start; gap: 0;
+          margin-top: 32px;
+          border-radius: 14px; overflow: hidden;
         }
         .hc-step {
-          display: flex; align-items: center; gap: 10px; flex: 1;
+          display: flex; flex-direction: column; align-items: flex-start;
+          gap: 6px; flex: 1; padding: 14px 16px;
           position: relative;
+          border-right: 1.5px solid rgba(255,255,255,0.1);
         }
+        /* cream card steps get a dark border */
+        .hc-step.cream-border { border-right-color: rgba(0,0,0,0.1); }
+        .hc-step:last-child { border-right: none; }
         .hc-step-num {
-          width: 28px; height: 28px; border-radius: 50%;
-          border: 2px solid; flex-shrink: 0;
+          width: 26px; height: 26px; border-radius: 50%;
           display: flex; align-items: center; justify-content: center;
-          font-size: 11px; font-weight: 900;
+          font-size: 12px; font-weight: 900;
+          /* bg + color set inline */
         }
-        .hc-step-text {}
-        .hc-step-label { font-size: 12px; font-weight: 800; line-height: 1.2; }
-        .hc-step-sub   { font-size: 10px; font-weight: 600; opacity: 0.5; margin-top: 1px; }
-        .hc-step-arrow {
-          font-size: 13px; opacity: 0.3; margin: 0 6px; flex-shrink: 0;
+        .hc-step-label {
+          font-size: 13px; font-weight: 900; line-height: 1.2;
+          /* colour set inline */
+        }
+        .hc-step-sub {
+          font-size: 11px; font-weight: 700; line-height: 1.3;
+          /* colour set inline — no opacity hacks */
         }
 
         /* CTA button */
         .hc-large-btn {
           display: inline-flex; align-items: center; gap: 8px;
-          padding: 11px 22px; border-radius: 12px;
-          font-size: 14px; font-weight: 900; border: 2.5px solid;
+          padding: 13px 26px; border-radius: 12px;
+          font-size: 15px; font-weight: 900; border: 2.5px solid;
           cursor: pointer; font-family: inherit; text-decoration: none;
           margin-top: 28px; align-self: flex-start;
           transition: transform 0.15s, box-shadow 0.15s;
-          box-shadow: 3px 3px 0 rgba(0,0,0,0.15);
         }
-        .hc-large-btn:hover { transform: translate(-1px, -1px); box-shadow: 5px 5px 0 rgba(0,0,0,0.2); }
+        .hc-large-btn:hover { transform: translate(-2px, -2px); }
 
         /* ── Small card ── */
         .hero-card-small {
-          padding: 22px 24px 20px;
+          padding: 24px 26px 22px;
           display: flex; flex-direction: column;
           text-decoration: none; position: relative;
           border-right: 2.5px solid var(--border-dark);
-          background: var(--cream);
+          background: #fff;
           transition: background 0.2s;
-          min-height: 160px;
+          min-height: 170px;
         }
         .hero-card-small:last-child { border-right: none; }
-        .hero-card-small:hover { background: #fff; }
+        .hero-card-small:hover { background: #FFFBEA; }
 
         .hc-small-stripe {
-          position: absolute; top: 0; left: 0; right: 0; height: 3px;
+          position: absolute; top: 0; left: 0; right: 0; height: 4px;
         }
-        .hc-icon-sm { font-size: 22px; margin-bottom: 10px; display: block; }
+        .hc-icon-sm { font-size: 26px; margin-bottom: 12px; display: block; }
         .hc-q-sm {
-          font-size: 10px; font-weight: 700; color: var(--muted);
-          letter-spacing: 0.04em; margin-bottom: 3px;
+          font-size: 11px; font-weight: 800; color: #6B6052;
+          letter-spacing: 0.06em; margin-bottom: 4px; text-transform: uppercase;
         }
         .hc-cta-sm {
-          font-size: 16px; font-weight: 900; letter-spacing: -0.3px;
-          line-height: 1.2; margin-bottom: 5px;
+          font-size: 19px; font-weight: 900; letter-spacing: -0.5px;
+          line-height: 1.15; margin-bottom: 6px;
+          /* colour set inline */
         }
         .hc-desc-sm {
-          font-size: 11px; font-weight: 600; color: var(--muted); line-height: 1.5; flex: 1;
+          font-size: 12px; font-weight: 700; color: #5C5346;
+          line-height: 1.55; flex: 1;
         }
         .hc-arrow-sm {
-          display: inline-flex; align-items: center; gap: 4px;
-          font-size: 11px; font-weight: 800; margin-top: 12px;
-          opacity: 0.7; transition: opacity 0.15s, transform 0.15s;
+          display: inline-flex; align-items: center; gap: 5px;
+          font-size: 13px; font-weight: 900; margin-top: 14px;
+          transition: transform 0.15s;
         }
-        .hero-card-small:hover .hc-arrow-sm { opacity: 1; transform: translateX(3px); }
+        .hero-card-small:hover .hc-arrow-sm { transform: translateX(4px); }
 
         /* ── Inline pill bar ── */
         .hero-pill-bar {
           display: flex; align-items: center; justify-content: center;
-          padding: 18px 32px; gap: 16px;
+          padding: 20px 32px; gap: 16px;
+          background: #fff;
+          border-top: 2.5px solid var(--border-dark);
         }
         .hero-pill-hint {
-          font-size: 12px; font-weight: 700; color: var(--muted);
-          display: flex; align-items: center; gap: 7px;
+          font-size: 13px; font-weight: 800; color: #5C5346;
+          display: flex; align-items: center; gap: 8px;
         }
         .hero-pill-dot {
-          width: 6px; height: 6px; border-radius: 50%;
+          width: 7px; height: 7px; border-radius: 50%;
           background: var(--yellow); border: 2px solid var(--border-dark);
           flex-shrink: 0;
         }
         .hero-pill-btn {
           display: inline-flex; align-items: center; gap: 7px;
-          padding: 9px 20px; border-radius: 99px;
+          padding: 10px 22px; border-radius: 99px;
           background: var(--border-dark); color: var(--yellow);
           border: 2.5px solid var(--border-dark);
-          font-size: 13px; font-weight: 900; cursor: pointer;
+          font-size: 14px; font-weight: 900; cursor: pointer;
           font-family: inherit;
           box-shadow: 3px 3px 0 var(--yellow);
           transition: transform 0.15s, box-shadow 0.15s;
@@ -1230,48 +1244,53 @@ export default function DashboardHome() {
           <div className="hero-view">
             {/* Top row — 2 large journey cards */}
             <div className="hero-top">
-              {HERO_CARDS_LARGE.map((card, i) => (
-                <Link
-                  key={i}
-                  href={card.href}
-                  className="hero-card-large"
-                  style={{ background: card.bg, color: card.textLight ? "#fff" : "#111110" }}
-                >
-                  <div className="hc-large-top">
-                    <span className="hc-icon-lg">{card.icon}</span>
-                    <div className="hc-q-lg" style={{ color: card.textLight ? "rgba(255,255,255,0.5)" : "var(--muted)" }}>{card.q}</div>
-                    <div className="hc-cta-lg" style={{ color: card.accent }}>{card.cta}</div>
-                    <div className="hc-desc-lg" style={{ color: card.textLight ? "rgba(255,255,255,0.4)" : "var(--muted)" }}>{card.desc}</div>
+              {HERO_CARDS_LARGE.map((card, i) => {
+                const isDark = card.bg === "#111110";
+                const qColor    = isDark ? "rgba(255,212,0,0.7)"  : "#6B5E3E";
+                const descColor = isDark ? "rgba(255,255,255,0.75)" : "#3D3325";
+                const stepBg    = isDark ? "rgba(255,212,0,0.15)"  : "rgba(0,0,0,0.06)";
+                const stepNumBg = isDark ? "#FFD400"               : "#111110";
+                const stepNumColor = isDark ? "#111110"            : "#FFD400";
+                const stepLabelColor = isDark ? "#fff"             : "#111110";
+                const stepSubColor   = isDark ? "rgba(255,255,255,0.6)" : "#5C4F3A";
+                const stepDivider    = isDark ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.1)";
+                const btnBg    = isDark ? "#FFD400" : "#111110";
+                const btnColor = isDark ? "#111110" : "#FFD400";
+                const btnBorder = isDark ? "#FFD400" : "#111110";
+                const btnShadow = isDark ? "3px 3px 0 rgba(255,255,255,0.2)" : "3px 3px 0 rgba(255,212,0,0.5)";
+                return (
+                  <Link key={i} href={card.href} className="hero-card-large" style={{ background: card.bg }}>
+                    <div className="hc-large-top">
+                      <span className="hc-icon-lg">{card.icon}</span>
+                      <div className="hc-q-lg" style={{ color: qColor }}>{card.q}</div>
+                      <div className="hc-cta-lg" style={{ color: card.accent }}>{card.cta}</div>
+                      <div className="hc-desc-lg" style={{ color: descColor }}>{card.desc}</div>
 
-                    {/* Journey steps */}
-                    <div className="hc-steps">
-                      {card.steps.map((step, si) => (
-                        <div key={si} className="hc-step">
-                          <div className="hc-step-num" style={{
-                            borderColor: card.accent,
-                            color: card.accent,
-                          }}>{step.n}</div>
-                          <div className="hc-step-text">
-                            <div className="hc-step-label" style={{ color: card.textLight ? "#fff" : "#111110" }}>{step.label}</div>
-                            <div className="hc-step-sub">{step.sub}</div>
+                      {/* Journey steps — pill background */}
+                      <div className="hc-steps" style={{ background: stepBg }}>
+                        {card.steps.map((step, si) => (
+                          <div key={si} className="hc-step" style={{
+                            borderRightColor: si < card.steps.length - 1 ? stepDivider : "transparent"
+                          }}>
+                            <div className="hc-step-num" style={{ background: stepNumBg, color: stepNumColor }}>
+                              {step.n}
+                            </div>
+                            <div className="hc-step-label" style={{ color: stepLabelColor }}>{step.label}</div>
+                            <div className="hc-step-sub" style={{ color: stepSubColor }}>{step.sub}</div>
                           </div>
-                          {si < card.steps.length - 1 && (
-                            <span className="hc-step-arrow" style={{ color: card.accent }}>→</span>
-                          )}
-                        </div>
-                      ))}
+                        ))}
+                      </div>
                     </div>
-                  </div>
 
-                  <span className="hc-large-btn" style={{
-                    background: card.accent,
-                    color: card.bg === "#FAF7F3" ? "#111110" : card.bg,
-                    borderColor: card.accent,
-                  }}>
-                    {card.cta} →
-                  </span>
-                </Link>
-              ))}
+                    <span className="hc-large-btn" style={{
+                      background: btnBg, color: btnColor,
+                      borderColor: btnBorder, boxShadow: btnShadow,
+                    }}>
+                      {card.cta} →
+                    </span>
+                  </Link>
+                );
+              })}
             </div>
 
             {/* Bottom row — 4 small cards */}
@@ -1284,7 +1303,7 @@ export default function DashboardHome() {
                   <div className="hc-cta-sm" style={{ color: card.accent }}>{card.cta}</div>
                   <div className="hc-desc-sm">{card.desc}</div>
                   <div className="hc-arrow-sm" style={{ color: card.accent }}>
-                    {card.cta} <ArrowRight size={12} />
+                    {card.cta} <ArrowRight size={13} />
                   </div>
                 </Link>
               ))}

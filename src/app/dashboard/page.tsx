@@ -1322,137 +1322,64 @@ export default function DashboardHome() {
                     {/* RIGHT: illustration */}
                     <div style={{
                       flex: 1,
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      padding: "24px 24px 24px 0",
+                      display: "flex", alignItems: "stretch",
+                      overflow: "hidden",
                       borderLeft: isDark ? "1.5px solid rgba(255,255,255,0.08)" : "1.5px solid rgba(0,0,0,0.07)",
+                      position: "relative",
                     }}>
                       {card.key === "inventory" ? (
-                        /* ── SHELF / WALL INVENTORY SVG ── */
-                        <svg viewBox="0 0 320 260" fill="none" xmlns="http://www.w3.org/2000/svg"
-                          style={{ width: "100%", maxWidth: 320, height: "auto" }}>
-
-                          {/* Shelf rail 1 */}
-                          <rect x="10" y="108" width="300" height="6" rx="3" fill="#FFD400" opacity="0.9"/>
-                          {/* Shelf rail 2 */}
-                          <rect x="10" y="218" width="300" height="6" rx="3" fill="#FFD400" opacity="0.9"/>
-
-                          {/* ── ROW 1: 3 artwork cards sitting on shelf 1 ── */}
-
-                          {/* Card 1 — Available (green badge) */}
-                          <rect x="16" y="22" width="82" height="84" rx="8" fill="#1E1E1C" stroke="#FFD400" strokeWidth="1.5"/>
-                          {/* artwork placeholder gradient */}
-                          <rect x="22" y="28" width="70" height="46" rx="5" fill="#2C2C2A"/>
-                          <rect x="22" y="28" width="70" height="46" rx="5" fill="url(#grad1)"/>
-                          {/* title line */}
-                          <rect x="22" y="82" width="44" height="5" rx="2.5" fill="#FFD400" opacity="0.8"/>
-                          {/* status badge — Available */}
-                          <rect x="22" y="92" width="36" height="10" rx="5" fill="#16A34A"/>
-                          <text x="40" y="100" fontSize="6" fill="white" fontWeight="800" textAnchor="middle">Available</text>
-
-                          {/* Card 2 — In Progress */}
-                          <rect x="116" y="22" width="82" height="84" rx="8" fill="#1E1E1C" stroke="#FFD400" strokeWidth="1.5"/>
-                          <rect x="122" y="28" width="70" height="46" rx="5" fill="#2C2C2A"/>
-                          <rect x="122" y="28" width="70" height="46" rx="5" fill="url(#grad2)"/>
-                          <rect x="122" y="82" width="52" height="5" rx="2.5" fill="#FFD400" opacity="0.8"/>
-                          <rect x="122" y="92" width="46" height="10" rx="5" fill="#7C3AED"/>
-                          <text x="145" y="100" fontSize="6" fill="white" fontWeight="800" textAnchor="middle">In Progress</text>
-
-                          {/* Card 3 — Sold */}
-                          <rect x="216" y="22" width="82" height="84" rx="8" fill="#1E1E1C" stroke="#FFD400" strokeWidth="1.5"/>
-                          <rect x="222" y="28" width="70" height="46" rx="5" fill="#2C2C2A"/>
-                          <rect x="222" y="28" width="70" height="46" rx="5" fill="url(#grad3)"/>
-                          <rect x="222" y="82" width="38" height="5" rx="2.5" fill="#FFD400" opacity="0.8"/>
-                          <rect x="222" y="92" width="28" height="10" rx="5" fill="#9B8F7A"/>
-                          <text x="236" y="100" fontSize="6" fill="white" fontWeight="800" textAnchor="middle">Sold</text>
-
-                          {/* ── ROW 2: 3 artwork cards on shelf 2 ── */}
-
-                          {/* Card 4 — Reserved */}
-                          <rect x="16" y="122" width="82" height="84" rx="8" fill="#1E1E1C" stroke="#FFD400" strokeWidth="1.5"/>
-                          <rect x="22" y="128" width="70" height="46" rx="5" fill="#2C2C2A"/>
-                          <rect x="22" y="128" width="70" height="46" rx="5" fill="url(#grad4)"/>
-                          <rect x="22" y="182" width="48" height="5" rx="2.5" fill="#FFD400" opacity="0.8"/>
-                          <rect x="22" y="192" width="36" height="10" rx="5" fill="#CA8A04"/>
-                          <text x="40" y="200" fontSize="6" fill="white" fontWeight="800" textAnchor="middle">Reserved</text>
-
-                          {/* Card 5 — Concept */}
-                          <rect x="116" y="122" width="82" height="84" rx="8" fill="#1E1E1C" stroke="#FFD400" strokeWidth="1.5"/>
-                          <rect x="122" y="128" width="70" height="46" rx="5" fill="#2C2C2A"/>
-                          <rect x="122" y="128" width="70" height="46" rx="5" fill="url(#grad5)"/>
-                          <rect x="122" y="182" width="54" height="5" rx="2.5" fill="#FFD400" opacity="0.8"/>
-                          <rect x="122" y="192" width="36" height="10" rx="5" fill="#4B5563"/>
-                          <text x="140" y="200" fontSize="6" fill="white" fontWeight="800" textAnchor="middle">Concept</text>
-
-                          {/* Card 6 — NFS */}
-                          <rect x="216" y="122" width="82" height="84" rx="8" fill="#1E1E1C" stroke="#FFD400" strokeWidth="1.5"/>
-                          <rect x="222" y="128" width="70" height="46" rx="5" fill="#2C2C2A"/>
-                          <rect x="222" y="128" width="70" height="46" rx="5" fill="url(#grad6)"/>
-                          <rect x="222" y="182" width="42" height="5" rx="2.5" fill="#FFD400" opacity="0.8"/>
-                          <rect x="222" y="192" width="22" height="10" rx="5" fill="#374151"/>
-                          <text x="233" y="200" fontSize="6" fill="white" fontWeight="800" textAnchor="middle">NFS</text>
-
-                          {/* Share icon — top right of illustration */}
-                          <circle cx="292" cy="240" r="14" fill="#FFD400"/>
-                          <text x="292" y="244" fontSize="12" textAnchor="middle" fill="#111110">↗</text>
-                          <text x="262" y="244" fontSize="9" fill="#FFD400" fontWeight="700" opacity="0.7">Share</text>
-
-                          {/* Gradients */}
-                          <defs>
-                            <linearGradient id="grad1" x1="0" y1="0" x2="1" y2="1">
-                              <stop offset="0%" stopColor="#FF6B6B" stopOpacity="0.7"/>
-                              <stop offset="100%" stopColor="#FF9F43" stopOpacity="0.7"/>
-                            </linearGradient>
-                            <linearGradient id="grad2" x1="0" y1="0" x2="1" y2="1">
-                              <stop offset="0%" stopColor="#4ECDC4" stopOpacity="0.7"/>
-                              <stop offset="100%" stopColor="#45B7D1" stopOpacity="0.7"/>
-                            </linearGradient>
-                            <linearGradient id="grad3" x1="0" y1="0" x2="1" y2="1">
-                              <stop offset="0%" stopColor="#8B5CF6" stopOpacity="0.7"/>
-                              <stop offset="100%" stopColor="#EC4899" stopOpacity="0.7"/>
-                            </linearGradient>
-                            <linearGradient id="grad4" x1="0" y1="0" x2="1" y2="1">
-                              <stop offset="0%" stopColor="#F59E0B" stopOpacity="0.7"/>
-                              <stop offset="100%" stopColor="#EF4444" stopOpacity="0.7"/>
-                            </linearGradient>
-                            <linearGradient id="grad5" x1="0" y1="0" x2="1" y2="1">
-                              <stop offset="0%" stopColor="#10B981" stopOpacity="0.7"/>
-                              <stop offset="100%" stopColor="#3B82F6" stopOpacity="0.7"/>
-                            </linearGradient>
-                            <linearGradient id="grad6" x1="0" y1="0" x2="1" y2="1">
-                              <stop offset="0%" stopColor="#F472B6" stopOpacity="0.7"/>
-                              <stop offset="100%" stopColor="#A78BFA" stopOpacity="0.7"/>
-                            </linearGradient>
-                          </defs>
-                        </svg>
+                        <>
+                          <img
+                            src="https://images.unsplash.com/photo-1541961017774-22349e4a1262?w=600&q=80&fit=crop"
+                            alt="Artist studio with artworks organized on wall"
+                            style={{
+                              width: "100%", height: "100%",
+                              objectFit: "cover", objectPosition: "center",
+                              display: "block",
+                            }}
+                          />
+                          {/* Dark overlay with label */}
+                          <div style={{
+                            position: "absolute", inset: 0,
+                            background: "linear-gradient(135deg, rgba(17,17,16,0.55) 0%, rgba(17,17,16,0.1) 100%)",
+                            display: "flex", alignItems: "flex-end", padding: "20px",
+                          }}>
+                            <div style={{
+                              background: "#FFD400", color: "#111110",
+                              padding: "6px 14px", borderRadius: 99,
+                              fontSize: 12, fontWeight: 900,
+                              border: "2px solid #111110",
+                            }}>
+                              6 works in your studio →
+                            </div>
+                          </div>
+                        </>
                       ) : (
-                        /* ── COLLABS: simple people network SVG ── */
-                        <svg viewBox="0 0 280 240" fill="none" xmlns="http://www.w3.org/2000/svg"
-                          style={{ width: "100%", maxWidth: 280, height: "auto" }}>
-                          {/* Connection lines */}
-                          <line x1="140" y1="60" x2="60" y2="150" stroke="#CA8A04" strokeWidth="2" strokeDasharray="6 4"/>
-                          <line x1="140" y1="60" x2="220" y2="150" stroke="#CA8A04" strokeWidth="2" strokeDasharray="6 4"/>
-                          <line x1="60" y1="150" x2="140" y2="200" stroke="#CA8A04" strokeWidth="1.5" strokeDasharray="4 4" opacity="0.5"/>
-                          <line x1="220" y1="150" x2="140" y2="200" stroke="#CA8A04" strokeWidth="1.5" strokeDasharray="4 4" opacity="0.5"/>
-                          {/* Centre node — you */}
-                          <circle cx="140" cy="60" r="30" fill="#111110" stroke="#CA8A04" strokeWidth="2.5"/>
-                          <text x="140" y="55" fontSize="18" textAnchor="middle">🎨</text>
-                          <text x="140" y="70" fontSize="8" fill="#CA8A04" fontWeight="800" textAnchor="middle">You</text>
-                          {/* Node 2 */}
-                          <circle cx="60" cy="150" r="26" fill="#FAF7F3" stroke="#111110" strokeWidth="2"/>
-                          <text x="60" y="145" fontSize="16" textAnchor="middle">🖼️</text>
-                          <text x="60" y="162" fontSize="7" fill="#111110" fontWeight="800" textAnchor="middle">Painter</text>
-                          {/* Node 3 */}
-                          <circle cx="220" cy="150" r="26" fill="#FAF7F3" stroke="#111110" strokeWidth="2"/>
-                          <text x="220" y="145" fontSize="16" textAnchor="middle">🏛️</text>
-                          <text x="220" y="162" fontSize="7" fill="#111110" fontWeight="800" textAnchor="middle">Gallery</text>
-                          {/* Node 4 — faded */}
-                          <circle cx="140" cy="210" r="22" fill="#FAF7F3" stroke="#111110" strokeWidth="1.5" opacity="0.6"/>
-                          <text x="140" y="205" fontSize="14" textAnchor="middle" opacity="0.6">📸</text>
-                          <text x="140" y="220" fontSize="7" fill="#111110" fontWeight="800" textAnchor="middle" opacity="0.6">Photographer</text>
-                          {/* Proposal badge */}
-                          <rect x="85" y="88" width="64" height="18" rx="9" fill="#CA8A04"/>
-                          <text x="117" y="100" fontSize="8" fill="white" fontWeight="900" textAnchor="middle">Proposal sent ✓</text>
-                        </svg>
+                        <>
+                          <img
+                            src="https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=600&q=80&fit=crop"
+                            alt="Artists collaborating together in studio"
+                            style={{
+                              width: "100%", height: "100%",
+                              objectFit: "cover", objectPosition: "center top",
+                              display: "block",
+                            }}
+                          />
+                          <div style={{
+                            position: "absolute", inset: 0,
+                            background: "linear-gradient(135deg, rgba(250,247,243,0.3) 0%, rgba(250,247,243,0.0) 100%)",
+                            display: "flex", alignItems: "flex-end", padding: "20px",
+                          }}>
+                            <div style={{
+                              background: "#111110", color: "#FFD400",
+                              padding: "6px 14px", borderRadius: 99,
+                              fontSize: 12, fontWeight: 900,
+                              border: "2px solid #111110",
+                            }}>
+                              Browse the collab pool →
+                            </div>
+                          </div>
+                        </>
                       )}
                     </div>
                   </Link>

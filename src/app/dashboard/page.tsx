@@ -14,9 +14,8 @@ import {
    HERO CARDS — 6 action cards shown as default view
    2 large (top) + 4 smaller (bottom)
 ───────────────────────────────────────────────────────────────── */
-const HERO_CARDS = [
+const HERO_CARDS_LARGE = [
   {
-    size: "large",
     q: "Got a new piece to document?",
     cta: "Add a work",
     href: "/dashboard/artworks/new",
@@ -24,35 +23,14 @@ const HERO_CARDS = [
     accent: "#FFD400",
     textLight: true,
     icon: "🖼️",
-    desc: "Upload photos, set your price, track the full lifecycle of every artwork.",
-    stat: "studio",
+    desc: "From photo to published in minutes.",
+    steps: [
+      { n: "1", label: "Photograph it", sub: "Upload your best shot" },
+      { n: "2", label: "Set your price", sub: "Or mark as NFS" },
+      { n: "3", label: "Publish",        sub: "Live on your storefront" },
+    ],
   },
   {
-    size: "large",
-    q: "Ready to sell something?",
-    cta: "Go to my store",
-    href: "/dashboard/mystore",
-    bg: "#FFD400",
-    accent: "#111110",
-    textLight: false,
-    icon: "🛍️",
-    desc: "Your live storefront — curate what the world can discover and buy.",
-    stat: "store",
-  },
-  {
-    size: "small",
-    q: "Planning a show or workshop?",
-    cta: "Create an event",
-    href: "/dashboard/exhibitions",
-    bg: "#FAF7F3",
-    accent: "#EC4899",
-    textLight: false,
-    icon: "🎪",
-    desc: "Schedule shows, manage exhibitions, and share with your audience.",
-    stat: "events",
-  },
-  {
-    size: "small",
     q: "Looking for a collaborator?",
     cta: "Browse collabs",
     href: "/dashboard/pool",
@@ -60,33 +38,20 @@ const HERO_CARDS = [
     accent: "#CA8A04",
     textLight: false,
     icon: "🤝",
-    desc: "Connect with artists and venues actively looking to work together.",
-    stat: "collabs",
+    desc: "Find the right artist, venue, or maker.",
+    steps: [
+      { n: "1", label: "Browse the pool",  sub: "Artists looking to connect" },
+      { n: "2", label: "Send a proposal",  sub: "Describe your idea" },
+      { n: "3", label: "Make it happen",   sub: "Collab confirmed" },
+    ],
   },
-  {
-    size: "small",
-    q: "Collecting references today?",
-    cta: "Open moodboard",
-    href: "/dashboard/moodboard",
-    bg: "#FAF7F3",
-    accent: "#EC4899",
-    textLight: false,
-    icon: "🗂️",
-    desc: "Visual boards for inspiration, project planning, and style references.",
-    stat: "moodboard",
-  },
-  {
-    size: "small",
-    q: "Want to learn something new?",
-    cta: "Education hub",
-    href: "/dashboard/education",
-    bg: "#FAF7F3",
-    accent: "#0EA5E9",
-    textLight: false,
-    icon: "📚",
-    desc: "Videos, articles, and community guides for building a sustainable practice.",
-    stat: "education",
-  },
+];
+
+const HERO_CARDS_SMALL = [
+  { q: "Ready to sell something?",      cta: "Go to my store",  href: "/dashboard/mystore",    accent: "#111110",  icon: "🛍️", desc: "Curate your live storefront." },
+  { q: "Planning a show or workshop?",  cta: "Create an event", href: "/dashboard/exhibitions", accent: "#EC4899", icon: "🎪", desc: "Schedule shows & openings." },
+  { q: "Collecting references today?",  cta: "Open moodboard",  href: "/dashboard/moodboard",  accent: "#EC4899",  icon: "🗂️", desc: "Visual boards & inspiration." },
+  { q: "Want to learn something new?",  cta: "Education hub",   href: "/dashboard/education",  accent: "#0EA5E9",  icon: "📚", desc: "Guides, videos & resources." },
 ];
 
 /* ─────────────────────────────────────────────────────────────────
@@ -959,157 +924,148 @@ export default function DashboardHome() {
            QUICK / HERO VIEW
         ──────────────────────────────────────────────────────── */
         .hero-view {
+          margin: 0 -32px; /* bleed to layout edges */
+          padding: 0 0 0;
           display: flex; flex-direction: column;
-          min-height: calc(100vh - 160px);
-          padding-bottom: 80px;
         }
 
         /* 2-large top row */
         .hero-top {
           display: grid;
           grid-template-columns: 1fr 1fr;
-          gap: 14px;
-          margin-bottom: 14px;
-          flex: 0 0 auto;
+          gap: 0;
+          border-bottom: 2.5px solid var(--border-dark);
         }
 
         /* 4-small bottom row */
         .hero-bottom {
           display: grid;
           grid-template-columns: repeat(4, 1fr);
-          gap: 14px;
-          flex: 1;
+          gap: 0;
+          border-bottom: 2.5px solid var(--border-dark);
         }
 
-        /* Base card */
-        .hero-card {
-          border-radius: 22px;
-          border: 2.5px solid var(--border-dark);
-          box-shadow: 5px 6px 0 var(--border-dark);
-          overflow: hidden; position: relative;
-          text-decoration: none; display: flex; flex-direction: column;
-          cursor: pointer;
-          transition: transform 0.2s, box-shadow 0.2s;
-        }
-        .hero-card:hover {
-          transform: translate(-2px, -3px);
-          box-shadow: 8px 9px 0 var(--border-dark);
-        }
-
-        /* Large card inner */
+        /* ── Large card ── */
         .hero-card-large {
-          min-height: 260px;
-          padding: 32px 34px;
-          justify-content: space-between;
+          padding: 36px 40px 32px;
+          display: flex; flex-direction: column; justify-content: space-between;
+          min-height: 300px;
+          position: relative; overflow: hidden;
+          text-decoration: none;
+          transition: filter 0.2s;
+          border-right: 2.5px solid var(--border-dark);
         }
-        .hero-card-large .hc-icon {
-          font-size: 52px; line-height: 1; margin-bottom: 18px;
-          display: block;
-          filter: drop-shadow(0 4px 12px rgba(0,0,0,0.15));
-        }
-        .hero-card-large .hc-q {
-          font-size: 13px; font-weight: 700; opacity: 0.55;
-          margin-bottom: 6px; letter-spacing: 0.02em;
-        }
-        .hero-card-large .hc-cta {
-          font-size: 30px; font-weight: 900;
-          letter-spacing: -1px; line-height: 1.1;
-          margin-bottom: 10px;
-        }
-        .hero-card-large .hc-desc {
-          font-size: 13px; font-weight: 600; opacity: 0.5;
-          line-height: 1.6; max-width: 320px;
-        }
-        .hero-card-large .hc-btn {
-          display: inline-flex; align-items: center; gap: 7px;
-          padding: 10px 20px; border-radius: 12px;
-          font-size: 14px; font-weight: 900;
-          border: 2.5px solid; cursor: pointer;
-          font-family: inherit; text-decoration: none;
-          margin-top: 24px; transition: transform 0.15s;
-          align-self: flex-start;
-        }
-        .hero-card-large .hc-btn:hover { transform: scale(1.04); }
+        .hero-card-large:last-child { border-right: none; }
+        .hero-card-large:hover { filter: brightness(0.97); }
 
-        /* Decorative circle bg element */
-        .hero-card-large::after {
-          content: "";
-          position: absolute; bottom: -60px; right: -60px;
-          width: 220px; height: 220px; border-radius: 50%;
-          background: currentColor; opacity: 0.05;
-          pointer-events: none;
+        .hc-large-top { display: flex; flex-direction: column; gap: 0; }
+        .hc-icon-lg { font-size: 40px; line-height: 1; margin-bottom: 16px; display: block; }
+        .hc-q-lg {
+          font-size: 12px; font-weight: 700; letter-spacing: 0.06em;
+          margin-bottom: 4px; opacity: 0.5;
         }
-
-        /* Small card inner */
-        .hero-card-small {
-          min-height: 170px;
-          padding: 24px 24px 20px;
-        }
-        .hero-card-small .hc-icon {
-          font-size: 30px; line-height: 1; margin-bottom: 12px;
-          display: block;
-        }
-        .hero-card-small .hc-q {
-          font-size: 11px; font-weight: 700; opacity: 0.5;
-          margin-bottom: 4px;
-        }
-        .hero-card-small .hc-cta {
-          font-size: 17px; font-weight: 900;
-          letter-spacing: -0.4px; line-height: 1.2;
+        .hc-cta-lg {
+          font-size: 34px; font-weight: 900; letter-spacing: -1.2px; line-height: 1.05;
           margin-bottom: 6px;
         }
-        .hero-card-small .hc-desc {
-          font-size: 11.5px; font-weight: 600; opacity: 0.5;
-          line-height: 1.55;
+        .hc-desc-lg {
+          font-size: 13px; font-weight: 600; opacity: 0.45; line-height: 1.5;
         }
-        .hero-card-small .hc-arrow {
+
+        /* Journey steps */
+        .hc-steps {
+          display: flex; align-items: center; gap: 0;
+          margin-top: 28px;
+        }
+        .hc-step {
+          display: flex; align-items: center; gap: 10px; flex: 1;
+          position: relative;
+        }
+        .hc-step-num {
+          width: 28px; height: 28px; border-radius: 50%;
+          border: 2px solid; flex-shrink: 0;
+          display: flex; align-items: center; justify-content: center;
+          font-size: 11px; font-weight: 900;
+        }
+        .hc-step-text {}
+        .hc-step-label { font-size: 12px; font-weight: 800; line-height: 1.2; }
+        .hc-step-sub   { font-size: 10px; font-weight: 600; opacity: 0.5; margin-top: 1px; }
+        .hc-step-arrow {
+          font-size: 13px; opacity: 0.3; margin: 0 6px; flex-shrink: 0;
+        }
+
+        /* CTA button */
+        .hc-large-btn {
+          display: inline-flex; align-items: center; gap: 8px;
+          padding: 11px 22px; border-radius: 12px;
+          font-size: 14px; font-weight: 900; border: 2.5px solid;
+          cursor: pointer; font-family: inherit; text-decoration: none;
+          margin-top: 28px; align-self: flex-start;
+          transition: transform 0.15s, box-shadow 0.15s;
+          box-shadow: 3px 3px 0 rgba(0,0,0,0.15);
+        }
+        .hc-large-btn:hover { transform: translate(-1px, -1px); box-shadow: 5px 5px 0 rgba(0,0,0,0.2); }
+
+        /* ── Small card ── */
+        .hero-card-small {
+          padding: 22px 24px 20px;
+          display: flex; flex-direction: column;
+          text-decoration: none; position: relative;
+          border-right: 2.5px solid var(--border-dark);
+          background: var(--cream);
+          transition: background 0.2s;
+          min-height: 160px;
+        }
+        .hero-card-small:last-child { border-right: none; }
+        .hero-card-small:hover { background: #fff; }
+
+        .hc-small-stripe {
+          position: absolute; top: 0; left: 0; right: 0; height: 3px;
+        }
+        .hc-icon-sm { font-size: 22px; margin-bottom: 10px; display: block; }
+        .hc-q-sm {
+          font-size: 10px; font-weight: 700; color: var(--muted);
+          letter-spacing: 0.04em; margin-bottom: 3px;
+        }
+        .hc-cta-sm {
+          font-size: 16px; font-weight: 900; letter-spacing: -0.3px;
+          line-height: 1.2; margin-bottom: 5px;
+        }
+        .hc-desc-sm {
+          font-size: 11px; font-weight: 600; color: var(--muted); line-height: 1.5; flex: 1;
+        }
+        .hc-arrow-sm {
           display: inline-flex; align-items: center; gap: 4px;
-          font-size: 12px; font-weight: 800;
-          margin-top: 14px; opacity: 0.7;
-          transition: opacity 0.15s, transform 0.15s;
+          font-size: 11px; font-weight: 800; margin-top: 12px;
+          opacity: 0.7; transition: opacity 0.15s, transform 0.15s;
         }
-        .hero-card:hover .hc-arrow { opacity: 1; transform: translateX(3px); }
+        .hero-card-small:hover .hc-arrow-sm { opacity: 1; transform: translateX(3px); }
 
-        /* Accent stripe on small cards */
-        .hero-card-small::before {
-          content: "";
-          position: absolute; top: 0; left: 0; right: 0;
-          height: 3px;
+        /* ── Inline pill bar ── */
+        .hero-pill-bar {
+          display: flex; align-items: center; justify-content: center;
+          padding: 18px 32px; gap: 16px;
         }
-
-        /* ── Sticky bottom bar ── */
-        .sticky-bar {
-          position: fixed; bottom: 0; left: 0; right: 0;
-          z-index: 100;
-          background: rgba(250,247,243,0.92);
-          backdrop-filter: blur(12px);
-          -webkit-backdrop-filter: blur(12px);
-          border-top: 2.5px solid var(--border-dark);
-          padding: 14px 32px;
-          display: flex; align-items: center; justify-content: space-between;
-          gap: 16px;
+        .hero-pill-hint {
+          font-size: 12px; font-weight: 700; color: var(--muted);
+          display: flex; align-items: center; gap: 7px;
         }
-        .sticky-bar-hint {
-          font-size: 13px; font-weight: 700; color: var(--muted);
-          display: flex; align-items: center; gap: 8px;
-        }
-        .sticky-bar-hint-dot {
-          width: 8px; height: 8px; border-radius: 50%;
+        .hero-pill-dot {
+          width: 6px; height: 6px; border-radius: 50%;
           background: var(--yellow); border: 2px solid var(--border-dark);
           flex-shrink: 0;
         }
-        .sticky-bar-btn {
-          display: flex; align-items: center; gap: 8px;
-          padding: 10px 22px;
+        .hero-pill-btn {
+          display: inline-flex; align-items: center; gap: 7px;
+          padding: 9px 20px; border-radius: 99px;
           background: var(--border-dark); color: var(--yellow);
-          border: 2.5px solid var(--border-dark); border-radius: 12px;
+          border: 2.5px solid var(--border-dark);
           font-size: 13px; font-weight: 900; cursor: pointer;
           font-family: inherit;
           box-shadow: 3px 3px 0 var(--yellow);
           transition: transform 0.15s, box-shadow 0.15s;
-          white-space: nowrap;
         }
-        .sticky-bar-btn:hover { transform: translate(-1px, -1px); box-shadow: 4px 4px 0 var(--yellow); }
+        .hero-pill-btn:hover { transform: translate(-1px, -1px); box-shadow: 4px 4px 0 var(--yellow); }
 
         /* back-to-top pill shown in full dashboard view */
         .back-to-hero-pill {
@@ -1139,6 +1095,9 @@ export default function DashboardHome() {
           .mb-card:nth-child(2) { border-right: none; }
           .mb-card:nth-child(3) { border-right: 1.5px solid var(--border); }
           .hero-bottom { grid-template-columns: repeat(2, 1fr); }
+          .hero-bottom .hero-card-small:nth-child(2) { border-right: none; }
+          .hero-bottom .hero-card-small:nth-child(3) { border-right: 2.5px solid var(--border-dark); border-top: 2.5px solid var(--border-dark); }
+          .hero-bottom .hero-card-small:nth-child(4) { border-right: none; border-top: 2.5px solid var(--border-dark); }
         }
         @media (max-width: 700px) {
           .bento { grid-template-columns: 1fr; }
@@ -1149,10 +1108,12 @@ export default function DashboardHome() {
           .mb-grid { grid-template-columns: 1fr 1fr; }
           .db-h1 { font-size: 20px; }
           .hero-top { grid-template-columns: 1fr; }
+          .hero-card-large { min-height: 240px; padding: 28px 24px; border-right: none; border-bottom: 2.5px solid var(--border-dark); }
+          .hc-cta-lg { font-size: 26px; }
+          .hc-steps { flex-direction: column; align-items: flex-start; gap: 10px; }
+          .hc-step-arrow { display: none; }
           .hero-bottom { grid-template-columns: 1fr 1fr; }
-          .hero-card-large { min-height: 200px; padding: 24px; }
-          .hero-card-large .hc-cta { font-size: 22px; }
-          .sticky-bar { padding: 12px 20px; }
+          .hero-view { margin: 0 -20px; }
         }
       `}</style>
 
@@ -1266,78 +1227,80 @@ export default function DashboardHome() {
             QUICK VIEW — Hero 6 cards (default)
         ════════════════════════════════════════════ */}
         {quickView && (
-          <>
-            <div className="hero-view">
-              {/* Top row — 2 large cards */}
-              <div className="hero-top">
-                {HERO_CARDS.filter(c => c.size === "large").map((card, i) => (
-                  <Link
-                    key={i}
-                    href={card.href}
-                    className="hero-card hero-card-large"
-                    style={{ background: card.bg, color: card.textLight ? "#fff" : "#111110" }}
-                  >
-                    <div>
-                      <span className="hc-icon">{card.icon}</span>
-                      <div className="hc-q" style={{ color: card.textLight ? "rgba(255,255,255,0.6)" : "var(--muted)" }}>
-                        {card.q}
-                      </div>
-                      <div className="hc-cta" style={{ color: card.accent }}>{card.cta}</div>
-                      <div className="hc-desc" style={{ color: card.textLight ? "rgba(255,255,255,0.45)" : "var(--muted)" }}>
-                        {card.desc}
-                      </div>
-                    </div>
-                    <span
-                      className="hc-btn"
-                      style={{
-                        background: card.accent,
-                        color: card.bg,
-                        borderColor: card.accent,
-                      }}
-                    >
-                      {card.cta} →
-                    </span>
-                  </Link>
-                ))}
-              </div>
+          <div className="hero-view">
+            {/* Top row — 2 large journey cards */}
+            <div className="hero-top">
+              {HERO_CARDS_LARGE.map((card, i) => (
+                <Link
+                  key={i}
+                  href={card.href}
+                  className="hero-card-large"
+                  style={{ background: card.bg, color: card.textLight ? "#fff" : "#111110" }}
+                >
+                  <div className="hc-large-top">
+                    <span className="hc-icon-lg">{card.icon}</span>
+                    <div className="hc-q-lg" style={{ color: card.textLight ? "rgba(255,255,255,0.5)" : "var(--muted)" }}>{card.q}</div>
+                    <div className="hc-cta-lg" style={{ color: card.accent }}>{card.cta}</div>
+                    <div className="hc-desc-lg" style={{ color: card.textLight ? "rgba(255,255,255,0.4)" : "var(--muted)" }}>{card.desc}</div>
 
-              {/* Bottom row — 4 small cards */}
-              <div className="hero-bottom">
-                {HERO_CARDS.filter(c => c.size === "small").map((card, i) => (
-                  <Link
-                    key={i}
-                    href={card.href}
-                    className="hero-card hero-card-small"
-                    style={{ background: card.bg }}
-                  >
-                    {/* Accent stripe */}
-                    <div style={{
-                      position: "absolute", top: 0, left: 0, right: 0,
-                      height: "3px", background: card.accent, borderRadius: "20px 20px 0 0",
-                    }} />
-                    <span className="hc-icon">{card.icon}</span>
-                    <div className="hc-q" style={{ color: "var(--muted)" }}>{card.q}</div>
-                    <div className="hc-cta" style={{ color: card.accent }}>{card.cta}</div>
-                    <div className="hc-desc" style={{ color: "var(--muted)" }}>{card.desc}</div>
-                    <div className="hc-arrow" style={{ color: card.accent }}>
-                      {card.cta} <ArrowRight size={13} />
+                    {/* Journey steps */}
+                    <div className="hc-steps">
+                      {card.steps.map((step, si) => (
+                        <div key={si} className="hc-step">
+                          <div className="hc-step-num" style={{
+                            borderColor: card.accent,
+                            color: card.accent,
+                          }}>{step.n}</div>
+                          <div className="hc-step-text">
+                            <div className="hc-step-label" style={{ color: card.textLight ? "#fff" : "#111110" }}>{step.label}</div>
+                            <div className="hc-step-sub">{step.sub}</div>
+                          </div>
+                          {si < card.steps.length - 1 && (
+                            <span className="hc-step-arrow" style={{ color: card.accent }}>→</span>
+                          )}
+                        </div>
+                      ))}
                     </div>
-                  </Link>
-                ))}
-              </div>
+                  </div>
+
+                  <span className="hc-large-btn" style={{
+                    background: card.accent,
+                    color: card.bg === "#FAF7F3" ? "#111110" : card.bg,
+                    borderColor: card.accent,
+                  }}>
+                    {card.cta} →
+                  </span>
+                </Link>
+              ))}
             </div>
 
-            {/* ── Sticky bottom bar ── */}
-            <div className="sticky-bar">
-              <div className="sticky-bar-hint">
-                <div className="sticky-bar-hint-dot" />
-                This is your Focus view — quick access to what matters most.
+            {/* Bottom row — 4 small cards */}
+            <div className="hero-bottom">
+              {HERO_CARDS_SMALL.map((card, i) => (
+                <Link key={i} href={card.href} className="hero-card-small">
+                  <div className="hc-small-stripe" style={{ background: card.accent }} />
+                  <span className="hc-icon-sm">{card.icon}</span>
+                  <div className="hc-q-sm">{card.q}</div>
+                  <div className="hc-cta-sm" style={{ color: card.accent }}>{card.cta}</div>
+                  <div className="hc-desc-sm">{card.desc}</div>
+                  <div className="hc-arrow-sm" style={{ color: card.accent }}>
+                    {card.cta} <ArrowRight size={12} />
+                  </div>
+                </Link>
+              ))}
+            </div>
+
+            {/* Inline pill bar */}
+            <div className="hero-pill-bar">
+              <div className="hero-pill-hint">
+                <div className="hero-pill-dot" />
+                This is your quick view — jump straight to what matters.
               </div>
-              <button className="sticky-bar-btn" onClick={() => setQuickView(false)}>
+              <button className="hero-pill-btn" onClick={() => setQuickView(false)}>
                 View full dashboard ↓
               </button>
             </div>
-          </>
+          </div>
         )}
 
         {/* ════════════════════════════════════════════

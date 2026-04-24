@@ -60,8 +60,73 @@ const GUIDED_ACTIONS = [
 ];
 
 /* ─────────────────────────────────────────────────────────────────
-   STATUS CONFIG
+   FOCUS FLOW — 2-step question journey
+   Q1: What brought you here today?
+   Q2: What do you want to focus on? (depends on Q1 answer)
+   → Routes to a specific dashboard page
 ───────────────────────────────────────────────────────────────── */
+const FOCUS_Q1 = [
+  {
+    id: "make",
+    label: "I want to make something",
+    sub: "New work, ideas, or references",
+    icon: "🎨",
+    color: "#FFD400",
+    bg: "#111110",
+    textLight: true,
+  },
+  {
+    id: "manage",
+    label: "I want to manage my work",
+    sub: "Artworks, contracts, or sales",
+    icon: "📋",
+    color: "#4ECDC4",
+    bg: "#FAF7F3",
+    textLight: false,
+  },
+  {
+    id: "connect",
+    label: "I want to connect or collaborate",
+    sub: "Galleries, artists, or clients",
+    icon: "🤝",
+    color: "#EC4899",
+    bg: "#FAF7F3",
+    textLight: false,
+  },
+  {
+    id: "learn",
+    label: "I want to learn or explore",
+    sub: "The scene, education, or inspiration",
+    icon: "📚",
+    color: "#8B5CF6",
+    bg: "#FAF7F3",
+    textLight: false,
+  },
+];
+
+const FOCUS_Q2: Record<string, Array<{ label: string; sub: string; icon: string; href: string; color: string }>> = {
+  make: [
+    { label: "Start a new artwork",    sub: "Document a piece from scratch",     icon: "🖼️", href: "/dashboard/artworks/new",  color: "#FFD400" },
+    { label: "Open my moodboard",      sub: "Collect references and inspiration", icon: "🗂️", href: "/dashboard/moodboard",      color: "#EC4899" },
+    { label: "Plan an event or show",  sub: "Schedule something upcoming",       icon: "🎪", href: "/dashboard/exhibitions",    color: "#4ECDC4" },
+  ],
+  manage: [
+    { label: "Review my artworks",     sub: "Check status, prices, availability", icon: "🖼️", href: "/dashboard/artworks",      color: "#FFD400" },
+    { label: "Look at my contracts",   sub: "Papers, agreements, signatures",     icon: "📄", href: "/dashboard/contracts",     color: "#CA8A04" },
+    { label: "Check my sales",         sub: "Revenue, collectors, deals",         icon: "💰", href: "/dashboard/sales",         color: "#16A34A" },
+  ],
+  connect: [
+    { label: "Browse the collab pool", sub: "Find artists, venues, galleries",   icon: "🤝", href: "/dashboard/pool",          color: "#EC4899" },
+    { label: "Check my messages",      sub: "Conversations and inquiries",        icon: "💬", href: "/dashboard/messages",      color: "#0EA5E9" },
+    { label: "Visit my front door",    sub: "See how your storefront looks",      icon: "🛍️", href: "/dashboard/mystore",       color: "#8B5CF6" },
+  ],
+  learn: [
+    { label: "Visit the Education hub", sub: "Videos, articles, and guides",     icon: "📚", href: "/dashboard/education",    color: "#8B5CF6" },
+    { label: "Explore the Art Scene",   sub: "Prague map and local events",       icon: "🗺️", href: "/dashboard/map",           color: "#4ECDC4" },
+    { label: "Browse the full scene",   sub: "Events, exhibitions, education",    icon: "🎭", href: "/dashboard/exhibitions",  color: "#FF6B6B" },
+  ],
+};
+
 const STATUS_CFG: Record<string, { label: string; color: string; bg: string }> = {
   available:   { label: "Available",   color: "#16A34A", bg: "#DCFCE7" },
   sold:        { label: "Sold",        color: "#9B8F7A", bg: "#F5F0E8" },
@@ -122,6 +187,10 @@ export default function DashboardHome() {
   const [dismissedActions, setDismissedActions] = useState<Set<number>>(new Set());
   // Quick view — hero cards shown by default, full bento hidden below
   const [quickView, setQuickView] = useState(true);
+  // Focus flow — the 2-step question journey shown on every session load
+  const [focusFlowDone, setFocusFlowDone] = useState(false);
+  const [focusStep, setFocusStep] = useState<1 | 2>(1);
+  const [focusQ1Answer, setFocusQ1Answer] = useState<string | null>(null);
 
   const today = new Date();
   const hour = today.getHours();
@@ -1100,6 +1169,202 @@ export default function DashboardHome() {
         }
         .back-to-hero-pill:hover { transform: translate(-1px, -1px); box-shadow: 3px 3px 0 var(--yellow); }
 
+        /* ────────────────────────────────────────────────────────
+           FOCUS FLOW — 2-step question journey
+        ──────────────────────────────────────────────────────── */
+        .ff-wrap {
+          min-height: 100vh;
+          display: flex; flex-direction: column;
+          background: var(--cream);
+          margin: 0 -32px;
+          padding: 0 0 40px;
+        }
+
+        /* progress bar */
+        .ff-progress {
+          display: flex; align-items: center; justify-content: space-between;
+          padding: 20px 40px 0;
+          border-bottom: 1.5px solid var(--border);
+        }
+        .ff-progress-track {
+          display: flex; align-items: center; gap: 6px;
+        }
+        .ff-progress-seg {
+          height: 4px; width: 56px; border-radius: 99px;
+          background: var(--border); transition: background 0.4s;
+        }
+        .ff-progress-seg.active { background: var(--yellow); }
+        .ff-progress-seg.done { background: var(--border-dark); }
+        .ff-progress-label {
+          font-size: 11px; font-weight: 800; color: var(--muted);
+          letter-spacing: 0.12em; text-transform: uppercase; margin-left: 10px;
+        }
+        .ff-skip {
+          font-size: 11px; font-weight: 800; color: var(--muted);
+          letter-spacing: 0.1em; text-transform: uppercase;
+          background: none; border: none; cursor: pointer;
+          font-family: inherit; display: flex; align-items: center; gap: 5px;
+          transition: color 0.15s;
+        }
+        .ff-skip:hover { color: var(--text); }
+
+        /* main content area */
+        .ff-body {
+          flex: 1; display: flex; flex-direction: column;
+          padding: 48px 40px 32px; max-width: 740px;
+        }
+
+        /* eyebrow */
+        .ff-eyebrow {
+          display: flex; align-items: center; gap: 8px;
+          margin-bottom: 20px;
+        }
+        .ff-eyebrow-line {
+          width: 28px; height: 3px; border-radius: 2px; background: var(--yellow);
+        }
+        .ff-eyebrow-label {
+          font-size: 10px; font-weight: 900; color: var(--muted);
+          text-transform: uppercase; letter-spacing: 0.18em;
+        }
+
+        /* headline */
+        .ff-headline {
+          font-size: clamp(36px, 5vw, 58px);
+          font-weight: 900; letter-spacing: -2px; line-height: 1.0;
+          color: var(--text); margin-bottom: 14px;
+        }
+        .ff-headline-highlight {
+          background: var(--yellow);
+          padding: 0 6px; border-radius: 4px;
+          display: inline; color: var(--text);
+        }
+        .ff-subline {
+          font-size: 16px; font-weight: 600; color: var(--muted);
+          line-height: 1.6; margin-bottom: 36px; max-width: 480px;
+        }
+
+        /* answer cards grid */
+        .ff-answers {
+          display: grid; grid-template-columns: 1fr 1fr;
+          gap: 12px; max-width: 680px;
+        }
+        .ff-answer {
+          display: flex; align-items: center; gap: 16px;
+          padding: 20px 22px;
+          background: #fff; border: 2.5px solid var(--border);
+          border-radius: 18px; cursor: pointer;
+          text-decoration: none; font-family: inherit;
+          text-align: left; width: 100%;
+          transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s, background 0.15s;
+        }
+        .ff-answer:hover {
+          border-color: var(--border-dark);
+          box-shadow: 4px 4px 0 var(--border-dark);
+          transform: translate(-2px, -2px);
+        }
+        .ff-answer.selected {
+          border-color: var(--border-dark);
+          background: var(--border-dark);
+          box-shadow: 4px 4px 0 var(--yellow);
+          transform: translate(-2px, -2px);
+        }
+        .ff-answer-icon {
+          width: 44px; height: 44px; border-radius: 14px;
+          display: flex; align-items: center; justify-content: center;
+          font-size: 22px; flex-shrink: 0;
+          border: 2px solid var(--border);
+          background: var(--warm-bg);
+          transition: background 0.15s, border-color 0.15s;
+        }
+        .ff-answer.selected .ff-answer-icon {
+          background: rgba(255,212,0,0.15); border-color: var(--yellow);
+        }
+        .ff-answer-text { flex: 1; min-width: 0; }
+        .ff-answer-label {
+          font-size: 15px; font-weight: 900; color: var(--text);
+          line-height: 1.2; margin-bottom: 3px;
+          transition: color 0.15s;
+        }
+        .ff-answer.selected .ff-answer-label { color: #fff; }
+        .ff-answer-sub {
+          font-size: 12px; font-weight: 600; color: var(--muted);
+          line-height: 1.4; transition: color 0.15s;
+        }
+        .ff-answer.selected .ff-answer-sub { color: rgba(255,255,255,0.55); }
+
+        /* Q2 answers — 3 in a row */
+        .ff-answers-3 {
+          display: grid; grid-template-columns: 1fr 1fr 1fr;
+          gap: 12px; max-width: 740px;
+        }
+        .ff-answer-3 {
+          display: flex; flex-direction: column; align-items: flex-start;
+          gap: 10px; padding: 20px 20px;
+          background: #fff; border: 2.5px solid var(--border);
+          border-radius: 18px; cursor: pointer;
+          text-decoration: none; font-family: inherit;
+          text-align: left; width: 100%;
+          transition: all 0.15s;
+          position: relative; overflow: hidden;
+        }
+        .ff-answer-3:hover {
+          border-color: var(--border-dark);
+          box-shadow: 4px 4px 0 var(--border-dark);
+          transform: translate(-2px, -2px);
+        }
+        .ff-answer-3-stripe {
+          position: absolute; top: 0; left: 0; right: 0; height: 3px;
+        }
+        .ff-answer-3-icon { font-size: 24px; }
+        .ff-answer-3-label {
+          font-size: 14px; font-weight: 900; color: var(--text); line-height: 1.2;
+        }
+        .ff-answer-3-sub {
+          font-size: 11px; font-weight: 600; color: var(--muted); line-height: 1.4;
+        }
+        .ff-answer-3-arrow {
+          font-size: 12px; font-weight: 900; margin-top: auto;
+          display: flex; align-items: center; gap: 4px;
+          opacity: 0; transition: opacity 0.15s;
+        }
+        .ff-answer-3:hover .ff-answer-3-arrow { opacity: 1; }
+
+        /* continue button */
+        .ff-continue {
+          display: flex; align-items: center; justify-content: flex-end;
+          padding: 24px 40px 0;
+        }
+        .ff-continue-btn {
+          display: flex; align-items: center; gap: 10px;
+          padding: 14px 28px; border-radius: 99px;
+          background: var(--border-dark); color: var(--yellow);
+          border: 2.5px solid var(--border-dark);
+          font-size: 15px; font-weight: 900;
+          cursor: pointer; font-family: inherit;
+          box-shadow: 4px 4px 0 var(--yellow);
+          transition: transform 0.15s, box-shadow 0.15s;
+        }
+        .ff-continue-btn:hover { transform: translate(-1px, -1px); box-shadow: 5px 5px 0 var(--yellow); }
+        .ff-continue-btn:disabled { opacity: 0.35; cursor: not-allowed; transform: none; box-shadow: none; }
+
+        /* "don't panic" notice */
+        .ff-no-panic {
+          margin: 32px 40px 0;
+          padding: 18px 22px;
+          background: #fff; border: 2px solid var(--border);
+          border-radius: 14px; border-left: 4px solid var(--yellow);
+          display: flex; gap: 14px; align-items: flex-start;
+        }
+        .ff-no-panic-emoji { font-size: 20px; flex-shrink: 0; margin-top: 1px; }
+        .ff-no-panic-title { font-size: 13px; font-weight: 900; color: var(--text); margin-bottom: 4px; }
+        .ff-no-panic-text { font-size: 12px; font-weight: 600; color: var(--muted); line-height: 1.6; }
+        .ff-no-panic-link {
+          font-size: 12px; font-weight: 800; color: var(--text);
+          text-decoration: underline; cursor: pointer;
+          background: none; border: none; font-family: inherit;
+        }
+        .ff-no-panic-link:hover { color: var(--muted); }
+
         /* ── Journey SVG animations ── */
         @keyframes artFloat1 {
           0%, 100% { transform: translateY(0px) rotate(-1deg); }
@@ -1171,8 +1436,163 @@ export default function DashboardHome() {
       <div className="db-wrap">
 
         {/* ════════════════════════════════════════════
-            HEADER
+            FOCUS FLOW — shown on every session load
         ════════════════════════════════════════════ */}
+        {!focusFlowDone && (
+          <div className="ff-wrap">
+
+            {/* Progress bar */}
+            <div className="ff-progress">
+              <div style={{ display: "flex", alignItems: "center" }}>
+                <div className="ff-progress-track">
+                  <div className={`ff-progress-seg ${focusStep >= 1 ? "active" : ""}`} />
+                  <div className={`ff-progress-seg ${focusStep >= 2 ? "active" : ""}`} />
+                </div>
+                <div className="ff-progress-label">
+                  0{focusStep} · of 02
+                </div>
+              </div>
+              <button className="ff-skip" onClick={() => { setFocusFlowDone(true); setQuickView(false); }}>
+                Skip → Full dashboard
+              </button>
+            </div>
+
+            {/* ── STEP 1 ── */}
+            {focusStep === 1 && (
+              <>
+                <div className="ff-body">
+                  <div className="ff-eyebrow">
+                    <div className="ff-eyebrow-line" />
+                    <div className="ff-eyebrow-label">Quick check-in</div>
+                  </div>
+                  <h1 className="ff-headline">
+                    What brought you<br />
+                    here <span className="ff-headline-highlight">today</span>,<br />
+                    {fname}?
+                  </h1>
+                  <p className="ff-subline">
+                    One question. We'll take you straight where you need to be.
+                  </p>
+
+                  <div className="ff-answers">
+                    {FOCUS_Q1.map((opt) => (
+                      <button
+                        key={opt.id}
+                        className={`ff-answer${focusQ1Answer === opt.id ? " selected" : ""}`}
+                        onClick={() => setFocusQ1Answer(opt.id)}
+                      >
+                        <div className="ff-answer-icon">{opt.icon}</div>
+                        <div className="ff-answer-text">
+                          <div className="ff-answer-label">{opt.label}</div>
+                          <div className="ff-answer-sub">{opt.sub}</div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="ff-continue">
+                  <button
+                    className="ff-continue-btn"
+                    disabled={!focusQ1Answer}
+                    onClick={() => setFocusStep(2)}
+                  >
+                    Continue →
+                  </button>
+                </div>
+
+                {/* Don't panic notice */}
+                <div className="ff-no-panic">
+                  <div className="ff-no-panic-emoji">🧘</div>
+                  <div>
+                    <div className="ff-no-panic-title">Not sure where to start? That's completely fine.</div>
+                    <div className="ff-no-panic-text">
+                      Artomango has a full dashboard with tools for sales, contracts, analytics and more — but you don't need to use all of it at once.
+                      This focus mode is here so you can come in, do one thing, and leave. If you ever feel overwhelmed by the numbers and tools,{" "}
+                      <button className="ff-no-panic-link" onClick={() => { setFocusFlowDone(false); setFocusStep(1); setFocusQ1Answer(null); }}>
+                        come back here
+                      </button>{" "}
+                      and we'll guide you through.
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* ── STEP 2 ── */}
+            {focusStep === 2 && focusQ1Answer && (
+              <>
+                <div className="ff-body">
+                  <div className="ff-eyebrow">
+                    <div className="ff-eyebrow-line" />
+                    <div className="ff-eyebrow-label">One more thing</div>
+                  </div>
+                  <h1 className="ff-headline">
+                    What do you want<br />
+                    to <span className="ff-headline-highlight">focus</span> on?
+                  </h1>
+                  <p className="ff-subline">
+                    Pick one — we'll take you straight there. No detours.
+                  </p>
+
+                  <div className="ff-answers-3">
+                    {FOCUS_Q2[focusQ1Answer].map((opt) => (
+                      <Link
+                        key={opt.href}
+                        href={opt.href}
+                        className="ff-answer-3"
+                        onClick={() => setFocusFlowDone(true)}
+                      >
+                        <div className="ff-answer-3-stripe" style={{ background: opt.color }} />
+                        <div className="ff-answer-3-icon">{opt.icon}</div>
+                        <div className="ff-answer-3-label">{opt.label}</div>
+                        <div className="ff-answer-3-sub">{opt.sub}</div>
+                        <div className="ff-answer-3-arrow" style={{ color: opt.color }}>
+                          Go there <ArrowRight size={12} />
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="ff-continue" style={{ justifyContent: "space-between" }}>
+                  <button
+                    className="ff-skip"
+                    style={{ padding: "10px 0" }}
+                    onClick={() => { setFocusStep(1); setFocusQ1Answer(null); }}
+                  >
+                    ← Back
+                  </button>
+                  <button
+                    className="ff-continue-btn"
+                    style={{ background: "var(--warm-bg)", color: "var(--text)", borderColor: "var(--border)", boxShadow: "3px 3px 0 var(--border)" }}
+                    onClick={() => { setFocusFlowDone(true); setQuickView(false); }}
+                  >
+                    Skip to full dashboard →
+                  </button>
+                </div>
+
+                {/* Don't panic notice */}
+                <div className="ff-no-panic">
+                  <div className="ff-no-panic-emoji">💛</div>
+                  <div>
+                    <div className="ff-no-panic-title">Heads up — there's a full dashboard behind this.</div>
+                    <div className="ff-no-panic-text">
+                      It has sales data, contracts, analytics, and a lot more. If it ever feels like too much, don't worry —
+                      that's exactly why we built this focus mode. You can always toggle <strong>Focus</strong> in the top right
+                      to come back here and take it one step at a time.
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        {/* ════════════════════════════════════════════
+            HEADER (only when focus flow is done)
+        ════════════════════════════════════════════ */}
+        {focusFlowDone && (<>
         <div className="db-header">
           <div className="db-hello">
             <div className="db-avatar">
@@ -2003,6 +2423,8 @@ export default function DashboardHome() {
         </div>
 
         </>)} {/* end !quickView */}
+
+        </>)} {/* end focusFlowDone */}
 
       </div>
     </>

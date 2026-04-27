@@ -174,6 +174,7 @@ export default function CalendarPage() {
   };
   const [form, setForm] = useState(blankForm);
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   /* ── public event detail panel ── */
   const [detailEvent, setDetailEvent] = useState<PublicEvent | null>(null);
@@ -341,6 +342,7 @@ export default function CalendarPage() {
     setForm({ ...blankForm, start_date: presetDate || todayStr });
     setSelectedPrivate(null);
     setDetailEvent(null);
+    setSaveError(null);
     setComposerOpen(true);
   };
 
@@ -363,22 +365,35 @@ export default function CalendarPage() {
       capacity: e.capacity ? String(e.capacity) : "",
     });
     setSelectedPrivate(null);
+    setSaveError(null);
     setComposerOpen(true);
   };
 
   const closeComposer = () => {
     setComposerOpen(false);
     setEditingId(null);
+    setSaveError(null);
   };
 
   const saveEvent = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
+    setSaveError(null);
     const supabase = createClient();
     try {
-      const { data: auth } = await supabase.auth.getUser();
+      const { data: auth, error: authErr } = await supabase.auth.getUser();
+      if (authErr) {
+        console.error("[calendar] auth error:", authErr);
+        setSaveError(`Auth error: ${authErr.message}`);
+        setSaving(false);
+        return;
+      }
       const user = auth?.user;
-      if (!user) { setSaving(false); return; }
+      if (!user) {
+        setSaveError("You're not signed in. Please refresh and log in again.");
+        setSaving(false);
+        return;
+      }
 
       const payload = {
         user_id: user.id,
@@ -398,18 +413,31 @@ export default function CalendarPage() {
         share_slug: form.is_public ? slugify(form.title) : null,
       };
 
+      console.log("[calendar] saving payload:", payload);
+
+      let resp;
       if (composerMode === "edit" && editingId) {
-        await supabase.from("calendar_events").update(payload).eq("id", editingId);
+        resp = await supabase.from("calendar_events").update(payload).eq("id", editingId).select();
       } else {
-        await supabase.from("calendar_events").insert({ ...payload, source: "private" });
+        resp = await supabase.from("calendar_events").insert({ ...payload, source: "private" }).select();
+      }
+
+      console.log("[calendar] supabase response:", resp);
+
+      if (resp.error) {
+        console.error("[calendar] supabase error:", resp.error);
+        setSaveError(`Save failed: ${resp.error.message}${resp.error.hint ? ` — ${resp.error.hint}` : ""}`);
+        setSaving(false);
+        return;
       }
 
       setComposerOpen(false);
       setEditingId(null);
       setForm(blankForm);
       await reload();
-    } catch (err) {
+    } catch (err: any) {
       console.error("[calendar] save error:", err);
+      setSaveError(`Unexpected error: ${err?.message || String(err)}`);
     } finally {
       setSaving(false);
     }
@@ -1761,6 +1789,25 @@ export default function CalendarPage() {
                     </button>
                   </div>
                 </div>
+
+                {saveError && (
+                  <div style={{
+                    marginTop: 12,
+                    padding: "12px 14px",
+                    background: "#FFE0DA",
+                    border: "2px solid #D93A26",
+                    borderRadius: 12,
+                    fontSize: 13,
+                    fontWeight: 700,
+                    color: "#7A1F12",
+                    lineHeight: 1.4,
+                    position: "relative",
+                    zIndex: 2,
+                  }}>
+                    <strong style={{ display: "block", marginBottom: 4, fontWeight: 900 }}>Save failed</strong>
+                    {saveError}
+                  </div>
+                )}
               </form>
 
               {/* RIGHT: live preview */}

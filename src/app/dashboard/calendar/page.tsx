@@ -383,8 +383,17 @@ export default function CalendarPage() {
     setSaveError(null);
   };
 
-  const saveEvent = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const saveEvent = async (e?: React.FormEvent | React.MouseEvent) => {
+    if (e) e.preventDefault();
+
+    // VISIBLE PROOF onClick fired. Remove this once it works.
+    console.log("🟡 [calendar] saveEvent called", { title: form.title, type: form.type });
+
+    if (!form.title.trim()) {
+      setSaveError("Please enter a title for the event.");
+      return;
+    }
+
     setSaving(true);
     setSaveError(null);
     const supabase = createClient();
@@ -403,7 +412,7 @@ export default function CalendarPage() {
         return;
       }
 
-      const payload = {
+      const payload: any = {
         user_id: user.id,
         title: form.title.trim(),
         type: form.type,
@@ -421,7 +430,7 @@ export default function CalendarPage() {
         share_slug: form.is_public ? slugify(form.title) : null,
       };
 
-      console.log("[calendar] saving payload:", payload);
+      console.log("🟡 [calendar] saving payload:", payload);
 
       let resp;
       if (composerMode === "edit" && editingId) {
@@ -430,10 +439,10 @@ export default function CalendarPage() {
         resp = await supabase.from("calendar_events").insert({ ...payload, source: "private" }).select();
       }
 
-      console.log("[calendar] supabase response:", resp);
+      console.log("🟢 [calendar] supabase response:", resp);
 
       if (resp.error) {
-        console.error("[calendar] supabase error:", resp.error);
+        console.error("🔴 [calendar] supabase error:", resp.error);
         setSaveError(`Save failed: ${resp.error.message}${resp.error.hint ? ` — ${resp.error.hint}` : ""}`);
         setSaving(false);
         return;
@@ -444,7 +453,7 @@ export default function CalendarPage() {
       setForm(blankForm);
       await reload();
     } catch (err: any) {
-      console.error("[calendar] save error:", err);
+      console.error("🔴 [calendar] save error:", err);
       setSaveError(`Unexpected error: ${err?.message || String(err)}`);
     } finally {
       setSaving(false);
@@ -1627,7 +1636,7 @@ export default function CalendarPage() {
               <button className="drawer-close" onClick={closeComposer} title="Close">×</button>
 
               {/* LEFT: form */}
-              <form className="composer-left" onSubmit={saveEvent}>
+              <div className="composer-left">
                 <div className="composer-eyebrow">
                   <span className="ln" />
                   {composerMode === "edit" ? "Edit event" : "New event"}
@@ -1813,7 +1822,12 @@ export default function CalendarPage() {
                   </div>
                   <div className="right">
                     <button type="button" className="btn ghost" onClick={closeComposer}>Cancel</button>
-                    <button type="submit" className="btn primary" disabled={saving || !form.title.trim()}>
+                    <button
+                      type="button"
+                      className="btn primary"
+                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); saveEvent(); }}
+                      style={saving ? { opacity: 0.6, cursor: "wait" } : undefined}
+                    >
                       {saving ? "Saving…" : (form.is_public ? "Publish event " : "Save event ")}
                       <span className="btn-arrow">→</span>
                     </button>
@@ -1838,7 +1852,7 @@ export default function CalendarPage() {
                     {saveError}
                   </div>
                 )}
-              </form>
+              </div>
 
               {/* RIGHT: live preview */}
               <div className="composer-right">

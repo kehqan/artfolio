@@ -127,16 +127,24 @@ const daysFromNow = (d?: string | null) => {
    MAIN COMPONENT
 ═══════════════════════════════════════════════════════════════ */
 export default function CalendarPage() {
-  const today = new Date();
-  const todayStr = isoDate(today);
+  // ─── HYDRATION-SAFE INIT ──────────────────────────────────────
+  // Never call `new Date()` during render or in initial state values,
+  // because the server (UTC) and client (local TZ) may disagree,
+  // which causes React hydration errors #418/#423/#425 and silently
+  // breaks all event handlers in the tree.
+  const [mounted, setMounted] = useState(false);
+  const [todayStr, setTodayStr] = useState<string>("");
+  const [cursor, setCursor] = useState({ year: 2026, month: 0, day: 1 });
+
+  useEffect(() => {
+    const t = new Date();
+    setTodayStr(isoDate(t));
+    setCursor({ year: t.getFullYear(), month: t.getMonth(), day: t.getDate() });
+    setMounted(true);
+  }, []);
 
   /* ── view & nav ── */
   const [view, setView] = useState<ViewMode>("month");
-  const [cursor, setCursor] = useState({
-    year: today.getFullYear(),
-    month: today.getMonth(),
-    day: today.getDate(),
-  });
 
   /* ── data ── */
   const [events, setEvents] = useState<CalEvent[]>([]);
@@ -516,7 +524,10 @@ export default function CalendarPage() {
       setCursor({ year: d.getFullYear(), month: d.getMonth(), day: d.getDate() });
     }
   };
-  const goToday = () => setCursor({ year: today.getFullYear(), month: today.getMonth(), day: today.getDate() });
+  const goToday = () => {
+    const t = new Date();
+    setCursor({ year: t.getFullYear(), month: t.getMonth(), day: t.getDate() });
+  };
 
   const toggleFilter = (key: string) => {
     setFilters(prev => {
@@ -576,6 +587,25 @@ export default function CalendarPage() {
   /* ════════════════════════════════════════════════════════════
      RENDER
   ═══════════════════════════════════════════════════════════ */
+
+  // Render a stable, date-free skeleton on the server / first paint.
+  // Once mounted on the client, render the real calendar.
+  // This eliminates the hydration mismatch (React #418/#423/#425)
+  // that was killing all event handlers in this tree.
+  if (!mounted) {
+    return (
+      <div style={{
+        fontFamily: "'Darker Grotesque', system-ui, sans-serif",
+        padding: "60px 32px",
+        color: "#5C5346",
+        fontSize: 14,
+        fontWeight: 600,
+      }}>
+        Loading calendar…
+      </div>
+    );
+  }
+
   return (
     <>
       <style>{`

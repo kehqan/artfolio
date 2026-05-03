@@ -522,6 +522,7 @@ function DetailModal({
 
       {showMsg && item.poster && (
         <MessageModal
+          isOpen={showMsg}
           recipientId={item.poster.id}
           recipientName={item.poster.full_name}
           onClose={() => setShowMsg(false)}

@@ -28,13 +28,12 @@ const NAV_SECTIONS = [
   {
     key: "scene",
     label: "The Scene",
-    emoji: "🗺️",
+    emoji: "🌆",
     icon: CalendarRange,
     items: [
-      { href: "/dashboard/pool",        label: "Find Collabs",   icon: Handshake,     desc: "Collaboration requests",        emoji: "🤝", color: "#CA8A04", bg: "#FEF9C3" },
-      { href: "/dashboard/exhibitions", label: "Events",         icon: CalendarRange, desc: "Shows, workshops & openings",   emoji: "🎪", color: "#EC4899", bg: "#FCE7F3" },
-      { href: "/dashboard/education",   label: "Education Hub",  icon: BookOpen,      desc: "Resources, videos & guides",    emoji: "📚", color: "#0EA5E9", bg: "#E0F2FE" },
-      { href: "/dashboard/map",         label: "Art Scene Map",  icon: MapPin,        desc: "Prague art scene map",          emoji: "📍", color: "#EF4444", bg: "#FEE2E2" },
+      { href: "/dashboard/scene",     label: "Collabs & Events", icon: Handshake,     desc: "Community feed of events & collabs", emoji: "🌆", color: "#CA8A04", bg: "#FEF9C3" },
+      { href: "/dashboard/education", label: "Education Hub",    icon: BookOpen,      desc: "Resources, videos & guides",         emoji: "📚", color: "#0EA5E9", bg: "#E0F2FE" },
+      { href: "/dashboard/map",       label: "Art Scene Map",    icon: MapPin,        desc: "Prague art scene map",               emoji: "📍", color: "#EF4444", bg: "#FEE2E2" },
     ],
   },
   {

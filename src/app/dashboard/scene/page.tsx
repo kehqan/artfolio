@@ -23,9 +23,9 @@ interface Profile {
   role?: string;
 }
 
-interface FeedItem {
+interface ScenePost {
   id: string;
-  source: "exhibition" | "pool_request" | "calendar_event";
+  user_id: string;
   post_type: PostType;
   title: string;
   description?: string;
@@ -37,18 +37,19 @@ interface FeedItem {
   end_date?: string;
   deadline?: string;
   price_from?: string;
-  created_at: string;
-  user_id: string;
-  poster?: Profile;
+  commission_scope?: string;
+  num_artists?: number;
+  submission_link?: string;
   from_calendar?: boolean;
+  calendar_event_id?: string;
+  created_at: string;
+  poster?: Profile;
 }
 
 interface EditorPick {
   id: string;
-  type: string;
   tag_label: string;
   title: string;
-  body?: string;
   emoji: string;
   bg_color: string;
   visual_bg: string;
@@ -84,22 +85,6 @@ const CREATE_TYPES: { key: PostType; emoji: string; name: string; desc: string }
   { key: "commission", emoji: "🎨", name: "Commission", desc: "Open for commissioned work" },
 ];
 
-const POOL_TYPE_MAP: Record<string, PostType> = {
-  showcase: "exhibition", lend: "collab", collab: "collab",
-  commission: "commission", gathering: "event", selection: "opencall", buying: "opencall",
-};
-
-const POST_TO_POOL_TYPE: Record<PostType, string> = {
-  exhibition: "showcase", event: "gathering", collab: "collab",
-  opencall: "selection", commission: "commission",
-};
-
-const CAL_TYPE_MAP: Record<string, PostType> = {
-  Exhibition: "exhibition", "Group Show": "exhibition",
-  Workshop: "event", Opening: "event", Fair: "event",
-  Gathering: "event", Talk: "event",
-};
-
 const FILTERS: { key: FilterKey; label: string }[] = [
   { key: "all",        label: "All" },
   { key: "event",      label: "🗓️ Events" },
@@ -131,8 +116,8 @@ function fmtDate(d?: string | null): string {
   return new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
-function isUpcoming(item: FeedItem): boolean {
-  const ref = item.end_date || item.start_date || item.deadline;
+function isUpcoming(post: ScenePost): boolean {
+  const ref = post.end_date || post.start_date || post.deadline;
   if (!ref) return true;
   return new Date(ref) >= new Date(new Date().setHours(0, 0, 0, 0));
 }
@@ -178,54 +163,59 @@ function Avatar({ name, avatarUrl, size = 28 }: { name?: string; avatarUrl?: str
 // ─────────────────────────────────────────────────────────────────
 // Feed Card
 // ─────────────────────────────────────────────────────────────────
-function FeedCard({ item, isOwn, onClick }: { item: FeedItem; isOwn: boolean; onClick: () => void }) {
-  const cfg = POST_TYPES[item.post_type];
-  const grad = CARD_GRADIENTS[item.post_type];
-  const coverImg = item.cover_image || (item.images && item.images[0]);
+function FeedCard({ post, isOwn, onClick }: { post: ScenePost; isOwn: boolean; onClick: () => void }) {
+  const cfg = POST_TYPES[post.post_type];
+  const grad = CARD_GRADIENTS[post.post_type];
+  const coverImg = post.cover_image || (post.images && post.images[0]);
 
   return (
-    <div onClick={onClick} style={{ marginBottom: 18, background: "#fff", border: "2.5px solid #111110", borderRadius: 20, overflow: "hidden", boxShadow: "3px 4px 0 #D4C9A8", cursor: "pointer", transition: "all .15s" }}
+    <div onClick={onClick}
+      style={{ marginBottom: 18, background: "#fff", border: "2.5px solid #111110", borderRadius: 20, overflow: "hidden", boxShadow: "3px 4px 0 #D4C9A8", cursor: "pointer", transition: "all .15s" }}
       onMouseEnter={e => { (e.currentTarget as HTMLElement).style.boxShadow = "6px 8px 0 #D4C9A8"; (e.currentTarget as HTMLElement).style.transform = "translate(-2px,-2px)"; }}
       onMouseLeave={e => { (e.currentTarget as HTMLElement).style.boxShadow = "3px 4px 0 #D4C9A8"; (e.currentTarget as HTMLElement).style.transform = "none"; }}>
+
       {/* Cover */}
       <div style={{ height: coverImg ? 180 : 110, background: grad, position: "relative", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
         {coverImg
-          ? <img src={coverImg} alt={item.title} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+          ? <img src={coverImg} alt={post.title} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
           : <span style={{ fontSize: 40 }}>{cfg.emoji}</span>}
-        <div style={{ position: "absolute", top: 10, left: 10 }}><TypeBadge type={item.post_type} /></div>
+        <div style={{ position: "absolute", top: 10, left: 10 }}><TypeBadge type={post.post_type} /></div>
         {isOwn && <div style={{ position: "absolute", top: 10, right: 10, padding: "3px 9px", background: "#111110", border: "2px solid #fff", borderRadius: 99, fontSize: 9, fontWeight: 800, color: "#fff" }}>✏️ Your post</div>}
-        {item.from_calendar && <div style={{ position: "absolute", bottom: 8, left: 10, display: "inline-flex", alignItems: "center", gap: 4, padding: "3px 9px", background: "#EDE9FE", border: "1.5px solid #C4B5FD", borderRadius: 99, fontSize: 9, fontWeight: 800, color: "#7C3AED", textTransform: "uppercase", letterSpacing: "0.06em" }}>📆 From Calendar</div>}
+        {post.from_calendar && (
+          <div style={{ position: "absolute", bottom: 8, left: 10, display: "inline-flex", alignItems: "center", gap: 4, padding: "3px 9px", background: "#EDE9FE", border: "1.5px solid #C4B5FD", borderRadius: 99, fontSize: 9, fontWeight: 800, color: "#7C3AED", textTransform: "uppercase", letterSpacing: "0.06em" }}>📆 From Calendar</div>
+        )}
       </div>
+
       {/* Body */}
       <div style={{ padding: "14px 16px 16px" }}>
-        <div style={{ fontSize: 15, fontWeight: 800, color: "#111110", lineHeight: 1.25, marginBottom: 8 }}>{item.title}</div>
+        <div style={{ fontSize: 15, fontWeight: 800, color: "#111110", lineHeight: 1.25, marginBottom: 8 }}>{post.title}</div>
         <div style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: 12 }}>
-          {(item.location || item.is_online) && (
+          {(post.location || post.is_online) && (
             <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, fontWeight: 600, color: "#9B8F7A" }}>
-              {item.is_online ? <Globe size={11} /> : <MapPin size={11} />}
-              <span>{item.is_online ? "Online" : item.location}</span>
+              {post.is_online ? <Globe size={11} /> : <MapPin size={11} />}
+              <span>{post.is_online ? "Online" : post.location}</span>
             </div>
           )}
-          {item.start_date && (
+          {post.start_date && (
             <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, fontWeight: 600, color: "#9B8F7A" }}>
               <Calendar size={11} />
-              <span>{fmtDate(item.start_date)}{item.end_date && item.end_date !== item.start_date ? ` — ${fmtDate(item.end_date)}` : ""}</span>
+              <span>{fmtDate(post.start_date)}{post.end_date && post.end_date !== post.start_date ? ` — ${fmtDate(post.end_date)}` : ""}</span>
             </div>
           )}
-          {item.deadline && !item.start_date && (
+          {post.deadline && !post.start_date && (
             <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, fontWeight: 600, color: "#9B8F7A" }}>
-              <Clock size={11} /><span>Deadline: {fmtDate(item.deadline)}</span>
+              <Clock size={11} /><span>Deadline: {fmtDate(post.deadline)}</span>
             </div>
           )}
-          {item.price_from && <div style={{ fontSize: 11, fontWeight: 600, color: "#9B8F7A" }}>💰 From {item.price_from}</div>}
+          {post.price_from && <div style={{ fontSize: 11, fontWeight: 600, color: "#9B8F7A" }}>💰 From {post.price_from}</div>}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8, paddingTop: 11, borderTop: "1.5px solid #E8E0D0" }}>
-          <Avatar name={item.poster?.full_name} avatarUrl={item.poster?.avatar_url} size={28} />
+          <Avatar name={post.poster?.full_name} avatarUrl={post.poster?.avatar_url} size={28} />
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: "#111110", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{item.poster?.full_name || "Unknown"}</div>
-            {item.poster?.role && <div style={{ fontSize: 10, fontWeight: 600, color: "#9B8F7A" }}>{item.poster.role}</div>}
+            <div style={{ fontSize: 12, fontWeight: 700, color: "#111110", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{post.poster?.full_name || "Unknown"}</div>
+            {post.poster?.role && <div style={{ fontSize: 10, fontWeight: 600, color: "#9B8F7A" }}>{post.poster.role}</div>}
           </div>
-          <span style={{ fontSize: 10, fontWeight: 700, color: "#9B8F7A", flexShrink: 0 }}>{timeAgo(item.created_at)}</span>
+          <span style={{ fontSize: 10, fontWeight: 700, color: "#9B8F7A", flexShrink: 0 }}>{timeAgo(post.created_at)}</span>
         </div>
       </div>
     </div>
@@ -235,15 +225,15 @@ function FeedCard({ item, isOwn, onClick }: { item: FeedItem; isOwn: boolean; on
 // ─────────────────────────────────────────────────────────────────
 // Detail Modal
 // ─────────────────────────────────────────────────────────────────
-function DetailModal({ item, isOwn, userId, onClose, onEdit }: { item: FeedItem; isOwn: boolean; userId: string | null; onClose: () => void; onEdit: () => void }) {
+function DetailModal({ post, isOwn, onClose, onEdit }: { post: ScenePost; isOwn: boolean; onClose: () => void; onEdit: () => void }) {
   const [showMsg, setShowMsg] = useState(false);
-  const cfg = POST_TYPES[item.post_type];
-  const grad = CARD_GRADIENTS[item.post_type];
-  const coverImg = item.cover_image || (item.images && item.images[0]);
+  const cfg = POST_TYPES[post.post_type];
+  const grad = CARD_GRADIENTS[post.post_type];
+  const coverImg = post.cover_image || (post.images && post.images[0]);
 
   const handleShare = () => {
     const url = `${window.location.origin}/scene`;
-    if (navigator.share) { navigator.share({ title: item.title, url }).catch(() => {}); }
+    if (navigator.share) { navigator.share({ title: post.title, url }).catch(() => {}); }
     else { navigator.clipboard.writeText(url).then(() => alert("Link copied!")); }
   };
 
@@ -251,33 +241,53 @@ function DetailModal({ item, isOwn, userId, onClose, onEdit }: { item: FeedItem;
     <>
       <div onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 1000, background: "rgba(17,17,16,0.55)", backdropFilter: "blur(2px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
         <div onClick={e => e.stopPropagation()} style={{ width: "100%", maxWidth: 560, background: "#fff", border: "2.5px solid #111110", borderRadius: 24, boxShadow: "8px 10px 0 #D4C9A8", maxHeight: "90vh", overflowY: "auto" }}>
+
+          {/* Cover */}
           <div style={{ height: coverImg ? 220 : 180, background: grad, display: "flex", alignItems: "center", justifyContent: "center", position: "relative", borderBottom: "2.5px solid #111110", overflow: "hidden" }}>
-            {coverImg ? <img src={coverImg} alt={item.title} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} /> : <span style={{ fontSize: 72 }}>{cfg.emoji}</span>}
-            <div style={{ position: "absolute", top: 14, left: 14 }}><TypeBadge type={item.post_type} /></div>
-            {item.from_calendar && <div style={{ position: "absolute", bottom: 12, left: 14, display: "inline-flex", alignItems: "center", gap: 4, padding: "4px 10px", background: "#EDE9FE", border: "1.5px solid #C4B5FD", borderRadius: 99, fontSize: 9, fontWeight: 800, color: "#7C3AED", textTransform: "uppercase", letterSpacing: "0.06em" }}>📆 From Calendar</div>}
+            {coverImg ? <img src={coverImg} alt={post.title} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} /> : <span style={{ fontSize: 72 }}>{cfg.emoji}</span>}
+            <div style={{ position: "absolute", top: 14, left: 14 }}><TypeBadge type={post.post_type} /></div>
+            {post.from_calendar && <div style={{ position: "absolute", bottom: 12, left: 14, display: "inline-flex", alignItems: "center", gap: 4, padding: "4px 10px", background: "#EDE9FE", border: "1.5px solid #C4B5FD", borderRadius: 99, fontSize: 9, fontWeight: 800, color: "#7C3AED", textTransform: "uppercase", letterSpacing: "0.06em" }}>📆 From Calendar</div>}
             <button onClick={onClose} style={{ position: "absolute", top: 14, right: 14, width: 34, height: 34, background: "#fff", border: "2.5px solid #111110", borderRadius: 10, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "2px 2px 0 #D4C9A8", color: "#111110" }}><X size={16} /></button>
           </div>
+
+          {/* Body */}
           <div style={{ padding: "20px 24px 24px" }}>
-            <h2 style={{ fontSize: 24, fontWeight: 900, color: "#111110", marginBottom: 12, lineHeight: 1.15, letterSpacing: "-0.02em" }}>{item.title}</h2>
+            <h2 style={{ fontSize: 24, fontWeight: 900, color: "#111110", marginBottom: 12, lineHeight: 1.15, letterSpacing: "-0.02em" }}>{post.title}</h2>
+
+            {/* Chips */}
             <div style={{ display: "flex", gap: 7, flexWrap: "wrap", marginBottom: 16 }}>
-              {(item.location || item.is_online) && <div style={{ display: "flex", alignItems: "center", gap: 5, padding: "5px 12px", background: "#F5F0E8", border: "1.5px solid #E8E0D0", borderRadius: 99, fontSize: 11, fontWeight: 700, color: "#5C5346" }}>{item.is_online ? <Globe size={11} /> : <MapPin size={11} />}{item.is_online ? "Online" : item.location}</div>}
-              {item.start_date && <div style={{ display: "flex", alignItems: "center", gap: 5, padding: "5px 12px", background: "#F5F0E8", border: "1.5px solid #E8E0D0", borderRadius: 99, fontSize: 11, fontWeight: 700, color: "#5C5346" }}><Calendar size={11} />{fmtDate(item.start_date)}{item.end_date && item.end_date !== item.start_date ? ` — ${fmtDate(item.end_date)}` : ""}</div>}
-              {item.deadline && <div style={{ display: "flex", alignItems: "center", gap: 5, padding: "5px 12px", background: "#FEF9C3", border: "1.5px solid #FDE047", borderRadius: 99, fontSize: 11, fontWeight: 700, color: "#92400E" }}><Clock size={11} />Deadline: {fmtDate(item.deadline)}</div>}
-              {isUpcoming(item) ? <div style={{ padding: "5px 12px", background: "#DCFCE7", border: "1.5px solid #86EFAC", borderRadius: 99, fontSize: 11, fontWeight: 800, color: "#166534" }}>📅 Upcoming</div> : <div style={{ padding: "5px 12px", background: "#F5F0E8", border: "1.5px solid #E8E0D0", borderRadius: 99, fontSize: 11, fontWeight: 800, color: "#9B8F7A" }}>🗂️ Past</div>}
+              {(post.location || post.is_online) && <div style={{ display: "flex", alignItems: "center", gap: 5, padding: "5px 12px", background: "#F5F0E8", border: "1.5px solid #E8E0D0", borderRadius: 99, fontSize: 11, fontWeight: 700, color: "#5C5346" }}>{post.is_online ? <Globe size={11} /> : <MapPin size={11} />}{post.is_online ? "Online" : post.location}</div>}
+              {post.start_date && <div style={{ display: "flex", alignItems: "center", gap: 5, padding: "5px 12px", background: "#F5F0E8", border: "1.5px solid #E8E0D0", borderRadius: 99, fontSize: 11, fontWeight: 700, color: "#5C5346" }}><Calendar size={11} />{fmtDate(post.start_date)}{post.end_date && post.end_date !== post.start_date ? ` — ${fmtDate(post.end_date)}` : ""}</div>}
+              {post.deadline && <div style={{ display: "flex", alignItems: "center", gap: 5, padding: "5px 12px", background: "#FEF9C3", border: "1.5px solid #FDE047", borderRadius: 99, fontSize: 11, fontWeight: 700, color: "#92400E" }}><Clock size={11} />Deadline: {fmtDate(post.deadline)}</div>}
+              {post.price_from && <div style={{ padding: "5px 12px", background: "#FFE4E6", border: "1.5px solid #FCA5A5", borderRadius: 99, fontSize: 11, fontWeight: 700, color: "#BE123C" }}>💰 From {post.price_from}</div>}
+              {post.num_artists && <div style={{ padding: "5px 12px", background: "#DCFCE7", border: "1.5px solid #86EFAC", borderRadius: 99, fontSize: 11, fontWeight: 700, color: "#166534" }}>👥 Seeking {post.num_artists} artists</div>}
+              {isUpcoming(post)
+                ? <div style={{ padding: "5px 12px", background: "#DCFCE7", border: "1.5px solid #86EFAC", borderRadius: 99, fontSize: 11, fontWeight: 800, color: "#166534" }}>📅 Upcoming</div>
+                : <div style={{ padding: "5px 12px", background: "#F5F0E8", border: "1.5px solid #E8E0D0", borderRadius: 99, fontSize: 11, fontWeight: 800, color: "#9B8F7A" }}>🗂️ Past</div>}
             </div>
-            {item.description && <p style={{ fontSize: 14, fontWeight: 600, color: "#5C5346", lineHeight: 1.6, marginBottom: 20 }}>{item.description}</p>}
+
+            {post.description && <p style={{ fontSize: 14, fontWeight: 600, color: "#5C5346", lineHeight: 1.6, marginBottom: 20 }}>{post.description}</p>}
+            {post.submission_link && (
+              <a href={post.submission_link} target="_blank" rel="noopener noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 14px", background: "#EDE9FE", border: "1.5px solid #C4B5FD", borderRadius: 10, fontSize: 12, fontWeight: 700, color: "#7C3AED", textDecoration: "none", marginBottom: 16 }}>
+                🔗 Submission link →
+              </a>
+            )}
+
+            {/* Poster row */}
             <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 16px", background: "#F5F0E8", border: "2px solid #E8E0D0", borderRadius: 14, marginBottom: 16 }}>
-              <Avatar name={item.poster?.full_name} avatarUrl={item.poster?.avatar_url} size={42} />
+              <Avatar name={post.poster?.full_name} avatarUrl={post.poster?.avatar_url} size={42} />
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 14, fontWeight: 800, color: "#111110" }}>{item.poster?.full_name || "Unknown"}</div>
-                {item.poster?.role && <div style={{ fontSize: 11, fontWeight: 600, color: "#9B8F7A" }}>{item.poster.role}</div>}
+                <div style={{ fontSize: 14, fontWeight: 800, color: "#111110" }}>{post.poster?.full_name || "Unknown"}</div>
+                {post.poster?.role && <div style={{ fontSize: 11, fontWeight: 600, color: "#9B8F7A" }}>{post.poster.role}</div>}
               </div>
-              {item.poster?.username && (
-                <Link href={`/${item.poster.username}`} style={{ textDecoration: "none" }}>
+              {post.poster?.username && (
+                <Link href={`/${post.poster.username}`} style={{ textDecoration: "none" }}>
                   <button style={{ padding: "7px 13px", border: "2px solid #111110", borderRadius: 10, fontFamily: "inherit", fontSize: 11, fontWeight: 800, cursor: "pointer", background: "#fff", boxShadow: "2px 2px 0 #D4C9A8", color: "#111110" }}>View profile →</button>
                 </Link>
               )}
             </div>
+
+            {/* Actions */}
             <div style={{ display: "flex", gap: 10 }}>
               {isOwn ? (
                 <button onClick={onEdit} style={{ flex: 1, padding: 13, background: "#FFD400", border: "2.5px solid #111110", borderRadius: 13, fontFamily: "inherit", fontSize: 14, fontWeight: 800, cursor: "pointer", boxShadow: "3px 4px 0 #111110", display: "flex", alignItems: "center", justifyContent: "center", gap: 7, color: "#111110" }}>
@@ -295,8 +305,9 @@ function DetailModal({ item, isOwn, userId, onClose, onEdit }: { item: FeedItem;
           </div>
         </div>
       </div>
-      {showMsg && item.poster && (
-        <MessageModal isOpen={showMsg} recipientId={item.poster.id} recipientName={item.poster.full_name} onClose={() => setShowMsg(false)} />
+
+      {showMsg && post.poster && (
+        <MessageModal isOpen={showMsg} recipientId={post.poster.id} recipientName={post.poster.full_name} onClose={() => setShowMsg(false)} />
       )}
     </>
   );
@@ -305,16 +316,16 @@ function DetailModal({ item, isOwn, userId, onClose, onEdit }: { item: FeedItem;
 // ─────────────────────────────────────────────────────────────────
 // Auth Wall
 // ─────────────────────────────────────────────────────────────────
-function AuthWall({ item, onClose }: { item: FeedItem; onClose: () => void }) {
+function AuthWall({ post, onClose }: { post: ScenePost; onClose: () => void }) {
   return (
     <div onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 2000, background: "rgba(17,17,16,0.6)", backdropFilter: "blur(3px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
       <div style={{ position: "absolute", maxWidth: 560, width: "calc(100% - 48px)", filter: "blur(6px)", pointerEvents: "none", userSelect: "none", background: "#fff", border: "2.5px solid #111110", borderRadius: 24, overflow: "hidden" }}>
-        <div style={{ height: 150, background: CARD_GRADIENTS[item.post_type], display: "flex", alignItems: "center", justifyContent: "center", borderBottom: "2.5px solid #111110" }}>
-          <span style={{ fontSize: 56 }}>{POST_TYPES[item.post_type].emoji}</span>
+        <div style={{ height: 150, background: CARD_GRADIENTS[post.post_type], display: "flex", alignItems: "center", justifyContent: "center", borderBottom: "2.5px solid #111110" }}>
+          <span style={{ fontSize: 56 }}>{POST_TYPES[post.post_type].emoji}</span>
         </div>
         <div style={{ padding: "20px 24px" }}>
-          <div style={{ fontSize: 20, fontWeight: 900, color: "#111110", marginBottom: 8 }}>{item.title}</div>
-          {item.description && <div style={{ fontSize: 13, color: "#5C5346" }}>{item.description.substring(0, 120)}…</div>}
+          <div style={{ fontSize: 20, fontWeight: 900, color: "#111110", marginBottom: 8 }}>{post.title}</div>
+          {post.description && <div style={{ fontSize: 13, color: "#5C5346" }}>{post.description.substring(0, 120)}…</div>}
         </div>
       </div>
       <div onClick={e => e.stopPropagation()} style={{ position: "relative", width: "100%", maxWidth: 380, background: "#fff", border: "2.5px solid #111110", borderRadius: 24, boxShadow: "8px 10px 0 #111110", padding: "32px 28px", textAlign: "center" }}>
@@ -369,35 +380,35 @@ function CreatePickerModal({ onClose, onSelect }: { onClose: () => void; onSelec
 }
 
 // ─────────────────────────────────────────────────────────────────
-// Post Form Modal — full form with image upload, validation, DB
+// Post Form Modal — writes ONLY to scene_posts
 // ─────────────────────────────────────────────────────────────────
-function PostFormModal({ type, userId, editItem, onClose, onSaved }: { type: PostType; userId: string; editItem?: FeedItem | null; onClose: () => void; onSaved: () => void }) {
+function PostFormModal({ type, userId, editPost, onClose, onSaved }: { type: PostType; userId: string; editPost?: ScenePost | null; onClose: () => void; onSaved: () => void }) {
   const sb = createClient();
   const fileRef = useRef<HTMLInputElement>(null);
-  const isEdit = !!editItem;
+  const isEdit = !!editPost;
   const cfg = POST_TYPES[type];
 
-  const [saving, setSaving]     = useState(false);
+  const [saving, setSaving]       = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [error, setError]       = useState("");
-  const [images, setImages]     = useState<string[]>(
-    editItem?.images?.filter(Boolean) || (editItem?.cover_image ? [editItem.cover_image] : [])
+  const [error, setError]         = useState("");
+  const [images, setImages]       = useState<string[]>(
+    editPost?.images?.filter(Boolean) || (editPost?.cover_image ? [editPost.cover_image] : [])
   );
   const [form, setForm] = useState({
-    title:            editItem?.title || "",
-    description:      editItem?.description || "",
-    location:         editItem?.location || "",
-    is_online:        editItem?.is_online || false,
-    start_date:       editItem?.start_date?.slice(0, 10) || "",
-    end_date:         editItem?.end_date?.slice(0, 10) || "",
-    deadline:         editItem?.deadline?.slice(0, 10) || "",
-    price_from:       editItem?.price_from || "",
-    num_artists:      "",
-    submission_link:  "",
-    commission_scope: "",
+    title:            editPost?.title || "",
+    description:      editPost?.description || "",
+    location:         editPost?.location || "",
+    is_online:        editPost?.is_online || false,
+    start_date:       editPost?.start_date?.slice(0, 10) || "",
+    end_date:         editPost?.end_date?.slice(0, 10) || "",
+    deadline:         editPost?.deadline?.slice(0, 10) || "",
+    price_from:       editPost?.price_from || "",
+    commission_scope: editPost?.commission_scope || "",
+    num_artists:      editPost?.num_artists?.toString() || "",
+    submission_link:  editPost?.submission_link || "",
   });
 
-  const set = (k: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
+  const set = (k: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
     setForm(p => ({ ...p, [k]: e.target.value }));
 
   async function uploadImages(files: FileList) {
@@ -423,56 +434,44 @@ function PostFormModal({ type, userId, editItem, onClose, onSaved }: { type: Pos
 
   async function handleSave() {
     setError("");
-    if (!form.title.trim()) { setError("Title is required — give your post a clear title."); return; }
-
+    if (!form.title.trim()) { setError("Title is required."); return; }
     setSaving(true);
-    try {
-      if (type === "exhibition") {
-        const payload: any = {
-          title:       form.title.trim(),
-          description: form.description.trim() || null,
-          venue:       form.is_online ? null : (form.location.trim() || null),
-          start_date:  form.start_date || null,
-          end_date:    form.end_date || null,
-          cover_image: images[0] || null,
-          is_public:   true,
-          status:      "upcoming",
-        };
-        if (isEdit && editItem?.source === "exhibition") {
-          const { error: err } = await sb.from("exhibitions").update(payload).eq("id", editItem.id);
-          if (err) throw new Error(err.message);
-        } else {
-          const { error: err } = await sb.from("exhibitions").insert({ ...payload, user_id: userId });
-          if (err) throw new Error(err.message);
-        }
-      } else {
-        // All other types → pool_requests
-        const extraDesc: string[] = [];
-        if (form.description.trim()) extraDesc.push(form.description.trim());
-        if (type === "opencall" && form.num_artists) extraDesc.push(`Looking for ${form.num_artists} artists.`);
-        if (type === "opencall" && form.submission_link) extraDesc.push(`Submit at: ${form.submission_link}`);
-        if (type === "commission" && form.commission_scope) extraDesc.push(`Scope: ${form.commission_scope}`);
 
-        const payload: any = {
-          title:        form.title.trim(),
-          description:  extraDesc.join("\n\n") || null,
-          request_type: POST_TO_POOL_TYPE[type],
-          poster_type:  "artist",
-          poster_role:  "artist",
-          cover_image:  images[0] || null,
-          images:       images,
-          location:     form.is_online ? "Online" : (form.location.trim() || null),
-          deadline:     form.deadline || null,
-          status:       "open",
-        };
-        if (isEdit && editItem) {
-          const { error: err } = await sb.from("pool_requests").update(payload).eq("id", editItem.id);
-          if (err) throw new Error(err.message);
-        } else {
-          const { error: err } = await sb.from("pool_requests").insert({ ...payload, user_id: userId });
-          if (err) throw new Error(err.message);
-        }
+    try {
+      // ── ALL posts go to scene_posts — no other table ──
+      const payload: any = {
+        post_type:        type,
+        title:            form.title.trim(),
+        description:      form.description.trim() || null,
+        location:         form.is_online ? null : (form.location.trim() || null),
+        is_online:        form.is_online,
+        start_date:       form.start_date || null,
+        end_date:         form.end_date || null,
+        deadline:         form.deadline || null,
+        cover_image:      images[0] || null,
+        images:           images,
+        price_from:       form.price_from.trim() || null,
+        commission_scope: form.commission_scope.trim() || null,
+        num_artists:      form.num_artists ? parseInt(form.num_artists, 10) : null,
+        submission_link:  form.submission_link.trim() || null,
+        is_public:        true,
+        status:           "active",
+        from_calendar:    false,
+      };
+
+      if (isEdit && editPost) {
+        const { error: err } = await sb
+          .from("scene_posts")
+          .update({ ...payload, updated_at: new Date().toISOString() })
+          .eq("id", editPost.id);
+        if (err) throw new Error(err.message);
+      } else {
+        const { error: err } = await sb
+          .from("scene_posts")
+          .insert({ ...payload, user_id: userId });
+        if (err) throw new Error(err.message);
       }
+
       onSaved();
       onClose();
     } catch (e: any) {
@@ -505,7 +504,7 @@ function PostFormModal({ type, userId, editItem, onClose, onSaved }: { type: Pos
 
         <div style={{ padding: "20px 22px", display: "flex", flexDirection: "column", gap: 18 }}>
 
-          {/* Error */}
+          {/* Error banner */}
           {error && (
             <div style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "12px 14px", background: "#FFE4E6", border: "2px solid #FCA5A5", borderRadius: 12 }}>
               <AlertCircle size={16} color="#BE123C" style={{ flexShrink: 0, marginTop: 1 }} />
@@ -526,7 +525,8 @@ function PostFormModal({ type, userId, editItem, onClose, onSaved }: { type: Pos
                   {i === 0 && <div style={{ position: "absolute", bottom: 3, left: 3, padding: "1px 6px", background: "#FFD400", borderRadius: 4, fontSize: 8, fontWeight: 900, color: "#111110" }}>COVER</div>}
                 </div>
               ))}
-              <button onClick={() => fileRef.current?.click()} disabled={uploading} style={{ width: 80, height: 80, borderRadius: 12, border: "2px dashed #E8E0D0", background: "#fff", cursor: uploading ? "not-allowed" : "pointer", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 4, flexShrink: 0, transition: "all .15s" }}
+              <button onClick={() => fileRef.current?.click()} disabled={uploading}
+                style={{ width: 80, height: 80, borderRadius: 12, border: "2px dashed #E8E0D0", background: "#fff", cursor: uploading ? "not-allowed" : "pointer", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 4, flexShrink: 0, transition: "all .15s" }}
                 onMouseEnter={e => !uploading && ((e.currentTarget as HTMLElement).style.borderColor = "#111110")}
                 onMouseLeave={e => ((e.currentTarget as HTMLElement).style.borderColor = "#E8E0D0")}>
                 {uploading ? <div style={{ fontSize: 9, fontWeight: 700, color: "#9B8F7A", textAlign: "center", padding: "0 6px" }}>Uploading…</div> : <><Upload size={16} color="#9B8F7A" /><span style={{ fontSize: 9, fontWeight: 700, color: "#9B8F7A" }}>Add photo</span></>}
@@ -538,8 +538,7 @@ function PostFormModal({ type, userId, editItem, onClose, onSaved }: { type: Pos
           {/* Title */}
           <div>
             <label style={LBL}>Title *</label>
-            <input
-              style={{ ...INP, borderColor: error && !form.title.trim() ? "#FCA5A5" : "#E8E0D0", fontSize: 14, fontWeight: 700 }}
+            <input style={{ ...INP, borderColor: error && !form.title.trim() ? "#FCA5A5" : "#E8E0D0", fontSize: 14, fontWeight: 700 }}
               value={form.title} onChange={set("title")}
               placeholder={
                 type === "event" ? "e.g. Open Studios Night — Holešovice" :
@@ -554,8 +553,7 @@ function PostFormModal({ type, userId, editItem, onClose, onSaved }: { type: Pos
           {/* Description */}
           <div>
             <label style={LBL}>Description</label>
-            <textarea
-              style={{ ...INP, resize: "vertical", minHeight: 100, lineHeight: 1.5 }}
+            <textarea style={{ ...INP, resize: "vertical", minHeight: 100, lineHeight: 1.5 }}
               value={form.description} onChange={set("description")}
               placeholder={
                 type === "collab" ? "Describe your project and what kind of collaborator you're looking for…" :
@@ -581,50 +579,29 @@ function PostFormModal({ type, userId, editItem, onClose, onSaved }: { type: Pos
           {/* Date fields */}
           {showDates && (
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-              <div>
-                <label style={LBL}>Start Date</label>
-                <input type="date" style={INP} value={form.start_date} onChange={set("start_date")} />
-              </div>
-              <div>
-                <label style={LBL}>End Date</label>
-                <input type="date" style={INP} value={form.end_date} onChange={set("end_date")} min={form.start_date} />
-              </div>
+              <div><label style={LBL}>Start Date</label><input type="date" style={INP} value={form.start_date} onChange={set("start_date")} /></div>
+              <div><label style={LBL}>End Date</label><input type="date" style={INP} value={form.end_date} onChange={set("end_date")} min={form.start_date} /></div>
             </div>
           )}
 
           {/* Deadline */}
           {showDeadline && (
-            <div>
-              <label style={LBL}>Application Deadline</label>
-              <input type="date" style={INP} value={form.deadline} onChange={set("deadline")} />
-            </div>
+            <div><label style={LBL}>Application Deadline</label><input type="date" style={INP} value={form.deadline} onChange={set("deadline")} /></div>
           )}
 
           {/* Open Call extras */}
           {showOpenCall && (
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-              <div>
-                <label style={LBL}>Artists Sought</label>
-                <input style={INP} type="number" min="1" value={form.num_artists} onChange={set("num_artists")} placeholder="e.g. 4" />
-              </div>
-              <div>
-                <label style={LBL}>Submission Link</label>
-                <input style={INP} value={form.submission_link} onChange={set("submission_link")} placeholder="https://…" />
-              </div>
+              <div><label style={LBL}>Artists Sought</label><input style={INP} type="number" min="1" value={form.num_artists} onChange={set("num_artists")} placeholder="e.g. 4" /></div>
+              <div><label style={LBL}>Submission Link</label><input style={INP} value={form.submission_link} onChange={set("submission_link")} placeholder="https://…" /></div>
             </div>
           )}
 
           {/* Commission extras */}
           {showCommission && (
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-              <div>
-                <label style={LBL}>Starting Price</label>
-                <input style={INP} value={form.price_from} onChange={set("price_from")} placeholder="e.g. 800 €" />
-              </div>
-              <div>
-                <label style={LBL}>Commission Scope</label>
-                <input style={INP} value={form.commission_scope} onChange={set("commission_scope")} placeholder="e.g. Murals, portraits…" />
-              </div>
+              <div><label style={LBL}>Starting Price</label><input style={INP} value={form.price_from} onChange={set("price_from")} placeholder="e.g. 800 €" /></div>
+              <div><label style={LBL}>Commission Scope</label><input style={INP} value={form.commission_scope} onChange={set("commission_scope")} placeholder="e.g. Murals, portraits…" /></div>
             </div>
           )}
 
@@ -632,14 +609,15 @@ function PostFormModal({ type, userId, editItem, onClose, onSaved }: { type: Pos
           <div style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "12px 14px", background: "#F5F0E8", border: "1.5px solid #E8E0D0", borderRadius: 12 }}>
             <Check size={15} color="#16A34A" style={{ flexShrink: 0, marginTop: 1 }} />
             <div style={{ fontSize: 12, fontWeight: 600, color: "#5C5346", lineHeight: 1.4 }}>
-              This post will be <strong>visible to everyone</strong> in The Scene feed. You can edit or remove it at any time.
+              This post will be <strong>visible to everyone</strong> in The Scene. You can edit or remove it at any time.
             </div>
           </div>
         </div>
 
         {/* Footer */}
         <div style={{ padding: "0 22px 22px" }}>
-          <button onClick={handleSave} disabled={saving || uploading} style={{ width: "100%", padding: "14px 20px", background: saving || uploading ? "#F5F0E8" : "#FFD400", border: `2.5px solid ${saving || uploading ? "#E8E0D0" : "#111110"}`, borderRadius: 13, fontFamily: "inherit", fontSize: 15, fontWeight: 900, cursor: saving || uploading ? "not-allowed" : "pointer", color: saving || uploading ? "#C0B8A8" : "#111110", boxShadow: saving || uploading ? "none" : "3px 4px 0 #111110", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, transition: "all .15s" }}
+          <button onClick={handleSave} disabled={saving || uploading}
+            style={{ width: "100%", padding: "14px 20px", background: saving || uploading ? "#F5F0E8" : "#FFD400", border: `2.5px solid ${saving || uploading ? "#E8E0D0" : "#111110"}`, borderRadius: 13, fontFamily: "inherit", fontSize: 15, fontWeight: 900, cursor: saving || uploading ? "not-allowed" : "pointer", color: saving || uploading ? "#C0B8A8" : "#111110", boxShadow: saving || uploading ? "none" : "3px 4px 0 #111110", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, transition: "all .15s" }}
             onMouseEnter={e => !saving && !uploading && ((e.currentTarget as HTMLElement).style.transform = "translate(-1px,-1px)")}
             onMouseLeave={e => ((e.currentTarget as HTMLElement).style.transform = "none")}>
             {saving ? "Posting…" : uploading ? "Uploading images…" : isEdit ? "Save Changes ✓" : "Post to The Scene ✦"}
@@ -709,16 +687,17 @@ export default function ScenePage() {
   const sb = createClient();
 
   const [userId, setUserId]             = useState<string | null>(null);
-  const [feed, setFeed]                 = useState<FeedItem[]>([]);
+  const [posts, setPosts]               = useState<ScenePost[]>([]);
   const [picks, setPicks]               = useState<EditorPick[]>([]);
   const [loading, setLoading]           = useState(true);
   const [filter, setFilter]             = useState<FilterKey>("all");
-  const [selectedItem, setSelectedItem] = useState<FeedItem | null>(null);
-  const [authWallItem, setAuthWallItem] = useState<FeedItem | null>(null);
+  const [selectedPost, setSelectedPost] = useState<ScenePost | null>(null);
+  const [authWallPost, setAuthWallPost] = useState<ScenePost | null>(null);
   const [showPicker, setShowPicker]     = useState(false);
   const [createType, setCreateType]     = useState<PostType | null>(null);
-  const [editItem, setEditItem]         = useState<FeedItem | null>(null);
+  const [editPost, setEditPost]         = useState<ScenePost | null>(null);
 
+  // ── Auth ──
   useEffect(() => {
     const init = async () => {
       const { data: { user } } = await sb.auth.getUser();
@@ -727,105 +706,87 @@ export default function ScenePage() {
     init();
   }, []);
 
+  // ── Load feed — ONLY from scene_posts ──
   const loadFeed = useCallback(async () => {
     setLoading(true);
     try {
-      const [exhRes, poolRes, calRes] = await Promise.all([
-        sb.from("exhibitions")
-          .select("id, user_id, title, description, cover_image, venue, start_date, end_date, created_at, profiles(id, full_name, username, avatar_url, role)")
-          .eq("is_public", true)
-          .order("created_at", { ascending: false })
-          .limit(60),
-        sb.from("pool_requests")
-          .select("id, user_id, title, description, cover_image, images, request_type, location, deadline, created_at, profiles(id, full_name, username, avatar_url, role)")
-          .eq("status", "open")
-          .order("created_at", { ascending: false })
-          .limit(60),
-        sb.from("calendar_events")
-          .select("id, user_id, title, description, venue, location_name, is_online, start_date, end_date, event_type, created_at, profiles(id, full_name, username, avatar_url, role)")
-          .eq("is_public", true)
-          .order("created_at", { ascending: false })
-          .limit(40),
-      ]);
+      const { data, error } = await sb
+        .from("scene_posts")
+        .select("*, profiles(id, full_name, username, avatar_url, role)")
+        .eq("is_public", true)
+        .eq("status", "active")
+        .order("created_at", { ascending: false })
+        .limit(120);
 
-      const exhItems: FeedItem[] = (exhRes.data || []).map((e: any): FeedItem => ({
-        id: e.id, source: "exhibition", post_type: "exhibition",
-        title: e.title, description: e.description, cover_image: e.cover_image,
-        location: e.venue, is_online: false, start_date: e.start_date, end_date: e.end_date,
-        created_at: e.created_at, user_id: e.user_id,
-        poster: Array.isArray(e.profiles) ? e.profiles[0] : e.profiles,
-        from_calendar: false,
+      if (error) throw new Error(error.message);
+
+      const mapped: ScenePost[] = (data || []).map((row: any): ScenePost => ({
+        id:               row.id,
+        user_id:          row.user_id,
+        post_type:        row.post_type as PostType,
+        title:            row.title,
+        description:      row.description,
+        cover_image:      row.cover_image,
+        images:           Array.isArray(row.images) ? row.images.filter(Boolean) : [],
+        location:         row.location,
+        is_online:        row.is_online,
+        start_date:       row.start_date,
+        end_date:         row.end_date,
+        deadline:         row.deadline,
+        price_from:       row.price_from,
+        commission_scope: row.commission_scope,
+        num_artists:      row.num_artists,
+        submission_link:  row.submission_link,
+        from_calendar:    row.from_calendar,
+        calendar_event_id: row.calendar_event_id,
+        created_at:       row.created_at,
+        poster:           Array.isArray(row.profiles) ? row.profiles[0] : row.profiles,
       }));
 
-      const poolItems: FeedItem[] = (poolRes.data || []).map((p: any): FeedItem => ({
-        id: p.id, source: "pool_request",
-        post_type: POOL_TYPE_MAP[p.request_type] || "collab",
-        title: p.title, description: p.description, cover_image: p.cover_image,
-        images: Array.isArray(p.images) ? p.images.filter(Boolean) : [],
-        location: p.location, deadline: p.deadline,
-        created_at: p.created_at, user_id: p.user_id,
-        poster: Array.isArray(p.profiles) ? p.profiles[0] : p.profiles,
-        from_calendar: false,
-      }));
-
-      const calItems: FeedItem[] = (calRes.data || []).map((c: any): FeedItem => ({
-        id: `cal_${c.id}`, source: "calendar_event",
-        post_type: CAL_TYPE_MAP[c.event_type || ""] || "event",
-        title: c.title, description: c.description,
-        location: c.venue || c.location_name, is_online: c.is_online || false,
-        start_date: c.start_date, end_date: c.end_date,
-        created_at: c.created_at, user_id: c.user_id,
-        poster: Array.isArray(c.profiles) ? c.profiles[0] : c.profiles,
-        from_calendar: true,
-      }));
-
-      // Merge, deduplicate by id, sort desc
-      const seen = new Set<string>();
-      const merged: FeedItem[] = [];
-      for (const item of [...exhItems, ...poolItems, ...calItems]) {
-        if (!seen.has(item.id)) { seen.add(item.id); merged.push(item); }
-      }
-      merged.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-      setFeed(merged);
+      setPosts(mapped);
     } catch (err) {
-      console.error("Scene feed load error:", err);
+      console.error("Scene feed error:", err);
     } finally {
       setLoading(false);
     }
   }, []);
 
+  // ── Load editor picks ──
   const loadPicks = useCallback(async () => {
     try {
       const { data } = await sb.from("editor_picks").select("*").eq("is_active", true).order("sort_order", { ascending: true });
       setPicks(data || []);
     } catch (err) {
-      console.error("Editor picks load error:", err);
+      console.error("Editor picks error:", err);
     }
   }, []);
 
   useEffect(() => { loadFeed(); loadPicks(); }, [loadFeed, loadPicks]);
 
-  const filteredFeed = feed.filter(item => {
+  // ── Filter ──
+  const filtered = posts.filter(p => {
     if (filter === "all")      return true;
-    if (filter === "online")   return !!item.is_online;
-    if (filter === "upcoming") return isUpcoming(item);
-    return item.post_type === filter;
+    if (filter === "online")   return !!p.is_online;
+    if (filter === "upcoming") return isUpcoming(p);
+    return p.post_type === filter;
   });
 
+  // ── Stats ──
   const stats = {
-    total:     feed.length,
-    upcoming:  feed.filter(isUpcoming).length,
-    collabs:   feed.filter(i => i.post_type === "collab" || i.post_type === "opencall").length,
-    opencalls: feed.filter(i => i.post_type === "opencall").length,
+    total:     posts.length,
+    upcoming:  posts.filter(isUpcoming).length,
+    collabs:   posts.filter(p => p.post_type === "collab" || p.post_type === "opencall").length,
+    opencalls: posts.filter(p => p.post_type === "opencall").length,
   };
 
-  const col1 = filteredFeed.filter((_, i) => i % 3 === 0);
-  const col2 = filteredFeed.filter((_, i) => i % 3 === 1);
-  const col3 = filteredFeed.filter((_, i) => i % 3 === 2);
+  // ── Masonry columns ──
+  const col1 = filtered.filter((_, i) => i % 3 === 0);
+  const col2 = filtered.filter((_, i) => i % 3 === 1);
+  const col3 = filtered.filter((_, i) => i % 3 === 2);
 
-  const handleCardClick = (item: FeedItem) => {
-    if (!userId) { setAuthWallItem(item); return; }
-    setSelectedItem(item);
+  const handleCardClick = (post: ScenePost) => {
+    if (!userId) { setAuthWallPost(post); return; }
+    setSelectedPost(post);
   };
 
   return (
@@ -834,15 +795,15 @@ export default function ScenePage() {
         @import url('https://fonts.googleapis.com/css2?family=Darker+Grotesque:wght@400;500;600;700;800;900&display=swap');
         *, *::before, *::after { box-sizing: border-box; }
         .scene-page { min-height: 100vh; background: #FFFBEA; font-family: 'Darker Grotesque', sans-serif; }
-        .scene-feed-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; padding: 20px 32px 48px; }
-        @media (max-width: 1100px) { .scene-feed-grid { grid-template-columns: repeat(2, 1fr); } }
-        @media (max-width: 700px) { .scene-feed-grid { grid-template-columns: 1fr; padding: 16px; } .scene-header { padding: 20px 16px 0 !important; flex-direction: column !important; align-items: flex-start !important; } .scene-stats { margin: 16px 16px 0 !important; } .scene-filters { padding: 14px 16px 0 !important; } }
+        .scene-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; padding: 20px 32px 48px; }
+        @media (max-width: 1100px) { .scene-grid { grid-template-columns: repeat(2, 1fr); } }
+        @media (max-width: 700px) { .scene-grid { grid-template-columns: 1fr; padding: 16px; } .scene-hdr { padding: 20px 16px 0 !important; flex-direction: column !important; align-items: flex-start !important; } .scene-stats { margin: 16px 16px 0 !important; } .scene-filters { padding: 14px 16px 0 !important; } }
         ::-webkit-scrollbar { width: 6px; } ::-webkit-scrollbar-thumb { background: #E8E0D0; border-radius: 99px; }
       `}</style>
 
       <div className="scene-page">
         {/* Header */}
-        <div className="scene-header" style={{ padding: "28px 32px 0", display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16 }}>
+        <div className="scene-hdr" style={{ padding: "28px 32px 0", display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16 }}>
           <div>
             <div style={{ fontSize: 10, fontWeight: 800, color: "#9B8F7A", textTransform: "uppercase", letterSpacing: "0.16em", marginBottom: 4 }}>🌆 The Scene</div>
             <h1 style={{ fontSize: 32, fontWeight: 900, color: "#111110", lineHeight: 1, letterSpacing: "-0.02em", margin: 0 }}>Collabs &amp; Events</h1>
@@ -889,35 +850,33 @@ export default function ScenePage() {
             <div style={{ fontSize: 32, marginBottom: 12 }}>🌆</div>
             <div style={{ fontSize: 16, fontWeight: 700 }}>Loading The Scene…</div>
           </div>
-        ) : filteredFeed.length === 0 ? (
+        ) : filtered.length === 0 ? (
           <div style={{ padding: "60px 32px", textAlign: "center" }}>
             <div style={{ fontSize: 44, marginBottom: 12 }}>🎨</div>
             <div style={{ fontSize: 16, fontWeight: 800, color: "#111110", marginBottom: 6 }}>Nothing here yet</div>
             <div style={{ fontSize: 13, color: "#9B8F7A", marginBottom: 20 }}>{filter === "all" ? "Be the first to post to the scene." : "No posts match this filter yet."}</div>
-            {userId && (
-              <button onClick={() => setShowPicker(true)} style={{ padding: "11px 22px", background: "#FFD400", border: "2.5px solid #111110", borderRadius: 13, fontFamily: "inherit", fontSize: 14, fontWeight: 800, cursor: "pointer", boxShadow: "3px 4px 0 #111110", color: "#111110" }}>✦ Post to The Scene</button>
-            )}
+            {userId && <button onClick={() => setShowPicker(true)} style={{ padding: "11px 22px", background: "#FFD400", border: "2.5px solid #111110", borderRadius: 13, fontFamily: "inherit", fontSize: 14, fontWeight: 800, cursor: "pointer", boxShadow: "3px 4px 0 #111110", color: "#111110" }}>✦ Post to The Scene</button>}
           </div>
         ) : (
-          <div className="scene-feed-grid">
-            <div style={{ display: "flex", flexDirection: "column" }}>{col1.map(item => <FeedCard key={item.id} item={item} isOwn={item.user_id === userId} onClick={() => handleCardClick(item)} />)}</div>
-            <div style={{ display: "flex", flexDirection: "column" }}>{col2.map(item => <FeedCard key={item.id} item={item} isOwn={item.user_id === userId} onClick={() => handleCardClick(item)} />)}</div>
-            <div style={{ display: "flex", flexDirection: "column" }}>{col3.map(item => <FeedCard key={item.id} item={item} isOwn={item.user_id === userId} onClick={() => handleCardClick(item)} />)}</div>
+          <div className="scene-grid">
+            <div style={{ display: "flex", flexDirection: "column" }}>{col1.map(p => <FeedCard key={p.id} post={p} isOwn={p.user_id === userId} onClick={() => handleCardClick(p)} />)}</div>
+            <div style={{ display: "flex", flexDirection: "column" }}>{col2.map(p => <FeedCard key={p.id} post={p} isOwn={p.user_id === userId} onClick={() => handleCardClick(p)} />)}</div>
+            <div style={{ display: "flex", flexDirection: "column" }}>{col3.map(p => <FeedCard key={p.id} post={p} isOwn={p.user_id === userId} onClick={() => handleCardClick(p)} />)}</div>
           </div>
         )}
       </div>
 
       {/* Modals */}
-      {selectedItem && (
-        <DetailModal item={selectedItem} isOwn={selectedItem.user_id === userId} userId={userId} onClose={() => setSelectedItem(null)}
-          onEdit={() => { setEditItem(selectedItem); setCreateType(selectedItem.post_type); setSelectedItem(null); }} />
+      {selectedPost && (
+        <DetailModal post={selectedPost} isOwn={selectedPost.user_id === userId} onClose={() => setSelectedPost(null)}
+          onEdit={() => { setEditPost(selectedPost); setCreateType(selectedPost.post_type); setSelectedPost(null); }} />
       )}
-      {authWallItem && <AuthWall item={authWallItem} onClose={() => setAuthWallItem(null)} />}
+      {authWallPost && <AuthWall post={authWallPost} onClose={() => setAuthWallPost(null)} />}
       {showPicker && <CreatePickerModal onClose={() => setShowPicker(false)} onSelect={type => { setCreateType(type); setShowPicker(false); }} />}
       {createType && (
-        <PostFormModal type={createType} userId={userId || ""} editItem={editItem}
-          onClose={() => { setCreateType(null); setEditItem(null); }}
-          onSaved={() => { loadFeed(); }} />
+        <PostFormModal type={createType} userId={userId || ""} editPost={editPost}
+          onClose={() => { setCreateType(null); setEditPost(null); }}
+          onSaved={loadFeed} />
       )}
     </>
   );

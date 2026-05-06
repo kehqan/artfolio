@@ -710,17 +710,30 @@ export default function ScenePage() {
   const loadFeed = useCallback(async () => {
     setLoading(true);
     try {
-      const { data, error } = await sb
+      // Step 1: fetch posts (no join — scene_posts has no FK to profiles in schema cache)
+      const { data: rows, error } = await sb
         .from("scene_posts")
-        .select("*, profiles(id, full_name, username, avatar_url, role)")
+        .select("*")
         .eq("is_public", true)
         .eq("status", "active")
         .order("created_at", { ascending: false })
         .limit(120);
 
       if (error) throw new Error(error.message);
+      if (!rows || rows.length === 0) { setPosts([]); return; }
 
-      const mapped: ScenePost[] = (data || []).map((row: any): ScenePost => ({
+      // Step 2: collect unique user_ids and fetch profiles separately
+      const userIds = Array.from(new Set(rows.map((r: any) => r.user_id)));
+      const { data: profRows } = await sb
+        .from("profiles")
+        .select("id, full_name, username, avatar_url, role")
+        .in("id", userIds);
+
+      const profMap: Record<string, Profile> = {};
+      (profRows || []).forEach((p: any) => { profMap[p.id] = p; });
+
+      // Step 3: merge
+      const mapped: ScenePost[] = rows.map((row: any): ScenePost => ({
         id:               row.id,
         user_id:          row.user_id,
         post_type:        row.post_type as PostType,
@@ -740,7 +753,7 @@ export default function ScenePage() {
         from_calendar:    row.from_calendar,
         calendar_event_id: row.calendar_event_id,
         created_at:       row.created_at,
-        poster:           Array.isArray(row.profiles) ? row.profiles[0] : row.profiles,
+        poster:           profMap[row.user_id] || undefined,
       }));
 
       setPosts(mapped);

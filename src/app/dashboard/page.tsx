@@ -16,27 +16,46 @@ const INTENTS: { key: IntentKey; label: string }[] = [
   { key: "learn",   label: "Check on sales" },
 ];
 
-type CellKey = "studio" | "scene" | "planning" | "activity" | "money" | "inbox";
+type CellKey = "studio" | "scene" | "planning" | "calendar" | "money" | "inbox";
 
 const SPOTLIGHT: Record<IntentKey, CellKey[]> = {
   make:    ["studio", "planning"],
-  manage:  ["planning", "activity"],
+  manage:  ["planning", "calendar"],
   connect: ["scene", "inbox"],
-  learn:   ["money", "activity"],
+  learn:   ["money", "calendar"],
+};
+
+/* ═══════════════════════════════════════════════════════════════════
+   SCENE POST TYPE CONFIG — mirrors /dashboard/scene
+═══════════════════════════════════════════════════════════════════ */
+type ScenePostType = "event" | "exhibition" | "collab" | "opencall" | "commission";
+
+const SCENE_POST_CFG: Record<ScenePostType, { label: string; emoji: string; gradient: string }> = {
+  event:      { label: "Event",      emoji: "🗓",  gradient: "linear-gradient(135deg, #E0F2FE 0%, #7DD3FC 100%)" },
+  exhibition: { label: "Exhibition", emoji: "🖼",  gradient: "linear-gradient(135deg, #FEF9C3 0%, #FFD400 100%)" },
+  collab:     { label: "Collab",     emoji: "🤝", gradient: "linear-gradient(135deg, #EDE9FE 0%, #C4B5FD 100%)" },
+  opencall:   { label: "Open call",  emoji: "🔍", gradient: "linear-gradient(135deg, #DCFCE7 0%, #86EFAC 100%)" },
+  commission: { label: "Commission", emoji: "🎨", gradient: "linear-gradient(135deg, #FFE4E6 0%, #FCA5A5 100%)" },
+};
+
+/* ═══════════════════════════════════════════════════════════════════
+   CALENDAR TYPE CONFIG — mirrors /dashboard/calendar TYPE_CFG
+═══════════════════════════════════════════════════════════════════ */
+const CAL_TYPE_COLOR: Record<string, string> = {
+  exhibition: "#CA8A04",
+  deadline:   "#D93A26",
+  collab:     "#0EA5A5",
+  meeting:    "#7C3AED",
+  personal:   "#111110",
+  sale:       "#EC4899",
+  artwork:    "#FFD400",
+  task:       "#FAFAF8",
+  scene:      "#FFD400",
 };
 
 /* ═══════════════════════════════════════════════════════════════════
    HELPERS
 ═══════════════════════════════════════════════════════════════════ */
-function fmtDate(d?: string) {
-  if (!d) return { day: "—", month: "—" };
-  const dt = new Date(d);
-  return {
-    day: dt.getDate(),
-    month: dt.toLocaleString("en-US", { month: "short" }).toUpperCase(),
-  };
-}
-
 function daysUntil(d?: string) {
   if (!d) return null;
   const dt = new Date(d).getTime();
@@ -69,18 +88,42 @@ function relDate(d?: string) {
   return `${Math.floor(diff / (30 * day))}mo ago`;
 }
 
-// Deterministic palette for collabs / artworks without imagery — used for the
-// vertical color strip on collab cards and for sale avatars.
+function fmtAgendaDate(d: string): { rel: string; num: number } {
+  const dt = new Date(d);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const target = new Date(dt);
+  target.setHours(0, 0, 0, 0);
+  const diff = Math.round((target.getTime() - today.getTime()) / (24 * 60 * 60 * 1000));
+  let rel: string;
+  if (diff === 0) rel = "today";
+  else if (diff === 1) rel = "tomorrow";
+  else rel = dt.toLocaleDateString("en-US", { weekday: "short" }).toLowerCase();
+  return { rel, num: dt.getDate() };
+}
+
+function fmtTime(t?: string | null) {
+  if (!t) return null;
+  return t.slice(0, 5);
+}
+
+function isoDate(d: Date) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
 function paletteFor(seed: string): [string, string, string] {
   const palettes: [string, string, string][] = [
-    ["#C73E1D", "#E89C5A", "#F5E5C0"], // warm earth
-    ["#2D3142", "#4F5D75", "#BFC0C0"], // cool grey
-    ["#2D6A4F", "#74C69D", "#D8F3DC"], // forest
-    ["#6B2D5C", "#C73E1D", "#FFD400"], // jewel
-    ["#1F2421", "#3C5045", "#7A9E7E"], // night
-    ["#8B4513", "#D2691E", "#F4A460"], // umber
-    ["#2C3E50", "#E74C3C", "#ECF0F1"], // editorial
-    ["#5A189A", "#9D4EDD", "#E0AAFF"], // violet
+    ["#C73E1D", "#E89C5A", "#F5E5C0"],
+    ["#2D3142", "#4F5D75", "#BFC0C0"],
+    ["#2D6A4F", "#74C69D", "#D8F3DC"],
+    ["#6B2D5C", "#C73E1D", "#FFD400"],
+    ["#1F2421", "#3C5045", "#7A9E7E"],
+    ["#8B4513", "#D2691E", "#F4A460"],
+    ["#2C3E50", "#E74C3C", "#ECF0F1"],
+    ["#5A189A", "#9D4EDD", "#E0AAFF"],
   ];
   let h = 0;
   for (const c of seed) h = (h * 31 + c.charCodeAt(0)) % palettes.length;
@@ -88,26 +131,45 @@ function paletteFor(seed: string): [string, string, string] {
 }
 
 /* ═══════════════════════════════════════════════════════════════════
+   AGENDA ITEM SHAPE
+═══════════════════════════════════════════════════════════════════ */
+type AgendaItem = {
+  id: string;
+  title: string;
+  type: string;
+  source: "private" | "task" | "public";
+  date: string;
+  time?: string | null;
+  where?: string | null;
+  href: string;
+};
+
+/* ═══════════════════════════════════════════════════════════════════
    PAGE
 ═══════════════════════════════════════════════════════════════════ */
 export default function DashboardPage() {
-  /* ── State ──────────────────────────────────────────── */
+  /* ── Data state ─────────────────────────────────────── */
   const [profile, setProfile] = useState<{ full_name?: string; username?: string; avatar_url?: string } | null>(null);
   const [artworks, setArtworks] = useState<any[]>([]);
-  const [stats, setStats] = useState({ total: 0, available: 0, in_progress: 0, sold: 0, sales_month: 0, sales_total: 0, sales_prev_month: 0, followers: 0 });
+  const [stats, setStats] = useState({
+    total: 0, available: 0, in_progress: 0, sold: 0,
+    sales_month: 0, sales_total: 0, sales_prev_month: 0,
+    followers: 0,
+  });
   const [tasks, setTasks] = useState<any[]>([]);
-  const [nextEvent, setNextEvent] = useState<any>(null);
-  const [collabs, setCollabs] = useState<any[]>([]);
+  const [scenePosts, setScenePosts] = useState<any[]>([]);
+  const [calendarEvents, setCalendarEvents] = useState<any[]>([]);
+  const [publicEvents, setPublicEvents] = useState<any[]>([]);
+  const [calendarTasks, setCalendarTasks] = useState<any[]>([]);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [unreadMessages, setUnreadMessages] = useState(0);
-  const [recentSales, setRecentSales] = useState<any[]>([]);
-  const [recentClients, setRecentClients] = useState<any[]>([]);
   const [contractsOut, setContractsOut] = useState({ out: 0, awaiting: 0 });
   const [loaded, setLoaded] = useState(false);
   const [latestNote, setLatestNote] = useState<{ text: string; when: string } | null>(null);
 
   /* ── UI state ───────────────────────────────────────── */
   const [intent, setIntent] = useState<IntentKey | null>(null);
+  const [calToggle, setCalToggle] = useState<"yours" | "around">("yours");
 
   /* ── Load intent from localStorage ──────────────────── */
   useEffect(() => {
@@ -119,7 +181,6 @@ export default function DashboardPage() {
     } catch {}
   }, []);
 
-  /* ── Save intent to localStorage ────────────────────── */
   useEffect(() => {
     try {
       if (intent) localStorage.setItem("artomango_intent", intent);
@@ -127,7 +188,26 @@ export default function DashboardPage() {
     } catch {}
   }, [intent]);
 
-  /* ── Fetch all data ─────────────────────────────────── */
+  /* ── Load unread messages from /api/conversations ─── */
+  useEffect(() => {
+    const loadUnreadMessages = async () => {
+      try {
+        const res = await fetch("/api/conversations");
+        if (!res.ok) return;
+        const data = await res.json();
+        const total = (data.conversations || []).reduce(
+          (sum: number, c: any) => sum + (c.unread_count || 0),
+          0
+        );
+        setUnreadMessages(total);
+      } catch {}
+    };
+    loadUnreadMessages();
+    const interval = setInterval(loadUnreadMessages, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  /* ── Fetch all dashboard data ───────────────────────── */
   useEffect(() => {
     const supabase = createClient();
 
@@ -140,54 +220,143 @@ export default function DashboardPage() {
         const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
         const prevMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString();
         const prevMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59).toISOString();
+        const todayIso = isoDate(now);
+        const weekAhead = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000);
+        const weekAheadIso = isoDate(weekAhead);
 
         const [
           { data: prof },
           { data: awAll },
           { data: awRecent },
           { data: tk },
-          { data: evNext },
           { data: salesAll },
           { data: salesMonth },
           { data: salesPrevMonth },
-          { data: msgs },
           { data: notifs },
           { count: followerCount },
-          { data: rSales },
-          { data: rClients },
-          { data: collabData },
           { data: contracts },
+          { data: sceneRows },
+          { data: calEvents },
+          { data: pubEvents },
+          { data: calTasks },
         ] = await Promise.all([
+          // Profile
           supabase.from("profiles").select("full_name,username,avatar_url").eq("id", user.id).single(),
+          // Artworks aggregate counts
           supabase.from("artworks").select("id,status").eq("user_id", user.id),
-          supabase.from("artworks").select("id,title,images,status,price,medium,created_at").eq("user_id", user.id).order("created_at", { ascending: false }).limit(8),
-          supabase.from("tasks").select("id,title,priority,due_date,description,status,created_at").eq("user_id", user.id).neq("status", "done").order("created_at", { ascending: false }).limit(10),
-          supabase.from("exhibitions").select("id,title,venue,start_date,event_type").eq("user_id", user.id).gte("start_date", new Date().toISOString().slice(0, 10)).order("start_date", { ascending: true }).limit(1),
-          supabase.from("sales").select("amount,sale_date").eq("user_id", user.id),
-          supabase.from("sales").select("amount").eq("user_id", user.id).gte("sale_date", monthStart),
-          supabase.from("sales").select("amount").eq("user_id", user.id).gte("sale_date", prevMonthStart).lte("sale_date", prevMonthEnd),
-          supabase.from("conversations").select("id").eq("user_id", user.id),
-          supabase.from("notifications").select("id,title,body,type,created_at,read").eq("user_id", user.id).eq("read", false).order("created_at", { ascending: false }).limit(6),
+          // Recent artworks for the wall — favor available work that's been photographed
+          supabase
+            .from("artworks")
+            .select("id,title,images,status,price,medium,created_at,updated_at")
+            .eq("user_id", user.id)
+            .order("updated_at", { ascending: false })
+            .limit(12),
+          // Tasks for the to-do cell and the wall-note
+          supabase
+            .from("tasks")
+            .select("id,title,priority,due_date,description,status,created_at")
+            .eq("user_id", user.id)
+            .neq("status", "done")
+            .order("created_at", { ascending: false })
+            .limit(10),
+          // Sales — FIXED: use sale_price column, filter status=completed
+          supabase
+            .from("sales")
+            .select("sale_price,sale_date,status")
+            .eq("user_id", user.id)
+            .ilike("status", "completed"),
+          supabase
+            .from("sales")
+            .select("sale_price,status")
+            .eq("user_id", user.id)
+            .ilike("status", "completed")
+            .gte("sale_date", monthStart),
+          supabase
+            .from("sales")
+            .select("sale_price,status")
+            .eq("user_id", user.id)
+            .ilike("status", "completed")
+            .gte("sale_date", prevMonthStart)
+            .lte("sale_date", prevMonthEnd),
+          // Notifications
+          supabase
+            .from("notifications")
+            .select("id,title,body,type,created_at,read")
+            .eq("user_id", user.id)
+            .eq("read", false)
+            .order("created_at", { ascending: false })
+            .limit(6),
+          // Followers
           supabase.from("follows").select("*", { count: "exact", head: true }).eq("following_id", user.id),
-          supabase.from("sales").select("id,buyer_name,amount,sale_date,artwork_id").eq("user_id", user.id).order("sale_date", { ascending: false }).limit(4),
-          supabase.from("clients").select("id,full_name,email,created_at").eq("user_id", user.id).order("created_at", { ascending: false }).limit(4),
-          supabase.from("collaborations").select("id,title,type,status,created_at").eq("user_id", user.id).order("created_at", { ascending: false }).limit(3),
+          // Contracts
           supabase.from("contracts").select("status").eq("user_id", user.id),
+          // Scene posts — FIXED: read from scene_posts, public+active feed
+          supabase
+            .from("scene_posts")
+            .select("id,user_id,post_type,title,description,cover_image,images,location,is_online,start_date,end_date,deadline,price_from,commission_scope,created_at")
+            .eq("is_public", true)
+            .eq("status", "active")
+            .order("created_at", { ascending: false })
+            .limit(6),
+          // Calendar — your private events for the next ~2 weeks
+          supabase
+            .from("calendar_events")
+            .select("id,title,type,start_date,end_date,start_time,end_time,all_day,location,source,origin_id")
+            .eq("user_id", user.id)
+            .gte("start_date", todayIso)
+            .lte("start_date", weekAheadIso)
+            .order("start_date", { ascending: true })
+            .limit(20),
+          // Public events for the "Around" toggle
+          supabase
+            .from("public_events")
+            .select("id,title,type,start_date,end_date,start_time,venue,city,closes_at,cover_url")
+            .gte("start_date", todayIso)
+            .lte("start_date", weekAheadIso)
+            .order("start_date", { ascending: true })
+            .limit(20),
+          // Tasks with due dates for calendar agenda
+          supabase
+            .from("tasks")
+            .select("id,title,due_date,priority,status")
+            .eq("user_id", user.id)
+            .neq("status", "done")
+            .not("due_date", "is", null)
+            .gte("due_date", todayIso)
+            .lte("due_date", weekAheadIso)
+            .order("due_date", { ascending: true })
+            .limit(20),
         ]);
 
         setProfile(prof || null);
         setArtworks(awRecent || []);
         setTasks(tk || []);
-        setNextEvent((evNext || [])[0] || null);
         setNotifications(notifs || []);
-        setUnreadMessages((msgs || []).length);
-        setRecentSales(rSales || []);
-        setRecentClients(rClients || []);
-        setCollabs(collabData || []);
+        setScenePosts(sceneRows || []);
+        setCalendarEvents(calEvents || []);
+        setPublicEvents(pubEvents || []);
+        setCalendarTasks(calTasks || []);
 
-        // Latest note — pull the most recent task description as a stand-in
-        // "studio note" until we ship the proper sketchbook entity.
-        const tkWithDescription = (tk || []).find((t: any) => t.description && t.description.trim().length > 0);
+        // Resolve scene posters in a second round
+        const sceneList = sceneRows || [];
+        if (sceneList.length > 0) {
+          const posterIds = Array.from(new Set(sceneList.map((r: any) => r.user_id)));
+          const { data: posters } = await supabase
+            .from("profiles")
+            .select("id,full_name,username,avatar_url")
+            .in("id", posterIds);
+          const profMap: Record<string, any> = {};
+          (posters || []).forEach((p: any) => { profMap[p.id] = p; });
+          setScenePosts(
+            sceneList.map((r: any) => ({ ...r, poster: profMap[r.user_id] || null }))
+          );
+        }
+
+        // Pull the most recent task description as the wall note (until a real
+        // sketchbook entity exists).
+        const tkWithDescription = (tk || []).find(
+          (t: any) => t.description && t.description.trim().length > 0
+        );
         if (tkWithDescription) {
           setLatestNote({
             text: tkWithDescription.description.slice(0, 80),
@@ -198,17 +367,42 @@ export default function DashboardPage() {
         if (awAll) {
           const total = awAll.length;
           const available = awAll.filter((a: any) => a.status === "available").length;
-          const in_progress = awAll.filter((a: any) => ["in_progress", "concept"].includes(a.status)).length;
+          const in_progress = awAll.filter((a: any) =>
+            ["in_progress", "concept"].includes(a.status)
+          ).length;
           const sold = awAll.filter((a: any) => a.status === "sold").length;
-          const sales_total = (salesAll || []).reduce((s: number, r: any) => s + (r.amount || 0), 0);
-          const sales_month = (salesMonth || []).reduce((s: number, r: any) => s + (r.amount || 0), 0);
-          const sales_prev_month = (salesPrevMonth || []).reduce((s: number, r: any) => s + (r.amount || 0), 0);
-          setStats({ total, available, in_progress, sold, sales_total, sales_month, sales_prev_month, followers: followerCount || 0 });
+          // FIXED: read sale_price, not amount
+          const sales_total = (salesAll || []).reduce(
+            (s: number, r: any) => s + (Number(r.sale_price) || 0),
+            0
+          );
+          const sales_month = (salesMonth || []).reduce(
+            (s: number, r: any) => s + (Number(r.sale_price) || 0),
+            0
+          );
+          const sales_prev_month = (salesPrevMonth || []).reduce(
+            (s: number, r: any) => s + (Number(r.sale_price) || 0),
+            0
+          );
+          setStats({
+            total,
+            available,
+            in_progress,
+            sold,
+            sales_total,
+            sales_month,
+            sales_prev_month,
+            followers: followerCount || 0,
+          });
         }
 
         if (contracts) {
-          const out = contracts.filter((c: any) => ["sent", "active", "executed"].includes(c.status)).length;
-          const awaiting = contracts.filter((c: any) => c.status === "sent" || c.status === "awaiting_signature").length;
+          const out = contracts.filter((c: any) =>
+            ["sent", "active", "executed"].includes(c.status)
+          ).length;
+          const awaiting = contracts.filter((c: any) =>
+            c.status === "sent" || c.status === "awaiting_signature"
+          ).length;
           setContractsOut({ out, awaiting });
         }
 
@@ -230,45 +424,125 @@ export default function DashboardPage() {
   const activeSpotlight: CellKey[] = intent ? SPOTLIGHT[intent] : [];
   const isLit = (key: CellKey) => !intent || activeSpotlight.includes(key);
 
-  const todayFmt = new Date().toLocaleDateString("en-US", { weekday: "long", day: "numeric", month: "long" });
+  const todayFmt = new Date().toLocaleDateString("en-US", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  });
 
-  // Greeting subtitle — observational, never cheerleading
-  const collabsLen = collabs.length;
-  const tasksLen = tasks.length;
+  // Greeting subtitle — observational
   const observations: string[] = [];
   if (unreadMessages > 0) observations.push(`${unreadMessages} new message${unreadMessages > 1 ? "s" : ""}`);
-  if (collabsLen > 0) observations.push(`${collabsLen} collab thread${collabsLen > 1 ? "s" : ""}`);
-  if (nextEvent) {
-    const d = daysUntil(nextEvent.start_date);
-    if (d) observations.push(`${nextEvent.title} ${d}`);
+  const nextPrivateEv = calendarEvents[0];
+  if (nextPrivateEv) {
+    const d = daysUntil(nextPrivateEv.start_date);
+    if (d) observations.push(`${nextPrivateEv.title} ${d}`);
   }
-  const greetSub = observations.length > 0
-    ? observations.slice(0, 2).join(" · ") + "."
-    : "A quiet week so far. The work doesn't mind quiet.";
+  if (tasks.length > 0) {
+    observations.push(`${tasks.length} open task${tasks.length > 1 ? "s" : ""}`);
+  }
+  const greetSub =
+    observations.length > 0
+      ? observations.slice(0, 2).join(" · ") + "."
+      : "A quiet week so far. The work doesn't mind quiet.";
 
-  // Counts for the focus pills
   const pillCount = (key: IntentKey): number => {
-    if (key === "manage") return tasksLen;
+    if (key === "manage") return tasks.length;
     if (key === "connect") return unreadMessages;
     return 0;
   };
 
-  // Anchor + salon-hang slot assignment from real artworks
-  const wallPieces = artworks.slice(0, 5);
-  const anchor = wallPieces[0];
-  const salonHang = wallPieces.slice(1, 5);
+  // Wall composition — anchor prefers an available work with an image
+  const wallEligible = artworks.filter(
+    (a) => a.images && a.images[0]
+  );
+  const anchorPick =
+    wallEligible.find((a) => a.status === "available") ||
+    wallEligible[0] ||
+    artworks[0];
+  const restOfWall = artworks
+    .filter((a) => a.id !== (anchorPick && anchorPick.id))
+    .slice(0, 3);
 
-  // Humane Sales note based on state
+  // Sales note — copy that responds to state
   const salesNote = (() => {
+    if (stats.sales_month > 0 && stats.sales_total === stats.sales_month) {
+      return "First sale of the month. There may be more.";
+    }
     if (stats.sales_month > 0) return "Real money in the door.";
     if (stats.sales_prev_month > 0) return "Last month landed. This one's still open.";
     return "A quiet month. The work goes on.";
   })();
 
-  // Humane Reach note
-  const reachNote = stats.followers > 0
-    ? "People paying attention to your front door."
-    : "Your audience will gather here.";
+  const reachNote =
+    stats.followers > 0
+      ? "People paying attention to your front door."
+      : "Your audience will gather here.";
+
+  // ─── AGENDA — build for the calendar cell ────────────
+  const agendaYours: AgendaItem[] = [
+    ...calendarEvents.map((e: any): AgendaItem => ({
+      id: `ev-${e.id}`,
+      title: e.title,
+      type: e.type || "personal",
+      source: "private",
+      date: e.start_date,
+      time: e.all_day ? null : fmtTime(e.start_time),
+      where: e.location,
+      href: "/dashboard/calendar",
+    })),
+    ...calendarTasks.map((t: any): AgendaItem => ({
+      id: `tk-${t.id}`,
+      title: t.title,
+      type: "task",
+      source: "task",
+      date: t.due_date,
+      time: null,
+      where: "task",
+      href: "/dashboard/tasks",
+    })),
+  ].sort((a, b) => a.date.localeCompare(b.date)).slice(0, 5);
+
+  const agendaAround: AgendaItem[] = publicEvents
+    .map((p: any): AgendaItem => ({
+      id: `pub-${p.id}`,
+      title: p.title,
+      type: p.type === "open_call" || p.type === "residency" ? "scene" : "exhibition",
+      source: "public",
+      date: p.start_date,
+      time: fmtTime(p.start_time),
+      where: p.venue ? `${p.venue}${p.city ? `, ${p.city}` : ""}` : p.city || null,
+      href: "/dashboard/calendar",
+    }))
+    .slice(0, 5);
+
+  const agenda = calToggle === "yours" ? agendaYours : agendaAround;
+
+  // Scene post meta builder — short contextual line per post type
+  const sceneMeta = (p: any): string => {
+    const parts: string[] = [];
+    if (p.is_online) parts.push("Online");
+    else if (p.location) parts.push(p.location);
+    if (p.start_date) {
+      const dt = new Date(p.start_date).toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+      });
+      const d = daysUntil(p.start_date);
+      parts.push(d === "today" || d === "tomorrow" ? `opens ${d}` : `${dt}`);
+    } else if (p.deadline) {
+      const dt = new Date(p.deadline).toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+      });
+      parts.push(`closes ${dt}`);
+    }
+    if (p.price_from) parts.push(`from ${p.price_from}`);
+    if (parts.length === 0 && p.description) {
+      return p.description.slice(0, 60);
+    }
+    return parts.join(" · ");
+  };
 
   return (
     <>
@@ -288,6 +562,13 @@ export default function DashboardPage() {
           --radius: 20px;
           --shadow: 3px 4px 0 var(--line);
           --shadow-hard: 3px 4px 0 var(--black);
+
+          /* Emil-correct easing tokens */
+          --ease-out: cubic-bezier(0.25, 0.46, 0.45, 0.94);
+          --ease-in-out: cubic-bezier(0.42, 0, 0.58, 1);
+          --dur-micro: 150ms;
+          --dur-base: 180ms;
+          --dur-large: 220ms;
         }
         * { box-sizing: border-box; }
         .db-root {
@@ -301,7 +582,7 @@ export default function DashboardPage() {
           min-height: 100vh;
         }
 
-        /* ─── GREETING + INTEGRATED FOCUS ─── */
+        /* ─── GREETING + FOCUS ─── */
         .greet {
           padding: 24px 4px 28px;
           margin-bottom: 26px;
@@ -325,9 +606,7 @@ export default function DashboardPage() {
           color: var(--muted);
           margin-bottom: 14px;
         }
-        .greet-eyebrow .line {
-          width: 28px; height: 1.5px; background: var(--muted);
-        }
+        .greet-eyebrow .line { width: 28px; height: 1.5px; background: var(--muted); }
         .greet-headline {
           font-family: 'Fraunces', serif;
           font-weight: 500;
@@ -337,11 +616,7 @@ export default function DashboardPage() {
           color: var(--ink);
           margin: 0;
         }
-        .greet-headline em {
-          font-style: italic;
-          font-weight: 400;
-          color: var(--muted);
-        }
+        .greet-headline em { font-style: italic; font-weight: 400; color: var(--muted); }
         .greet-sub {
           font-family: 'Fraunces', serif;
           font-style: italic;
@@ -352,16 +627,8 @@ export default function DashboardPage() {
           max-width: 580px;
           line-height: 1.4;
         }
-        .greet-stats {
-          display: flex;
-          gap: 0;
-          align-items: stretch;
-        }
-        .gstat {
-          padding: 14px 22px;
-          border-left: 1.5px solid var(--line);
-          text-align: left;
-        }
+        .greet-stats { display: flex; align-items: stretch; }
+        .gstat { padding: 14px 22px; border-left: 1.5px solid var(--line); }
         .gstat:first-child { border-left: none; padding-left: 0; }
         .gstat-n {
           font-family: 'Fraunces', serif;
@@ -369,7 +636,6 @@ export default function DashboardPage() {
           font-weight: 500;
           letter-spacing: -1.2px;
           line-height: 1;
-          color: var(--ink);
         }
         .gstat-l {
           font-size: 10px;
@@ -380,7 +646,6 @@ export default function DashboardPage() {
           margin-top: 6px;
         }
 
-        /* Focus question — integrated, no panel */
         .focus {
           display: grid;
           grid-template-columns: auto 1fr auto;
@@ -396,11 +661,7 @@ export default function DashboardPage() {
           letter-spacing: -0.3px;
           white-space: nowrap;
         }
-        .focus-pills {
-          display: flex;
-          gap: 8px;
-          flex-wrap: wrap;
-        }
+        .focus-pills { display: flex; gap: 8px; flex-wrap: wrap; }
         .pill {
           display: inline-flex;
           align-items: center;
@@ -414,21 +675,15 @@ export default function DashboardPage() {
           cursor: pointer;
           font-family: inherit;
           color: var(--ink);
-          transition: all .15s;
+          transition: background var(--dur-micro) var(--ease-out), color var(--dur-micro) var(--ease-out);
         }
-        .pill:hover {
-          background: var(--ink);
-          color: var(--cream);
-        }
+        .pill:hover { background: var(--ink); color: var(--cream); }
         .pill:hover .pill-count {
           background: var(--yellow);
           color: var(--ink);
           border-color: var(--yellow);
         }
-        .pill.active {
-          background: var(--ink);
-          color: var(--cream);
-        }
+        .pill.active { background: var(--ink); color: var(--cream); }
         .pill.active .pill-count {
           background: var(--yellow);
           color: var(--ink);
@@ -446,7 +701,6 @@ export default function DashboardPage() {
           border: 1.5px solid var(--ink);
           font-size: 10px;
           font-weight: 900;
-          line-height: 1;
         }
         .focus-reset {
           font-size: 11.5px;
@@ -457,7 +711,6 @@ export default function DashboardPage() {
           cursor: pointer;
           font-family: inherit;
           text-decoration: underline;
-          text-decoration-thickness: 1.5px;
           text-underline-offset: 3px;
           white-space: nowrap;
         }
@@ -479,7 +732,7 @@ export default function DashboardPage() {
           overflow: hidden;
           display: flex;
           flex-direction: column;
-          transition: opacity .3s, filter .3s;
+          transition: opacity var(--dur-large) var(--ease-out), filter var(--dur-large) var(--ease-out);
         }
         .cell.dim { opacity: 0.32; filter: saturate(0.5); }
         .cell.spotlight {
@@ -518,13 +771,11 @@ export default function DashboardPage() {
           text-decoration: underline;
           text-decoration-thickness: 1.5px;
           text-underline-offset: 4px;
-          cursor: pointer;
           white-space: nowrap;
         }
 
-        /* ─── STUDIO CELL — THE WALL ─── */
+        /* ─── STUDIO — THE WALL ─── */
         .c-studio { grid-column: 1; grid-row: 1; }
-
         .studio-numbers {
           display: grid;
           grid-template-columns: repeat(4, 1fr);
@@ -532,10 +783,7 @@ export default function DashboardPage() {
           border-top: 1.5px solid var(--line);
           border-bottom: 1.5px solid var(--line);
         }
-        .snum {
-          padding: 14px 18px;
-          border-right: 1.5px solid var(--line);
-        }
+        .snum { padding: 14px 18px; border-right: 1.5px solid var(--line); }
         .snum:last-child { border-right: none; }
         .snum-l {
           font-size: 9.5px;
@@ -572,13 +820,11 @@ export default function DashboardPage() {
         .wall::after {
           content: "";
           position: absolute;
-          left: 6%; right: 6%;
-          top: 6px;
+          left: 6%; right: 6%; top: 6px;
           height: 1px;
           background: var(--line);
           opacity: 0.6;
         }
-
         .piece {
           position: absolute;
           background: #fff;
@@ -586,7 +832,7 @@ export default function DashboardPage() {
           box-shadow: 3px 4px 0 var(--ink);
           overflow: hidden;
           cursor: pointer;
-          transition: transform .2s ease, box-shadow .2s ease;
+          transition: transform var(--dur-base) var(--ease-out), box-shadow var(--dur-base) var(--ease-out);
           text-decoration: none;
           color: var(--ink);
         }
@@ -600,10 +846,7 @@ export default function DashboardPage() {
           height: 100%;
           background-size: cover;
           background-position: center;
-          display: block;
         }
-
-        /* Anchor */
         .piece.anchor {
           left: 3%;
           top: 16px;
@@ -624,13 +867,10 @@ export default function DashboardPage() {
           border: 1px solid rgba(17,17,16,0.15);
           z-index: 5;
         }
-
-        /* Salon hang slots */
         .piece.p2 { left: 41%; top: 22px;  width: 22%; height: 158px; transform: rotate(1.2deg);  z-index: 2; }
         .piece.p3 { left: 65%; top: 12px;  width: 23%; height: 175px; transform: rotate(-1.5deg); z-index: 2; }
         .piece.p4 { left: 41%; top: 198px; width: 16%; height: 108px; transform: rotate(-0.8deg); z-index: 2; }
 
-        /* The empty frame — promoted to a real focal slot */
         .piece.empty-frame {
           left: 60%; top: 196px;
           width: 28%; height: 112px;
@@ -647,9 +887,7 @@ export default function DashboardPage() {
           justify-content: center;
           z-index: 2;
         }
-        .piece.empty-frame:hover {
-          background: var(--yellow);
-        }
+        .piece.empty-frame:hover { background: var(--yellow); }
         .piece.empty-frame::before {
           content: "";
           position: absolute;
@@ -681,7 +919,6 @@ export default function DashboardPage() {
           line-height: 1.2;
         }
 
-        /* Title pins on pieces */
         .piece-pin {
           position: absolute;
           bottom: 6px; left: 6px; right: 6px;
@@ -696,12 +933,8 @@ export default function DashboardPage() {
           overflow: hidden;
           text-overflow: ellipsis;
         }
-        .anchor .piece-pin {
-          font-size: 13px;
-          padding: 6px 10px;
-        }
+        .anchor .piece-pin { font-size: 13px; padding: 6px 10px; }
 
-        /* Sketch note — footer strip under the wall */
         .wall-note {
           margin-top: 14px;
           padding: 12px 16px;
@@ -739,13 +972,17 @@ export default function DashboardPage() {
           white-space: nowrap;
         }
 
-        /* ─── SCENE CELL ─── */
+        /* ─── SCENE — reads scene_posts ─── */
         .c-scene { grid-column: 2; grid-row: 1; }
-        .scene-list { flex: 1; display: flex; flex-direction: column; gap: 10px; }
-
-        .collab {
+        .scene-list {
+          flex: 1;
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+        }
+        .scene-post {
           display: block;
-          padding: 14px;
+          padding: 0;
           border: 2px solid var(--ink);
           border-radius: 14px;
           background: #fff;
@@ -753,108 +990,107 @@ export default function DashboardPage() {
           text-decoration: none;
           color: var(--ink);
           box-shadow: 2px 3px 0 var(--ink);
-          transition: transform .15s;
+          transition: transform var(--dur-base) var(--ease-out);
+          overflow: hidden;
           position: relative;
+        }
+        .scene-post:hover { transform: translate(-1px, -1px); }
+        .scene-post-row {
+          display: flex;
+          align-items: stretch;
+        }
+        .scene-post-cover {
+          width: 78px;
+          flex-shrink: 0;
+          position: relative;
+          background-size: cover;
+          background-position: center;
+          border-right: 1.5px solid var(--ink);
+        }
+        .scene-post-tag {
+          position: absolute;
+          top: 6px;
+          left: 6px;
+          padding: 2px 7px;
+          background: var(--ink);
+          color: var(--yellow);
+          font-size: 8.5px;
+          font-weight: 900;
+          letter-spacing: 0.1em;
+          text-transform: uppercase;
+          border-radius: 99px;
+          white-space: nowrap;
+        }
+        .scene-post-body {
+          flex: 1;
+          padding: 12px 14px;
+          min-width: 0;
+        }
+        .scene-post-title {
+          font-family: 'Fraunces', serif;
+          font-size: 15px;
+          font-weight: 500;
+          letter-spacing: -0.2px;
+          line-height: 1.2;
+          margin-bottom: 4px;
+          display: -webkit-box;
+          -webkit-line-clamp: 1;
+          -webkit-box-orient: vertical;
           overflow: hidden;
         }
-        .collab:hover { transform: translate(-1px, -1px); }
-        .collab-texture {
-          position: absolute;
-          top: 0; left: 0; bottom: 0;
-          width: 6px;
-        }
-        .collab-row {
-          display: flex;
-          gap: 12px;
-          align-items: flex-start;
-          margin-left: 8px;
-        }
-        .collab-av {
-          width: 42px; height: 42px;
-          border-radius: 50%;
-          border: 2px solid var(--ink);
+        .scene-post-meta {
           font-family: 'Fraunces', serif;
-          font-size: 16px;
-          font-weight: 500;
+          font-style: italic;
+          font-size: 12px;
+          color: var(--muted);
+          line-height: 1.3;
+          margin-bottom: 6px;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          display: -webkit-box;
+          -webkit-line-clamp: 1;
+          -webkit-box-orient: vertical;
+        }
+        .scene-post-foot {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          font-size: 10px;
+          font-weight: 700;
+          color: var(--muted);
+          min-width: 0;
+        }
+        .scene-post-poster {
+          display: inline-flex;
+          align-items: center;
+          gap: 5px;
+          min-width: 0;
+        }
+        .scene-post-av {
+          width: 18px; height: 18px;
+          border-radius: 50%;
+          border: 1.5px solid var(--ink);
+          background: var(--yellow);
+          font-size: 8.5px;
+          font-weight: 900;
           display: flex;
           align-items: center;
           justify-content: center;
           flex-shrink: 0;
-          background: var(--yellow);
+          overflow: hidden;
+        }
+        .scene-post-poster-name {
+          font-weight: 800;
           color: var(--ink);
-        }
-        .collab-body { flex: 1; min-width: 0; }
-        .collab-head-row {
-          display: flex;
-          align-items: baseline;
-          justify-content: space-between;
-          gap: 8px;
-          margin-bottom: 4px;
-        }
-        .collab-name {
-          font-family: 'Fraunces', serif;
-          font-size: 16px;
-          font-weight: 500;
-          letter-spacing: -0.3px;
-          line-height: 1;
           white-space: nowrap;
           overflow: hidden;
           text-overflow: ellipsis;
-          min-width: 0;
         }
-        .collab-disc {
-          font-size: 9.5px;
-          font-weight: 800;
-          letter-spacing: 0.14em;
-          text-transform: uppercase;
+        .scene-post-time {
           color: var(--muted);
-          white-space: nowrap;
+          flex-shrink: 0;
         }
-        .collab-fragment {
-          font-family: 'Fraunces', serif;
-          font-style: italic;
-          font-size: 13.5px;
-          color: var(--ink);
-          line-height: 1.35;
-          margin-top: 6px;
-          margin-bottom: 8px;
-        }
-        .collab-fragment-date {
-          font-style: normal;
-          font-weight: 700;
-          color: var(--muted);
-          font-size: 11px;
-          letter-spacing: 0.05em;
-        }
-        .collab-foot {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          margin-top: 6px;
-          flex-wrap: wrap;
-        }
-        .tag {
-          font-size: 9px;
-          font-weight: 900;
-          padding: 3px 8px;
-          border-radius: 99px;
-          border: 1.5px solid var(--ink);
-          background: var(--cream-deep);
-          text-transform: uppercase;
-          letter-spacing: 0.08em;
-        }
-        .tag.hot { background: var(--yellow); }
-        .tag.muted { border-color: var(--muted-soft); color: var(--muted); background: transparent; }
-        .collab-palette {
-          display: flex;
-          gap: 3px;
-          margin-left: auto;
-        }
-        .swatch {
-          width: 14px; height: 14px;
-          border: 1.5px solid var(--ink);
-          border-radius: 3px;
-        }
+        .scene-post-time::before { content: "·"; padding: 0 4px; }
 
         .scene-empty {
           padding: 28px 16px;
@@ -866,7 +1102,6 @@ export default function DashboardPage() {
           line-height: 1.4;
         }
 
-        /* Scene CTAs at the foot */
         .scene-ctas {
           display: grid;
           grid-template-columns: 1fr auto;
@@ -889,7 +1124,7 @@ export default function DashboardPage() {
           cursor: pointer;
           text-decoration: none;
           color: inherit;
-          transition: all .15s;
+          transition: transform var(--dur-base) var(--ease-out), box-shadow var(--dur-base) var(--ease-out), background var(--dur-base) var(--ease-out);
         }
         .scene-cta.primary {
           background: var(--ink);
@@ -910,9 +1145,7 @@ export default function DashboardPage() {
           background: transparent;
           padding: 13px 18px;
         }
-        .scene-cta.ghost:hover {
-          background: var(--cream-deep);
-        }
+        .scene-cta.ghost:hover { background: var(--cream-deep); }
         .scene-cta.ghost .cta-icon {
           font-family: 'Fraunces', serif;
           font-style: italic;
@@ -942,7 +1175,7 @@ export default function DashboardPage() {
           box-shadow: 2px 2px 0 var(--ink);
           text-decoration: none;
           color: inherit;
-          transition: transform .15s;
+          transition: transform var(--dur-base) var(--ease-out);
         }
         .task:hover { transform: translate(-1px, -1px); }
         .task .check {
@@ -989,64 +1222,120 @@ export default function DashboardPage() {
           font-weight: 800;
           margin-top: auto;
           text-decoration: none;
-          transition: transform .15s;
+          transition: transform var(--dur-base) var(--ease-out);
         }
         .plan-add:hover { transform: translate(-1px, -1px); }
 
-        /* ─── ROW 2 ─── */
-        .c-activity { grid-column: 1; grid-row: 2; }
-        .c-money    { grid-column: 2; grid-row: 2; }
-        .c-inbox    { grid-column: 3; grid-row: 2; }
-
-        /* Activity */
-        .activity-row {
+        /* ─── CALENDAR CELL ─── */
+        .c-calendar { grid-column: 1; grid-row: 2; }
+        .cal-head-right {
           display: flex;
           align-items: center;
+          gap: 12px;
+        }
+        .cal-toggle {
+          display: inline-flex;
+          border: 2px solid var(--ink);
+          border-radius: 99px;
+          overflow: hidden;
+          padding: 2px;
+          background: var(--cream-deep);
+        }
+        .cal-toggle button {
+          padding: 6px 14px;
+          border: none;
+          background: none;
+          font-family: inherit;
+          font-size: 11px;
+          font-weight: 800;
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
+          cursor: pointer;
+          border-radius: 99px;
+          color: var(--ink);
+          transition: background var(--dur-micro) var(--ease-out), color var(--dur-micro) var(--ease-out);
+        }
+        .cal-toggle button.on {
+          background: var(--ink);
+          color: var(--yellow);
+        }
+        .agenda-list { display: flex; flex-direction: column; }
+        .agenda-row {
+          display: grid;
+          grid-template-columns: 64px auto 1fr auto;
           gap: 14px;
-          padding: 14px 0;
+          align-items: center;
+          padding: 12px 4px;
           border-bottom: 1px solid var(--line);
           text-decoration: none;
           color: inherit;
+          transition: background var(--dur-base) var(--ease-out);
         }
-        .activity-row:last-child { border-bottom: none; }
-        .activity-when {
+        .agenda-row:last-child { border-bottom: none; }
+        .agenda-row:hover { background: rgba(255, 212, 0, 0.06); }
+        .agenda-date {
           font-family: 'Fraunces', serif;
           font-style: italic;
           font-size: 12px;
           color: var(--muted);
-          flex-shrink: 0;
-          width: 80px;
+          line-height: 1.2;
         }
-        .activity-what {
-          font-size: 13.5px;
-          font-weight: 600;
-          flex: 1;
-          min-width: 0;
-        }
-        .activity-what em {
-          font-family: 'Fraunces', serif;
-          font-style: italic;
+        .agenda-date b {
+          font-style: normal;
           font-weight: 500;
+          font-size: 20px;
+          letter-spacing: -0.6px;
           color: var(--ink);
+          display: block;
         }
-        .activity-amt {
-          font-family: 'Fraunces', serif;
-          font-weight: 500;
-          font-size: 15px;
-          letter-spacing: -0.4px;
-          color: var(--ink);
+        .agenda-dot {
+          width: 10px;
+          height: 10px;
+          border-radius: 50%;
+          border: 1.5px solid var(--ink);
+        }
+        .agenda-dot.public {
+          background: var(--cream);
+          border-style: dashed;
+        }
+        .agenda-body { min-width: 0; }
+        .agenda-title {
+          font-size: 14px;
+          font-weight: 700;
+          line-height: 1.25;
+          overflow: hidden;
+          text-overflow: ellipsis;
           white-space: nowrap;
         }
-        .activity-empty {
-          padding: 28px 16px;
+        .agenda-where {
           font-family: 'Fraunces', serif;
           font-style: italic;
-          font-size: 14px;
+          font-size: 11.5px;
+          color: var(--muted);
+          margin-top: 2px;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+        .agenda-time {
+          font-family: 'Fraunces', serif;
+          font-size: 12px;
+          font-weight: 500;
+          color: var(--muted);
+          white-space: nowrap;
+        }
+        .agenda-empty {
+          padding: 32px 16px;
+          text-align: center;
+          font-family: 'Fraunces', serif;
+          font-style: italic;
+          font-size: 15px;
           color: var(--muted);
           line-height: 1.5;
         }
 
-        /* Money */
+        /* ─── MONEY ─── */
+        .c-money { grid-column: 2; grid-row: 2; }
         .money-grid {
           display: grid;
           grid-template-columns: 1fr 1fr;
@@ -1060,7 +1349,7 @@ export default function DashboardPage() {
           box-shadow: 2px 2px 0 var(--ink);
           text-decoration: none;
           color: inherit;
-          transition: transform .15s;
+          transition: transform var(--dur-base) var(--ease-out);
         }
         .money-tile:hover { transform: translate(-1px, -1px); }
         .money-tile.live { background: #fff; }
@@ -1098,10 +1387,8 @@ export default function DashboardPage() {
           margin-top: 6px;
         }
 
-        /* Inbox */
-        .inbox-empty {
-          padding: 8px 0;
-        }
+        /* ─── INBOX ─── */
+        .c-inbox { grid-column: 3; grid-row: 2; }
         .inbox-empty-headline {
           font-family: 'Fraunces', serif;
           font-size: 17px;
@@ -1128,7 +1415,7 @@ export default function DashboardPage() {
           box-shadow: 2px 2px 0 var(--ink);
           text-decoration: none;
           color: inherit;
-          transition: transform .15s;
+          transition: transform var(--dur-base) var(--ease-out);
         }
         .inbox-item:hover { transform: translate(-1px, -1px); }
         .ibx-av {
@@ -1136,8 +1423,11 @@ export default function DashboardPage() {
           border-radius: 8px;
           background: var(--yellow);
           border: 2px solid var(--ink);
-          display: flex; align-items: center; justify-content: center;
-          font-size: 10px; font-weight: 900;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 10px;
+          font-weight: 900;
           flex-shrink: 0;
         }
         .ibx-t {
@@ -1168,7 +1458,7 @@ export default function DashboardPage() {
           .c-studio   { grid-column: 1 / 3; grid-row: 1; }
           .c-scene    { grid-column: 1; grid-row: 2; }
           .c-plan     { grid-column: 2; grid-row: 2; }
-          .c-activity { grid-column: 1 / 3; grid-row: 3; }
+          .c-calendar { grid-column: 1 / 3; grid-row: 3; }
           .c-money    { grid-column: 1; grid-row: 4; }
           .c-inbox    { grid-column: 2; grid-row: 4; }
           .greet-headline { font-size: 38px; }
@@ -1178,7 +1468,7 @@ export default function DashboardPage() {
         @media (max-width: 700px) {
           .db-root { padding: 0 16px 60px; }
           .bento { grid-template-columns: 1fr; }
-          .c-studio,.c-scene,.c-plan,.c-activity,.c-money,.c-inbox {
+          .c-studio,.c-scene,.c-plan,.c-calendar,.c-money,.c-inbox {
             grid-column: 1; grid-row: auto;
           }
           .greet { padding: 18px 0 22px; }
@@ -1194,16 +1484,29 @@ export default function DashboardPage() {
           .piece.p2 { width: 26%; height: 130px; left: 48%; }
           .piece.p3 { width: 26%; height: 145px; left: 75%; top: 6px; }
           .piece.p4 { width: 22%; height: 90px; left: 48%; top: 168px; }
-          .piece.empty-frame { width: 28%; height: 95px; left: 71%; top: 175px; }
+          .piece.empty-frame {
+            width: 28%; height: 95px;
+            left: 71%; top: 175px;
+            transform: rotate(0deg); /* edit #3: no rotation on mobile */
+          }
           .studio-numbers { grid-template-columns: 1fr 1fr; }
           .snum:nth-child(2) { border-right: none; }
           .snum:nth-child(1), .snum:nth-child(2) { border-bottom: 1.5px solid var(--line); }
+          .cal-head-right { flex-direction: column; align-items: flex-end; gap: 6px; }
+        }
+
+        /* prefers-reduced-motion — edit #1 */
+        @media (prefers-reduced-motion: reduce) {
+          .piece, .scene-post, .task, .pill, .scene-cta, .money-tile,
+          .agenda-row, .cal-toggle button, .plan-add, .inbox-item, .cell {
+            transition: none;
+          }
         }
       `}</style>
 
       <div className="db-root">
 
-        {/* ═════════════ GREETING + INTEGRATED FOCUS ═════════════ */}
+        {/* ═════════════ GREETING + FOCUS ═════════════ */}
         <div className="greet">
 
           <div className="greet-grid">
@@ -1227,7 +1530,9 @@ export default function DashboardPage() {
                 <div className="gstat-l">for sale</div>
               </div>
               <div className="gstat">
-                <div className="gstat-n">€{loaded ? Math.round(stats.sales_month).toLocaleString() : "—"}</div>
+                <div className="gstat-n">
+                  €{loaded ? Math.round(stats.sales_month).toLocaleString() : "—"}
+                </div>
                 <div className="gstat-l">this month</div>
               </div>
             </div>
@@ -1262,7 +1567,7 @@ export default function DashboardPage() {
         {/* ═════════════ BENTO ═════════════ */}
         <div className="bento">
 
-          {/* ── STUDIO — THE WALL ── */}
+          {/* ── STUDIO ── */}
           <section className={`cell c-studio${isLit("studio") ? (intent ? " spotlight" : "") : " dim"}`}>
             <div className="cell-head">
               <div className="cell-label">
@@ -1294,25 +1599,35 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            {/* THE WALL */}
             <div className="wall">
-
-              {anchor ? (
-                <Link href={`/dashboard/artworks/${anchor.id}`} className="piece anchor">
-                  {anchor.images && anchor.images[0] ? (
-                    <div className="piece-img" style={{ backgroundImage: `url(${anchor.images[0]})` }} />
+              {anchorPick ? (
+                <Link
+                  href={`/dashboard/artworks/${anchorPick.id}`}
+                  className="piece anchor"
+                >
+                  {anchorPick.images && anchorPick.images[0] ? (
+                    <div
+                      className="piece-img"
+                      style={{ backgroundImage: `url(${anchorPick.images[0]})` }}
+                    />
                   ) : (
                     <div
                       className="piece-img"
                       style={{
-                        background: `linear-gradient(135deg, ${paletteFor(anchor.id)[0]} 0%, ${paletteFor(anchor.id)[1]} 100%)`,
+                        background: `linear-gradient(135deg, ${paletteFor(anchorPick.id)[0]} 0%, ${paletteFor(anchorPick.id)[1]} 100%)`,
                       }}
                     />
                   )}
-                  <div className="piece-pin">{anchor.title || "Untitled"}</div>
+                  <div className="piece-pin">
+                    {anchorPick.title || "Untitled"}
+                  </div>
                 </Link>
               ) : (
-                <Link href="/dashboard/artworks/new" className="piece empty-frame" style={{ left: "3%", top: "16px", width: "35%", height: "270px", transform: "rotate(-0.5deg)" }}>
+                <Link
+                  href="/dashboard/artworks/new"
+                  className="piece empty-frame"
+                  style={{ left: "3%", top: "16px", width: "35%", height: "270px", transform: "rotate(-0.5deg)" }}
+                >
                   <div className="empty-frame-text">
                     <div className="ef-mark">+</div>
                     <div className="ef-line">Hang the first piece</div>
@@ -1320,13 +1635,20 @@ export default function DashboardPage() {
                 </Link>
               )}
 
-              {salonHang.map((aw, i) => {
+              {restOfWall.map((aw, i) => {
                 const slot = ["p2", "p3", "p4"][i];
                 if (!slot) return null;
                 return (
-                  <Link key={aw.id} href={`/dashboard/artworks/${aw.id}`} className={`piece ${slot}`}>
+                  <Link
+                    key={aw.id}
+                    href={`/dashboard/artworks/${aw.id}`}
+                    className={`piece ${slot}`}
+                  >
                     {aw.images && aw.images[0] ? (
-                      <div className="piece-img" style={{ backgroundImage: `url(${aw.images[0]})` }} />
+                      <div
+                        className="piece-img"
+                        style={{ backgroundImage: `url(${aw.images[0]})` }}
+                      />
                     ) : (
                       <div
                         className="piece-img"
@@ -1340,8 +1662,7 @@ export default function DashboardPage() {
                 );
               })}
 
-              {/* The empty frame — always present as the CTA, unless wall is fully empty */}
-              {anchor && (
+              {anchorPick && (
                 <Link href="/dashboard/artworks/new" className="piece empty-frame">
                   <div className="empty-frame-text">
                     <div className="ef-mark">+</div>
@@ -1349,10 +1670,8 @@ export default function DashboardPage() {
                   </div>
                 </Link>
               )}
-
             </div>
 
-            {/* Sketch note strip — uses real task description as a stand-in for sketchbook */}
             {latestNote && (
               <div className="wall-note">
                 <div className="wall-note-label">Note · {relDate(latestNote.when)}</div>
@@ -1362,7 +1681,7 @@ export default function DashboardPage() {
             )}
           </section>
 
-          {/* ── SCENE — RICHER COLLAB CARDS ── */}
+          {/* ── SCENE — reads scene_posts ── */}
           <section className={`cell c-scene${isLit("scene") ? (intent ? " spotlight" : "") : " dim"}`}>
             <div className="cell-head">
               <div className="cell-label">
@@ -1372,82 +1691,57 @@ export default function DashboardPage() {
             </div>
 
             <div className="scene-list">
-              {nextEvent && (
-                <Link href="/dashboard/calendar" className="collab">
-                  <div className="collab-texture" style={{ background: "linear-gradient(180deg, #FFD400 0%, #C73E1D 100%)" }} />
-                  <div className="collab-row">
-                    <div className="collab-av" style={{ background: "#FFD400" }}>
-                      {fmtDate(nextEvent.start_date).day}
-                    </div>
-                    <div className="collab-body">
-                      <div className="collab-head-row">
-                        <div className="collab-name">{nextEvent.title}</div>
-                        <div className="collab-disc">{nextEvent.event_type || "Event"}</div>
-                      </div>
-                      <div className="collab-fragment">
-                        <span className="collab-fragment-date">
-                          {fmtDate(nextEvent.start_date).month} {fmtDate(nextEvent.start_date).day} —
-                        </span>
-                        {" "}
-                        {nextEvent.venue || "venue tbc"}{daysUntil(nextEvent.start_date) ? `, ${daysUntil(nextEvent.start_date)}` : ""}.
-                      </div>
-                      <div className="collab-foot">
-                        <span className="tag hot">Upcoming</span>
-                      </div>
-                    </div>
-                  </div>
-                </Link>
-              )}
-
-              {collabs.length > 0 ? (
-                collabs.slice(0, nextEvent ? 2 : 3).map((c) => {
-                  const palette = paletteFor(c.id);
-                  const isOpen = c.status === "new" || c.status === "pending" || c.status === "open";
+              {scenePosts.length > 0 ? (
+                scenePosts.slice(0, 3).map((p) => {
+                  const cfg = SCENE_POST_CFG[p.post_type as ScenePostType] || SCENE_POST_CFG.event;
+                  const cover = p.cover_image || (p.images && p.images[0]);
                   return (
-                    <Link key={c.id} href="/dashboard/pool" className="collab">
-                      <div
-                        className="collab-texture"
-                        style={{ background: `linear-gradient(180deg, ${palette[0]} 0%, ${palette[1]} 100%)` }}
-                      />
-                      <div className="collab-row">
-                        <div className="collab-av" style={{ background: palette[1], color: "#fff" }}>
-                          {initials(c.title)}
+                    <Link key={p.id} href="/dashboard/scene" className="scene-post">
+                      <div className="scene-post-row">
+                        <div
+                          className="scene-post-cover"
+                          style={{
+                            background: cover ? `url(${cover})` : cfg.gradient,
+                            backgroundSize: "cover",
+                            backgroundPosition: "center",
+                          }}
+                        >
+                          <div className="scene-post-tag">{cfg.emoji} {cfg.label}</div>
                         </div>
-                        <div className="collab-body">
-                          <div className="collab-head-row">
-                            <div className="collab-name">{c.title || "Untitled collab"}</div>
-                            <div className="collab-disc">{c.type || "Collab"}</div>
-                          </div>
-                          <div className="collab-fragment">
-                            <span className="collab-fragment-date">{relDate(c.created_at)} —</span>
-                            {" "}
-                            {c.status === "new" || c.status === "pending"
-                              ? "waiting for a reply."
-                              : c.status === "active"
-                                ? "still in motion."
-                                : "in the books."}
-                          </div>
-                          <div className="collab-foot">
-                            <span className={`tag${isOpen ? " hot" : " muted"}`}>
-                              {isOpen ? "Open" : "Quiet"}
-                            </span>
-                            <div className="collab-palette">
-                              <div className="swatch" style={{ background: palette[0] }} />
-                              <div className="swatch" style={{ background: palette[1] }} />
-                              <div className="swatch" style={{ background: palette[2] }} />
+                        <div className="scene-post-body">
+                          <div className="scene-post-title">{p.title}</div>
+                          <div className="scene-post-meta">{sceneMeta(p)}</div>
+                          <div className="scene-post-foot">
+                            <div className="scene-post-poster">
+                              <div className="scene-post-av">
+                                {p.poster?.avatar_url ? (
+                                  // eslint-disable-next-line @next/next/no-img-element
+                                  <img
+                                    src={p.poster.avatar_url}
+                                    alt=""
+                                    style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                                  />
+                                ) : (
+                                  initials(p.poster?.full_name)
+                                )}
+                              </div>
+                              <span className="scene-post-poster-name">
+                                {p.poster?.full_name || "Anonymous"}
+                              </span>
                             </div>
+                            <span className="scene-post-time">{relDate(p.created_at)}</span>
                           </div>
                         </div>
                       </div>
                     </Link>
                   );
                 })
-              ) : !nextEvent ? (
+              ) : (
                 <div className="scene-empty">
                   Nothing live in the scene yet. <br />
                   Post something or wander.
                 </div>
-              ) : null}
+              )}
             </div>
 
             <div className="scene-ctas">
@@ -1473,16 +1767,39 @@ export default function DashboardPage() {
 
             {tasks.length > 0 ? (
               tasks.slice(0, 3).map((t) => {
-                const pClass = t.priority === "high" || t.priority === "urgent" ? "" : t.priority === "low" ? " low" : " mid";
-                const pLabel = t.priority === "high" || t.priority === "urgent" ? "High" : t.priority === "low" ? "Low" : "Med";
+                const pClass =
+                  t.priority === "high" || t.priority === "urgent"
+                    ? ""
+                    : t.priority === "low"
+                      ? " low"
+                      : " mid";
+                const pLabel =
+                  t.priority === "high" || t.priority === "urgent"
+                    ? "High"
+                    : t.priority === "low"
+                      ? "Low"
+                      : "Med";
                 return (
                   <Link key={t.id} href="/dashboard/tasks" className="task">
                     <div className="check" />
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div className="task-t" style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.title}</div>
+                      <div
+                        className="task-t"
+                        style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}
+                      >
+                        {t.title}
+                      </div>
                       <div className="task-meta">
                         <span className={`priority${pClass}`}>{pLabel}</span>
-                        {t.due_date && <span>· {new Date(t.due_date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>}
+                        {t.due_date && (
+                          <span>
+                            ·{" "}
+                            {new Date(t.due_date).toLocaleDateString("en-US", {
+                              month: "short",
+                              day: "numeric",
+                            })}
+                          </span>
+                        )}
                       </div>
                     </div>
                   </Link>
@@ -1498,45 +1815,69 @@ export default function DashboardPage() {
             </Link>
           </section>
 
-          {/* ── ACTIVITY ── */}
-          <section className={`cell c-activity${isLit("activity") ? (intent ? " spotlight" : "") : " dim"}`}>
+          {/* ── CALENDAR — replaces Activity ── */}
+          <section className={`cell c-calendar${isLit("calendar") ? (intent ? " spotlight" : "") : " dim"}`}>
             <div className="cell-head">
               <div className="cell-label">
-                <span className="cell-label-tag">Recent activity</span>
-                <h2 className="cell-title">The week so far</h2>
+                <span className="cell-label-tag">This week</span>
+                <h2 className="cell-title">Calendar</h2>
               </div>
-              <Link href="/dashboard/sales" className="cell-link">All →</Link>
+              <div className="cal-head-right">
+                <div className="cal-toggle">
+                  <button
+                    className={calToggle === "yours" ? "on" : ""}
+                    onClick={() => setCalToggle("yours")}
+                  >
+                    Yours
+                  </button>
+                  <button
+                    className={calToggle === "around" ? "on" : ""}
+                    onClick={() => setCalToggle("around")}
+                  >
+                    Around
+                  </button>
+                </div>
+                <Link href="/dashboard/calendar" className="cell-link">Open →</Link>
+              </div>
             </div>
 
-            {recentSales.length > 0 || recentClients.length > 0 ? (
-              <>
-                {recentSales.slice(0, 2).map((s) => (
-                  <Link key={s.id} href="/dashboard/sales" className="activity-row">
-                    <div className="activity-when">{relDate(s.sale_date)}</div>
-                    <div className="activity-what">
-                      Sale to <em>{s.buyer_name || "a collector"}</em>.
-                    </div>
-                    <div className="activity-amt">€{(s.amount || 0).toLocaleString()}</div>
-                  </Link>
-                ))}
-                {recentClients.slice(0, 3 - Math.min(recentSales.length, 2)).map((c) => (
-                  <Link key={c.id} href="/dashboard/clients" className="activity-row">
-                    <div className="activity-when">{relDate(c.created_at)}</div>
-                    <div className="activity-what">
-                      <em>{c.full_name || "A new collector"}</em> joined your list.
-                    </div>
-                    <div className="activity-amt" />
-                  </Link>
-                ))}
-              </>
-            ) : (
-              <div className="activity-empty">
-                Nothing has moved through the books yet. Sales and new collectors will appear here as they come.
-              </div>
-            )}
+            <div className="agenda-list">
+              {agenda.length > 0 ? (
+                agenda.map((item) => {
+                  const { rel, num } = fmtAgendaDate(item.date);
+                  const dotColor = CAL_TYPE_COLOR[item.type] || "#FAFAF8";
+                  return (
+                    <Link key={item.id} href={item.href} className="agenda-row">
+                      <div className="agenda-date">
+                        {rel}<b>{num}</b>
+                      </div>
+                      <div
+                        className={`agenda-dot${item.source === "public" ? " public" : ""}`}
+                        style={item.source === "public" ? undefined : { background: dotColor }}
+                      />
+                      <div className="agenda-body">
+                        <div className="agenda-title">{item.title}</div>
+                        {item.where && (
+                          <div className="agenda-where">{item.where}</div>
+                        )}
+                      </div>
+                      <div className="agenda-time">
+                        {item.time || (item.source === "task" ? "due" : "all day")}
+                      </div>
+                    </Link>
+                  );
+                })
+              ) : (
+                <div className="agenda-empty">
+                  {calToggle === "yours"
+                    ? "The week is open. Make of it what you will."
+                    : "Quiet around town this week."}
+                </div>
+              )}
+            </div>
           </section>
 
-          {/* ── MONEY ── */}
+          {/* ── MONEY — sales fixed ── */}
           <section className={`cell c-money${isLit("money") ? (intent ? " spotlight" : "") : " dim"}`}>
             <div className="cell-head">
               <div className="cell-label">
@@ -1549,12 +1890,16 @@ export default function DashboardPage() {
             <div className="money-grid">
               <Link href="/dashboard/sales" className="money-tile live">
                 <div className="money-label">Sales</div>
-                <div className="money-value">€{loaded ? Math.round(stats.sales_month).toLocaleString() : "—"}</div>
+                <div className="money-value">
+                  €{loaded ? Math.round(stats.sales_month).toLocaleString() : "—"}
+                </div>
                 <div className="money-note">{salesNote}</div>
               </Link>
               <Link href="/dashboard/discover" className="money-tile live">
                 <div className="money-label">Reach</div>
-                <div className="money-value">{loaded ? stats.followers.toLocaleString() : "—"}</div>
+                <div className="money-value">
+                  {loaded ? stats.followers.toLocaleString() : "—"}
+                </div>
                 <div className="money-note">{reachNote}</div>
               </Link>
               <Link href="/dashboard/contracts" className="money-tile">
@@ -1576,7 +1921,9 @@ export default function DashboardPage() {
             <div className="cell-head">
               <div className="cell-label">
                 <span className="cell-label-tag">Inbox</span>
-                <h2 className="cell-title">{notifications.length > 0 ? `${notifications.length} new` : "Quiet"}</h2>
+                <h2 className="cell-title">
+                  {notifications.length > 0 ? `${notifications.length} new` : "Quiet"}
+                </h2>
               </div>
             </div>
 
@@ -1591,7 +1938,7 @@ export default function DashboardPage() {
                 </Link>
               ))
             ) : (
-              <div className="inbox-empty">
+              <div>
                 <div className="inbox-empty-headline">Nothing new today.</div>
                 <div className="inbox-empty-sub">
                   When someone reaches out — a collector, a curator, a fellow artist — it will land here. Not before.

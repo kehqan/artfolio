@@ -1,0 +1,171 @@
+:root{
+  /* Core */
+  --flame:#FF5400; --flame-hi:#FF7A38; --flame-lo:#E24E00;
+  --honey:#FFC047; --navy:#193948; --teal2:#24506A; --ink:#0B1016;
+
+  /* Text tiers — all text is white at an opacity */
+  --lt-1:#FFFFFF;
+  --lt-2:rgba(255,255,255,0.92);
+  --lt-3:rgba(255,255,255,0.74);
+  --lt-4:rgba(255,255,255,0.52);
+  --border:rgba(255,255,255,0.16);
+
+  /* Status: text color always paired with its own tinted well */
+  --ok:#7FE3A8; --ok-well:rgba(50,180,110,0.22);
+  --warn:#FFC98F; --warn-well:rgba(255,166,77,0.22);
+  --bad:#FF9C86; --bad-well:rgba(196,60,40,0.22);
+  --accent-well:rgba(255,84,0,0.35); --accent-on-well:#FFE0CC;
+
+  /* Link color used on dark glass */
+  --link:#FFB07A;
+
+  /* Semantic aliases */
+  --text-heading:var(--lt-1);
+  --text-body:var(--lt-2);
+  --text-meta:var(--lt-3);
+  --text-quiet:var(--lt-4);
+  --text-accent:var(--flame);
+  --text-secondary-accent:var(--honey);
+}
+:root{
+  /* Families. Skolar carries headings — the inversion from the parent system. */
+  --serif:"Skolar","Vazirmatn",Georgia,serif; /* @kind font */
+  --sans:"Skolar Sans","Vazirmatn",system-ui,sans-serif; /* @kind font */
+  --font-head:var(--serif); /* @kind font */
+  --text-body-face:var(--serif); /* @kind font */
+  --text-ui-face:var(--sans); /* @kind font */
+
+  /* Role sizes */
+  --fs-hero:46px; --fs-section:24px; --fs-card-title:15px; --fs-body:14.5px;
+  --fs-number:33px; --fs-number-sm:24px; --fs-label:13px; --fs-meta:12px;
+  --fs-eyebrow:10px; --fs-table-head:10px;
+
+  --lh-hero:1.12; /* @kind other */
+  --lh-body:1.65; /* @kind other */
+  --lh-card-title:1.34; /* @kind other */
+  --lh-number:1; /* @kind other */
+  --tr-hero:-0.02em; /* @kind other */
+  --tr-eyebrow:0.10em; /* @kind other */
+  --tr-table-head:0.08em; /* @kind other */
+
+  --w-body:400; /* @kind other */
+  --w-medium:500; /* @kind other */
+  --w-semibold:600; /* @kind other */
+  --w-bold:700; /* @kind other */
+
+  /* Mandatory text shadow over the scene */
+    --ts:0 1px 2px rgba(4,12,16,0.85), 0 2px 10px rgba(4,12,16,0.55); /* @kind shadow */
+    --ts-lg:0 1px 3px rgba(4,12,16,0.90), 0 3px 16px rgba(4,12,16,0.60), 0 1px 1px rgba(4,12,16,0.70); /* @kind shadow */
+
+  --measure-hero:490px;
+  --measure-body:560px;
+}
+:root{
+  /* Glass — intensity "standard" */
+  --glass:rgba(255,255,255,0.16);
+  --glass-filter:blur(38px) saturate(2.4) brightness(1.10); /* @kind other */
+  --chip:rgba(255,255,255,0.10);
+  --chip-hover:rgba(255,255,255,0.18);
+  --nested:rgba(255,255,255,0.06);
+  --nested-hover:rgba(255,255,255,0.09);
+  --opaque:rgba(22,27,36,0.90);
+
+  /* Rim — the rim IS the border. Never pair with a border property. */
+  --rim:inset 0 0 0 1px rgba(255,255,255,0.14), inset 0 1.5px 2px rgba(255,255,255,0.34), inset 0 -2px 3px rgba(4,12,16,0.20), inset 0 0 32px rgba(255,255,255,0.045); /* @kind shadow */
+  --rim-sm:inset 0 0 0 1px rgba(255,255,255,0.11), inset 0 1px 1.5px rgba(255,255,255,0.26), inset 0 -1.5px 2px rgba(4,12,16,0.18); /* @kind shadow */
+  --sunk:inset 0 3px 6px rgba(4,12,16,0.30), inset 0 1px 2px rgba(4,12,16,0.20), inset 0 -1px 2px rgba(255,255,255,0.12), inset 0 0 0 1px rgba(255,255,255,0.10); /* @kind shadow */
+
+  /* Ambient shadow tiers */
+  --ambient:0 1px 2px rgba(6,20,28,0.44), 0 10px 30px rgba(6,20,28,0.40), 0 30px 70px rgba(6,20,28,0.34);
+  --ambient-lg:0 1px 2px rgba(6,20,28,0.46), 0 14px 36px rgba(6,20,28,0.40), 0 44px 90px rgba(6,20,28,0.38);
+  --ambient-hi:0 1px 2px rgba(6,20,28,0.50), 0 20px 46px rgba(6,20,28,0.44), 0 56px 110px rgba(6,20,28,0.42);
+  --shadow-opaque:0 24px 64px rgba(0,0,0,0.5);
+
+  /* Primary button — the only sanctioned gradient on a control */
+  --btn-primary:linear-gradient(180deg,var(--flame-hi) 0%,var(--flame) 60%,var(--flame-lo) 100%); /* @kind color */
+  --btn-primary-shadow:0 1px 2px rgba(120,36,0,0.35), 0 8px 20px rgba(255,84,0,0.26), inset 0 1px 0 rgba(255,255,255,0.30), inset 0 -1px 1px rgba(120,34,0,0.30);
+  --ghost-hover:rgba(255,120,50,0.16);
+
+  /* Radius */
+  --r-control:100px; --r-card:16px; --r-slab:24px; --r-well:12px; --r-thumb:10px;
+
+  /* Semantic surface aliases */
+  --surface-slab:var(--glass); /* @kind color */
+  --surface-card:var(--nested);
+  --surface-well:var(--chip);
+  --surface-opaque:var(--opaque);
+
+  /* Section wash — the only permitted background variation */
+  --section-wash:linear-gradient(180deg, rgba(255,255,255,0.025), transparent 60%); /* @kind color */
+  --hairline:linear-gradient(90deg,transparent,rgba(255,255,255,0.20),transparent); /* @kind color */
+
+  /* Icon well */
+  --icon-well:rgba(255,192,71,0.14);
+}
+
+/* ---- Sanctioned glass intensities: fill, blur, rim and shadows move together ---- */
+[data-glass="whisper"]{
+  --glass:rgba(255,255,255,0.09);
+  --glass-filter:blur(52px) saturate(2.8) brightness(1.16); /* @kind other */
+  --chip:rgba(255,255,255,0.06);
+  --rim:inset 0 0 0 1px rgba(255,255,255,0.10), inset 0 1.5px 2px rgba(255,255,255,0.26), inset 0 -2px 3px rgba(4,12,16,0.16), inset 0 0 34px rgba(255,255,255,0.035); /* @kind shadow */
+  --ambient:0 1px 2px rgba(6,20,28,0.34), 0 8px 24px rgba(6,20,28,0.30), 0 24px 56px rgba(6,20,28,0.26);
+  --ambient-lg:0 1px 2px rgba(6,20,28,0.36), 0 12px 30px rgba(6,20,28,0.32), 0 36px 74px rgba(6,20,28,0.30);
+}
+[data-glass="solid"]{
+  --glass:rgba(20,26,34,0.72);
+  --glass-filter:blur(22px) saturate(1.4) brightness(1.02); /* @kind other */
+  --chip:rgba(255,255,255,0.07);
+  --rim:inset 0 0 0 1px rgba(255,255,255,0.12), inset 0 1px 1.5px rgba(255,255,255,0.20); /* @kind shadow */
+  --ambient:0 1px 2px rgba(4,8,12,0.55), 0 12px 32px rgba(4,8,12,0.48), 0 34px 78px rgba(4,8,12,0.44);
+  --ambient-lg:0 1px 2px rgba(4,8,12,0.58), 0 18px 42px rgba(4,8,12,0.50), 0 52px 104px rgba(4,8,12,0.48);
+}
+:root{
+  /* Scene — mood "deep teal" (default) */
+  --bloom-a:rgba(60,130,170,0.40);
+  --bloom-b:rgba(120,90,200,0.22);
+  --bloom-c:rgba(36,80,106,0.46);
+  --scene-base:linear-gradient(160deg,#141B2B 0%,#101725 42%,#0D1119 100%); /* @kind color */
+
+  /* Drifting violet blooms — atmosphere only, never chrome */
+  --drift-a:rgba(96,58,150,0.18);
+  --drift-b:rgba(118,72,176,0.18);
+  --drift-c:rgba(58,66,108,0.14);
+}
+
+/* ---- Sanctioned scene moods: one per product ---- */
+[data-mood="violet dusk"]{--bloom-a:rgba(150,110,255,0.46);--bloom-b:rgba(255,120,40,0.26);--bloom-c:rgba(130,90,230,0.40);--scene-base:linear-gradient(160deg,#191A2E 0%,#131327 42%,#0C0B15 100%); /* @kind color */}
+[data-mood="ember"]{--bloom-a:rgba(255,140,60,0.34);--bloom-b:rgba(255,84,0,0.26);--bloom-c:rgba(180,90,40,0.34);--scene-base:linear-gradient(160deg,#221A1C 0%,#1A1417 42%,#120E10 100%); /* @kind color */}
+[data-mood="graphite"]{--bloom-a:rgba(150,170,190,0.20);--bloom-b:rgba(255,84,0,0.14);--bloom-c:rgba(110,125,140,0.22);--scene-base:linear-gradient(160deg,#1A1D22 0%,#14171B 42%,#0D0F12 100%); /* @kind color */}
+:root{
+  --s-1:4px; --s-2:8px; --s-3:12px; --s-4:16px; --s-5:22px;
+  --s-6:32px; --s-7:44px; --s-8:56px; --s-9:64px; --s-10:88px;
+
+  /* Layout */
+  --page-max:1240px; --content-max:1176px; --gutter:32px; --header-h:74px;
+  --collapse:900px; /* @kind spacing */
+  --section-pad:60px; /* @kind spacing */
+}
+:root{
+  --eo:cubic-bezier(0.25,0.46,0.45,0.94); /* @kind other */
+  --em:cubic-bezier(0.22,1,0.36,1); /* @kind other */
+  --grow:cubic-bezier(0.16,1,0.3,1); /* @kind other */
+  --d-hover:140ms; /* @kind other */
+  --d-entrance:480ms; /* @kind other */
+  --d-stagger:55ms; /* @kind other */
+  --d-grow:380ms; /* @kind other */
+  --d-drift:36s; /* @kind other */
+}
+
+@keyframes lucerna-rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
+@keyframes lucerna-drift-a{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(50px,35px) scale(1.08)}}
+@keyframes lucerna-drift-b{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(-40px,-30px) scale(1.06)}}
+@keyframes lucerna-drift-c{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(35px,-25px) scale(1.08)}}
+@keyframes lucerna-pulse-ring{0%,100%{box-shadow:0 0 10px rgba(255,84,0,.9), 0 0 0 0 rgba(255,84,0,.5)}50%{box-shadow:0 0 10px rgba(255,84,0,.9), 0 0 0 6px rgba(255,84,0,0)}}
+@media (prefers-reduced-motion:reduce){*{animation-duration:.01ms !important;transition-duration:.01ms !important}}
+html{color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;font-family:var(--sans);color:var(--lt-2);background:var(--ink);-webkit-font-smoothing:antialiased}
+a{color:var(--link);text-decoration:none}
+a:hover{color:var(--lt-1)}
+:focus-visible{outline:2px solid rgba(255,150,80,0.6);outline-offset:2px}

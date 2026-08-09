@@ -1,0 +1,35 @@
+/* Lucerna fonts.
+   Skolar Sans PE is self-hosted from fonts/ (TRIAL files, normal width — the Cn/Cp/Ex
+   width variants are also in fonts/ if a design needs them).
+   Skolar (the serif that carries every heading) is now self-hosted too, from the Cyrillic
+   cut uploaded to fonts/ — PT Serif is no longer needed as a stand-in. */
+@import url("https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;600;700&display=swap");
+
+@font-face{font-family:"Skolar";font-weight:400;font-style:normal;font-display:swap;src:url("/fonts/SkolarCyrillic.woff2") format("woff2"),url("/fonts/SkolarCyrillic.woff") format("woff"),url("/fonts/SkolarCyrillic.ttf") format("truetype")}
+@font-face{font-family:"Skolar";font-weight:700;font-style:normal;font-display:swap;src:url("/fonts/SkolarCyrillic-Bold.woff2") format("woff2"),url("/fonts/SkolarCyrillic-Bold.woff") format("woff"),url("/fonts/SkolarCyrillic-Bold.ttf") format("truetype")}
+@font-face{font-family:"Skolar";font-weight:400;font-style:italic;font-display:swap;src:url("/fonts/SkolarCyrillic-Italic.woff2") format("woff2"),url("/fonts/SkolarCyrillic-Italic.woff") format("woff"),url("/fonts/SkolarCyrillic-Italic.ttf") format("truetype")}
+
+@font-face{font-family:"Skolar Sans";font-weight:100;font-style:normal;font-display:swap;src:url("/fonts/SkolarSansPETRIAL-Th.otf") format("opentype")}
+@font-face{font-family:"Skolar Sans";font-weight:100;font-style:italic;font-display:swap;src:url("/fonts/SkolarSansPETRIAL-ThIt.otf") format("opentype")}
+@font-face{font-family:"Skolar Sans";font-weight:200;font-style:normal;font-display:swap;src:url("/fonts/SkolarSansPETRIAL-El.otf") format("opentype")}
+@font-face{font-family:"Skolar Sans";font-weight:200;font-style:italic;font-display:swap;src:url("/fonts/SkolarSansPETRIAL-ElIt.otf") format("opentype")}
+@font-face{font-family:"Skolar Sans";font-weight:300;font-style:normal;font-display:swap;src:url("/fonts/SkolarSansPETRIAL-Lt.otf") format("opentype")}
+@font-face{font-family:"Skolar Sans";font-weight:300;font-style:italic;font-display:swap;src:url("/fonts/SkolarSansPETRIAL-LtIt.otf") format("opentype")}
+@font-face{font-family:"Skolar Sans";font-weight:400;font-style:normal;font-display:swap;src:url("/fonts/SkolarSansPETRIAL-Rg.otf") format("opentype")}
+@font-face{font-family:"Skolar Sans";font-weight:400;font-style:italic;font-display:swap;src:url("/fonts/SkolarSansPETRIAL-It.otf") format("opentype")}
+@font-face{font-family:"Skolar Sans";font-weight:500;font-style:normal;font-display:swap;src:url("/fonts/SkolarSansPETRIAL-Me.otf") format("opentype")}
+@font-face{font-family:"Skolar Sans";font-weight:500;font-style:italic;font-display:swap;src:url("/fonts/SkolarSansPETRIAL-MeIt.otf") format("opentype")}
+@font-face{font-family:"Skolar Sans";font-weight:600;font-style:normal;font-display:swap;src:url("/fonts/SkolarSansPETRIAL-Sb.otf") format("opentype")}
+@font-face{font-family:"Skolar Sans";font-weight:600;font-style:italic;font-display:swap;src:url("/fonts/SkolarSansPETRIAL-SbIt.otf") format("opentype")}
+@font-face{font-family:"Skolar Sans";font-weight:700;font-style:normal;font-display:swap;src:url("/fonts/SkolarSansPETRIAL-Bd.otf") format("opentype")}
+@font-face{font-family:"Skolar Sans";font-weight:700;font-style:italic;font-display:swap;src:url("/fonts/SkolarSansPETRIAL-BdIt.otf") format("opentype")}
+@font-face{font-family:"Skolar Sans";font-weight:800;font-style:normal;font-display:swap;src:url("/fonts/SkolarSansPETRIAL-Eb.otf") format("opentype")}
+@font-face{font-family:"Skolar Sans";font-weight:800;font-style:italic;font-display:swap;src:url("/fonts/SkolarSansPETRIAL-EbIt.otf") format("opentype")}
+@font-face{font-family:"Skolar Sans";font-weight:900;font-style:normal;font-display:swap;src:url("/fonts/SkolarSansPETRIAL-Bl.otf") format("opentype")}
+@font-face{font-family:"Skolar Sans";font-weight:900;font-style:italic;font-display:swap;src:url("/fonts/SkolarSansPETRIAL-BlIt.otf") format("opentype")}
+
+/* Width variants — use only where a layout genuinely needs them, never as a second voice. */
+@font-face{font-family:"Skolar Sans Condensed";font-weight:400;font-display:swap;src:url("/fonts/SkolarSansPECnTRIAL-Rg.otf") format("opentype")}
+@font-face{font-family:"Skolar Sans Condensed";font-weight:600;font-display:swap;src:url("/fonts/SkolarSansPECnTRIAL-Sb.otf") format("opentype")}
+@font-face{font-family:"Skolar Sans Compressed";font-weight:600;font-display:swap;src:url("/fonts/SkolarSansPECpTRIAL-Sb.otf") format("opentype")}
+@font-face{font-family:"Skolar Sans Extended";font-weight:600;font-display:swap;src:url("/fonts/SkolarSansPEExTRIAL-Sb.otf") format("opentype")}

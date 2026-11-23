@@ -1,0 +1,114 @@
+/* ─────────────────────────────────────────────────────────────────────
+   Artomango design tokens  ·  "soft brutalism"
+
+   This file is the ONLY place raw color, size and shadow values live.
+   Tailwind (tailwind.config.ts) and the components in src/components/ui
+   read these variables. Pages should never hardcode hex values.
+
+   Rules of the accent:
+   - Ink outline + hard shadow only on things you can touch (buttons,
+     active states, clickable cards on hover) and things that float
+     (menus, modals, toasts). Static content gets a hairline.
+   - Mango marks the main action / current item. Never a large fill.
+   - Darker Grotesque for headlines >= 20px only; Instrument Sans for
+     body, labels and forms. Nothing below 12px.
+   See DESIGN_SYSTEM.md for the full guide.
+   ───────────────────────────────────────────────────────────────────── */
+
+:root {
+  /* ── Brand ─────────────────────────────────────────────────────── */
+  --color-ink: #111110;
+  --color-mango: #ffd400;
+  --color-mango-hover: #ffde3d;
+  --color-mango-soft: #fff4bf;
+  --color-on-mango: #111110;
+
+  /* ── Surfaces ──────────────────────────────────────────────────── */
+  --color-page: #fbf8f0;        /* app background ("paper") */
+  --color-surface: #ffffff;     /* cards, inputs, panels */
+  --color-sunken: #f5f0e8;      /* wells, table heads, hover fills */
+  --color-inverse: #111110;     /* dark chips, active tab */
+  --color-on-inverse: #ffffff;
+  --color-scrim: rgba(17, 17, 16, 0.4); /* behind modals */
+
+  /* ── Warm neutrals ─────────────────────────────────────────────── */
+  --color-n-100: #f5f0e8;
+  --color-n-200: #e8e0d0;       /* hairlines, dividers */
+  --color-n-300: #d4c9b4;       /* input borders */
+  --color-n-400: #b3a891;       /* input hover, disabled icons */
+  --color-n-500: #857a65;
+  --color-n-600: #5c5346;
+  --color-n-700: #3a342b;
+
+  /* ── Text ──────────────────────────────────────────────────────── */
+  --color-fg: #111110;          /* headings, primary text */
+  --color-fg-2: #5c5346;        /* body copy, secondary */
+  --color-fg-3: #7a6f5b;        /* captions, meta (AA on white) */
+  --color-fg-disabled: #b3a891;
+
+  /* ── Lines ─────────────────────────────────────────────────────── */
+  --color-line: #e8e0d0;
+  --color-line-strong: #d4c9b4;
+
+  /* ── Status: text color + its own soft well ────────────────────── */
+  --color-ok: #157f3b;     --color-ok-well: #dcfce7;
+  --color-warn: #9a5b00;   --color-warn-well: #fef3c7;
+  --color-bad: #c62828;    --color-bad-well: #fee2e2;
+  --color-info: #0369a1;   --color-info-well: #e0f2fe;
+
+  /* ── Category tags (mediums, exhibitions, calendar) ────────────── */
+  --color-tag-coral: #ff6b6b;
+  --color-tag-teal: #2bb5ac;
+  --color-tag-violet: #7c3aed;
+  --color-tag-pink: #db2777;
+  --color-tag-sky: #0ea5e9;
+
+  /* ── Type ──────────────────────────────────────────────────────── */
+  --font-display: var(--font-darker-grotesque), "Arial Narrow", system-ui, sans-serif;
+  --font-ui: var(--font-instrument-sans), system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: ui-monospace, "SFMono-Regular", Menlo, monospace;
+
+  /* size / line-height pairs */
+  --text-display: 56px;  --leading-display: 1;
+  --text-h1: 40px;       --leading-h1: 1.05;
+  --text-h2: 28px;       --leading-h2: 1.1;
+  --text-h3: 20px;       --leading-h3: 1.2;
+  --text-lead: 18px;     --leading-lead: 1.55;
+  --text-body: 15px;     --leading-body: 1.55;
+  --text-label: 13px;    --leading-label: 1.4;
+  --text-caption: 12px;  --leading-caption: 1.4;
+  --text-body-sm: 14px;  --leading-body-sm: 1.5;
+  --text-control: 14px;  /* buttons, inputs */
+
+  /* ── Shape ─────────────────────────────────────────────────────── */
+  --radius-chip: 6px;      /* small buttons, chips */
+  --radius-control: 10px;  /* buttons, inputs */
+  --radius-card: 16px;     /* cards, modals, panels */
+  --radius-pill: 999px;    /* badges, tabs, nav */
+
+  --border-outline: 1.5px; /* ink outlines on interactive things */
+  --border-hair: 1px;      /* quiet dividers */
+
+  /* hard offset shadows (always ink) */
+  --shadow-hard-1: 2px 2px 0 var(--color-ink);  /* resting controls */
+  --shadow-hard-2: 3px 3px 0 var(--color-ink);  /* hover lift */
+  --shadow-hard-3: 5px 5px 0 var(--color-ink);  /* floating layers */
+
+  /* ── Motion ────────────────────────────────────────────────────── */
+  --ease-standard: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --duration-fast: 120ms;
+  --duration-base: 200ms;
+
+  /* ── Layers ────────────────────────────────────────────────────── */
+  --z-nav: 100;
+  --z-dropdown: 200;
+  --z-modal: 300;
+  --z-toast: 400;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration-fast: 0ms;
+    --duration-base: 0ms;
+  }
+}

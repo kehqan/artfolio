@@ -76,7 +76,7 @@ export default function DiscoverPage() {
 
       {/* Directory CTAs */}
       <div className="grid grid-cols-2 gap-0 mb-6 border-2 border-black" style={{ boxShadow: "3px 3px 0 #111110" }}>
-        <Link href="/directory/artists"
+        <Link href="/explore#artists"
           className="flex items-center justify-between px-5 py-4 bg-black text-[#FFD400] border-r-2 border-black hover:bg-stone-900 transition-colors group">
           <div className="flex items-center gap-3">
             <Palette className="w-5 h-5" />
@@ -87,7 +87,7 @@ export default function DiscoverPage() {
           </div>
           <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
         </Link>
-        <Link href="/directory/venues"
+        <Link href="/explore#venues"
           className="flex items-center justify-between px-5 py-4 bg-[#FFD400] hover:bg-yellow-300 transition-colors group">
           <div className="flex items-center gap-3">
             <Building2 className="w-5 h-5 text-black" />

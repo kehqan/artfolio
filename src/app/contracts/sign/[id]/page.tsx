@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Check, Shield, CheckCircle2, AlertCircle, Handshake } from "lucide-react";
 
@@ -30,6 +30,7 @@ function Row({ label, value }: { label: string; value?: string | null }) {
 // ══════════════════════════════════════════════════════════════════
 export default function ExternalSignPage() {
   const { id } = useParams<{ id: string }>();
+  const token = useSearchParams().get("t");
 
   const [contract,  setContract]  = useState<any>(null);
   const [artworks,  setArtworks]  = useState<any[]>([]);
@@ -40,52 +41,39 @@ export default function ExternalSignPage() {
   const [signing,   setSigning]   = useState(false);
   const [done,      setDone]      = useState(false);
 
+  // Contracts are no longer readable directly by anonymous visitors. The
+  // page goes through two database functions that check the signing token
+  // from the link (or that the signed-in user is the counterparty).
   useEffect(() => {
     if (!id) return;
     const sb = createClient();
-    sb.from("contracts").select("*").eq("id", id).single().then(async ({ data, error: err }) => {
-      if (err || !data) { setError("This contract link is invalid or has expired."); setLoading(false); return; }
-      if (data.status === "signed") { setDone(true); setLoading(false); setContract(data); return; }
-      if (data.status === "cancelled") { setError("This contract has been cancelled."); setLoading(false); return; }
-      setContract(data);
-
-      const { data: ca } = await sb.from("contract_artworks")
-        .select("artwork_id, artworks(id,title,medium,price)")
-        .eq("contract_id", id);
-      setArtworks((ca || []).map((r: any) => r.artworks));
+    sb.rpc("get_contract_for_signing", { p_contract_id: id, p_token: token }).then(({ data, error: err }) => {
+      const c = data as any;
+      if (err || !c) { setError("This contract link is invalid or has expired."); setLoading(false); return; }
+      if (c.status === "signed") { setDone(true); setLoading(false); setContract(c); return; }
+      if (c.status === "cancelled") { setError("This contract has been cancelled."); setLoading(false); return; }
+      setContract(c);
+      setArtworks(c.artworks || []);
       setLoading(false);
     });
-  }, [id]);
+  }, [id, token]);
 
   async function handleSign() {
     if (!sigName.trim() || !agreed) return;
     setSigning(true);
+    setError("");
     const sb = createClient();
-    const now = new Date().toISOString();
-
-    const bothSigned = !!contract.initiator_signed_at;
-    const update: Record<string, unknown> = {
-      counterparty_signed_at: now,
-      counterparty_signature: sigName.trim(),
-      status: bothSigned ? "signed" : "partially_signed",
-    };
-    if (bothSigned) update.executed_at = now;
-
-    await sb.from("contracts").update(update).eq("id", id);
-
-    // Provenance notes on artworks if fully signed
-    if (bothSigned && artworks.length > 0) {
-      for (const aw of artworks) {
-        await sb.from("provenance_entries").insert({
-          artwork_id:  aw.id,
-          event_type:  contract.contract_type === "exhibition" ? "exhibited" : "transferred",
-          date:        now.split("T")[0],
-          notes:       `Part of signed contract: ${contract.title} (${contract.reference_number || id.slice(0, 8)})`,
-        });
-      }
-    }
-
+    const { data, error: err } = await sb.rpc("sign_contract_as_counterparty", {
+      p_contract_id: id, p_token: token, p_signature: sigName.trim(),
+    });
     setSigning(false);
+    if (err || !data) {
+      setError(err?.message?.includes("already signed")
+        ? "This contract has already been signed."
+        : "We couldn't record your signature. Please try again or ask the sender for a new link.");
+      return;
+    }
+    setContract(data);
     setDone(true);
   }
 

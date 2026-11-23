@@ -133,7 +133,6 @@ export default function AdminPage() {
   const [tab, setTab] = useState<Tab>("overview");
   const [authed, setAuthed] = useState(false);
   const [authLoading, setAuthLoading] = useState(true);
-  const [adminPass, setAdminPass] = useState("");
   const [authError, setAuthError] = useState("");
   const [users, setUsers]       = useState<Profile[]>([]);
   const [artworks, setArtworks] = useState<Artwork[]>([]);
@@ -151,18 +150,20 @@ export default function AdminPage() {
   const [newSlideUrl, setNewSlideUrl] = useState("");
   const [addingSlide, setAddingSlide] = useState(false);
 
+  // Admin access is decided by the signed-in user's profile role, checked here
+  // and in middleware. The database (RLS + is_admin()) is the real guard.
   useEffect(() => {
-    const stored = sessionStorage.getItem("artomango_admin");
-    if (stored === "granted") { setAuthed(true); loadAll(); }
-    setAuthLoading(false);
+    (async () => {
+      const { data: { user } } = await sb.auth.getUser();
+      if (!user) { setAuthError("Sign in with an admin account to continue."); setAuthLoading(false); return; }
+      const { data: me } = await sb.from("profiles").select("role").eq("id", user.id).maybeSingle();
+      if (me?.role === "admin") { setAuthed(true); loadAll(); }
+      else setAuthError("This account does not have admin access.");
+      setAuthLoading(false);
+    })();
   }, []);
 
-  function tryAuth() {
-    const PASS = process.env.NEXT_PUBLIC_ADMIN_PASSWORD || "artomango2026";
-    if (adminPass === PASS) { sessionStorage.setItem("artomango_admin", "granted"); setAuthed(true); setAuthError(""); loadAll(); }
-    else setAuthError("Wrong password. Try again.");
-  }
-  function signOut() { sessionStorage.removeItem("artomango_admin"); setAuthed(false); }
+  async function signOut() { await sb.auth.signOut(); window.location.href = "/login"; }
 
   async function loadAll() {
     setLoading(true);
@@ -200,7 +201,8 @@ export default function AdminPage() {
   }
 
   async function updateUser(u: Profile) {
-    await sb.from("profiles").update({ full_name: u.full_name, role: u.role, bio: u.bio, location: u.location, username: u.username }).eq("id", u.id);
+    const { data, error } = await sb.from("profiles").update({ full_name: u.full_name, role: u.role, bio: u.bio, location: u.location, username: u.username }).eq("id", u.id).select("id");
+    if (error || !data?.length) { alert(`Could not save this user${error ? `: ${error.message}` : " (no permission)"}.`); return; }
     setUsers(p => p.map(x => x.id === u.id ? u : x)); setEditUser(null);
   }
   async function deleteUser(id: string) {
@@ -254,12 +256,10 @@ export default function AdminPage() {
         <div style={{ background:"#FFFBEA", border:"2.5px solid #111110", borderRadius:20, padding:"36px 32px", width:"100%", maxWidth:380, boxShadow:"8px 8px 0 #FFD400" }}>
           <div style={{ fontSize:44, textAlign:"center", marginBottom:16 }}>🥭</div>
           <h1 style={{ fontSize:24, fontWeight:900, color:"#111110", letterSpacing:"-0.8px", marginBottom:4, textAlign:"center" }}>Admin Panel</h1>
-          <p style={{ fontSize:13, color:"#9B8F7A", fontWeight:600, textAlign:"center", marginBottom:24 }}>Enter the admin password to continue</p>
-          <input type="password" value={adminPass} onChange={e => setAdminPass(e.target.value)} onKeyDown={e => e.key === "Enter" && tryAuth()} style={{ ...inp, marginBottom:12, fontSize:15 }} placeholder="Password" />
-          {authError && <div style={{ fontSize:12, color:"#EF4444", fontWeight:700, marginBottom:10 }}>{authError}</div>}
-          <button onClick={tryAuth} style={{ width:"100%", padding:13, border:"2.5px solid #111110", borderRadius:12, background:"#FFD400", fontSize:14, fontWeight:800, cursor:"pointer", fontFamily:"inherit", boxShadow:"3px 3px 0 #111110" }}>
-            <Shield size={14} style={{ display:"inline", marginRight:6, verticalAlign:"middle" }}/> Enter Admin
-          </button>
+          <p style={{ fontSize:13, color:"#9B8F7A", fontWeight:600, textAlign:"center", marginBottom:24 }}>{authError || "Checking access…"}</p>
+          <a href="/login" style={{ display:"block", width:"100%", padding:13, border:"2.5px solid #111110", borderRadius:12, background:"#FFD400", fontSize:14, fontWeight:800, cursor:"pointer", fontFamily:"inherit", boxShadow:"3px 3px 0 #111110", textAlign:"center", color:"#111110", textDecoration:"none" }}>
+            <Shield size={14} style={{ display:"inline", marginRight:6, verticalAlign:"middle" }}/> Sign in
+          </a>
           <a href="/" style={{ display:"block", textAlign:"center", marginTop:16, fontSize:12, color:"#9B8F7A", fontWeight:700, textDecoration:"none" }}>← Back to site</a>
         </div>
       </div>

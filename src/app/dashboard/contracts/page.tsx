@@ -23,6 +23,7 @@ type Contract = {
   counterparty_id?: string;
   counterparty_name: string;
   counterparty_role: string;
+  counterparty_token?: string | null;
   counterparty_email?: string;
   start_date?: string;
   end_date?: string;
@@ -111,7 +112,7 @@ function ContractCard({ contract, myId, onCopyLink }: { contract: Contract; myId
 
   function copyLink(e: React.MouseEvent) {
     e.stopPropagation();
-    const url = `${window.location.origin}/contracts/sign/${contract.id}`;
+    const url = `${window.location.origin}/contracts/sign/${contract.id}${contract.counterparty_token ? `?t=${encodeURIComponent(contract.counterparty_token)}` : ""}`;
     navigator.clipboard.writeText(url);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);

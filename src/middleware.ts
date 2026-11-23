@@ -23,6 +23,12 @@ export async function middleware(request: NextRequest) {
   if (!user && request.nextUrl.pathname.startsWith("/dashboard")) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
+  const path = request.nextUrl.pathname;
+  if (path.startsWith("/admin") || path.startsWith("/dashboard/admin")) {
+    if (!user) return NextResponse.redirect(new URL("/login", request.url));
+    const { data: me } = await supabase.from("profiles").select("role").eq("id", user.id).maybeSingle();
+    if (me?.role !== "admin") return NextResponse.redirect(new URL("/dashboard", request.url));
+  }
   if (user && (request.nextUrl.pathname === "/login" || request.nextUrl.pathname === "/register")) {
     return NextResponse.redirect(new URL("/dashboard", request.url));
   }

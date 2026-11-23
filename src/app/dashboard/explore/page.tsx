@@ -83,7 +83,7 @@ export default function ExplorePage() {
               <div className="p-3">
                 <p className="text-sm font-medium text-stone-900 truncate">{a.title}</p>
                 {a.artist_name && a.artist_username && (
-                  <Link href={`/artist/${a.artist_username}`} className="text-xs text-emerald-600 hover:underline">{a.artist_name}</Link>
+                  <Link href={`/${a.artist_username}`} className="text-xs text-emerald-600 hover:underline">{a.artist_name}</Link>
                 )}
                 <div className="flex items-center justify-between mt-1.5">
                   <span className="badge badge-available text-[10px]">{a.status}</span>
@@ -98,7 +98,7 @@ export default function ExplorePage() {
           {filteredArtists.length === 0 ? (
             <div className="col-span-full card p-12 text-center text-stone-400">No artists found</div>
           ) : filteredArtists.map((a) => (
-            <Link key={a.id} href={`/artist/${a.username}`} className="card-hover p-5 flex items-center gap-4">
+            <Link key={a.id} href={`/${a.username}`} className="card-hover p-5 flex items-center gap-4">
               {a.avatar_url ? <img src={a.avatar_url} alt="" className="w-12 h-12 rounded-full object-cover shrink-0" />
                 : <div className="w-12 h-12 rounded-full bg-stone-200 flex items-center justify-center text-stone-600 font-semibold text-lg shrink-0">{a.name?.[0]}</div>}
               <div className="min-w-0">
@@ -114,7 +114,7 @@ export default function ExplorePage() {
           {filteredVenues.length === 0 ? (
             <div className="col-span-full card p-12 text-center text-stone-400">No venues found</div>
           ) : filteredVenues.map((v) => (
-            <Link key={v.id} href={`/venue/${v.id}`} className="card-hover p-5 flex items-center gap-4">
+            <div key={v.id} className="card-hover p-5 flex items-center gap-4">
               {v.logo_url ? <img src={v.logo_url} alt="" className="w-12 h-12 rounded-xl object-cover shrink-0" />
                 : <div className="w-12 h-12 rounded-xl bg-stone-200 flex items-center justify-center text-stone-600 font-semibold text-lg shrink-0">{v.name?.[0]}</div>}
               <div className="min-w-0">
@@ -122,7 +122,7 @@ export default function ExplorePage() {
                 <p className="text-xs text-stone-500 capitalize">{v.type}</p>
                 {v.city && <p className="text-xs text-stone-400">{v.city}</p>}
               </div>
-            </Link>
+            </div>
           ))}
         </div>
       )}

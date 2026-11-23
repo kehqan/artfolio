@@ -593,7 +593,7 @@ export default function ExplorePage() {
         )}
 
         {/* ── ARTWORKS ── */}
-        <section className="fade-up d1" style={{ marginBottom:44 }}>
+        <section id="artworks" className="fade-up d1" style={{ marginBottom:44 }}>
           <SectionHead emoji="🎨" sub="Available now" title="Artworks" cta="See all" ctaHref="/register" />
 
           {loading ? (
@@ -646,7 +646,7 @@ export default function ExplorePage() {
         <div className="ex-sep"/>
 
         {/* ── ARTISTS ── */}
-        <section className="fade-up d2" style={{ marginBottom:44 }}>
+        <section id="artists" className="fade-up d2" style={{ marginBottom:44 }}>
           <SectionHead emoji="👤" sub="Discover creators" title="Artists" cta="All artists" ctaHref="/register" />
           <HScroll>
             {filteredArtists.map((artist, i) => (
@@ -689,7 +689,7 @@ export default function ExplorePage() {
         <div className="ex-sep"/>
 
         {/* ── VENUES ── */}
-        <section className="fade-up d3" style={{ marginBottom:44 }}>
+        <section id="venues" className="fade-up d3" style={{ marginBottom:44 }}>
           <SectionHead emoji="🏛️" sub="Galleries & spaces" title="Venues" cta="All venues" ctaHref="/register" />
           <HScroll>
             {filteredVenues.map(venue => (
@@ -730,7 +730,7 @@ export default function ExplorePage() {
         <div className="ex-sep"/>
 
         {/* ── EVENTS ── */}
-        <section style={{ marginBottom:44 }}>
+        <section id="events" style={{ marginBottom:44 }}>
           <SectionHead emoji="📅" sub="What's happening" title="Events" cta="All events" ctaHref="/dashboard/exhibitions" />
           <HScroll>
             {upcomingEvents.slice(0,10).map(ev => {

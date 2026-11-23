@@ -1,11 +1,20 @@
 import type { Metadata, Viewport } from "next";
-import { Darker_Grotesque } from "next/font/google";
+import { Darker_Grotesque, Instrument_Sans } from "next/font/google";
+import "../styles/tokens.css";
 import "./globals.css";
 
 const darkerGrotesque = Darker_Grotesque({
   subsets: ["latin"],
   weight: ["300", "400", "500", "600", "700", "800", "900"],
   variable: "--font-darker-grotesque",
+  display: "swap",
+});
+
+// Body / UI face for the design system (see DESIGN_SYSTEM.md)
+const instrumentSans = Instrument_Sans({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-instrument-sans",
   display: "swap",
 });
 
@@ -72,7 +81,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={darkerGrotesque.variable}>
+    <html lang="en" className={`${darkerGrotesque.variable} ${instrumentSans.variable}`}>
       <head>
         {/* PWA install hint for iOS Safari */}
         <meta name="apple-mobile-web-app-capable" content="yes" />

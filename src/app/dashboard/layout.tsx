@@ -32,6 +32,8 @@ const NAV_SECTIONS = [
     icon: CalendarRange,
     items: [
       { href: "/dashboard/scene",     label: "Collabs & Events", icon: Handshake,     desc: "Community feed of events & collabs", emoji: "🌆", color: "#CA8A04", bg: "#FEF9C3" },
+      { href: "/dashboard/exhibitions", label: "Exhibitions",    icon: CalendarRange, desc: "Plan and publish your shows",        emoji: "🖼️", color: "#7C3AED", bg: "#EDE9FE" },
+      { href: "/dashboard/pool",      label: "The Pool",         icon: Globe,         desc: "Open calls from artists & venues",   emoji: "🏊", color: "#16A34A", bg: "#DCFCE7" },
       { href: "/dashboard/education", label: "Education Hub",    icon: BookOpen,      desc: "Resources, videos & guides",         emoji: "📚", color: "#0EA5E9", bg: "#E0F2FE" },
       { href: "/dashboard/map",       label: "Art Scene Map",    icon: MapPin,        desc: "Prague art scene map",               emoji: "📍", color: "#EF4444", bg: "#FEE2E2" },
     ],

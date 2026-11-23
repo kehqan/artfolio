@@ -652,7 +652,7 @@ export default function HomePage() {
             <a href="#why"     className="nav-link">Features</a>
             <a href="#how"     className="nav-link">How it works</a>
             <a href="#explore" className="nav-link">Explore</a>
-            <a href="/directory/artists" className="nav-link">Artists</a>
+            <a href="/explore#artists" className="nav-link">Artists</a>
           </div>
           <div style={{marginLeft:"auto",display:"flex",alignItems:"center",gap:4}}>
             <a href="/login"    className="btn-ghost">Sign in</a>
@@ -1117,7 +1117,7 @@ export default function HomePage() {
             </div>
             <div>
               <div className="footer-col-title">Explore</div>
-              {[["Artists","/directory/artists"],["Venues","/directory/venues"],["Analytics","/dashboard/analytics"],["Sales","/dashboard/sales"]].map(([l,h])=>(
+              {[["Artworks","/explore#artworks"],["Artists","/explore#artists"],["Venues","/explore#venues"],["Events","/explore#events"]].map(([l,h])=>(
                 <a key={l} href={h} className="footer-link">{l}</a>
               ))}
             </div>

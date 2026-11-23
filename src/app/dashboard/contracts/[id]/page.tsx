@@ -236,7 +236,7 @@ export default function ContractDetailPage() {
   }
 
   function copySigningLink() {
-    const url = `${window.location.origin}/contracts/sign/${id}`;
+    const url = `${window.location.origin}/contracts/sign/${id}${contract?.counterparty_token ? `?t=${encodeURIComponent(contract.counterparty_token)}` : ""}`;
     navigator.clipboard.writeText(url);
     setCopied(true);
     setTimeout(() => setCopied(false), 2500);

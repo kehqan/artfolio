@@ -31,12 +31,12 @@ export default function DiscoverPage() {
       .from("profiles").select("id, full_name, username, role, bio, location, avatar_url")
       .neq("id", currentUserId).limit(50);
     if (!profilesData) { setLoading(false); return; }
-    const { data: follows } = await supabase.from("follows").select("following_id").eq("follower_id", currentUserId);
+    const { data: follows } = await supabase.from("followers").select("following_id").eq("follower_id", currentUserId);
     const followingIds = new Set(follows?.map(f => f.following_id) || []);
     const enriched = await Promise.all(profilesData.map(async p => {
       const [{ count: artwork_count }, { count: follower_count }] = await Promise.all([
         supabase.from("artworks").select("*", { count: "exact", head: true }).eq("user_id", p.id),
-        supabase.from("follows").select("*", { count: "exact", head: true }).eq("following_id", p.id),
+        supabase.from("followers").select("*", { count: "exact", head: true }).eq("following_id", p.id),
       ]);
       return { ...p, artwork_count: artwork_count || 0, follower_count: follower_count || 0, is_following: followingIds.has(p.id) };
     }));
@@ -50,9 +50,9 @@ export default function DiscoverPage() {
     const supabase = createClient();
     const profile = profiles.find(p => p.id === targetId);
     if (profile?.is_following) {
-      await supabase.from("follows").delete().eq("follower_id", userId).eq("following_id", targetId);
+      await supabase.from("followers").delete().eq("follower_id", userId).eq("following_id", targetId);
     } else {
-      await supabase.from("follows").insert({ follower_id: userId, following_id: targetId });
+      await supabase.from("followers").insert({ follower_id: userId, following_id: targetId });
     }
     setProfiles(prev => prev.map(p => p.id === targetId ? {
       ...p, is_following: !p.is_following,

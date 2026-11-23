@@ -134,7 +134,7 @@ export default function ProfilePage() {
     // Stats
     const [{ count: aw }, { count: fo }, { count: ex }, { count: sa }] = await Promise.all([
       sb.from("artworks").select("id",    { count: "exact", head: true }).eq("user_id", user.id),
-      sb.from("follows").select("id",     { count: "exact", head: true }).eq("following_id", user.id),
+      sb.from("followers").select("id",     { count: "exact", head: true }).eq("following_id", user.id),
       sb.from("exhibitions").select("id", { count: "exact", head: true }).eq("user_id", user.id),
       sb.from("sales").select("id",       { count: "exact", head: true }).eq("user_id", user.id),
     ]);

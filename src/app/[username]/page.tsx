@@ -300,7 +300,7 @@ export default function PublicProfilePage() {
     const { data: mb } = await sb.from("moodboards").select("id,provider,url,title,description,thumbnail_url,og_image,tags").eq("user_id", prof.id).eq("is_public", true).order("created_at", { ascending: false });
     setMoodboards((mb || []).map((b: any) => ({ ...b, tags: b.tags || [] })));
 
-    const { count } = await sb.from("follows").select("*", { count: "exact", head: true }).eq("following_id", prof.id);
+    const { count } = await sb.from("followers").select("*", { count: "exact", head: true }).eq("following_id", prof.id);
     setFollowerCount(count || 0);
     setLoading(false);
   }

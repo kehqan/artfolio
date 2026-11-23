@@ -204,7 +204,7 @@ export default function AnalyticsPage() {
         sb.from("artworks").select("id,status,title,price,medium").eq("user_id", user.id),
         sb.from("clients").select("id,name,email").eq("user_id", user.id),
         sb.from("profiles").select("full_name").eq("id", user.id).single(),
-        sb.from("follows").select("*", { count: "exact", head: true }).eq("following_id", user.id),
+        sb.from("followers").select("*", { count: "exact", head: true }).eq("following_id", user.id),
         sb.from("collaborations").select("*", { count: "exact", head: true }).eq("user_id", user.id),
         sb.from("exhibitions").select("*", { count: "exact", head: true }).eq("user_id", user.id),
       ]);

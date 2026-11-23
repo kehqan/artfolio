@@ -287,7 +287,7 @@ export default function DashboardPage() {
             .order("created_at", { ascending: false })
             .limit(6),
           // Followers
-          supabase.from("follows").select("*", { count: "exact", head: true }).eq("following_id", user.id),
+          supabase.from("followers").select("*", { count: "exact", head: true }).eq("following_id", user.id),
           // Contracts
           supabase.from("contracts").select("status").eq("user_id", user.id),
           // Scene posts — FIXED: read from scene_posts, public+active feed

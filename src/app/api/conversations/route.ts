@@ -69,10 +69,38 @@ export async function POST(request: NextRequest) {
       guest_email,
     } = body;
 
-    if (!recipient_id) return NextResponse.json({ error: "recipient_id required" }, { status: 400 });
+    if (!recipient_id || !/^[0-9a-f-]{36}$/i.test(String(recipient_id))) {
+      return NextResponse.json({ error: "recipient_id required" }, { status: 400 });
+    }
     if (!initial_message?.trim()) return NextResponse.json({ error: "Message body required" }, { status: 400 });
 
     const senderId = user?.id || null;
+
+    // Visitors without an account go through a database function that checks
+    // the input and creates the conversation, message and notification.
+    if (!senderId) {
+      if (!guest_name?.trim() || !guest_email?.trim()) {
+        return NextResponse.json({ error: "Name and email required" }, { status: 400 });
+      }
+      const { data: convoId, error: guestErr } = await supabase.rpc("start_guest_conversation", {
+        p_recipient_id: recipient_id,
+        p_guest_name: guest_name,
+        p_guest_email: guest_email,
+        p_body: initial_message,
+        p_context_type: context_type,
+        p_context_id: context_id || null,
+        p_context_title: context_title || null,
+        p_context_meta: context_meta || null,
+      });
+      if (guestErr || !convoId) {
+        const tooMany = guestErr?.message?.includes("Too many");
+        return NextResponse.json(
+          { error: tooMany ? "Too many messages. Please try again later." : "Could not send your message." },
+          { status: tooMany ? 429 : 400 }
+        );
+      }
+      return NextResponse.json({ conversation_id: convoId });
+    }
 
     // Check if conversation already exists between these two
     if (senderId) {

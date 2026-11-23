@@ -470,10 +470,9 @@ export default function LoginPage() {
               <div className="field">
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 7 }}>
                   <label className="field-label" style={{ margin: 0 }}>Password</label>
-                  {/* Forgot password — placeholder for future */}
-                  <span style={{ fontSize: 11, fontWeight: 700, color: "#C0B8A8" }}>
+                  <Link href="/forgot-password" style={{ fontSize: 11, fontWeight: 700, color: "#9B8F7A", textDecoration: "none" }}>
                     Forgot password?
-                  </span>
+                  </Link>
                 </div>
                 <div className="field-wrap">
                   <input

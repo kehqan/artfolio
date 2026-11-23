@@ -1,15 +1,24 @@
 // src/app/api/og-preview/route.ts
 import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@/lib/supabase/server";
 
 export const runtime = "edge";
 
 export async function GET(req: NextRequest) {
+  // Signed-in users only, so this can't be used as an open proxy.
+  const { data: { user } } = await createClient().auth.getUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
   const url = req.nextUrl.searchParams.get("url");
   if (!url) return NextResponse.json({ error: "Missing url" }, { status: 400 });
 
   try {
     const parsed = new URL(url);
-    if (!["http:", "https:"].includes(parsed.protocol)) {
+    const host = parsed.hostname.toLowerCase();
+    const isPrivate = host === "localhost" || host.endsWith(".local") || host.endsWith(".internal")
+      || /^(127\.|10\.|0\.|169\.254\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(host)
+      || host.startsWith("[");
+    if (!["http:", "https:"].includes(parsed.protocol) || isPrivate) {
       return NextResponse.json({ error: "Invalid URL" }, { status: 400 });
     }
 

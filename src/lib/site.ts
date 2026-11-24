@@ -62,7 +62,7 @@ export const SECTION_HINT: Record<SectionKey, string> = {
 };
 
 export const ARTIST_SECTIONS: SectionKey[] = ["featured", "work", "onshow", "about", "shows", "contact"];
-export const VENUE_SECTIONS: SectionKey[] = ["featured", "work", "about", "shows", "contact"];
+export const VENUE_SECTIONS: SectionKey[] = ["perspective", "onwalls", "calls", "history", "collection", "space", "contact"];
 
 export type CvItem = { year: string; text: string };
 
@@ -111,7 +111,7 @@ export type SiteProfile = {
   id: string; full_name: string; username: string; role?: string | null;
   bio?: string | null; location?: string | null; avatar_url?: string | null;
   website?: string | null; instagram?: string | null; behance?: string | null; linkedin?: string | null;
-  venue_name?: string | null; venue_type?: string | null;
+  venue_name?: string | null; venue_type?: string | null; art_styles_sought?: string[] | null;
 };
 export type SiteWork = {
   id: string; title: string; medium?: string | null; year?: number | null; description?: string | null;
@@ -139,7 +139,7 @@ export type SiteData = {
 };
 
 const WORK_FIELDS = "id, title, medium, year, description, price, currency, status, images, sale_method, width_cm, height_cm, depth_cm, framed";
-const PROFILE_FIELDS = "id, full_name, username, role, bio, location, avatar_url, website, instagram, behance, linkedin, venue_name, venue_type";
+const PROFILE_FIELDS = "id, full_name, username, role, bio, location, avatar_url, website, instagram, behance, linkedin, venue_name, venue_type, art_styles_sought";
 
 export async function loadSiteData(sb: SupabaseClient, by: { username?: string; id?: string }): Promise<SiteData | null> {
   const q = sb.from("profiles").select(PROFILE_FIELDS);

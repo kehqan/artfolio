@@ -67,6 +67,7 @@ export default function SiteEditorPage() {
   const frame = useRef<HTMLIFrameElement>(null);
   const box = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const spaceRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const sb = createClient();
@@ -126,24 +127,43 @@ export default function SiteEditorPage() {
     setTimeout(() => setNotice(n => (n?.tone === "ok" ? null : n)), 3000);
   }
 
-  async function upload(file: File) {
-    if (!uid) return;
-    if (!file.type.startsWith("image/")) { setNotice({ tone: "bad", text: "Choose an image file (JPG, PNG or WebP)." }); return; }
-    if (file.size > 10 * 1024 * 1024) { setNotice({ tone: "bad", text: "That image is over 10 MB. Try a smaller one." }); return; }
-    setUploading(true); setNotice(null);
+  /** Upload one image; returns its public address or null. */
+  async function sendImage(file: File, name: string): Promise<string | null> {
+    if (!uid) return null;
+    if (!file.type.startsWith("image/")) { setNotice({ tone: "bad", text: "Choose an image file (JPG, PNG or WebP)." }); return null; }
+    if (file.size > 10 * 1024 * 1024) { setNotice({ tone: "bad", text: "That image is over 10 MB. Try a smaller one." }); return null; }
     const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
-    const path = `${uid}/store-banner-${Date.now()}.${ext}`;
+    const path = `${uid}/${name}-${Date.now()}.${ext}`;
     try {
       const res = await fetch("/api/upload", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ path, contentType: file.type }) });
       const { signedUrl } = await res.json();
       if (!signedUrl) throw new Error("no url");
       const put = await fetch(signedUrl, { method: "PUT", body: file, headers: { "Content-Type": file.type } });
       if (!put.ok) throw new Error("upload failed");
-      const { data: { publicUrl } } = createClient().storage.from("artwork-images").getPublicUrl(path);
-      setExtra(p => ({ ...p, banner_url: publicUrl }));
+      return createClient().storage.from("artwork-images").getPublicUrl(path).data.publicUrl;
     } catch {
       setNotice({ tone: "bad", text: "The image didn't upload. Please try again." });
+      return null;
     }
+  }
+
+  async function upload(file: File) {
+    setUploading(true); setNotice(null);
+    const url = await sendImage(file, "store-banner");
+    if (url) setExtra(p => ({ ...p, banner_url: url }));
+    setUploading(false);
+  }
+
+  async function addSpace(files: FileList) {
+    if (!site) return;
+    setUploading(true); setNotice(null);
+    const room = 6 - (site.space_images?.length || 0);
+    const urls: string[] = [];
+    for (const f of Array.from(files).slice(0, room)) {
+      const u = await sendImage(f, "space");
+      if (u) urls.push(u);
+    }
+    setSite(s => (s ? { ...s, space_images: [...(s.space_images || []), ...urls] } : s));
     setUploading(false);
   }
 
@@ -268,6 +288,42 @@ export default function SiteEditorPage() {
               Choose featured works and what&rsquo;s for sale
             </Link>
           </Card>
+
+          {venue && (
+            <Card padding="lg" className="flex flex-col gap-4">
+              <h2 className="font-display text-h3 text-fg">Your venue</h2>
+              <Field label="Your perspective on art" hint="What you love to show, and why. It opens your site, large.">
+                {p => <Textarea {...p} rows={3} maxLength={400} value={site.perspective || ""} placeholder="Quiet, warm work by young painters, hung where people actually sit with it." onChange={e => set({ perspective: e.target.value })} />}
+              </Field>
+              <p className="font-ui text-caption text-fg-3">Your bio and the styles you look for come from <Link href="/dashboard/profile" className="underline underline-offset-2">your profile</Link>.</p>
+              <div className="flex flex-col gap-2">
+                <span className="font-ui text-label font-semibold text-fg">Photos of the space</span>
+                <div className="grid grid-cols-3 gap-2">
+                  {(site.space_images || []).map(src => (
+                    <span key={src} className="group relative aspect-square overflow-hidden rounded-control bg-sunken">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={src} alt="" className="h-full w-full object-cover" />
+                      <button type="button" aria-label="Remove photo" onClick={() => set({ space_images: (site.space_images || []).filter(x => x !== src) })}
+                        className="absolute right-1 top-1 grid h-6 w-6 place-items-center rounded-pill border-hair border-ink bg-surface"><X size={12} aria-hidden /></button>
+                    </span>
+                  ))}
+                  {(site.space_images?.length || 0) < 6 && (
+                    <button type="button" onClick={() => spaceRef.current?.click()} disabled={uploading}
+                      className="grid aspect-square place-items-center rounded-control border-hair border-dashed border-line-strong font-ui text-caption text-fg-3 hover:border-ink hover:text-fg">
+                      <span className="flex flex-col items-center gap-1"><ImagePlus size={16} aria-hidden />{uploading ? "Uploading…" : "Add"}</span>
+                    </button>
+                  )}
+                </div>
+                <input ref={spaceRef} type="file" accept="image/*" multiple className="hidden" onChange={e => { if (e.target.files?.length) addSpace(e.target.files); e.target.value = ""; }} />
+              </div>
+              <Field label="About the space" hint="Walls, light, who comes by.">
+                {p => <Textarea {...p} rows={3} maxLength={600} value={site.space_note || ""} onChange={e => set({ space_note: e.target.value })} />}
+              </Field>
+              <Field label="Opening hours">
+                {p => <Textarea {...p} rows={2} maxLength={200} value={site.hours || ""} placeholder={"Mon–Fri 8:00–20:00\nSat–Sun 10:00–18:00"} onChange={e => set({ hours: e.target.value })} />}
+              </Field>
+            </Card>
+          )}
 
           {!venue && (
             <Card padding="lg" className="flex flex-col gap-4">

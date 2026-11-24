@@ -621,8 +621,8 @@ export default function DashboardPage() {
           </div>
         </Panel>
 
-        {/* ── Money & papers ── */}
-        <Panel title="Deals and papers" eyebrow="Money" action={<PanelLink href="/dashboard/sales">Sales</PanelLink>}>
+        {/* ── Sales & papers ── */}
+        <Panel title="Deals and papers" eyebrow="Sales" action={<PanelLink href="/dashboard/sales">Sales</PanelLink>}>
           <dl className="divide-y divide-line">
             {[
               { label: "Sold in total", value: loaded ? formatPrice(stats.sales_total, cur) : "–", href: "/dashboard/sales" },

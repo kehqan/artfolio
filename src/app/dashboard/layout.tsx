@@ -49,7 +49,7 @@ const AREAS: Area[] = [
     match: ["/dashboard/exhibitions", "/dashboard/pool", "/dashboard/map"],
   },
   {
-    key: "business", label: "Money", icon: Wallet, href: "/dashboard/sales",
+    key: "business", label: "Sales", icon: Wallet, href: "/dashboard/sales",
     pages: [
       { href: "/dashboard/sales", label: "Sales" },
       { href: "/dashboard/clients", label: "Collectors" },

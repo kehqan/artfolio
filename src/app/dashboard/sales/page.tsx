@@ -1,44 +1,43 @@
 "use client";
-// Sales: what you've sold, what's pending, and how the year is going.
-// The numbers that used to live on a separate "My Reach" page sit at
-// the top: four quiet totals, the last twelve months and top buyers.
+// Sales: one calm number for the year, what's still waiting for payment,
+// and every sale with what you keep after commission. Recording a sale is
+// a short step-by-step flow; tapping a sale opens the full editor.
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Plus } from "lucide-react";
+import { Check, Plus } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { Badge, Button, Card, Chip, EmptyState, PageHeader, SearchField, Skeleton, StatTile, cn } from "@/components/ui";
-import type { BadgeTone } from "@/components/ui";
+import { Button, Card, EmptyState, PageHeader, SearchField, Skeleton, Tabs, cn } from "@/components/ui";
 import { Mat, formatPrice } from "@/components/public/PublicChrome";
-import { type Sale, fmtDay, isCompleted, mainCurrency, net, statusKey } from "./money";
+import { type Sale, channelLabel, fmtDay, isCompleted, isWaiting, mainCurrency, net, statusKey } from "./money";
 import { SaleModal } from "./SaleModal";
+import { type FlowClient, type FlowWork, SaleFlow } from "./SaleFlow";
 
-type Filter = "all" | "completed" | "pending" | "cancelled";
-const FILTERS: { key: Filter; label: string }[] = [
-  { key: "all", label: "All" }, { key: "completed", label: "Completed" }, { key: "pending", label: "Pending" }, { key: "cancelled", label: "Cancelled" },
-];
-const TONE: Record<string, BadgeTone> = { completed: "ok", pending: "warn", cancelled: "neutral" };
+type View = "year" | "all" | "waiting";
 const PAGE = 25;
+const yearOf = (d?: string | null) => (d || "").slice(0, 4);
 
 export default function SalesPage() {
   const [userId, setUserId] = useState<string | null>(null);
   const [sales, setSales] = useState<Sale[]>([]);
-  const [artworks, setArtworks] = useState<{ id: string; title: string; price?: number | null; currency?: string | null; status?: string | null }[]>([]);
-  const [clients, setClients] = useState<{ id: string; name: string; email?: string | null }[]>([]);
+  const [works, setWorks] = useState<FlowWork[]>([]);
+  const [clients, setClients] = useState<FlowClient[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [filter, setFilter] = useState<Filter>("all");
+  const [view, setView] = useState<View>("year");
   const [search, setSearch] = useState("");
   const [shown, setShown] = useState(PAGE);
-  const [modal, setModal] = useState<{ sale: Sale | null } | null>(null);
+  const [edit, setEdit] = useState<Sale | null>(null);
+  const [flow, setFlow] = useState<{ work?: string | null; client?: string | null } | null>(null);
+  const [paying, setPaying] = useState<string | null>(null);
 
   const load = useCallback(async (me: string) => {
     const sb = createClient();
     const [s, a, c] = await Promise.all([
       sb.from("sales").select("*, artworks(id,title,images)").eq("user_id", me).order("sale_date", { ascending: false, nullsFirst: false }),
-      sb.from("artworks").select("id,title,price,currency,status").eq("user_id", me).order("created_at", { ascending: false }),
+      sb.from("artworks").select("id,title,images,price,currency,status").eq("user_id", me).order("created_at", { ascending: false }),
       sb.from("clients").select("id,name,email").eq("user_id", me).order("name"),
     ]);
     if (s.error) setError("Your sales didn't load. Please refresh the page.");
-    setSales((s.data || []) as Sale[]); setArtworks(a.data || []); setClients(c.data || []);
+    setSales((s.data || []) as Sale[]); setWorks((a.data || []) as FlowWork[]); setClients((c.data || []) as FlowClient[]);
     setLoading(false);
   }, []);
 
@@ -46,174 +45,189 @@ export default function SalesPage() {
     createClient().auth.getUser().then(({ data: { user } }) => {
       if (!user) { setLoading(false); return; }
       setUserId(user.id); load(user.id);
-      if (new URLSearchParams(window.location.search).get("new") === "1") setModal({ sale: null });
+      const p = new URLSearchParams(window.location.search);
+      if (p.get("new") === "1" || p.get("work") || p.get("client")) setFlow({ work: p.get("work"), client: p.get("client") });
     });
+    const again = () => setFlow({});
+    window.addEventListener("sale-flow-again", again);
+    return () => window.removeEventListener("sale-flow-again", again);
   }, [load]);
 
-  const currency = useMemo(() => mainCurrency([...sales, ...artworks]), [sales, artworks]);
+  const currency = useMemo(() => mainCurrency([...sales, ...works]), [sales, works]);
+  const thisYear = String(new Date().getFullYear());
 
-  const stats = useMemo(() => {
-    const done = sales.filter(isCompleted).filter(s => (s.currency || currency).toUpperCase() === currency);
+  const year = useMemo(() => {
+    const done = sales.filter(s => isCompleted(s) && yearOf(s.sale_date) === thisYear && (s.currency || currency).toUpperCase() === currency);
     const now = new Date();
-    const ym = (d?: string | null) => (d || "").slice(0, 7);
-    const thisMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-    const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    const prevMonth = `${prev.getFullYear()}-${String(prev.getMonth() + 1).padStart(2, "0")}`;
-    const year = String(now.getFullYear());
-    const sum = (rows: Sale[]) => rows.reduce((t, s) => t + (Number(s.sale_price) || 0), 0);
-    const month = sum(done.filter(s => ym(s.sale_date) === thisMonth));
-    const before = sum(done.filter(s => ym(s.sale_date) === prevMonth));
-    const yearRows = done.filter(s => (s.sale_date || "").startsWith(year));
     const months = Array.from({ length: 12 }, (_, i) => {
-      const d = new Date(now.getFullYear(), now.getMonth() - 11 + i, 1);
-      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-      return { key, label: d.toLocaleDateString("en-GB", { month: "short" }), value: sum(done.filter(s => ym(s.sale_date) === key)) };
+      const key = `${thisYear}-${String(i + 1).padStart(2, "0")}`;
+      const value = done.filter(s => (s.sale_date || "").startsWith(key)).reduce((t, s) => t + (Number(s.sale_price) || 0), 0);
+      return { key, label: new Date(Number(thisYear), i, 1).toLocaleDateString("en-GB", { month: "short" }), value, future: i > now.getMonth() };
     });
-    const buyers = new Map<string, { name: string; total: number; count: number }>();
-    done.forEach(s => {
-      const name = (s.buyer_name || "").trim();
-      if (!name) return;
-      const k = name.toLowerCase();
-      const b = buyers.get(k) || { name, total: 0, count: 0 };
-      b.total += Number(s.sale_price) || 0; b.count += 1;
-      buyers.set(k, b);
-    });
-    const sold = artworks.filter(a => statusKey(a.status || "") === "sold").length;
     return {
-      month, before, year: sum(yearRows), yearCount: yearRows.length,
-      avg: done.length ? sum(done) / done.length : 0,
-      sold, sellThrough: artworks.length ? Math.round((sold / artworks.length) * 100) : 0,
-      kept: done.reduce((t, s) => t + net(s), 0), months, max: Math.max(1, ...months.map(m => m.value)),
-      buyers: Array.from(buyers.values()).sort((a, b) => b.total - a.total).slice(0, 5),
-      pending: sales.filter(s => statusKey(s.status) === "pending").length,
-      other: sales.filter(isCompleted).length - done.length,
+      total: done.reduce((t, s) => t + (Number(s.sale_price) || 0), 0),
+      kept: done.reduce((t, s) => t + net(s), 0),
+      count: done.length,
+      months, max: Math.max(1, ...months.map(m => m.value)),
+      other: sales.filter(s => isCompleted(s) && yearOf(s.sale_date) === thisYear).length - done.length,
     };
-  }, [sales, artworks, currency]);
+  }, [sales, currency, thisYear]);
+
+  const waiting = sales.filter(isWaiting);
+  const waitingTotal = waiting.filter(s => (s.currency || currency).toUpperCase() === currency).reduce((t, s) => t + (Number(s.sale_price) || 0), 0);
+  const buyerOf = (s: Sale) => (s.client_id && clients.find(c => c.id === s.client_id)?.name) || s.buyer_name || "";
 
   const q = search.toLowerCase().trim();
   const rows = sales.filter(s => {
-    if (filter !== "all" && statusKey(s.status) !== filter) return false;
+    if (view === "year" && yearOf(s.sale_date) !== thisYear) return false;
+    if (view === "waiting" && !isWaiting(s)) return false;
+    if (view !== "waiting" && isWaiting(s) && !q) return false; // already shown above
     if (!q) return true;
-    return [s.artworks?.title, s.buyer_name, s.buyer_email, s.notes].some(v => (v || "").toLowerCase().includes(q));
+    return [s.artworks?.title, buyerOf(s), s.buyer_email, s.notes].some(v => (v || "").toLowerCase().includes(q));
   });
 
-  const monthName = new Date().toLocaleDateString("en-GB", { month: "long" });
+  async function markPaid(s: Sale) {
+    if (!userId) return;
+    setPaying(s.id);
+    const sb = createClient();
+    const { error: e } = await sb.from("sales").update({ status: "Completed" }).eq("id", s.id).eq("user_id", userId);
+    if (!e && s.artwork_id) await sb.from("artworks").update({ status: "sold" }).eq("id", s.artwork_id).eq("user_id", userId);
+    setPaying(null);
+    if (e) { setError("That didn't save. Please try again."); return; }
+    setSales(list => list.map(x => (x.id === s.id ? { ...x, status: "Completed" } : x)));
+  }
+
+  const record = () => setFlow({});
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-8">
       <PageHeader
         title="Sales"
-        description="What you've sold, what's still open, and how the year is going."
-        actions={<Button variant="primary" onClick={() => setModal({ sale: null })}><Plus size={16} aria-hidden /> Record a sale</Button>}
+        description="What you've sold, and what's still to be paid."
+        actions={<Button variant="primary" onClick={record}><Plus size={16} aria-hidden /> Record a sale</Button>}
       />
 
       {error && <p role="alert" className="font-ui text-body-sm text-bad">{error}</p>}
 
       {loading ? (
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{[0, 1, 2, 3].map(i => <Skeleton key={i} className="h-28 rounded-card" />)}</div>
+        <div className="flex flex-col gap-4"><Skeleton className="h-48 rounded-card" /><Skeleton className="h-64 rounded-card" /></div>
+      ) : sales.length === 0 ? (
+        <EmptyState
+          title="No sales yet"
+          description="When a work sells, record it here in a few taps. We mark the work as sold, save the buyer as a collector and keep your totals right."
+          action={<Button variant="primary" onClick={record}><Plus size={15} aria-hidden /> Record your first sale</Button>}
+        />
       ) : (
         <>
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            <StatTile label={`Sold in ${monthName}`} value={formatPrice(stats.month, currency)}
-              delta={stats.before > 0 || stats.month > 0 ? `${formatPrice(stats.before, currency)} the month before` : undefined} />
-            <StatTile label={`This year`} value={formatPrice(stats.year, currency)} delta={`${stats.yearCount} ${stats.yearCount === 1 ? "sale" : "sales"}`} />
-            <StatTile label="Average sale" value={formatPrice(Math.round(stats.avg), currency)} delta={stats.kept > 0 ? `${formatPrice(Math.round(stats.kept), currency)} kept after commission, all time` : undefined} />
-            <StatTile label="Works sold" value={stats.sold} delta={artworks.length ? `${stats.sellThrough}% of your works` : undefined} />
-          </div>
-
-          <div className="grid gap-6 lg:grid-cols-3">
-            <Card padding="md" className="flex flex-col gap-4 lg:col-span-2">
-              <div className="flex items-baseline justify-between gap-3">
-                <h2 className="font-ui text-label font-semibold text-fg">The last 12 months</h2>
-                <span className="font-ui text-caption text-fg-3">Completed sales in {currency}</span>
-              </div>
-              <div className="flex h-40 items-end gap-1.5" role="img" aria-label={`Sales per month: ${stats.months.map(m => `${m.label} ${formatPrice(m.value, currency)}`).join(", ")}`}>
-                {stats.months.map((m, i) => (
-                  <div key={m.key} className="flex h-full flex-1 flex-col items-center justify-end gap-1.5">
-                    <div title={`${m.label}: ${formatPrice(m.value, currency)}`}
-                      className={cn("w-full rounded-t-[4px]", i === 11 ? "bg-mango border-outline border-ink" : m.value ? "bg-ink" : "bg-n-100")}
-                      style={{ height: m.value ? `${Math.max(4, (m.value / stats.max) * 100)}%` : "3px" }} />
-                    <span className="font-ui text-caption text-fg-3">{m.label.slice(0, 1)}<span className="hidden sm:inline">{m.label.slice(1)}</span></span>
-                  </div>
-                ))}
-              </div>
-              {stats.other > 0 && (
-                <p className="font-ui text-caption text-fg-3">{stats.other} {stats.other === 1 ? "sale is" : "sales are"} in another currency and not counted in these totals.</p>
-              )}
-            </Card>
-
-            <Card padding="none" className="overflow-hidden">
-              <div className="border-b-hair border-line px-4 py-3">
-                <h2 className="font-ui text-label font-semibold text-fg">Top buyers</h2>
-              </div>
-              {stats.buyers.length === 0 ? (
-                <p className="px-4 py-4 font-ui text-body-sm text-fg-3">Buyers you add to sales show up here.</p>
-              ) : (
-                <ol className="divide-y divide-line">
-                  {stats.buyers.map((b, i) => (
-                    <li key={b.name} className="flex items-center gap-3 px-4 py-3">
-                      <span className="w-4 font-ui text-caption tabular-nums text-fg-3">{i + 1}</span>
-                      <span className="flex min-w-0 flex-1 flex-col">
-                        <span className="truncate font-ui text-body-sm font-semibold text-fg">{b.name}</span>
-                        <span className="font-ui text-caption text-fg-3">{b.count} {b.count === 1 ? "work" : "works"}</span>
-                      </span>
-                      <span className="font-ui text-body-sm tabular-nums text-fg">{formatPrice(b.total, currency)}</span>
-                    </li>
-                  ))}
-                </ol>
-              )}
-            </Card>
-          </div>
-
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex flex-wrap gap-2" role="group" aria-label="Show">
-              {FILTERS.map(x => (
-                <Chip key={x.key} selected={filter === x.key} onClick={() => { setFilter(x.key); setShown(PAGE); }}>
-                  {x.label}{x.key === "pending" && stats.pending > 0 && <span className="tabular-nums opacity-70"> {stats.pending}</span>}
-                </Chip>
+          {/* The year, in one line and one small chart. */}
+          <Card padding="none" className="grid overflow-hidden md:grid-cols-[1fr_1.1fr]">
+            <div className="flex flex-col justify-center gap-2 p-6 sm:p-8">
+              <span className="font-ui text-caption font-semibold uppercase tracking-[0.12em] text-fg-3">{thisYear} so far</span>
+              <span className="font-display text-[56px] font-extrabold leading-none tabular-nums text-fg sm:text-[68px]">{formatPrice(year.total, currency)}</span>
+              <span className="font-ui text-body text-fg-2">
+                {year.count === 0 ? "No paid sales yet this year." : <>from {year.count} {year.count === 1 ? "work" : "works"}{year.kept < year.total - 0.5 && <>, and you kept <strong className="tabular-nums text-fg">{formatPrice(Math.round(year.kept), currency)}</strong> after commission</>}.</>}
+              </span>
+              {year.other > 0 && <span className="font-ui text-caption text-fg-3">{year.other} {year.other === 1 ? "sale" : "sales"} in another currency not counted.</span>}
+            </div>
+            <div className="flex h-48 items-end gap-1.5 border-t-hair border-line bg-sunken px-5 pb-4 pt-6 md:h-auto md:border-l-hair md:border-t-0"
+              role="img" aria-label={`Paid sales per month in ${thisYear}: ${year.months.filter(m => !m.future).map(m => `${m.label} ${formatPrice(m.value, currency)}`).join(", ")}`}>
+              {year.months.map((m, i) => (
+                <div key={m.key} className="flex h-full flex-1 flex-col items-center justify-end gap-1.5">
+                  <div title={`${m.label}: ${formatPrice(m.value, currency)}`}
+                    className={cn("w-full rounded-t-[4px]", i === new Date().getMonth() ? "border-outline border-ink bg-mango" : m.value ? "bg-ink" : m.future ? "bg-transparent" : "bg-line")}
+                    style={{ height: m.value ? `${Math.max(5, (m.value / year.max) * 100)}%` : "3px" }} />
+                  <span className={cn("font-ui text-caption", m.future ? "text-fg-disabled" : "text-fg-3")}>{m.label.slice(0, 1)}<span className="hidden lg:inline">{m.label.slice(1)}</span></span>
+                </div>
               ))}
             </div>
-            <SearchField value={search} onChange={v => { setSearch(v); setShown(PAGE); }} placeholder="Search works, buyers, notes" className="lg:w-80" />
-          </div>
+          </Card>
 
-          {rows.length === 0 ? (
-            <EmptyState
-              title={sales.length === 0 ? "No sales yet" : "Nothing matches that"}
-              description={sales.length === 0 ? "When a work sells, record it here. It marks the work as sold and keeps your totals right." : "Try another word or filter."}
-              action={sales.length === 0 ? <Button variant="secondary" onClick={() => setModal({ sale: null })}><Plus size={15} aria-hidden /> Record a sale</Button> : undefined}
-            />
-          ) : (
-            <Card padding="none" className="overflow-hidden">
-              <ul className="divide-y divide-line">
-                {rows.slice(0, shown).map(s => (
-                  <li key={s.id}>
-                    <button type="button" onClick={() => setModal({ sale: s })} className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-sunken">
-                      <Mat src={s.artworks?.images?.[0]} alt={s.artworks?.title || "Sale"} className="h-12 w-12 shrink-0 rounded-control" pad="p-1" />
-                      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                        <span className="truncate font-ui text-body font-semibold text-fg">{s.artworks?.title || "No work linked"}</span>
-                        <span className="truncate font-ui text-body-sm text-fg-3">
-                          {[s.buyer_name || "No buyer added", fmtDay(s.sale_date)].filter(Boolean).join(" · ")}
+          {/* Money that's on its way. */}
+          {waiting.length > 0 && view !== "waiting" && (
+            <section className="flex flex-col gap-3" aria-labelledby="waiting-h">
+              <div className="flex items-baseline justify-between gap-3">
+                <h2 id="waiting-h" className="font-display text-h3 text-fg">Waiting for payment</h2>
+                {waitingTotal > 0 && <span className="font-ui text-body-sm tabular-nums text-fg-3">{formatPrice(waitingTotal, currency)} to come</span>}
+              </div>
+              <Card padding="none" className="overflow-hidden border-ink bg-mango-soft">
+                <ul className="divide-y divide-line">
+                  {waiting.map(s => (
+                    <li key={s.id} className="flex items-center gap-3 px-4 py-3">
+                      <button type="button" onClick={() => setEdit(s)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
+                        <Mat src={s.artworks?.images?.[0]} alt={s.artworks?.title || "Sale"} className="h-12 w-12 shrink-0 rounded-control" pad="p-1" />
+                        <span className="flex min-w-0 flex-col gap-0.5">
+                          <span className="truncate font-ui text-body font-semibold text-fg">{s.artworks?.title || "A work not in Artomango"}</span>
+                          <span className="truncate font-ui text-body-sm text-fg-2">{[buyerOf(s) || "Buyer not added", fmtDay(s.sale_date)].filter(Boolean).join(" · ")}</span>
                         </span>
-                      </span>
-                      <Badge tone={TONE[statusKey(s.status)] || "neutral"} className="hidden sm:inline-flex">{s.status}</Badge>
-                      <span className="w-24 shrink-0 text-right font-ui text-body tabular-nums text-fg">{formatPrice(Number(s.sale_price) || 0, s.currency || currency)}</span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-              {rows.length > shown && (
-                <div className="border-t-hair border-line px-4 py-3">
-                  <Button variant="ghost" size="sm" onClick={() => setShown(n => n + PAGE)}>Show more ({rows.length - shown})</Button>
-                </div>
-              )}
-            </Card>
+                      </button>
+                      <span className="hidden font-ui text-body tabular-nums text-fg sm:block">{formatPrice(Number(s.sale_price) || 0, s.currency || currency)}</span>
+                      <Button size="sm" variant="secondary" disabled={paying === s.id} onClick={() => markPaid(s)}>
+                        <Check size={14} aria-hidden /> {paying === s.id ? "Saving…" : "Mark as paid"}
+                      </Button>
+                    </li>
+                  ))}
+                </ul>
+              </Card>
+            </section>
           )}
+
+          <section className="flex flex-col gap-4" aria-label="Your sales">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <Tabs label="Show" value={view} onChange={v => { setView(v); setShown(PAGE); }}
+                items={[{ value: "year", label: "This year" }, { value: "all", label: "All" }, { value: "waiting", label: "Waiting", count: waiting.length || undefined }]} />
+              {sales.length > 10 && <SearchField value={search} onChange={v => { setSearch(v); setShown(PAGE); }} placeholder="Search works or buyers" className="sm:w-72" />}
+            </div>
+
+            {rows.length === 0 ? (
+              <p className="rounded-card bg-sunken px-4 py-6 text-center font-ui text-body-sm text-fg-2">
+                {q ? "Nothing matches that." : view === "waiting" ? "Nothing is waiting for payment." : view === "year" ? "No paid sales this year yet. Older ones are under All." : "Every sale is waiting for payment, above."}
+              </p>
+            ) : (
+              <Card padding="none" className="overflow-hidden">
+                <ul className="divide-y divide-line">
+                  {rows.slice(0, shown).map(s => {
+                    const cur = s.currency || currency;
+                    const fee = Number(s.commission_percentage) || 0;
+                    const cancelled = statusKey(s.status) === "cancelled";
+                    return (
+                      <li key={s.id}>
+                        <button type="button" onClick={() => setEdit(s)} className={cn("flex w-full items-center gap-4 px-4 py-3.5 text-left transition hover:bg-sunken", cancelled && "opacity-60")}>
+                          <Mat src={s.artworks?.images?.[0]} alt={s.artworks?.title || "Sale"} className="h-14 w-14 shrink-0 rounded-control" pad="p-1" />
+                          <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                            <span className="truncate font-ui text-body font-semibold text-fg">{s.artworks?.title || "A work not in Artomango"}</span>
+                            <span className="truncate font-ui text-body-sm text-fg-3">
+                              {[buyerOf(s) || "Buyer not added", channelLabel(s.channel), fmtDay(s.sale_date)].filter(Boolean).join(" · ")}
+                            </span>
+                          </span>
+                          <span className="flex shrink-0 flex-col items-end gap-0.5">
+                            <span className={cn("font-ui text-body font-semibold tabular-nums text-fg", cancelled && "line-through")}>{formatPrice(Number(s.sale_price) || 0, cur)}</span>
+                            {cancelled ? <span className="font-ui text-caption text-fg-3">Cancelled</span>
+                              : isWaiting(s) ? <span className="font-ui text-caption text-warn">Waiting</span>
+                              : fee > 0 ? <span className="font-ui text-caption tabular-nums text-fg-3">You keep {formatPrice(Math.round(net(s)), cur)}</span> : null}
+                          </span>
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+                {rows.length > shown && (
+                  <div className="border-t-hair border-line px-4 py-3">
+                    <Button variant="ghost" size="sm" onClick={() => setShown(n => n + PAGE)}>Show more ({rows.length - shown})</Button>
+                  </div>
+                )}
+              </Card>
+            )}
+          </section>
         </>
       )}
 
       {userId && (
-        <SaleModal open={!!modal} sale={modal?.sale || null} userId={userId} defaultCurrency={currency}
-          artworks={artworks} clients={clients} onClose={() => setModal(null)} onSaved={() => load(userId)} />
+        <>
+          <SaleFlow open={!!flow} userId={userId} defaultCurrency={currency} works={works} clients={clients}
+            startWork={flow?.work} startClient={flow?.client} onClose={() => setFlow(null)} onSaved={() => load(userId)} />
+          <SaleModal open={!!edit} sale={edit} userId={userId} defaultCurrency={currency}
+            artworks={works} clients={clients} onClose={() => setEdit(null)} onSaved={() => load(userId)} />
+        </>
       )}
     </div>
   );

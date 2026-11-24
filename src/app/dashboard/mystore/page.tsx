@@ -7,8 +7,9 @@ import {
 } from "lucide-react";
 import {
   Alert, Badge, Button, ButtonLink, Card, EmptyState, Field, Input, Modal, PageHeader,
-  SearchField, Skeleton, Switch, Tabs, cn,
+  Menu, SearchField, Skeleton, Switch, Tabs, cn,
 } from "@/components/ui";
+import { BoardModal, PROVIDER_LABEL, type Board } from "./BoardModal";
 import { Mat, formatPrice } from "@/components/public/PublicChrome";
 
 /* ── Types ────────────────────────────────────────────────────── */
@@ -24,19 +25,13 @@ type Artwork = {
   price?: number; medium?: string; sale_method?: string; currency?: string;
 };
 type StoreArtwork = { artwork_id: string; sort_order: number; featured: boolean };
-type Moodboard = {
-  id: string; provider: string; url: string; title: string;
-  thumbnail_url?: string; og_image?: string; is_public: boolean;
-};
+type Moodboard = Board;
 type Tab = "works" | "page" | "moodboards";
 
 const DEFAULT_SETTINGS: StoreSettings = {
   store_name: "", tagline: "", banner_url: "",
   show_bio: true, show_collabs: true, show_events: true, show_location: true,
   accent_color: "#FFD400", is_active: false, layout: "grid",
-};
-const PROVIDER_LABEL: Record<string, string> = {
-  milanote: "Milanote", pinterest: "Pinterest", figma: "Figma", miro: "Miro", notion: "Notion",
 };
 
 function statusBadge(status?: string) {
@@ -118,7 +113,14 @@ export default function MyFrontDoorPage() {
   const [origin, setOrigin] = useState("");
   const bannerInputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => { setOrigin(window.location.origin); load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const [boardModal, setBoardModal] = useState<{ board: Moodboard | null } | null>(null);
+
+  useEffect(() => {
+    setOrigin(window.location.origin);
+    const t = new URLSearchParams(window.location.search).get("tab");
+    if (t === "works" || t === "page" || t === "moodboards") setTab(t);
+    load();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function load() {
     const sb = createClient();
@@ -131,7 +133,7 @@ export default function MyFrontDoorPage() {
       sb.from("store_settings").select("*").eq("user_id", user.id).single(),
       sb.from("artworks").select("id, title, status, images, price, medium, sale_method, currency").eq("user_id", user.id).order("created_at", { ascending: false }),
       sb.from("store_artworks").select("artwork_id, sort_order, featured").eq("user_id", user.id).order("sort_order", { ascending: true }),
-      sb.from("moodboards").select("id, provider, url, title, thumbnail_url, og_image, is_public").eq("user_id", user.id).order("created_at", { ascending: false }),
+      sb.from("moodboards").select("id, provider, url, title, description, thumbnail_url, og_image, is_public").eq("user_id", user.id).order("created_at", { ascending: false }),
     ]);
 
     setUsername(prof?.username || null);
@@ -250,6 +252,12 @@ export default function MyFrontDoorPage() {
     setMbSaving(null);
   }
 
+  async function deleteBoard(board: Moodboard) {
+    const { error } = await createClient().from("moodboards").delete().eq("id", board.id);
+    if (!error) setMoodboards(p => p.filter(b => b.id !== board.id));
+    else setNotice({ tone: "bad", text: "Couldn't delete that board. Please try again." });
+  }
+
   function copyUrl() {
     if (!pageUrl) return;
     navigator.clipboard?.writeText(pageUrl);
@@ -284,8 +292,8 @@ export default function MyFrontDoorPage() {
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
-        title="My Front Door"
-        description="Choose what people see when they open your public page."
+        title="Your public page"
+        description="Choose what people see when they open your page: your works, your details and your moodboards."
         actions={
           <>
             {username && (
@@ -448,12 +456,15 @@ export default function MyFrontDoorPage() {
         moodboards.length === 0 ? (
           <EmptyState
             title="No moodboards yet"
-            description="Link boards from Pinterest, Milanote, Figma and others in Moodboard, then choose which ones to show here."
-            action={<ButtonLink href="/dashboard/moodboard" variant="secondary">Go to Moodboard</ButtonLink>}
+            description="Link boards from Pinterest, Milanote, Figma, Miro or Notion, and choose which ones show on your page."
+            action={<Button variant="secondary" onClick={() => setBoardModal({ board: null })}><Plus size={15} aria-hidden /> Add a board</Button>}
           />
         ) : (
           <Card padding="none" className="overflow-hidden">
-            <div className="border-b-hair border-line px-4 py-3 font-ui text-body-sm text-fg-2">Changes here save right away.</div>
+            <div className="flex items-center justify-between gap-3 border-b-hair border-line px-4 py-3">
+              <span className="font-ui text-body-sm text-fg-2">{publicBoards} of {moodboards.length} shown on your page. Changes save right away.</span>
+              <Button variant="secondary" size="sm" onClick={() => setBoardModal({ board: null })}><Plus size={14} aria-hidden /> Add a board</Button>
+            </div>
             <ul className="divide-y divide-line">
               {moodboards.map(b => {
                 const thumb = b.thumbnail_url || b.og_image;
@@ -466,11 +477,19 @@ export default function MyFrontDoorPage() {
                       )}
                     </div>
                     <div className="flex min-w-0 flex-1 flex-col">
-                      <span className="truncate font-ui text-body font-semibold text-fg">{b.title}</span>
+                      <a href={b.url} target="_blank" rel="noopener noreferrer" className="truncate font-ui text-body font-semibold text-fg underline-offset-4 hover:underline">{b.title}</a>
                       <span className="font-ui text-body-sm text-fg-3">{PROVIDER_LABEL[b.provider] || "Board"}</span>
                     </div>
                     <span className="hidden font-ui text-body-sm text-fg-3 sm:inline">{b.is_public ? "Shown" : "Hidden"}</span>
                     <Switch checked={b.is_public} disabled={mbSaving === b.id} onChange={() => toggleMoodboard(b)} label={`Show ${b.title} on your page`} />
+                    <Menu
+                      label={`More for ${b.title}`}
+                      items={[
+                        { label: "Open board", icon: ExternalLink, onSelect: () => window.open(b.url, "_blank", "noopener") },
+                        { label: "Edit", onSelect: () => setBoardModal({ board: b }) },
+                        { label: "Delete", icon: Trash2, danger: true, onSelect: () => deleteBoard(b) },
+                      ]}
+                    />
                   </li>
                 );
               })}
@@ -484,6 +503,16 @@ export default function MyFrontDoorPage() {
           <span className="font-ui text-body-sm text-fg">You have unsaved changes.</span>
           <Button variant="primary" size="sm" onClick={saveAll} disabled={saving}>{saving ? "Saving…" : "Save changes"}</Button>
         </div>
+      )}
+
+      {userId && (
+        <BoardModal
+          open={!!boardModal}
+          board={boardModal?.board || null}
+          userId={userId}
+          onClose={() => setBoardModal(null)}
+          onSaved={saved => setMoodboards(p => p.some(b => b.id === saved.id) ? p.map(b => (b.id === saved.id ? saved : b)) : [saved, ...p])}
+        />
       )}
 
       <Modal

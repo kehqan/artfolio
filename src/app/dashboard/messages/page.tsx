@@ -1,616 +1,317 @@
 "use client";
+// Messages: every conversation on the left, the open one on the right.
+// On a phone the list and the chat take turns.
 import { useState, useEffect, useRef, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
-import {
-  Send, Search, X, MessageSquare, ChevronRight,
-  Handshake, ShoppingBag, User, Check, CheckCheck,
-  Sparkles, ArrowLeft,
-} from "lucide-react";
+import { ArrowLeft, Check, CheckCheck, ChevronRight, MessageSquare, Send, Sparkles } from "lucide-react";
+import { Avatar, Badge, ButtonLink, Chip, EmptyState, SearchField, Skeleton, cn } from "@/components/ui";
+import type { BadgeTone } from "@/components/ui";
 
-// ── Types ──────────────────────────────────────────────────────────
-type OtherProfile = { id: string; full_name: string; username?: string; avatar_url?: string; role?: string; };
+type OtherProfile = { id: string; full_name: string; username?: string; avatar_url?: string; role?: string };
 type Conversation = {
-  id: string;
-  participant_a: string | null;
-  participant_b: string | null;
-  context_type: string;
-  context_title: string | null;
-  context_meta: any | null;
-  context_id: string | null;
-  guest_name: string | null;
-  guest_email: string | null;
-  last_message_at: string;
-  last_message_preview: string | null;
-  unread_count: number;
+  id: string; participant_a: string | null; participant_b: string | null;
+  context_type: string; context_title: string | null; context_meta: any | null; context_id: string | null;
+  guest_name: string | null; guest_email: string | null;
+  last_message_at: string; last_message_preview: string | null; unread_count: number;
   other_profile: OtherProfile | null;
 };
 type Message = {
-  id: string;
-  conversation_id: string;
-  sender_id: string | null;
-  guest_name: string | null;
-  body: string;
-  template_key: string | null;
-  created_at: string;
-  read_by_a: boolean;
-  read_by_b: boolean;
+  id: string; conversation_id: string; sender_id: string | null; guest_name: string | null;
+  body: string; template_key: string | null; created_at: string; read_by_a: boolean; read_by_b: boolean;
 };
 
-// ── Templates ─────────────────────────────────────────────────────
-const TEMPLATES = [
-  { key: "interested", label: "Interested! 🤝",  body: "Hi! I'm very interested. Could we chat to discuss the details?" },
-  { key: "tell_more",  label: "Tell me more",     body: "Could you share more details? I'd love to understand what you're looking for." },
-  { key: "available",  label: "I'm available",    body: "Thanks for reaching out! I'm available and would love to discuss further." },
-  { key: "price",      label: "Price inquiry",    body: "Could you tell me more about the pricing for this?" },
-  { key: "visit",      label: "Let's meet",       body: "I'd love to arrange a meeting. What dates work best for you?" },
-  { key: "pass",       label: "Not a fit",        body: "Thank you for reaching out! This isn't quite the right fit for me right now." },
+const QUICK_REPLIES = [
+  { key: "interested", label: "I'm interested", body: "Hi! I'm very interested. Could we chat to discuss the details?" },
+  { key: "tell_more", label: "Tell me more", body: "Could you share more details? I'd love to understand what you're looking for." },
+  { key: "available", label: "I'm available", body: "Thanks for reaching out! I'm available and would love to discuss further." },
+  { key: "price", label: "Ask the price", body: "Could you tell me more about the pricing for this?" },
+  { key: "visit", label: "Let's meet", body: "I'd love to arrange a meeting. What dates work best for you?" },
+  { key: "pass", label: "Not a fit", body: "Thank you for reaching out! This isn't quite the right fit for me right now." },
 ];
 
-// ── Context config ─────────────────────────────────────────────────
-const CTX_CFG: Record<string, { label: string; icon: React.ReactNode; color: string; bg: string; border: string }> = {
-  collab:          { label: "Collab Request",  icon: <Handshake size={10} />,    color: "#7C3AED", bg: "#EDE9FE", border: "#C4B5FD" },
-  artwork_inquiry: { label: "Artwork Inquiry", icon: <ShoppingBag size={10} />,  color: "#0EA5E9", bg: "#E0F2FE", border: "#7DD3FC" },
-  direct:          { label: "Direct Message",  icon: <MessageSquare size={10} />, color: "#9B8F7A", bg: "#F5F0E8", border: "#E8E0D0" },
+const CONTEXT: Record<string, { label: string; tone: BadgeTone }> = {
+  collab: { label: "Collab", tone: "violet" },
+  artwork_inquiry: { label: "About a work", tone: "info" },
+  direct: { label: "Message", tone: "neutral" },
 };
 
 function timeAgo(d: string) {
-  const diff = Date.now() - new Date(d).getTime();
-  const m = Math.floor(diff / 60000);
+  const m = Math.floor((Date.now() - new Date(d).getTime()) / 60000);
   if (m < 1) return "now";
   if (m < 60) return `${m}m`;
   const h = Math.floor(m / 60);
   if (h < 24) return `${h}h`;
   const days = Math.floor(h / 24);
   if (days < 7) return `${days}d`;
-  return new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  return new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
 }
-
-function fmtTime(d: string) {
-  return new Date(d).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
-}
-
-function fmtDateLabel(d: string) {
-  const date = new Date(d);
-  const today = new Date();
-  const yesterday = new Date(today);
-  yesterday.setDate(yesterday.getDate() - 1);
+const fmtTime = (d: string) => new Date(d).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+function dayLabel(d: string) {
+  const date = new Date(d), today = new Date(), y = new Date();
+  y.setDate(y.getDate() - 1);
   if (date.toDateString() === today.toDateString()) return "Today";
-  if (date.toDateString() === yesterday.toDateString()) return "Yesterday";
-  return date.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" });
+  if (date.toDateString() === y.toDateString()) return "Yesterday";
+  return date.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "short" });
 }
 
-function Avatar({ profile, size = 36, guest }: { profile?: OtherProfile | null; size?: number; guest?: string }) {
-  const name = profile?.full_name || guest || "?";
-  const initials = name.split(" ").map((w: string) => w[0]).join("").slice(0, 2).toUpperCase();
-  return (
-    <div style={{
-      width: size, height: size, borderRadius: size * 0.3,
-      background: profile ? "#FFD400" : "#E8E0D0",
-      border: "2px solid #111110",
-      display: "flex", alignItems: "center", justifyContent: "center",
-      fontSize: size * 0.36, fontWeight: 900, color: "#111110",
-      overflow: "hidden", flexShrink: 0,
-    }}>
-      {profile?.avatar_url
-        ? <img src={profile.avatar_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-        : initials
-      }
-    </div>
-  );
-}
+const nameOf = (c: Conversation) => c.other_profile?.full_name || c.guest_name || "Guest";
+const hasContext = (c: Conversation) => !!(c.context_title || c.context_meta);
 
-// ── Mini post card — compact pill for sidebar ─────────────────────
-function ContextPill({ convo }: { convo: Conversation }) {
-  const ctx = CTX_CFG[convo.context_type || "direct"] || CTX_CFG.direct;
+/** The post or work the conversation started from. */
+function ContextCard({ convo }: { convo: Conversation }) {
+  const ctx = CONTEXT[convo.context_type || "direct"] || CONTEXT.direct;
   const meta = convo.context_meta;
-  if (!convo.context_title && !meta) return null;
-  return (
-    <div style={{
-      display: "inline-flex", alignItems: "center", gap: 3,
-      padding: "2px 7px", borderRadius: 99,
-      background: ctx.bg, border: `1px solid ${ctx.border}`,
-      fontSize: 9, fontWeight: 800, color: ctx.color,
-      textTransform: "uppercase" as const, letterSpacing: ".1em",
-      maxWidth: "100%", marginBottom: 2, overflow: "hidden",
-    }}>
-      {ctx.icon}
-      {meta?.emoji && <span style={{ fontSize: 10 }}>{meta.emoji}</span>}
-      <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-        {convo.context_title
-          ? (convo.context_title.length > 22 ? convo.context_title.slice(0, 22) + "…" : convo.context_title)
-          : ctx.label}
+  const href = convo.context_type === "collab" ? "/dashboard/scene"
+    : convo.context_type === "artwork_inquiry" && convo.context_id ? `/artwork/${convo.context_id}/passport` : null;
+  const body = (
+    <>
+      {meta?.image && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={meta.image} alt="" className="h-12 w-12 shrink-0 rounded-chip border-hair border-line bg-sunken object-contain" />
+      )}
+      <span className="flex min-w-0 flex-1 flex-col gap-1">
+        <Badge tone={ctx.tone} className="w-fit">{meta?.label || ctx.label}</Badge>
+        {convo.context_title && <span className="truncate font-ui text-label font-semibold text-fg">{convo.context_title}</span>}
+        {meta?.subtitle && <span className="truncate font-ui text-caption text-fg-3">{meta.subtitle}</span>}
       </span>
-    </div>
+      {href && <ChevronRight size={16} aria-hidden className="shrink-0 text-fg-3" />}
+    </>
   );
+  const cls = "flex items-center gap-3 rounded-control border-hair border-line bg-surface px-3 py-2.5";
+  return href
+    ? <a href={href} target="_blank" rel="noopener noreferrer" className={cn(cls, "hover:border-ink")}>{body}</a>
+    : <div className={cls}>{body}</div>;
 }
 
-// ── Full mini post card — shown in chat area ─────────────────────
-function ContextPostCard({ convo }: { convo: Conversation }) {
-  const ctx = CTX_CFG[convo.context_type || "direct"] || CTX_CFG.direct;
-  const meta = convo.context_meta;
-  if (!convo.context_title && !meta) return null;
-
-  // Where to link
-  const href = convo.context_type === "collab"
-    ? "/dashboard/scene"
-    : convo.context_type === "artwork_inquiry" && convo.context_id
-    ? `/artwork/${convo.context_id}/passport`
-    : null;
-
-  const fallbackEmoji = convo.context_type === "collab" ? "🤝"
-    : convo.context_type === "artwork_inquiry" ? "🖼️" : "💬";
-
-  return (
-    <a
-      href={href || "#"}
-      target={href ? "_blank" : undefined}
-      rel="noopener noreferrer"
-      onClick={href ? undefined : e => e.preventDefault()}
-      style={{ textDecoration: "none", display: "block" }}
-    >
-      <div
-        className="ctx-card"
-        style={{
-          display: "flex", alignItems: "stretch",
-          background: "#fff",
-          border: `2px solid ${ctx.border}`,
-          borderRadius: 14,
-          overflow: "hidden",
-          cursor: href ? "pointer" : "default",
-        }}
-      >
-        {/* Thumbnail or emoji placeholder */}
-        <div style={{
-          width: 70, flexShrink: 0,
-          background: meta?.image ? "#F5F0E8" : ctx.bg,
-          display: "flex", alignItems: "center", justifyContent: "center",
-          fontSize: 26, minHeight: 70,
-          overflow: "hidden",
-        }}>
-          {meta?.image
-            ? <img src={meta.image} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-            : (meta?.emoji || fallbackEmoji)
-          }
-        </div>
-
-        {/* Text content */}
-        <div style={{ padding: "10px 12px", flex: 1, minWidth: 0, display: "flex", flexDirection: "column", justifyContent: "center", gap: 5 }}>
-          {/* Type badge */}
-          <div style={{
-            display: "inline-flex", alignItems: "center", gap: 4,
-            padding: "2px 8px", borderRadius: 99,
-            background: ctx.bg, border: `1px solid ${ctx.border}`,
-            fontSize: 9, fontWeight: 800, color: ctx.color,
-            textTransform: "uppercase" as const, letterSpacing: ".12em",
-            width: "fit-content",
-          }}>
-            {ctx.icon}
-            {meta?.label || ctx.label}
-          </div>
-
-          {/* Title */}
-          {convo.context_title && (
-            <div style={{
-              fontSize: 13, fontWeight: 900, color: "#111110", lineHeight: 1.25,
-              overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-            }}>
-              {convo.context_title}
-            </div>
-          )}
-
-          {/* Subtitle — location, price, etc */}
-          {meta?.subtitle && (
-            <div style={{
-              fontSize: 11, color: "#9B8F7A", fontWeight: 600,
-              overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-            }}>
-              {meta.subtitle}
-            </div>
-          )}
-        </div>
-
-        {/* Click arrow — only if there's a destination */}
-        {href && (
-          <div style={{
-            display: "flex", alignItems: "center",
-            paddingRight: 12, color: ctx.color, flexShrink: 0,
-          }}>
-            <ChevronRight size={16} />
-          </div>
-        )}
-      </div>
-    </a>
-  );
-}
-
-// ══════════════════════════════════════════════════════════════════
 export default function MessagesPage() {
-  const [myId, setMyId]             = useState<string>("");
-  const [convos, setConvos]         = useState<Conversation[]>([]);
-  const [active, setActive]         = useState<Conversation | null>(null);
-  const [messages, setMessages]     = useState<Message[]>([]);
-  const [loading, setLoading]       = useState(true);
+  const [myId, setMyId] = useState("");
+  const [convos, setConvos] = useState<Conversation[]>([]);
+  const [active, setActive] = useState<Conversation | null>(null);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [loading, setLoading] = useState(true);
   const [msgLoading, setMsgLoading] = useState(false);
-  const [input, setInput]           = useState("");
-  const [sending, setSending]       = useState(false);
-  const [search, setSearch]         = useState("");
-  const [showTemplates, setShowTemplates] = useState(false);
-  const [mobileView, setMobileView] = useState<"list" | "chat">("list");
+  const [input, setInput] = useState("");
+  const [sending, setSending] = useState(false);
+  const [search, setSearch] = useState("");
+  const [showQuick, setShowQuick] = useState(false);
+  const [error, setError] = useState("");
 
   const bottomRef = useRef<HTMLDivElement>(null);
-  const inputRef  = useRef<HTMLTextAreaElement>(null);
-  const pollRef   = useRef<ReturnType<typeof setInterval> | null>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  async function loadConvos() {
+    try {
+      const res = await fetch("/api/conversations");
+      const data = await res.json();
+      setConvos(data.conversations || []);
+    } catch { setError("Your messages didn't load. Please refresh the page."); }
+    setLoading(false);
+  }
 
   useEffect(() => {
-    const sb = createClient();
-    sb.auth.getUser().then(({ data: { user } }) => {
-      if (!user) return;
+    createClient().auth.getUser().then(({ data: { user } }) => {
+      if (!user) { setLoading(false); return; }
       setMyId(user.id);
       loadConvos();
     });
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
   }, []);
 
-  async function loadConvos() {
-    setLoading(true);
-    const res = await fetch("/api/conversations");
-    const data = await res.json();
-    setConvos(data.conversations || []);
-    setLoading(false);
-  }
-
-  const loadMessages = useCallback(async (convoId: string) => {
-    setMsgLoading(true);
-    const res = await fetch(`/api/conversations/${convoId}/messages`);
-    const data = await res.json();
-    setMessages(data.messages || []);
+  const loadMessages = useCallback(async (convoId: string, quiet = false) => {
+    if (!quiet) setMsgLoading(true);
+    try {
+      const res = await fetch(`/api/conversations/${convoId}/messages`);
+      const data = await res.json();
+      setMessages(data.messages || []);
+    } catch { /* keep what we have */ }
     setMsgLoading(false);
     loadConvos();
-    setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
   }, []);
 
   useEffect(() => {
     if (pollRef.current) clearInterval(pollRef.current);
     if (!active) return;
-    pollRef.current = setInterval(() => loadMessages(active.id), 8000);
+    pollRef.current = setInterval(() => loadMessages(active.id, true), 8000);
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
   }, [active, loadMessages]);
 
   useEffect(() => {
-    setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
+    const t = setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" }), 50);
+    return () => clearTimeout(t);
   }, [messages]);
 
   function openConvo(c: Conversation) {
-    setActive(c);
-    setMobileView("chat");
+    setActive(c); setShowQuick(false); setMessages([]);
     loadMessages(c.id);
-    setShowTemplates(false);
   }
 
   async function send(body?: string) {
     const text = body ?? input.trim();
     if (!text || !active) return;
-    setSending(true);
-    setInput("");
-    setShowTemplates(false);
-    const res = await fetch(`/api/conversations/${active.id}/messages`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ body: text }),
-    });
-    const data = await res.json();
-    if (data.message) {
-      setMessages(p => [...p, data.message]);
-      setConvos(p => p.map(c =>
-        c.id === active.id
-          ? { ...c, last_message_preview: text.slice(0, 120), last_message_at: new Date().toISOString(), unread_count: 0 }
-          : c
-      ));
-    }
+    setSending(true); setInput(""); setShowQuick(false);
+    try {
+      const res = await fetch(`/api/conversations/${active.id}/messages`, {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ body: text }),
+      });
+      const data = await res.json();
+      if (data.message) {
+        setMessages(p => [...p, data.message]);
+        setConvos(p => p.map(c => c.id === active.id
+          ? { ...c, last_message_preview: text.slice(0, 120), last_message_at: new Date().toISOString(), unread_count: 0 } : c));
+      } else { setInput(text); }
+    } catch { setInput(text); }
     setSending(false);
     inputRef.current?.focus();
   }
 
-  const filtered = convos.filter(c => {
-    const name = c.other_profile?.full_name || c.guest_name || "";
-    return name.toLowerCase().includes(search.toLowerCase()) ||
-      (c.context_title || "").toLowerCase().includes(search.toLowerCase()) ||
-      (c.last_message_preview || "").toLowerCase().includes(search.toLowerCase());
-  });
-
-  const totalUnread = convos.reduce((sum, c) => sum + c.unread_count, 0);
-  const isMe = (msg: Message) => msg.sender_id === myId;
-  const hasCtx = (c: Conversation) => !!(c.context_title || c.context_meta);
+  const q = search.toLowerCase().trim();
+  const list = convos.filter(c => !q || [nameOf(c), c.context_title, c.last_message_preview].some(v => (v || "").toLowerCase().includes(q)));
+  const totalUnread = convos.reduce((n, c) => n + (c.unread_count || 0), 0);
 
   return (
-    <>
-      <style>{CSS}</style>
-      <div className="msg-root">
-
-        {/* ── SIDEBAR ──────────────────────────────────────────── */}
-        <div className={`msg-sidebar ${mobileView === "chat" ? "msg-hide-mobile" : ""}`}>
-          <div className="msg-sidebar-hdr">
-            <div className="msg-sidebar-title">
-              <MessageSquare size={18} strokeWidth={2.5} />
-              Messages
-              {totalUnread > 0 && <span className="msg-badge">{totalUnread}</span>}
-            </div>
-            <div className="msg-search">
-              <Search size={13} color="#9B8F7A" />
-              <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search conversations…" className="msg-search-input" />
-              {search && <button onClick={() => setSearch("")} className="msg-search-clear"><X size={12} /></button>}
-            </div>
-          </div>
-
-          <div className="msg-list">
-            {loading ? (
-              <div className="msg-empty"><div className="msg-spinner" /></div>
-            ) : filtered.length === 0 ? (
-              <div className="msg-empty">
-                <div style={{ fontSize: 36, marginBottom: 10 }}>💬</div>
-                <div style={{ fontSize: 14, fontWeight: 800, color: "#111110", marginBottom: 4 }}>
-                  {search ? "No results" : "No messages yet"}
-                </div>
-                <div style={{ fontSize: 12, color: "#9B8F7A", fontWeight: 600, textAlign: "center" }}>
-                  {search ? "Try a different search" : "Messages from collectors, venues & artists will appear here"}
-                </div>
-              </div>
-            ) : filtered.map(c => {
-              const isActive = active?.id === c.id;
-              const name = c.other_profile?.full_name || c.guest_name || "Guest";
-
+    <div className="flex h-[calc(100dvh-var(--shell-header)-3rem)] min-h-[420px] overflow-hidden rounded-card border-outline border-ink bg-surface shadow-hard-2 lg:h-[calc(100dvh-var(--shell-header)-4rem)]">
+      {/* ── List ── */}
+      <section aria-label="Conversations" className={cn("flex w-full flex-col border-r-hair border-line md:w-80 md:shrink-0", active && "hidden md:flex")}>
+        <div className="flex flex-col gap-3 border-b-hair border-line p-4">
+          <h1 className="sr-only">Messages</h1>
+          <SearchField value={search} onChange={setSearch} placeholder="Search people and posts" />
+          {totalUnread > 0 && <p className="font-ui text-caption font-semibold text-fg-2">{totalUnread === 1 ? "1 unread message" : `${totalUnread} unread messages`}</p>}
+        </div>
+        {error && <p role="alert" className="px-4 pt-3 font-ui text-body-sm text-bad">{error}</p>}
+        <ul className="flex-1 overflow-y-auto p-2">
+          {loading ? [0, 1, 2, 3].map(i => <li key={i} className="p-2"><Skeleton className="h-14 rounded-control" /></li>)
+            : list.length === 0 ? (
+              <li className="px-4 py-10 text-center">
+                <p className="font-ui text-label font-semibold text-fg">{q ? "No one by that name" : "No messages yet"}</p>
+                <p className="mt-1 font-ui text-body-sm text-fg-3">{q ? "Try another search." : "When collectors, venues or artists write to you, it shows up here."}</p>
+              </li>
+            ) : list.map(c => {
+              const on = active?.id === c.id;
+              const unread = c.unread_count > 0;
+              const ctx = hasContext(c) ? CONTEXT[c.context_type] || CONTEXT.direct : null;
               return (
-                <button key={c.id} className={`msg-convo-item ${isActive ? "active" : ""} ${c.unread_count > 0 ? "unread" : ""}`} onClick={() => openConvo(c)}>
-                  <Avatar profile={c.other_profile} guest={c.guest_name || undefined} size={42} />
-                  <div className="msg-convo-info">
-                    <div className="msg-convo-top">
-                      <span className="msg-convo-name">{name}</span>
-                      <span className="msg-convo-time">{timeAgo(c.last_message_at)}</span>
-                    </div>
-                    {hasCtx(c) && <ContextPill convo={c} />}
-                    <div className="msg-convo-preview">{c.last_message_preview || "No messages yet"}</div>
-                  </div>
-                  {c.unread_count > 0 && <div className="msg-unread-dot">{c.unread_count}</div>}
-                </button>
+                <li key={c.id}>
+                  <button type="button" onClick={() => openConvo(c)} aria-current={on ? "true" : undefined}
+                    className={cn("flex w-full items-start gap-3 rounded-control border-outline px-3 py-2.5 text-left transition-colors duration-fast",
+                      on ? "border-ink bg-mango-soft" : "border-transparent hover:bg-sunken")}>
+                    <Avatar name={nameOf(c)} src={c.other_profile?.avatar_url} />
+                    <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                      <span className="flex items-baseline justify-between gap-2">
+                        <span className={cn("truncate font-ui text-label text-fg", unread ? "font-bold" : "font-semibold")}>{nameOf(c)}</span>
+                        <span className="shrink-0 font-ui text-caption tabular-nums text-fg-3">{timeAgo(c.last_message_at)}</span>
+                      </span>
+                      {ctx && c.context_title && <span className="truncate font-ui text-caption text-fg-2">{ctx.label} · {c.context_title}</span>}
+                      <span className="flex items-center gap-2">
+                        <span className={cn("min-w-0 flex-1 truncate font-ui text-body-sm", unread ? "font-semibold text-fg" : "text-fg-3")}>
+                          {c.last_message_preview || "No messages yet"}
+                        </span>
+                        {unread && (
+                          <span className="grid h-5 min-w-5 shrink-0 place-items-center rounded-pill bg-ink px-1.5 font-ui text-caption font-bold leading-none text-on-inverse">
+                            {c.unread_count > 9 ? "9+" : c.unread_count}
+                          </span>
+                        )}
+                      </span>
+                    </span>
+                  </button>
+                </li>
               );
             })}
+        </ul>
+      </section>
+
+      {/* ── Chat ── */}
+      <section aria-label="Conversation" className={cn("min-w-0 flex-1 flex-col bg-page", active ? "flex" : "hidden md:flex")}>
+        {!active ? (
+          <div className="grid flex-1 place-items-center p-6">
+            <EmptyState icon={<MessageSquare size={20} aria-hidden />} title="Pick a conversation"
+              description="Choose someone on the left to read and reply." className="border-none bg-transparent" />
           </div>
-        </div>
-
-        {/* ── CHAT PANEL ───────────────────────────────────────── */}
-        <div className={`msg-chat ${mobileView === "list" ? "msg-hide-mobile" : ""}`}>
-          {!active ? (
-            <div className="msg-chat-empty">
-              <div style={{ fontSize: 56, marginBottom: 16 }}>💬</div>
-              <div style={{ fontSize: 20, fontWeight: 900, color: "#111110", marginBottom: 6 }}>Select a conversation</div>
-              <div style={{ fontSize: 14, color: "#9B8F7A", fontWeight: 600 }}>Choose from the left to start messaging</div>
-            </div>
-          ) : (
-            <>
-              {/* Header */}
-              <div className="msg-chat-hdr">
-                <button className="msg-back-btn" onClick={() => setMobileView("list")}><ArrowLeft size={16} /></button>
-                <Avatar profile={active.other_profile} guest={active.guest_name || undefined} size={38} />
-                <div className="msg-chat-hdr-info">
-                  <div className="msg-chat-hdr-name">
-                    {active.other_profile?.full_name || active.guest_name || "Guest"}
-                  </div>
-                  {(active.guest_email || active.other_profile?.role) && (
-                    <div className="msg-chat-hdr-sub">
-                      {active.guest_email
-                        ? <><User size={10} /> {active.guest_email}</>
-                        : <span style={{ textTransform: "capitalize" }}>{active.other_profile?.role}</span>
-                      }
-                    </div>
-                  )}
-                </div>
-                {active.other_profile?.username && (
-                  <a href={`/${active.other_profile.username}`} target="_blank" rel="noopener noreferrer" className="msg-profile-link">
-                    View profile <ChevronRight size={12} />
-                  </a>
+        ) : (
+          <>
+            <header className="flex items-center gap-3 border-b-hair border-line bg-surface px-4 py-3">
+              <button type="button" aria-label="Back to conversations" onClick={() => setActive(null)}
+                className="-ml-1 grid h-9 w-9 shrink-0 place-items-center rounded-pill text-fg-2 hover:bg-sunken hover:text-fg md:hidden">
+                <ArrowLeft size={18} aria-hidden />
+              </button>
+              <Avatar name={nameOf(active)} src={active.other_profile?.avatar_url} />
+              <span className="flex min-w-0 flex-1 flex-col">
+                <span className="truncate font-ui text-body font-semibold text-fg">{nameOf(active)}</span>
+                {(active.guest_email || active.other_profile?.role) && (
+                  <span className="truncate font-ui text-caption capitalize text-fg-3">
+                    {active.guest_email ? <span className="normal-case">{active.guest_email}</span> : active.other_profile?.role === "gallery" ? "venue" : active.other_profile?.role}
+                  </span>
                 )}
-              </div>
-
-              {/* ── Context post card — clickable mini request card ── */}
-              {hasCtx(active) && (
-                <div style={{ padding: "10px 14px 0" }}>
-                  <ContextPostCard convo={active} />
-                </div>
+              </span>
+              {active.other_profile?.username && (
+                <ButtonLink href={`/${active.other_profile.username}`} target="_blank" rel="noopener noreferrer" variant="ghost" size="sm">
+                  Profile <ChevronRight size={14} aria-hidden />
+                </ButtonLink>
               )}
+            </header>
 
-              {/* Messages */}
-              <div className="msg-messages">
-                {msgLoading ? (
-                  <div className="msg-empty"><div className="msg-spinner" /></div>
-                ) : messages.length === 0 ? (
-                  <div style={{ textAlign: "center", padding: "40px 24px", color: "#9B8F7A", fontSize: 13, fontWeight: 600 }}>
-                    No messages yet — say hello!
-                  </div>
-                ) : (
-                  <>
-                    {messages.map((msg, i) => {
-                      const mine = isMe(msg);
-                      const prev = messages[i - 1];
-                      const showDate = !prev || new Date(msg.created_at).toDateString() !== new Date(prev.created_at).toDateString();
-                      const showAvatar = !mine && (!messages[i + 1] || messages[i + 1].sender_id !== msg.sender_id);
-
-                      return (
-                        <div key={msg.id}>
-                          {showDate && <div className="msg-date-sep">{fmtDateLabel(msg.created_at)}</div>}
-                          <div className={`msg-bubble-row ${mine ? "mine" : "theirs"}`}>
-                            {!mine && (
-                              showAvatar
-                                ? <Avatar profile={active.other_profile} guest={active.guest_name || undefined} size={28} />
-                                : <div style={{ width: 28, flexShrink: 0 }} />
-                            )}
-                            <div className="msg-bubble-col">
-                              {msg.template_key && (
-                                <div className="msg-template-tag"><Sparkles size={9} /> Quick reply</div>
-                              )}
-                              <div className={`msg-bubble ${mine ? "msg-bubble-mine" : "msg-bubble-theirs"}`}>
-                                {msg.body}
-                              </div>
-                              <div className={`msg-bubble-meta ${mine ? "mine" : ""}`}>
-                                {fmtTime(msg.created_at)}
-                                {mine && (msg.read_by_b ? <CheckCheck size={12} color="#16A34A" /> : <Check size={12} color="#9B8F7A" />)}
-                              </div>
-                            </div>
-                          </div>
+            <div className="flex-1 overflow-y-auto px-4 py-4">
+              {hasContext(active) && <div className="mx-auto mb-4 max-w-md"><ContextCard convo={active} /></div>}
+              {msgLoading ? (
+                <div className="flex flex-col gap-3">{[0, 1, 2].map(i => <Skeleton key={i} className={cn("h-10 w-2/3 rounded-card", i % 2 === 1 && "ml-auto")} />)}</div>
+              ) : messages.length === 0 ? (
+                <p className="py-10 text-center font-ui text-body-sm text-fg-3">No messages yet. Say hello.</p>
+              ) : (
+                <ol className="flex flex-col gap-1">
+                  {messages.map((m, i) => {
+                    const mine = m.sender_id === myId;
+                    const prev = messages[i - 1];
+                    const newDay = !prev || new Date(m.created_at).toDateString() !== new Date(prev.created_at).toDateString();
+                    const lastOfRun = !messages[i + 1] || messages[i + 1].sender_id !== m.sender_id;
+                    return (
+                      <li key={m.id} className="flex flex-col">
+                        {newDay && <span className="my-3 self-center font-ui text-caption font-semibold text-fg-3">{dayLabel(m.created_at)}</span>}
+                        <div className={cn("flex max-w-[78%] flex-col", mine ? "items-end self-end" : "items-start self-start")}>
+                          {m.template_key && <span className="mb-0.5 inline-flex items-center gap-1 font-ui text-caption text-fg-3"><Sparkles size={11} aria-hidden /> Quick reply</span>}
+                          <p className={cn("whitespace-pre-wrap break-words rounded-card border-outline px-3.5 py-2 font-ui text-body",
+                            mine ? "border-ink bg-mango text-on-mango" : "border-line bg-surface text-fg")}>
+                            {m.body}
+                          </p>
+                          {lastOfRun && (
+                            <span className="mt-1 inline-flex items-center gap-1 px-1 font-ui text-caption tabular-nums text-fg-3">
+                              {fmtTime(m.created_at)}
+                              {mine && (m.read_by_b ? <CheckCheck size={13} aria-label="Read" className="text-ok" /> : <Check size={13} aria-label="Sent" />)}
+                            </span>
+                          )}
                         </div>
-                      );
-                    })}
-                    <div ref={bottomRef} />
-                  </>
-                )}
-              </div>
-
-              {/* Quick replies */}
-              {showTemplates && (
-                <div className="msg-templates">
-                  <div className="msg-templates-title">
-                    <Sparkles size={12} /> Quick replies
-                    <button onClick={() => setShowTemplates(false)} className="msg-templates-close"><X size={13} /></button>
-                  </div>
-                  <div className="msg-templates-grid">
-                    {TEMPLATES.map(t => (
-                      <button key={t.key} className="msg-template-btn" onClick={() => send(t.body)}>{t.label}</button>
-                    ))}
-                  </div>
-                </div>
+                      </li>
+                    );
+                  })}
+                </ol>
               )}
+              <div ref={bottomRef} />
+            </div>
 
-              {/* Input */}
-              <div className="msg-input-area">
-                <button className={`msg-template-toggle ${showTemplates ? "active" : ""}`} onClick={() => setShowTemplates(p => !p)} title="Quick replies">
-                  <Sparkles size={15} />
-                </button>
-                <div className="msg-input-wrap">
-                  <textarea
-                    ref={inputRef}
-                    value={input}
-                    onChange={e => setInput(e.target.value)}
-                    onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}
-                    placeholder="Type a message… (Enter to send)"
-                    className="msg-textarea"
-                    rows={1}
-                  />
-                </div>
-                <button className="msg-send-btn" onClick={() => send()} disabled={!input.trim() || sending}>
-                  {sending ? <div className="msg-spinner-sm" /> : <Send size={16} />}
-                </button>
+            {showQuick && (
+              <div className="flex gap-2 overflow-x-auto border-t-hair border-line bg-surface px-4 py-3" role="group" aria-label="Quick replies">
+                {QUICK_REPLIES.map(t => <Chip key={t.key} onClick={() => send(t.body)} className="shrink-0">{t.label}</Chip>)}
               </div>
-            </>
-          )}
-        </div>
-      </div>
-    </>
+            )}
+
+            <form onSubmit={e => { e.preventDefault(); send(); }} className="flex items-end gap-2 border-t-hair border-line bg-surface px-3 py-3">
+              <button type="button" aria-label="Quick replies" aria-pressed={showQuick} onClick={() => setShowQuick(v => !v)}
+                className={cn("grid h-10 w-10 shrink-0 place-items-center rounded-pill transition-colors duration-fast",
+                  showQuick ? "bg-inverse text-on-inverse" : "text-fg-2 hover:bg-sunken hover:text-fg")}>
+                <Sparkles size={18} aria-hidden />
+              </button>
+              <textarea ref={inputRef} value={input} rows={1} aria-label="Message"
+                onChange={e => { setInput(e.target.value); e.target.style.height = "auto"; e.target.style.height = Math.min(e.target.scrollHeight, 140) + "px"; }}
+                onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}
+                placeholder="Write a message"
+                className="max-h-36 min-h-10 flex-1 resize-none rounded-control border-hair border-line-strong bg-surface px-3 py-2 font-ui text-control text-fg outline-none placeholder:text-fg-3 focus:border-ink focus:shadow-hard-1" />
+              <button type="submit" aria-label="Send" disabled={!input.trim() || sending}
+                className="grid h-10 w-10 shrink-0 place-items-center rounded-pill border-outline border-ink bg-mango text-on-mango shadow-hard-1 transition-transform duration-fast hover:-translate-y-px disabled:opacity-40 disabled:hover:translate-y-0">
+                <Send size={17} aria-hidden />
+              </button>
+            </form>
+          </>
+        )}
+      </section>
+    </div>
   );
 }
-
-// ══════════════════════════════════════════════════════════════════
-const CSS = `
-  @import url('https://fonts.googleapis.com/css2?family=Darker+Grotesque:wght@500;600;700;800;900&display=swap');
-
-  .msg-root {
-    display: grid; grid-template-columns: 300px 1fr;
-    height: calc(100vh - 80px);
-    background: #fff; border: 2.5px solid #111110;
-    border-radius: 20px; overflow: hidden;
-    box-shadow: 5px 6px 0 #D4C9A8;
-    font-family: 'Darker Grotesque', system-ui, sans-serif;
-  }
-
-  /* ── SIDEBAR ─────────────────────────────────────────────────── */
-  .msg-sidebar { display: flex; flex-direction: column; border-right: 2px solid #E8E0D0; background: #FFFBEA; }
-  .msg-sidebar-hdr { padding: 16px 14px 12px; border-bottom: 2px solid #E8E0D0; background: #fff; }
-  .msg-sidebar-title { display: flex; align-items: center; gap: 8px; font-size: 17px; font-weight: 900; color: #111110; margin-bottom: 10px; letter-spacing: -.3px; }
-  .msg-badge { background: #FFD400; color: #111110; font-size: 10px; font-weight: 900; padding: 1px 7px; border-radius: 99px; border: 2px solid #111110; min-width: 20px; text-align: center; }
-  .msg-search { display: flex; align-items: center; gap: 8px; background: #F5F0E8; border: 2px solid #E8E0D0; border-radius: 10px; padding: 0 10px; height: 34px; transition: border-color .15s; }
-  .msg-search:focus-within { border-color: #111110; background: #fff; }
-  .msg-search-input { flex: 1; border: none; outline: none; background: transparent; font-family: inherit; font-size: 12px; font-weight: 600; color: #111110; }
-  .msg-search-input::placeholder { color: #C0B8A8; }
-  .msg-search-clear { background: none; border: none; cursor: pointer; color: #9B8F7A; display: flex; padding: 0; }
-
-  .msg-list { flex: 1; overflow-y: auto; padding: 6px; }
-  .msg-list::-webkit-scrollbar { width: 3px; }
-  .msg-list::-webkit-scrollbar-thumb { background: #E8E0D0; border-radius: 99px; }
-
-  .msg-convo-item {
-    display: flex; align-items: flex-start; gap: 10px;
-    width: 100%; padding: 10px; border-radius: 12px;
-    border: 2px solid transparent; background: transparent;
-    cursor: pointer; text-align: left; font-family: inherit;
-    transition: all .12s; position: relative; margin-bottom: 2px;
-  }
-  .msg-convo-item:hover { background: #F5F0E8; }
-  .msg-convo-item.active { background: #FFD400; border-color: #111110; box-shadow: 2px 2px 0 #111110; }
-  .msg-convo-item.unread .msg-convo-name { font-weight: 900; }
-  .msg-convo-item.unread .msg-convo-preview { color: #111110; font-weight: 700; }
-  .msg-convo-info { flex: 1; min-width: 0; }
-  .msg-convo-top { display: flex; justify-content: space-between; align-items: baseline; gap: 4px; margin-bottom: 3px; }
-  .msg-convo-name { font-size: 13px; font-weight: 800; color: #111110; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 130px; }
-  .msg-convo-time { font-size: 10px; font-weight: 700; color: #9B8F7A; flex-shrink: 0; }
-  .msg-convo-preview { font-size: 11px; font-weight: 600; color: #9B8F7A; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
-  .msg-unread-dot { background: #111110; color: #FFD400; font-size: 10px; font-weight: 900; min-width: 18px; height: 18px; border-radius: 99px; display: flex; align-items: center; justify-content: center; padding: 0 4px; flex-shrink: 0; margin-top: 2px; }
-
-  /* ── CHAT ────────────────────────────────────────────────────── */
-  .msg-chat { display: flex; flex-direction: column; background: #FFFBEA; overflow: hidden; }
-  .msg-chat-empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #9B8F7A; }
-
-  .msg-chat-hdr { display: flex; align-items: center; gap: 10px; padding: 12px 14px 10px; border-bottom: 2px solid #E8E0D0; background: #fff; }
-  .msg-back-btn { display: none; background: none; border: none; cursor: pointer; padding: 4px; color: #111110; border-radius: 8px; }
-  .msg-chat-hdr-info { flex: 1; min-width: 0; }
-  .msg-chat-hdr-name { font-size: 15px; font-weight: 900; color: #111110; line-height: 1.2; }
-  .msg-chat-hdr-sub { display: flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 700; color: #9B8F7A; }
-  .msg-profile-link { display: flex; align-items: center; gap: 3px; font-size: 11px; font-weight: 800; color: #111110; padding: 5px 10px; border: 2px solid #E8E0D0; border-radius: 9px; text-decoration: none; white-space: nowrap; transition: all .15s; background: #fff; flex-shrink: 0; }
-  .msg-profile-link:hover { border-color: #111110; }
-
-  /* Context post card hover */
-  .ctx-card { transition: all .15s; }
-  .ctx-card:hover { box-shadow: 4px 4px 0 #C4B5FD; transform: translate(-1px,-1px); }
-
-  .msg-messages { flex: 1; overflow-y: auto; padding: 12px 14px; display: flex; flex-direction: column; gap: 2px; }
-  .msg-messages::-webkit-scrollbar { width: 3px; }
-  .msg-messages::-webkit-scrollbar-thumb { background: #E8E0D0; border-radius: 99px; }
-
-  .msg-date-sep { text-align: center; font-size: 10px; font-weight: 700; color: #C0B8A8; padding: 10px 0 4px; letter-spacing: .06em; }
-  .msg-bubble-row { display: flex; align-items: flex-end; gap: 6px; margin-bottom: 2px; }
-  .msg-bubble-row.mine { flex-direction: row-reverse; }
-  .msg-bubble-col { display: flex; flex-direction: column; max-width: 70%; }
-  .msg-template-tag { display: flex; align-items: center; gap: 3px; font-size: 9px; font-weight: 800; color: #9B8F7A; letter-spacing: .08em; margin-bottom: 2px; padding-left: 2px; }
-  .msg-bubble { padding: 9px 13px; border-radius: 16px; border: 2px solid #111110; font-size: 14px; font-weight: 600; line-height: 1.5; word-break: break-word; }
-  .msg-bubble-mine { background: #FFD400; color: #111110; border-radius: 16px 16px 4px 16px; box-shadow: 2px 2px 0 #111110; }
-  .msg-bubble-theirs { background: #fff; color: #111110; border-radius: 16px 16px 16px 4px; box-shadow: 1px 2px 0 #E8E0D0; }
-  .msg-bubble-meta { display: flex; align-items: center; gap: 4px; font-size: 10px; font-weight: 700; color: #C0B8A8; padding: 2px 3px; margin-top: 1px; }
-  .msg-bubble-meta.mine { justify-content: flex-end; }
-
-  .msg-templates { background: #fff; border-top: 2px solid #E8E0D0; padding: 10px 14px; }
-  .msg-templates-title { display: flex; align-items: center; gap: 6px; font-size: 10px; font-weight: 800; color: #9B8F7A; text-transform: uppercase; letter-spacing: .12em; margin-bottom: 8px; }
-  .msg-templates-close { background: none; border: none; cursor: pointer; color: #9B8F7A; margin-left: auto; display: flex; }
-  .msg-templates-grid { display: flex; flex-wrap: wrap; gap: 5px; }
-  .msg-template-btn { padding: 4px 11px; background: #F5F0E8; border: 1.5px solid #E8E0D0; border-radius: 99px; font-family: inherit; font-size: 11px; font-weight: 700; color: #111110; cursor: pointer; transition: all .15s; }
-  .msg-template-btn:hover { background: #FFD400; border-color: #111110; }
-
-  .msg-input-area { display: flex; align-items: flex-end; gap: 8px; padding: 10px 14px; border-top: 2px solid #E8E0D0; background: #fff; }
-  .msg-template-toggle { width: 36px; height: 36px; border-radius: 10px; flex-shrink: 0; border: 2px solid #E8E0D0; background: #F5F0E8; display: flex; align-items: center; justify-content: center; cursor: pointer; color: #9B8F7A; transition: all .15s; }
-  .msg-template-toggle:hover, .msg-template-toggle.active { background: #FFD400; border-color: #111110; color: #111110; }
-  .msg-input-wrap { flex: 1; }
-  .msg-textarea { width: 100%; border: 2px solid #E8E0D0; border-radius: 12px; padding: 8px 13px; font-family: inherit; font-size: 14px; font-weight: 600; color: #111110; background: #fff; outline: none; resize: none; min-height: 36px; max-height: 120px; overflow-y: auto; line-height: 1.5; transition: border-color .15s; }
-  .msg-textarea:focus { border-color: #111110; }
-  .msg-textarea::placeholder { color: #C0B8A8; }
-  .msg-send-btn { width: 36px; height: 36px; border-radius: 10px; flex-shrink: 0; border: 2.5px solid #111110; background: #FFD400; display: flex; align-items: center; justify-content: center; cursor: pointer; color: #111110; transition: all .15s; box-shadow: 2px 2px 0 #111110; }
-  .msg-send-btn:hover:not(:disabled) { transform: translate(-1px,-1px); box-shadow: 3px 3px 0 #111110; }
-  .msg-send-btn:disabled { opacity: .4; cursor: not-allowed; }
-
-  @keyframes spin { to { transform: rotate(360deg); } }
-  .msg-empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px 24px; }
-  .msg-spinner { width: 22px; height: 22px; border: 3px solid #E8E0D0; border-top-color: #111110; border-radius: 50%; animation: spin .7s linear infinite; }
-  .msg-spinner-sm { width: 14px; height: 14px; border: 2px solid rgba(0,0,0,.15); border-top-color: #111110; border-radius: 50%; animation: spin .7s linear infinite; }
-
-  @media (max-width: 700px) {
-    .msg-root { grid-template-columns: 1fr; height: calc(100vh - 100px); }
-    .msg-sidebar, .msg-chat { grid-column: 1; grid-row: 1; }
-    .msg-hide-mobile { display: none !important; }
-    .msg-back-btn { display: flex !important; }
-  }
-`;

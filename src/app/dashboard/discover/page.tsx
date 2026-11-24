@@ -1,161 +1,157 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import { Search, UserCheck, UserPlus, MapPin, ArrowRight, Palette, Building2 } from "lucide-react";
+import { ExternalLink, MapPin, UserCheck, UserPlus } from "lucide-react";
+import { Avatar, Button, ButtonLink, Card, Chip, EmptyState, PageHeader, SearchField, Skeleton } from "@/components/ui";
 
 type Profile = {
   id: string; full_name: string; username?: string; role?: string;
   bio?: string; location?: string; avatar_url?: string;
   artwork_count?: number; follower_count?: number; is_following?: boolean;
 };
+type Filter = "all" | "artist" | "venue";
+
+const isVenue = (r?: string) => r === "venue" || r === "gallery";
 
 export default function DiscoverPage() {
-  const [profiles, setProfiles]   = useState<Profile[]>([]);
-  const [search, setSearch]       = useState("");
-  const [filter, setFilter]       = useState<"all" | "artist" | "gallery">("all");
-  const [loading, setLoading]     = useState(true);
-  const [userId, setUserId]       = useState<string | null>(null);
+  const [profiles, setProfiles] = useState<Profile[]>([]);
+  const [search, setSearch] = useState("");
+  const [filter, setFilter] = useState<Filter>("all");
+  const [loading, setLoading] = useState(true);
+  const [userId, setUserId] = useState<string | null>(null);
   const [followLoading, setFollowLoading] = useState<string | null>(null);
+  const [error, setError] = useState("");
 
   useEffect(() => {
-    const supabase = createClient();
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (user) { setUserId(user.id); loadProfiles(user.id); }
+    const sb = createClient();
+    sb.auth.getUser().then(({ data: { user } }) => {
+      if (user) { setUserId(user.id); loadProfiles(user.id); } else setLoading(false);
     });
   }, []);
 
-  async function loadProfiles(currentUserId: string) {
-    const supabase = createClient();
-    const { data: profilesData } = await supabase
-      .from("profiles").select("id, full_name, username, role, bio, location, avatar_url")
-      .neq("id", currentUserId).limit(50);
-    if (!profilesData) { setLoading(false); return; }
-    const { data: follows } = await supabase.from("followers").select("following_id").eq("follower_id", currentUserId);
-    const followingIds = new Set(follows?.map(f => f.following_id) || []);
-    const enriched = await Promise.all(profilesData.map(async p => {
+  async function loadProfiles(me: string) {
+    const sb = createClient();
+    const [{ data: rows }, { data: follows }] = await Promise.all([
+      sb.from("profiles").select("id, full_name, username, role, bio, location, avatar_url")
+        .neq("id", me).not("full_name", "is", null).neq("full_name", "").limit(50),
+      sb.from("followers").select("following_id").eq("follower_id", me),
+    ]);
+    if (!rows) { setLoading(false); return; }
+    const following = new Set(follows?.map(f => f.following_id) || []);
+    const enriched = await Promise.all(rows.map(async (p: Profile) => {
       const [{ count: artwork_count }, { count: follower_count }] = await Promise.all([
-        supabase.from("artworks").select("*", { count: "exact", head: true }).eq("user_id", p.id),
-        supabase.from("followers").select("*", { count: "exact", head: true }).eq("following_id", p.id),
+        sb.from("artworks").select("*", { count: "exact", head: true }).eq("user_id", p.id),
+        sb.from("followers").select("*", { count: "exact", head: true }).eq("following_id", p.id),
       ]);
-      return { ...p, artwork_count: artwork_count || 0, follower_count: follower_count || 0, is_following: followingIds.has(p.id) };
+      return { ...p, artwork_count: artwork_count || 0, follower_count: follower_count || 0, is_following: following.has(p.id) };
     }));
     setProfiles(enriched);
     setLoading(false);
   }
 
-  async function toggleFollow(targetId: string) {
+  async function toggleFollow(target: Profile) {
     if (!userId) return;
-    setFollowLoading(targetId);
-    const supabase = createClient();
-    const profile = profiles.find(p => p.id === targetId);
-    if (profile?.is_following) {
-      await supabase.from("followers").delete().eq("follower_id", userId).eq("following_id", targetId);
+    setFollowLoading(target.id); setError("");
+    const sb = createClient();
+    const { error: err } = target.is_following
+      ? await sb.from("followers").delete().eq("follower_id", userId).eq("following_id", target.id)
+      : await sb.from("followers").insert({ follower_id: userId, following_id: target.id });
+    if (err) {
+      setError("That didn't go through. Please try again.");
     } else {
-      await supabase.from("followers").insert({ follower_id: userId, following_id: targetId });
+      setProfiles(prev => prev.map(p => p.id === target.id ? {
+        ...p, is_following: !p.is_following,
+        follower_count: Math.max(0, (p.follower_count || 0) + (p.is_following ? -1 : 1)),
+      } : p));
     }
-    setProfiles(prev => prev.map(p => p.id === targetId ? {
-      ...p, is_following: !p.is_following,
-      follower_count: (p.follower_count || 0) + (p.is_following ? -1 : 1)
-    } : p));
     setFollowLoading(null);
   }
 
+  const q = search.toLowerCase().trim();
   const filtered = profiles.filter(p => {
-    const matchSearch = !search || p.full_name?.toLowerCase().includes(search.toLowerCase()) || p.username?.toLowerCase().includes(search.toLowerCase());
-    const matchFilter = filter === "all" || p.role?.toLowerCase() === filter;
+    const matchSearch = !q || [p.full_name, p.username, p.location].some(v => (v || "").toLowerCase().includes(q));
+    const matchFilter = filter === "all" || (filter === "venue" ? isVenue(p.role) : p.role === "artist");
     return matchSearch && matchFilter;
   });
+  const counts = {
+    all: profiles.length,
+    artist: profiles.filter(p => p.role === "artist").length,
+    venue: profiles.filter(p => isVenue(p.role)).length,
+  };
 
   return (
-    <div>
-      <div className="page-header">
-        <h1 className="page-title">Discover</h1>
-        <p className="page-subtitle">Find and connect with artists and galleries</p>
-      </div>
+    <div className="flex flex-col gap-6">
+      <PageHeader
+        title="Artists and venues"
+        description="Find people in the scene and follow the ones you want to keep up with."
+        actions={<ButtonLink href="/explore" target="_blank" variant="secondary"><ExternalLink size={15} aria-hidden /> Public Explore</ButtonLink>}
+      />
 
-      {/* Directory CTAs */}
-      <div className="grid grid-cols-2 gap-0 mb-6 border-2 border-black" style={{ boxShadow: "3px 3px 0 #111110" }}>
-        <Link href="/explore#artists"
-          className="flex items-center justify-between px-5 py-4 bg-black text-[#FFD400] border-r-2 border-black hover:bg-stone-900 transition-colors group">
-          <div className="flex items-center gap-3">
-            <Palette className="w-5 h-5" />
-            <div>
-              <p className="text-[9px] font-black uppercase tracking-widest text-[#FFD400]/40 mb-0.5">Browse all</p>
-              <p className="font-black text-sm">Artists Directory</p>
-            </div>
-          </div>
-          <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
-        </Link>
-        <Link href="/explore#venues"
-          className="flex items-center justify-between px-5 py-4 bg-[#FFD400] hover:bg-yellow-300 transition-colors group">
-          <div className="flex items-center gap-3">
-            <Building2 className="w-5 h-5 text-black" />
-            <div>
-              <p className="text-[9px] font-black uppercase tracking-widest text-black/40 mb-0.5">Browse all</p>
-              <p className="font-black text-sm text-black">Venues Directory</p>
-            </div>
-          </div>
-          <ArrowRight className="w-4 h-4 text-black group-hover:translate-x-0.5 transition-transform" />
-        </Link>
-      </div>
-
-      {/* Search + filter */}
-      <div className="flex items-center gap-3 mb-6 flex-wrap">
-        <div className="relative flex-1 min-w-48 max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search by name..." className="input pl-9" />
-        </div>
-        <div className="flex rounded-xl border border-stone-200 overflow-hidden">
-          {(["all","artist","gallery"] as const).map(f => (
-            <button key={f} onClick={() => setFilter(f)}
-              className={`px-4 py-2 text-sm font-medium capitalize transition-colors ${filter === f ? "bg-stone-900 text-white" : "bg-white text-stone-600 hover:bg-stone-50"}`}>
-              {f}
-            </button>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <SearchField value={search} onChange={setSearch} placeholder="Search by name or city" className="sm:w-80" />
+        <div className="flex gap-2" role="group" aria-label="Show">
+          {([["all", "Everyone"], ["artist", "Artists"], ["venue", "Venues"]] as [Filter, string][]).map(([k, label]) => (
+            <Chip key={k} selected={filter === k} onClick={() => setFilter(k)}>
+              {label} <span className="tabular-nums opacity-70">{counts[k]}</span>
+            </Chip>
           ))}
         </div>
       </div>
+
+      {error && <p role="alert" className="font-ui text-body-sm text-bad">{error}</p>}
 
       {loading ? (
-        <div className="text-center py-20 text-stone-400">Loading...</div>
-      ) : filtered.length === 0 ? (
-        <div className="card p-16 text-center"><p className="text-stone-400">No artists found</p></div>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {filtered.map(p => (
-            <div key={p.id} className="card-hover p-5 flex flex-col">
-              <div className="flex items-start gap-3 mb-3">
-                {p.avatar_url
-                  ? <img src={p.avatar_url} alt="" className="w-12 h-12 rounded-full object-cover shrink-0" />
-                  : <div className="w-12 h-12 rounded-full bg-stone-200 flex items-center justify-center text-stone-600 font-semibold text-lg shrink-0">{p.full_name?.[0] || "A"}</div>}
-                <div className="min-w-0">
-                  <Link href={p.username ? `/profile/${p.username}` : "#"} className="font-semibold text-stone-900 hover:underline text-sm truncate block">
-                    {p.full_name}
-                  </Link>
-                  <span className={`badge capitalize mt-0.5 ${p.role === "gallery" ? "badge-storage" : "badge-available"}`}>
-                    {p.role || "artist"}
-                  </span>
-                </div>
-              </div>
-              {p.location && (
-                <div className="flex items-center gap-1.5 text-xs text-stone-500 mb-2">
-                  <MapPin className="w-3 h-3" /> {p.location}
-                </div>
-              )}
-              {p.bio && <p className="text-xs text-stone-600 line-clamp-2 mb-3 flex-1">{p.bio}</p>}
-              <div className="flex items-center justify-between text-xs text-stone-500 mb-4 mt-auto">
-                <span>{p.artwork_count} works</span>
-                <span>{p.follower_count} followers</span>
-              </div>
-              <button onClick={() => toggleFollow(p.id)} disabled={followLoading === p.id}
-                className={`w-full py-2 rounded-xl text-sm font-semibold transition-colors ${p.is_following ? "bg-stone-100 text-stone-700 hover:bg-rose-50 hover:text-rose-600" : "bg-stone-900 text-white hover:bg-stone-800"}`}>
-                {followLoading === p.id ? "…" : p.is_following
-                  ? <span className="flex items-center justify-center gap-2"><UserCheck className="w-4 h-4" /> Following</span>
-                  : <span className="flex items-center justify-center gap-2"><UserPlus className="w-4 h-4" /> Follow</span>}
-              </button>
-            </div>
-          ))}
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-40 rounded-card" />)}
         </div>
+      ) : filtered.length === 0 ? (
+        <EmptyState
+          title={q ? "No one matches that" : "No one here yet"}
+          description={q ? "Try a shorter name or a different city." : "As more artists and venues join, they show up here."}
+        />
+      ) : (
+        <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          {filtered.map(p => {
+            const href = p.username ? `/${p.username}` : null;
+            return (
+              <li key={p.id}>
+                <Card padding="md" className="flex h-full flex-col gap-4">
+                  <div className="flex items-start gap-3">
+                    <Avatar name={p.full_name || "Member"} src={p.avatar_url} size="md" />
+                    <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                      {href ? (
+                        <Link href={href} target="_blank" className="truncate font-ui text-body font-semibold text-fg hover:underline hover:underline-offset-4">{p.full_name}</Link>
+                      ) : (
+                        <span className="truncate font-ui text-body font-semibold text-fg">{p.full_name}</span>
+                      )}
+                      <span className="flex items-center gap-1.5 truncate font-ui text-body-sm text-fg-3">
+                        {isVenue(p.role) ? "Venue" : "Artist"}
+                        {p.location && <><span aria-hidden>·</span><MapPin size={12} aria-hidden className="shrink-0" />{p.location}</>}
+                      </span>
+                    </div>
+                  </div>
+                  {p.bio && <p className="line-clamp-2 font-ui text-body-sm text-fg-2">{p.bio}</p>}
+                  <div className="mt-auto flex items-center justify-between gap-3 border-t-hair border-line pt-3">
+                    <span className="font-ui text-body-sm tabular-nums text-fg-3">
+                      {!isVenue(p.role) && <>{p.artwork_count} {p.artwork_count === 1 ? "work" : "works"} · </>}
+                      {p.follower_count} {p.follower_count === 1 ? "follower" : "followers"}
+                    </span>
+                    <Button
+                      size="sm"
+                      variant={p.is_following ? "ghost" : "secondary"}
+                      onClick={() => toggleFollow(p)}
+                      disabled={followLoading === p.id}
+                      aria-pressed={!!p.is_following}
+                    >
+                      {p.is_following ? <><UserCheck size={14} aria-hidden /> Following</> : <><UserPlus size={14} aria-hidden /> Follow</>}
+                    </Button>
+                  </div>
+                </Card>
+              </li>
+            );
+          })}
+        </ul>
       )}
     </div>
   );

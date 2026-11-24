@@ -105,6 +105,7 @@ export default function RegisterPage() {
       if (data.user) {
         const p: Record<string, unknown> = { id: data.user.id, full_name: name, email, role, onboarding_done: true };
         if (role === "artist") { p.mediums = mediums; p.style_tags = styles; p.years_active = years; p.location = city; p.lat = cityCoords?.lat || null; p.lng = cityCoords?.lng || null; p.instagram = ig; p.bio = bio; }
+        else { p.venue_name = vName; p.venue_type = vType; p.art_styles_sought = vStyles; p.location = vCity; p.lat = vCityCoords?.lat || null; p.lng = vCityCoords?.lng || null; p.instagram = vIg; }
         await sb.from("profiles").upsert(p);
         router.push("/dashboard");
       }

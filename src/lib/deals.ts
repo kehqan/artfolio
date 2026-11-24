@@ -26,7 +26,7 @@ export type Person = { id: string; full_name?: string | null; avatar_url?: strin
 export type DealView = Deal & {
   works: PlaceArtwork[];
   other: Person | null;
-  post: { id: string; title: string; details?: DealTerms | null; location?: string | null } | null;
+  post: { id: string; title: string; details?: DealTerms | null; location?: string | null; status?: string | null } | null;
 };
 
 /** The 4 steps everyone sees. */
@@ -83,7 +83,7 @@ export async function loadDeals(sb: SupabaseClient, me: string): Promise<DealVie
   const [{ data: ws }, { data: ps }, { data: pr }] = await Promise.all([
     sb.from("artworks").select("id,title,images,medium,width_cm,height_cm,depth_cm,price,currency,status,wall_terms,user_id").in("id", workIds),
     sb.from("profiles").select("id,full_name,avatar_url,role,location,username").in("id", people),
-    posts.length ? sb.from("pool_requests").select("id,title,details,location").in("id", posts) : Promise.resolve({ data: [] as any[] }),
+    posts.length ? sb.from("pool_requests").select("id,title,details,location,status").in("id", posts) : Promise.resolve({ data: [] as any[] }),
   ]);
   const work = new Map(((ws || []) as PlaceArtwork[]).map(w => [w.id, w]));
   const person = new Map(((ps || []) as Person[]).map(p => [p.id, p]));

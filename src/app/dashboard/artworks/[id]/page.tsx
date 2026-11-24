@@ -71,8 +71,22 @@ export default function ArtworkDetailPage() {
   const [activeImg,  setActiveImg]  = useState(0);
   const [stageOpen,  setStageOpen]  = useState(false);
   const [confirmDel, setConfirmDel] = useState(false);
+  const [onShow,     setOnShow]     = useState<{ venue: string; until: string | null; contract: string } | null>(null);
 
   useEffect(() => { load(); }, [id]);
+
+  // Signed into a show through a deal: say where it hangs.
+  useEffect(() => {
+    const sb = createClient();
+    sb.from("deals").select("contract_id").eq("status", "signed").contains("artwork_ids", [id]).not("contract_id", "is", null)
+      .order("updated_at", { ascending: false }).limit(1).then(async ({ data }) => {
+        const cid = data?.[0]?.contract_id;
+        if (!cid) return;
+        const { data: c } = await sb.from("contracts").select("venue_name,end_date").eq("id", cid).single();
+        if (!c || (c.end_date && c.end_date < new Date().toISOString().slice(0, 10))) return;
+        setOnShow({ venue: c.venue_name || "a venue", until: c.end_date, contract: cid });
+      });
+  }, [id]);
 
   async function load() {
     const sb = createClient();
@@ -208,6 +222,12 @@ export default function ArtworkDetailPage() {
             </div>
             <Heading level={1} className="break-words">{artwork.title}</Heading>
             {meta && <p className="font-ui text-body text-fg-2">{meta}</p>}
+            {onShow && (
+              <Link href={`/dashboard/contracts/${onShow.contract}`} className="inline-flex items-center gap-1.5 self-start rounded-pill border-outline border-ink bg-mango px-3 py-1 font-ui text-label font-semibold text-on-mango">
+                <MapPin size={13} aria-hidden /> On show at {onShow.venue}
+                {onShow.until && <span className="font-normal">until {new Date(onShow.until).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}</span>}
+              </Link>
+            )}
           </div>
         </div>
 
@@ -230,7 +250,7 @@ export default function ArtworkDetailPage() {
             )}
           </div>
 
-          {!isSold(artwork) && (
+          {!isSold(artwork) && !onShow && (
             <ButtonLink href={`/dashboard/looking?work=${id}`} variant="primary">
               <MapPin size={15} aria-hidden /> Find a place for it
             </ButtonLink>

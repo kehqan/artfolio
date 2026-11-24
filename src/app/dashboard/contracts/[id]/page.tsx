@@ -146,6 +146,8 @@ export default function ContractDetailPage() {
 
     const { data: c } = await sb.from("contracts").select("*").eq("id", id).single();
     setContract(c);
+    // Signed by both: the deal it came from is done.
+    if (c?.executed_at) sb.from("deals").update({ status: "signed" }).eq("contract_id", id).eq("status", "agreement_sent").then(() => {});
 
     const [{ data: sigs }, { data: hash }] = await Promise.all([
       sb.from("contract_signatures").select("party, signer_name, signer_email, signed_via, ip_address, signed_at, terms_hash").eq("contract_id", id).order("signed_at"),

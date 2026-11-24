@@ -1,11 +1,17 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useParams } from "next/navigation";
+import {
+  ArrowRightLeft, BadgeDollarSign, Gift, Landmark, PenTool, Printer, Repeat, Scale, ShieldCheck, Wrench,
+} from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+import { Avatar, Badge, Button, ButtonLink, EmptyState, Eyebrow, Heading, Skeleton } from "@/components/ui";
+import type { BadgeTone } from "@/components/ui";
+import { Wordmark } from "@/components/brand/Wordmark";
+import { Mat } from "@/components/public/PublicChrome";
 
-type Artist = {
-  id: string; full_name: string; username?: string;
-  location?: string; avatar_url?: string;
-};
+type Artist = { id: string; full_name: string; username?: string; location?: string; avatar_url?: string };
 type Artwork = {
   id: string; title: string; medium?: string; year?: number;
   description?: string; status: string; images?: string[];
@@ -21,500 +27,251 @@ type ProvenanceEntry = {
   id: string; event_type: string; owner_name?: string;
   is_anonymous?: boolean; date?: string; location?: string; notes?: string;
 };
+type Exhibition = { id: string; title: string; venue?: string; gallery_name?: string; start_date?: string; end_date?: string };
 
-const AUTH_LABELS: Record<string, string> = {
-  original: "Original Work",
-  limited_edition: "Limited Edition",
-  reproduction: "Reproduction",
-  pending: "Pending Verification",
+// Same vocabulary and icons as the dashboard passport
+const EVENTS: Record<string, { label: string; icon: LucideIcon }> = {
+  created: { label: "Created", icon: PenTool },
+  sold: { label: "Sold", icon: BadgeDollarSign },
+  transferred: { label: "Transferred", icon: ArrowRightLeft },
+  exhibited: { label: "Exhibited", icon: Landmark },
+  restored: { label: "Restored", icon: Wrench },
+  appraised: { label: "Appraised", icon: Scale },
+  donated: { label: "Donated", icon: Gift },
+  loaned: { label: "Loaned", icon: Repeat },
+};
+const AUTH: Record<string, { label: string; tone: BadgeTone }> = {
+  original: { label: "Original work", tone: "ok" },
+  limited_edition: { label: "Limited edition", tone: "warn" },
+  reproduction: { label: "Reproduction", tone: "neutral" },
+  pending: { label: "Not yet authenticated", tone: "neutral" },
 };
 
 function fmt(d?: string | null) {
-  if (!d) return "—";
-  try { return new Date(d).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }); }
+  if (!d) return "";
+  try { return new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" }); }
   catch { return d; }
+}
+
+function Fact({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex flex-col gap-0.5">
+      <dt className="font-ui text-caption font-semibold uppercase tracking-eyebrow text-fg-3">{label}</dt>
+      <dd className="font-ui text-body text-fg">{children}</dd>
+    </div>
+  );
 }
 
 export default function ArtworkPassportPage() {
   const params = useParams<{ id: string }>();
   const artworkId = params?.id;
 
-  const [artwork, setArtwork]       = useState<Artwork | null>(null);
-  const [artist, setArtist]         = useState<Artist | null>(null);
+  const [artwork, setArtwork] = useState<Artwork | null>(null);
+  const [artist, setArtist] = useState<Artist | null>(null);
   const [provenance, setProvenance] = useState<ProvenanceEntry[]>([]);
-  const [viewCount, setViewCount]   = useState(0);
-  const [loading, setLoading]       = useState(true);
-  const [error, setError]           = useState("");
+  const [exhibitions, setExhibitions] = useState<Exhibition[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [qrUrl, setQrUrl] = useState<string | null>(null);
 
   useEffect(() => {
     if (!artworkId) return;
+    setQrUrl(`https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(window.location.href)}&margin=8`);
     fetch(`/api/artworks/${artworkId}/passport`)
       .then(r => r.json())
       .then(data => {
         if (data.error) { setError(data.error); setLoading(false); return; }
-        const aw = { ...data.artwork };
-        const ar = aw.artist ?? null;
-        delete aw.artist;
+        const { artist: ar, ...aw } = data.artwork;
         setArtwork(aw);
-        setArtist(ar);
+        setArtist(ar ?? null);
         setProvenance(data.provenance || []);
-        setViewCount(data.viewCount || 0);
+        setExhibitions(data.exhibitions || []);
         setLoading(false);
       })
-      .catch(() => { setError("Failed to load"); setLoading(false); });
+      .catch(() => { setError("We couldn't load this passport. Check your connection and try again."); setLoading(false); });
   }, [artworkId]);
 
-  if (loading) return (
-    <>
-      <style>{CSS}</style>
-      <div className="cert-loading">
-        <div className="cert-loading-box">
-          <div className="cert-loading-shine" />
-          <div style={{ fontSize: 36, marginBottom: 12 }}>🥭</div>
-          <div className="cert-loading-text">Loading Certificate…</div>
-          <div className="cert-loading-bar"><div className="cert-loading-fill" /></div>
-        </div>
+  const header = (
+    <header className="border-b-hair border-line bg-surface print:hidden">
+      <div className="mx-auto flex h-header max-w-[920px] items-center justify-between gap-4 px-4 sm:px-6">
+        <Wordmark />
+        {artwork && (
+          <Button variant="secondary" onClick={() => window.print()}>
+            <Printer size={15} aria-hidden /> Print
+          </Button>
+        )}
       </div>
-    </>
+    </header>
   );
 
-  if (error || !artwork) return (
-    <>
-      <style>{CSS}</style>
-      <div className="cert-loading">
-        <div style={{ textAlign: "center" }}>
-          <div style={{ fontSize: 40, marginBottom: 12 }}>📄</div>
-          <div style={{ fontSize: 20, fontWeight: 700, color: "#1a2744", marginBottom: 8 }}>Certificate not found</div>
-          <div style={{ fontSize: 14, color: "#8a9ab5" }}>{error}</div>
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-page">
+        {header}
+        <div className="mx-auto flex max-w-[920px] flex-col gap-6 px-4 py-10 sm:px-6" aria-busy>
+          <Skeleton className="h-8 w-72" />
+          <Skeleton className="aspect-[4/3] w-full rounded-card" />
+          <Skeleton className="h-24 w-full rounded-card" />
         </div>
       </div>
-    </>
-  );
+    );
+  }
 
-  const mainImg = Array.isArray(artwork.images) ? artwork.images[0] : null;
-  const isVerified = artwork.authentication_status && artwork.authentication_status !== "pending";
-  const authLabel = AUTH_LABELS[artwork.authentication_status || "pending"] || "Pending";
+  if (error || !artwork) {
+    return (
+      <div className="min-h-screen bg-page">
+        {header}
+        <div className="mx-auto max-w-[920px] px-4 py-20 sm:px-6">
+          <EmptyState
+            title="Passport not found"
+            description="This link doesn't match an artwork on Artomango. If you scanned a label, ask the artist or gallery for a fresh link."
+            action={<ButtonLink href="/explore" variant="secondary">Explore Artomango</ButtonLink>}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  const auth = AUTH[artwork.authentication_status || "pending"] || AUTH.pending;
+  const isAuthenticated = !!artwork.authentication_status && artwork.authentication_status !== "pending";
   const dims = [artwork.width_cm, artwork.height_cm, artwork.depth_cm].filter(Boolean);
-  const certId = artwork.certificate_id || "—";
-  const qrUrl = typeof window !== "undefined"
-    ? `https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(window.location.href)}&bgcolor=f4f6fb&color=1a2744&margin=10`
-    : null;
-
-  // Owner = last non-anonymous provenance entry, or artist
   const ownerEntry = [...provenance].reverse().find(p => p.owner_name && !p.is_anonymous);
-  const ownerName = ownerEntry?.owner_name || artist?.full_name || "—";
+  const lastOwnerChange = [...provenance].reverse().find(p => ["sold", "transferred", "donated"].includes(p.event_type));
+  const owner = lastOwnerChange?.is_anonymous ? "Private collection" : ownerEntry?.owner_name || artist?.full_name || "";
+  const images = (artwork.images || []).filter(Boolean);
 
   return (
-    <>
-      <style>{CSS}</style>
-      <div className="cert-page">
-        {/* Outer border frame */}
-        <div className="cert-frame">
-          {/* Corner ornaments */}
-          <div className="cert-corner cert-corner-tl"><Ornament /></div>
-          <div className="cert-corner cert-corner-tr"><Ornament /></div>
-          <div className="cert-corner cert-corner-bl"><Ornament /></div>
-          <div className="cert-corner cert-corner-br"><Ornament /></div>
+    <div className="min-h-screen bg-page text-fg print:bg-surface">
+      {header}
 
-          {/* Inner content */}
-          <div className="cert-inner">
-
-            {/* Header */}
-            <div className="cert-header">
-              <div className="cert-issuer" style={{display:"flex",alignItems:"center",gap:5}}>
-                <img src="/logo.png" alt="artomango" style={{width:24,height:24,objectFit:"contain"}} />
-                Artomango
-              </div>
-              <div className="cert-title-block">
-                <div className="cert-title">ARTWORK PASSPORT</div>
-                <div className="cert-subtitle">Certificate of Authenticity</div>
-              </div>
-              {isVerified && (
-                <div className="cert-verified-seal">
-                  <div className="cert-seal-inner">
-                    <div className="cert-seal-icon">✦</div>
-                    <div className="cert-seal-text">VERIFIED</div>
-                  </div>
-                </div>
+      <main className="mx-auto max-w-[920px] px-4 py-8 sm:px-6 lg:py-12 print:p-0">
+        <article className="overflow-hidden rounded-card border-hair border-line bg-surface print:rounded-none">
+          {/* ── Title block ── */}
+          <div className="flex flex-col gap-5 border-b-hair border-line p-6 sm:flex-row sm:items-start sm:justify-between sm:p-8">
+            <div className="flex min-w-0 flex-col gap-3">
+              <Eyebrow>Artwork passport · Certificate of authenticity</Eyebrow>
+              <Heading level={1} size="h1">{artwork.title}</Heading>
+              {artist && (
+                <Link href={artist.username ? `/${artist.username}` : "/explore"} className="inline-flex items-center gap-2.5 self-start rounded-pill pr-2 hover:bg-sunken">
+                  <Avatar name={artist.full_name || "Artist"} src={artist.avatar_url} size="sm" />
+                  <span className="font-ui text-body font-semibold text-fg">{artist.full_name}</span>
+                  {artist.location && <span className="font-ui text-body-sm text-fg-3">{artist.location}</span>}
+                </Link>
               )}
             </div>
-
-            <div className="cert-divider" />
-
-            {/* Artwork name */}
-            <div className="cert-artwork-name">
-              "{artwork.title}"
-            </div>
-            {artwork.description && (
-              <div className="cert-artwork-desc">{artwork.description}</div>
-            )}
-
-            <div className="cert-divider cert-divider-light" />
-
-            {/* Main info grid */}
-            <div className="cert-grid">
-              <div className="cert-field">
-                <div className="cert-field-label">Artist</div>
-                <div className="cert-field-value">{artist?.full_name || "—"}</div>
-              </div>
-              <div className="cert-field">
-                <div className="cert-field-label">Year</div>
-                <div className="cert-field-value">{artwork.year || "—"}</div>
-              </div>
-              <div className="cert-field">
-                <div className="cert-field-label">Medium</div>
-                <div className="cert-field-value">{artwork.medium || "—"}</div>
-              </div>
-              <div className="cert-field">
-                <div className="cert-field-label">Dimensions</div>
-                <div className="cert-field-value">{dims.length ? dims.join(" × ") + " cm" : "—"}</div>
-              </div>
-              <div className="cert-field">
-                <div className="cert-field-label">Status</div>
-                <div className="cert-field-value">{artwork.status || "—"}</div>
-              </div>
-              <div className="cert-field">
-                <div className="cert-field-label">Authentication</div>
-                <div className="cert-field-value cert-field-auth" style={{ color: isVerified ? "#16593a" : "#8a9ab5" }}>
-                  {authLabel}
-                </div>
-              </div>
-              {artwork.framed && (
-                <div className="cert-field">
-                  <div className="cert-field-label">Framed</div>
-                  <div className="cert-field-value">Yes</div>
-                </div>
-              )}
-              {artwork.editions && (
-                <div className="cert-field">
-                  <div className="cert-field-label">Editions</div>
-                  <div className="cert-field-value">{artwork.editions}</div>
-                </div>
-              )}
-              <div className="cert-field">
-                <div className="cert-field-label">Current Owner</div>
-                <div className="cert-field-value">{ownerName}</div>
-              </div>
-              <div className="cert-field">
-                <div className="cert-field-label">Provenance Entries</div>
-                <div className="cert-field-value">{provenance.length}</div>
-              </div>
-            </div>
-
-            <div className="cert-divider" />
-
-            {/* Bottom row: authenticated by + QR + serial */}
-            <div className="cert-bottom">
-              {/* Auth signature block */}
-              <div className="cert-auth-block">
-                {artwork.authenticated_by ? (
-                  <>
-                    <div className="cert-signature">{artwork.authenticated_by}</div>
-                    <div className="cert-auth-name">{artwork.authenticated_by}</div>
-                    <div className="cert-auth-role">Authentication Specialist</div>
-                    {artwork.authentication_date && (
-                      <div className="cert-auth-date">Date: {fmt(artwork.authentication_date)}</div>
-                    )}
-                  </>
-                ) : (
-                  <>
-                    <div className="cert-signature cert-sig-pending">—</div>
-                    <div className="cert-auth-name" style={{ color: "#b0bac8" }}>Pending Authentication</div>
-                    <div className="cert-auth-role">Authentication Specialist</div>
-                  </>
-                )}
-              </div>
-
-              {/* Artwork thumbnail */}
-              {mainImg && (
-                <div className="cert-artwork-thumb">
-                  <img src={mainImg} alt={artwork.title} />
-                </div>
-              )}
-
-              {/* QR + serial */}
-              <div className="cert-qr-block">
-                {qrUrl && (
-                  <img src={qrUrl} alt="QR Code" className="cert-qr" />
-                )}
-                <div className="cert-serial">
-                  <div className="cert-field-label">Certificate ID</div>
-                  <div className="cert-serial-value">{certId}</div>
-                </div>
-                {artwork.authentication_date && (
-                  <div className="cert-serial">
-                    <div className="cert-field-label">Date of Authentication</div>
-                    <div className="cert-serial-value">{fmt(artwork.authentication_date)}</div>
-                  </div>
-                )}
-              </div>
-            </div>
-
+            <Badge tone={auth.tone} className="self-start">
+              {isAuthenticated && <ShieldCheck size={13} aria-hidden />} {auth.label}
+            </Badge>
           </div>
-        </div>
-      </div>
-    </>
+
+          {/* ── Image ── */}
+          {images.length > 0 && (
+            <div className="border-b-hair border-line">
+              <Mat src={images[0]} alt={artwork.title} className="aspect-[4/3] w-full sm:aspect-[16/10]" pad="p-6" />
+              {images.length > 1 && (
+                <div className="flex gap-2 overflow-x-auto border-t-hair border-line p-3 print:hidden">
+                  {images.slice(1).map((src, i) => (
+                    <Mat key={src + i} src={src} alt={`${artwork.title}, view ${i + 2}`} className="h-20 w-20 shrink-0 rounded-control" pad="p-1" />
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── Facts ── */}
+          <dl className="grid grid-cols-2 gap-x-6 gap-y-5 border-b-hair border-line p-6 sm:grid-cols-4 sm:p-8">
+            <Fact label="Year">{artwork.year || "Not given"}</Fact>
+            <Fact label="Medium">{artwork.medium || "Not given"}</Fact>
+            <Fact label="Size">{dims.length ? `${dims.join(" × ")} cm` : "Not given"}</Fact>
+            {artwork.editions ? <Fact label="Edition">{artwork.editions}</Fact> : <Fact label="Framed">{artwork.framed ? "Yes" : "No"}</Fact>}
+            {owner && <Fact label="Current owner">{owner}</Fact>}
+            <Fact label="Records">{provenance.length} {provenance.length === 1 ? "entry" : "entries"}</Fact>
+          </dl>
+
+          {artwork.description && (
+            <div className="border-b-hair border-line p-6 sm:p-8">
+              <p className="max-w-[65ch] whitespace-pre-line font-ui text-body text-fg-2">{artwork.description}</p>
+            </div>
+          )}
+
+          {/* ── Provenance ── */}
+          <section className="border-b-hair border-line p-6 sm:p-8" aria-labelledby="prov-h">
+            <Heading level={2} size="h3" id="prov-h" className="mb-5">Provenance</Heading>
+            {provenance.length === 0 ? (
+              <p className="font-ui text-body-sm text-fg-3">No history recorded yet.</p>
+            ) : (
+              <ol className="relative flex flex-col gap-5 before:absolute before:bottom-2 before:left-[15px] before:top-2 before:w-px before:bg-line">
+                {provenance.map(p => {
+                  const ev = EVENTS[p.event_type] || { label: p.event_type, icon: PenTool };
+                  const Icon = ev.icon;
+                  const who = p.is_anonymous ? "Private collection" : p.owner_name;
+                  return (
+                    <li key={p.id} className="relative flex gap-4">
+                      <span className="z-[1] grid h-8 w-8 shrink-0 place-items-center rounded-pill border-hair border-line bg-surface text-fg-2">
+                        <Icon size={15} aria-hidden />
+                      </span>
+                      <div className="flex min-w-0 flex-col gap-0.5 pt-1">
+                        <span className="font-ui text-body font-semibold text-fg">
+                          {ev.label}{who ? <span className="font-normal text-fg-2"> · {who}</span> : null}
+                        </span>
+                        <span className="font-ui text-body-sm text-fg-3">{[fmt(p.date), p.location].filter(Boolean).join(" · ") || "Date not recorded"}</span>
+                        {p.notes && <p className="font-ui text-body-sm text-fg-2">{p.notes}</p>}
+                      </div>
+                    </li>
+                  );
+                })}
+              </ol>
+            )}
+          </section>
+
+          {/* ── Exhibitions ── */}
+          {exhibitions.length > 0 && (
+            <section className="border-b-hair border-line p-6 sm:p-8" aria-labelledby="ex-h">
+              <Heading level={2} size="h3" id="ex-h" className="mb-4">Exhibited</Heading>
+              <ul className="flex flex-col gap-3">
+                {exhibitions.map(ex => (
+                  <li key={ex.id} className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-0.5">
+                    <span className="font-ui text-body font-semibold text-fg">
+                      {ex.title}{(ex.gallery_name || ex.venue) && <span className="font-normal text-fg-2"> · {ex.gallery_name || ex.venue}</span>}
+                    </span>
+                    <span className="font-ui text-body-sm tabular-nums text-fg-3">{[fmt(ex.start_date), fmt(ex.end_date)].filter(Boolean).join(" – ")}</span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+
+          {/* ── Certificate ── */}
+          <div className="grid gap-6 bg-page p-6 sm:grid-cols-[1fr_auto] sm:items-end sm:p-8 print:bg-surface">
+            <div className="flex flex-col gap-4">
+              <div className="flex flex-col gap-1.5">
+                <span className="font-ui text-caption font-semibold uppercase tracking-eyebrow text-fg-3">Certificate ID</span>
+                <code className="self-start rounded-control bg-sunken px-3 py-1.5 font-code text-body-sm text-fg">{artwork.certificate_id || "Not issued yet"}</code>
+              </div>
+              {artwork.authenticated_by ? (
+                <p className="font-ui text-body-sm text-fg-2">
+                  Authenticated by <span className="font-semibold text-fg">{artwork.authenticated_by}</span>
+                  {artwork.authentication_date && <> on {fmt(artwork.authentication_date)}</>}.
+                </p>
+              ) : (
+                <p className="font-ui text-body-sm text-fg-3">No one has authenticated this work yet.</p>
+              )}
+              {artwork.authentication_notes && <p className="max-w-[60ch] font-ui text-body-sm text-fg-2">{artwork.authentication_notes}</p>}
+            </div>
+            {qrUrl && (
+              <div className="flex flex-col items-start gap-1.5 sm:items-end">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={qrUrl} alt="QR code linking to this passport" className="h-24 w-24 rounded-control border-hair border-line bg-surface" />
+                <span className="font-ui text-caption text-fg-3">Scan to check this passport</span>
+              </div>
+            )}
+          </div>
+        </article>
+
+        <p className="mt-6 text-center font-ui text-caption text-fg-3 print:hidden">
+          Issued on Artomango. The record is kept by the artist.
+        </p>
+      </main>
+    </div>
   );
 }
-
-// SVG ornament for corners
-function Ornament() {
-  return (
-    <svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path d="M2 2 L20 2 L20 6 L6 6 L6 20 L2 20 Z" fill="#1a2744" opacity="0.15"/>
-      <path d="M2 2 L14 2 L14 4 L4 4 L4 14 L2 14 Z" fill="#1a2744" opacity="0.4"/>
-      <circle cx="6" cy="6" r="2" fill="#1a2744" opacity="0.3"/>
-      <path d="M18 2 Q12 2 8 8 Q4 12 4 18" stroke="#1a2744" strokeWidth="0.8" opacity="0.2" fill="none"/>
-    </svg>
-  );
-}
-
-const CSS = `
-  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;0,900;1,400&family=EB+Garamond:wght@400;500;600&family=Darker+Grotesque:wght@500;600;700;800&display=swap');
-
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  html, body {
-    font-family: 'EB Garamond', Georgia, serif;
-    background: #e8eaf0;
-    min-height: 100vh;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  @keyframes loaderSlide { from{transform:translateX(-100%)} to{transform:translateX(200%)} }
-  @keyframes sealSpin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
-
-  /* ── LOADING ─────────────────────────────── */
-  .cert-loading {
-    min-height: 100vh; display: flex; align-items: center; justify-content: center;
-    background: #e8eaf0; font-family: 'Darker Grotesque', sans-serif;
-  }
-  .cert-loading-box {
-    background: #f4f6fb; border: 2px solid #c8d0e0;
-    border-radius: 16px; padding: 48px 56px; text-align: center;
-    position: relative; overflow: hidden;
-    box-shadow: 0 8px 32px rgba(26,39,68,.1);
-  }
-  .cert-loading-shine {
-    position: absolute; top: 0; left: 0; right: 0; height: 3px;
-    background: linear-gradient(90deg, transparent, #1a2744, transparent);
-    animation: loaderSlide 1.4s ease-in-out infinite;
-  }
-  .cert-loading-text { font-size: 16px; font-weight: 700; color: #1a2744; margin-bottom: 20px; font-family: 'Darker Grotesque', sans-serif; }
-  .cert-loading-bar { height: 3px; background: #dde3ef; border-radius: 99px; overflow: hidden; width: 160px; margin: 0 auto; }
-  .cert-loading-fill { height: 100%; background: #1a2744; border-radius: 99px; animation: loaderSlide 1.2s ease-in-out infinite; }
-
-  /* ── CERT PAGE ───────────────────────────── */
-  .cert-page {
-    min-height: 100vh;
-    display: flex; align-items: center; justify-content: center;
-    padding: 32px 16px;
-    background: #dde2ec;
-    background-image:
-      radial-gradient(ellipse at 20% 20%, rgba(26,39,68,.06) 0%, transparent 60%),
-      radial-gradient(ellipse at 80% 80%, rgba(26,39,68,.04) 0%, transparent 60%);
-  }
-
-  /* ── FRAME ───────────────────────────────── */
-  .cert-frame {
-    position: relative;
-    width: 100%;
-    max-width: 860px;
-    background: #f4f6fb;
-    border: 3px solid #1a2744;
-    border-radius: 4px;
-    padding: 6px;
-    box-shadow:
-      0 2px 0 #c8d0e0,
-      0 4px 0 #b8c2d8,
-      0 20px 60px rgba(26,39,68,.18),
-      0 4px 16px rgba(26,39,68,.12);
-  }
-
-  /* Inner double border */
-  .cert-frame::before {
-    content: '';
-    position: absolute;
-    inset: 10px;
-    border: 1px solid rgba(26,39,68,.2);
-    pointer-events: none;
-    z-index: 0;
-  }
-  /* Decorative border pattern */
-  .cert-frame::after {
-    content: '';
-    position: absolute;
-    inset: 13px;
-    border: 1px solid rgba(26,39,68,.08);
-    pointer-events: none;
-    z-index: 0;
-  }
-
-  /* ── CORNERS ─────────────────────────────── */
-  .cert-corner {
-    position: absolute; z-index: 2; width: 48px; height: 48px;
-  }
-  .cert-corner-tl { top: 8px; left: 8px; }
-  .cert-corner-tr { top: 8px; right: 8px; transform: scaleX(-1); }
-  .cert-corner-bl { bottom: 8px; left: 8px; transform: scaleY(-1); }
-  .cert-corner-br { bottom: 8px; right: 8px; transform: scale(-1); }
-
-  /* ── INNER CONTENT ───────────────────────── */
-  .cert-inner {
-    position: relative; z-index: 1;
-    padding: 40px 56px 36px;
-    background: linear-gradient(160deg, #f9fafc 0%, #f2f4f9 100%);
-    border-radius: 2px;
-  }
-
-  /* ── HEADER ──────────────────────────────── */
-  .cert-header {
-    display: flex; align-items: flex-start; justify-content: space-between;
-    margin-bottom: 18px; gap: 16px;
-  }
-  .cert-issuer {
-    font-family: 'Darker Grotesque', sans-serif;
-    font-size: 13px; font-weight: 700; color: #5a6a88;
-    letter-spacing: .08em; padding-top: 4px;
-  }
-  .cert-title-block { text-align: center; flex: 1; }
-  .cert-title {
-    font-family: 'Playfair Display', serif;
-    font-size: 32px; font-weight: 900; color: #1a2744;
-    letter-spacing: .12em; line-height: 1;
-  }
-  .cert-subtitle {
-    font-family: 'Darker Grotesque', sans-serif;
-    font-size: 12px; font-weight: 600; color: #8a9ab5;
-    letter-spacing: .22em; text-transform: uppercase; margin-top: 6px;
-  }
-
-  /* Verified seal */
-  .cert-verified-seal {
-    width: 60px; height: 60px; border-radius: 50%;
-    border: 2px solid #16593a;
-    display: flex; align-items: center; justify-content: center;
-    background: rgba(22,89,58,.06); flex-shrink: 0;
-    position: relative;
-  }
-  .cert-verified-seal::before {
-    content: '';
-    position: absolute; inset: 4px; border-radius: 50%;
-    border: 1px dashed rgba(22,89,58,.3);
-  }
-  .cert-seal-inner { text-align: center; }
-  .cert-seal-icon { font-size: 18px; color: #16593a; line-height: 1; }
-  .cert-seal-text { font-size: 7px; font-weight: 800; color: #16593a; letter-spacing: .18em; font-family: 'Darker Grotesque', sans-serif; }
-
-  /* ── DIVIDERS ────────────────────────────── */
-  .cert-divider {
-    height: 1px;
-    background: linear-gradient(to right, transparent, #1a2744 20%, #1a2744 80%, transparent);
-    margin: 18px 0; opacity: .2;
-  }
-  .cert-divider-light { opacity: .08; margin: 14px 0; }
-
-  /* ── ARTWORK NAME ────────────────────────── */
-  .cert-artwork-name {
-    font-family: 'Playfair Display', serif;
-    font-size: 26px; font-weight: 700; color: #1a2744;
-    text-align: center; letter-spacing: -.3px; line-height: 1.2;
-    margin-bottom: 8px;
-  }
-  .cert-artwork-desc {
-    font-size: 13px; color: #6a7a95; text-align: center; line-height: 1.6;
-    max-width: 500px; margin: 0 auto; font-style: italic;
-  }
-
-  /* ── GRID ────────────────────────────────── */
-  .cert-grid {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 0;
-    margin: 4px 0;
-  }
-  .cert-field {
-    text-align: center; padding: 14px 8px;
-    border-right: 1px solid rgba(26,39,68,.08);
-    border-bottom: 1px solid rgba(26,39,68,.08);
-  }
-  .cert-field:nth-child(4n) { border-right: none; }
-  .cert-field:nth-last-child(-n+4) { border-bottom: none; }
-  /* If last row has fewer than 4, remove bottom border from all in that row */
-  .cert-field-label {
-    font-family: 'Darker Grotesque', sans-serif;
-    font-size: 9px; font-weight: 800; color: #8a9ab5;
-    text-transform: uppercase; letter-spacing: .18em; margin-bottom: 5px;
-  }
-  .cert-field-value {
-    font-size: 14px; font-weight: 600; color: #1a2744; line-height: 1.3;
-  }
-  .cert-field-auth { font-weight: 700; }
-
-  /* ── BOTTOM ROW ──────────────────────────── */
-  .cert-bottom {
-    display: grid;
-    grid-template-columns: 1fr auto 1fr;
-    align-items: end;
-    gap: 24px;
-    margin-top: 4px;
-  }
-
-  /* Signature block */
-  .cert-auth-block { text-align: center; }
-  .cert-signature {
-    font-family: 'Playfair Display', serif;
-    font-size: 28px; font-style: italic; color: #1a2744;
-    margin-bottom: 4px; line-height: 1; min-height: 36px;
-    display: flex; align-items: center; justify-content: center;
-  }
-  .cert-sig-pending { color: #b0bac8; font-size: 20px; }
-  .cert-auth-name {
-    font-size: 13px; font-weight: 700; color: #1a2744;
-    border-top: 1.5px solid #1a2744; padding-top: 6px; margin-top: 2px;
-  }
-  .cert-auth-role { font-size: 11px; color: #8a9ab5; font-family: 'Darker Grotesque', sans-serif; font-weight: 600; letter-spacing: .06em; margin-top: 2px; }
-  .cert-auth-date { font-size: 11px; color: #8a9ab5; font-family: 'Darker Grotesque', sans-serif; margin-top: 2px; }
-
-  /* Artwork thumbnail */
-  .cert-artwork-thumb {
-    width: 110px; height: 110px; border: 2px solid #1a2744;
-    overflow: hidden; flex-shrink: 0;
-    box-shadow: 3px 3px 0 rgba(26,39,68,.15);
-  }
-  .cert-artwork-thumb img { width: 100%; height: 100%; object-fit: cover; }
-
-  /* QR block */
-  .cert-qr-block { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
-  .cert-qr {
-    width: 90px; height: 90px; border: 1.5px solid rgba(26,39,68,.2);
-    display: block;
-  }
-  .cert-serial { text-align: right; }
-  .cert-serial-value {
-    font-family: 'Darker Grotesque', sans-serif;
-    font-size: 12px; font-weight: 700; color: #1a2744;
-    letter-spacing: .08em; margin-top: 2px;
-  }
-
-  /* ── RESPONSIVE ──────────────────────────── */
-  @media (max-width: 700px) {
-    .cert-inner { padding: 28px 20px 24px; }
-    .cert-title { font-size: 22px; }
-    .cert-artwork-name { font-size: 20px; }
-    .cert-grid { grid-template-columns: repeat(2, 1fr); }
-    .cert-field:nth-child(2n) { border-right: none; }
-    .cert-field:nth-child(4n) { border-right: 1px solid rgba(26,39,68,.08); }
-    .cert-bottom { grid-template-columns: 1fr; gap: 20px; align-items: center; }
-    .cert-artwork-thumb { display: none; }
-    .cert-qr-block { align-items: center; }
-    .cert-serial { text-align: center; }
-    .cert-auth-block { border-bottom: 1px solid rgba(26,39,68,.1); padding-bottom: 20px; }
-  }
-
-  @media print {
-    .cert-page { background: white; padding: 0; }
-    .cert-frame { box-shadow: none; max-width: 100%; border: 2px solid #1a2744; }
-  }
-`;

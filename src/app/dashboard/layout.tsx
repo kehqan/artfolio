@@ -32,7 +32,8 @@ const AREAS: Area[] = [
     key: "studio", label: "Studio", icon: ImageIcon, href: "/dashboard/artworks",
     pages: [
       { href: "/dashboard/artworks", label: "Works" },
-      { href: "/dashboard/mystore", label: "Public page" },
+      { href: "/dashboard/site", label: "Your site" },
+      { href: "/dashboard/mystore", label: "For sale" },
     ],
     match: ["/dashboard/moodboard"],
   },

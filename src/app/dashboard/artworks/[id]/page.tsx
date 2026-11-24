@@ -1,90 +1,60 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import {
   ArrowLeft, Edit2, Copy, Trash2, ChevronLeft, ChevronRight,
-  X, ImageIcon, Shield, ExternalLink, Hash, Monitor,
-  Layers, MapPin, Check, FileText, DollarSign, Clock,
-  Eye, EyeOff, Maximize2,
+  X, ImageIcon, Shield, ExternalLink, Hash, Check, Maximize2, ChevronDown,
+  Link2,
 } from "lucide-react";
+import {
+  Badge, Button, ButtonLink, Card, EmptyState, Eyebrow, Heading, Modal, Skeleton, Tag, cn,
+} from "@/components/ui";
+import { STAGES, STAGE_MAP, toStageKey, formatPrice } from "@/lib/artwork-stage";
 
-// ── Stage config ───────────────────────────────────────────────────
-const STAGES = [
-  { key: "concept",     label: "Concept",     color: "#9B8F7A", bg: "#F5F0E8", grad: "135deg,#57534E,#9B8F7A" },
-  { key: "in_progress", label: "In Progress", color: "#7C3AED", bg: "#EDE9FE", grad: "135deg,#4C1D95,#7C3AED" },
-  { key: "complete",    label: "Complete",    color: "#0EA5E9", bg: "#E0F2FE", grad: "135deg,#075985,#0EA5E9" },
-  { key: "available",   label: "Available",   color: "#16A34A", bg: "#DCFCE7", grad: "135deg,#14532D,#16A34A" },
-  { key: "reserved",    label: "Reserved",    color: "#CA8A04", bg: "#FEF9C3", grad: "135deg,#713F12,#CA8A04" },
-  { key: "sold",        label: "Sold",        color: "#111110", bg: "#E5E5E5", grad: "135deg,#000,#374151" },
-];
-const STAGE_MAP = Object.fromEntries(STAGES.map(s => [s.key, s]));
-
-const ART_TYPE_CFG: Record<string, { label: string; emoji: string; color: string; bg: string }> = {
-  physical: { label: "Physical",       emoji: "🖼️", color: "#7C3AED", bg: "#EDE9FE" },
-  digital:  { label: "Digital",        emoji: "💻", color: "#0EA5E9", bg: "#E0F2FE" },
-  print:    { label: "Print / Edition",emoji: "🖨️", color: "#CA8A04", bg: "#FEF9C3" },
-  mixed:    { label: "Mixed Media",    emoji: "🎨", color: "#EC4899", bg: "#FCE7F3" },
+const ART_TYPE_LABEL: Record<string, string> = {
+  physical: "Physical",
+  digital: "Digital",
+  print: "Print / edition",
+  mixed: "Mixed media",
 };
 
-const AUTH_CFG: Record<string, { label: string; emoji: string; color: string; bg: string }> = {
-  original:        { label: "Original Work",   emoji: "✦", color: "#16A34A", bg: "#DCFCE7" },
-  limited_edition: { label: "Limited Edition", emoji: "◈", color: "#CA8A04", bg: "#FEF9C3" },
-  reproduction:    { label: "Reproduction",    emoji: "◇", color: "#9B8F7A", bg: "#F5F0E8" },
-  pending:         { label: "Pending",         emoji: "○", color: "#9B8F7A", bg: "#F5F0E8" },
+const AUTH_CFG: Record<string, { label: string; tone: "ok" | "warn" | "neutral" }> = {
+  original:        { label: "Original work",   tone: "ok" },
+  limited_edition: { label: "Limited edition", tone: "warn" },
+  reproduction:    { label: "Reproduction",    tone: "neutral" },
+  pending:         { label: "Not yet set",     tone: "neutral" },
 };
 
-const SALE_LABELS: Record<string, { label: string; emoji: string }> = {
-  direct:           { label: "Direct purchase",  emoji: "🛒" },
-  inquiry:          { label: "Inquiry only",      emoji: "✉️" },
-  price_on_request: { label: "Price on request",  emoji: "💬" },
-  auction:          { label: "Auction",           emoji: "🔨" },
-  not_for_sale:     { label: "Not for sale",      emoji: "🚫" },
+const SALE_LABELS: Record<string, string> = {
+  direct:           "Direct purchase",
+  inquiry:          "Inquiry only",
+  price_on_request: "Price on request",
+  auction:          "Auction",
+  not_for_sale:     "Not for sale",
 };
 
-const PROV_EMOJI: Record<string, string> = { milanote:"🟤", pinterest:"📌", figma:"🎨", miro:"🟡", notion:"📓", other:"🔗" };
-const PROV_GRAD: Record<string, string> = {
-  milanote:  "135deg,#3D2010,#8B4513",
-  pinterest: "135deg,#7F1D1D,#E60023",
-  figma:     "135deg,#4C1D95,#7C3AED",
-  miro:      "135deg,#713F12,#CA8A04",
-  notion:    "135deg,#111827,#374151",
-  other:     "135deg,#075985,#0EA5E9",
-};
-
-function toStageKey(s: string | null | undefined) {
-  const k = String(s || "").toLowerCase().replace(/ /g, "_");
-  return STAGE_MAP[k] ? k : "available";
-}
-
-// ── Shared info row ────────────────────────────────────────────────
+// ── Label / value row ──────────────────────────────────────────────
 function InfoRow({ label, value, mono }: { label: string; value: React.ReactNode; mono?: boolean }) {
   return (
-    <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", padding: "10px 0", borderBottom: "1px solid #F5F0E8", gap: 12 }}>
-      <span style={{ fontSize: 11, fontWeight: 800, color: "#9B8F7A", textTransform: "uppercase", letterSpacing: ".12em", flexShrink: 0 }}>{label}</span>
-      <span style={{ fontSize: 13, fontWeight: 700, color: "#111110", textAlign: "right", fontFamily: mono ? "monospace" : "inherit" }}>{value}</span>
+    <div className="flex items-start justify-between gap-3 border-b-hair border-line py-2.5 last:border-b-0">
+      <dt className="shrink-0 font-ui text-label text-fg-3">{label}</dt>
+      <dd className={cn("text-right font-ui text-body-sm font-medium text-fg", mono && "tabular-nums")}>{value}</dd>
     </div>
   );
 }
 
-// ── Section card ───────────────────────────────────────────────────
-function Card({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
+// ── Section ────────────────────────────────────────────────────────
+function Section({ title, right, children }: { title: string; right?: React.ReactNode; children: React.ReactNode }) {
   return (
-    <div style={{ background: "#fff", border: "2.5px solid #111110", borderRadius: 20, overflow: "hidden", boxShadow: "3px 4px 0 #D4C9A8", ...style }}>
-      {children}
-    </div>
-  );
-}
-function CardHeader({ title, emoji, right }: { title: string; emoji?: string; right?: React.ReactNode }) {
-  return (
-    <div style={{ padding: "12px 18px", borderBottom: "2px solid #E8E0D0", background: "#FAF7F3", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        {emoji && <span style={{ fontSize: 15 }}>{emoji}</span>}
-        <span style={{ fontSize: 13, fontWeight: 900, color: "#111110", letterSpacing: "-.2px" }}>{title}</span>
+    <Card padding="none">
+      <div className="flex items-center justify-between gap-3 border-b-hair border-line px-5 py-3">
+        <Heading level={2} size="h3">{title}</Heading>
+        {right}
       </div>
-      {right}
-    </div>
+      <div className="px-5 py-2">{children}</div>
+    </Card>
   );
 }
 
@@ -99,6 +69,7 @@ export default function ArtworkDetailPage() {
   const [lightbox,   setLightbox]   = useState<number | null>(null);
   const [activeImg,  setActiveImg]  = useState(0);
   const [stageOpen,  setStageOpen]  = useState(false);
+  const [confirmDel, setConfirmDel] = useState(false);
 
   useEffect(() => { load(); }, [id]);
 
@@ -126,7 +97,6 @@ export default function ArtworkDetailPage() {
   }
 
   async function handleDelete() {
-    if (!confirm("Delete this artwork permanently? This cannot be undone.")) return;
     const sb = createClient();
     await sb.from("artworks").delete().eq("id", id);
     router.push("/dashboard/artworks");
@@ -141,404 +111,316 @@ export default function ArtworkDetailPage() {
     if (data) router.push(`/dashboard/artworks/${data.id}`);
   }
 
-  // ── Loading state ─────────────────────────────────────────────
+  const images: string[] = Array.isArray(artwork?.images) ? artwork.images.filter(Boolean) : [];
+
+  // Lightbox keyboard controls
+  const onKey = useCallback((e: KeyboardEvent) => {
+    if (lightbox === null) return;
+    if (e.key === "Escape") setLightbox(null);
+    if (e.key === "ArrowLeft") setLightbox(l => Math.max(0, (l ?? 0) - 1));
+    if (e.key === "ArrowRight") setLightbox(l => Math.min(images.length - 1, (l ?? 0) + 1));
+  }, [lightbox, images.length]);
+  useEffect(() => {
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onKey]);
+
+  // ── Loading ───────────────────────────────────────────────────
   if (loading) return (
-    <>
-      <style>{CSS}</style>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "60vh", flexDirection: "column", gap: 12 }}>
-        <div style={{ width: 40, height: 40, borderRadius: "50%", border: "3px solid #FFD400", borderTopColor: "transparent", animation: "spin .7s linear infinite" }} />
-        <div style={{ fontSize: 13, fontWeight: 700, color: "#9B8F7A" }}>Loading artwork…</div>
+    <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]" aria-busy="true" aria-label="Loading artwork">
+      <Skeleton className="aspect-[4/3] w-full rounded-card" />
+      <div className="flex flex-col gap-4">
+        <Skeleton className="h-8 w-3/4" />
+        <Skeleton className="h-40 w-full rounded-card" />
+        <Skeleton className="h-32 w-full rounded-card" />
       </div>
-    </>
+    </div>
   );
 
   if (!artwork) return (
-    <>
-      <style>{CSS}</style>
-      <div style={{ textAlign: "center", padding: "80px 24px" }}>
-        <div style={{ fontSize: 48, marginBottom: 12 }}>🖼️</div>
-        <div style={{ fontSize: 18, fontWeight: 800, color: "#111110", marginBottom: 8 }}>Artwork not found</div>
-        <Link href="/dashboard/artworks"><button style={{ padding: "10px 20px", background: "#FFD400", border: "2px solid #111110", borderRadius: 11, fontWeight: 800, cursor: "pointer", fontFamily: "inherit", boxShadow: "3px 3px 0 #111110" }}>← Back to artworks</button></Link>
-      </div>
-    </>
+    <EmptyState
+      icon={<ImageIcon size={22} aria-hidden />}
+      title="Artwork not found"
+      description="It may have been deleted, or the link is wrong."
+      action={<ButtonLink href="/dashboard/artworks" size="sm"><ArrowLeft size={15} aria-hidden /> Back to artworks</ButtonLink>}
+    />
   );
 
-  const images     = Array.isArray(artwork.images) ? artwork.images.filter(Boolean) : [];
-  const sk         = toStageKey(artwork.status);
-  const stage      = STAGE_MAP[sk];
-  const atCfg      = ART_TYPE_CFG[artwork.art_type] || ART_TYPE_CFG.physical;
-  const authCfg    = AUTH_CFG[artwork.authentication_status || "pending"];
-  const saleCfg    = artwork.sale_method ? SALE_LABELS[artwork.sale_method] : null;
-  const dims       = [artwork.width_cm, artwork.height_cm, artwork.depth_cm].filter(Boolean).join(" × ");
-  const hasDims    = !!dims;
-  const isDigital  = artwork.art_type === "digital" || artwork.art_type === "mixed";
-  const isPrint    = artwork.art_type === "print";
+  const sk        = toStageKey(artwork.status);
+  const stage     = STAGE_MAP[sk];
+  const typeLabel = ART_TYPE_LABEL[artwork.art_type] || ART_TYPE_LABEL.physical;
+  const authCfg   = AUTH_CFG[artwork.authentication_status || "pending"] || AUTH_CFG.pending;
+  const saleLabel = artwork.sale_method ? SALE_LABELS[artwork.sale_method] : null;
+  const dims      = [artwork.width_cm, artwork.height_cm, artwork.depth_cm].filter(Boolean).join(" × ");
+  const hasDims   = !!dims;
+  const isDigital = artwork.art_type === "digital" || artwork.art_type === "mixed";
+  const price     = formatPrice(artwork.price, artwork.currency);
+  const meta      = [artwork.medium, hasDims ? `${dims} cm` : null, artwork.year].filter(Boolean).join(" · ");
 
   return (
-    <>
-      <style>{CSS}</style>
+    <div className="flex flex-col gap-6 font-ui">
 
       {/* ── Lightbox ── */}
       {lightbox !== null && images.length > 0 && (
-        <div style={{ position: "fixed", inset: 0, zIndex: 9000, background: "rgba(17,17,16,.95)", display: "flex", alignItems: "center", justifyContent: "center" }} onClick={() => setLightbox(null)}>
-          <button onClick={e => { e.stopPropagation(); setLightbox(null); }} style={{ position: "absolute", top: 16, right: 16, width: 40, height: 40, borderRadius: 12, background: "rgba(255,255,255,.1)", border: "1.5px solid rgba(255,255,255,.2)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
-            <X size={18} color="#fff" />
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={`${artwork.title}, image ${lightbox + 1} of ${images.length}`}
+          className="fixed inset-0 z-modal grid place-items-center bg-inverse"
+          onClick={() => setLightbox(null)}
+        >
+          <button type="button" aria-label="Close" onClick={e => { e.stopPropagation(); setLightbox(null); }}
+            className="absolute right-4 top-4 grid h-10 w-10 place-items-center rounded-control text-on-inverse hover:bg-n-700">
+            <X size={20} aria-hidden />
           </button>
           {images.length > 1 && (
             <>
-              <button onClick={e => { e.stopPropagation(); setLightbox(l => Math.max(0, (l ?? 0) - 1)); }} style={{ position: "absolute", left: 16, width: 40, height: 40, borderRadius: 12, background: "rgba(255,255,255,.1)", border: "1.5px solid rgba(255,255,255,.2)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
-                <ChevronLeft size={18} color="#fff" />
+              <button type="button" aria-label="Previous image" onClick={e => { e.stopPropagation(); setLightbox(l => Math.max(0, (l ?? 0) - 1)); }}
+                className="absolute left-4 grid h-10 w-10 place-items-center rounded-control text-on-inverse hover:bg-n-700">
+                <ChevronLeft size={22} aria-hidden />
               </button>
-              <button onClick={e => { e.stopPropagation(); setLightbox(l => Math.min(images.length - 1, (l ?? 0) + 1)); }} style={{ position: "absolute", right: 16, width: 40, height: 40, borderRadius: 12, background: "rgba(255,255,255,.1)", border: "1.5px solid rgba(255,255,255,.2)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
-                <ChevronRight size={18} color="#fff" />
+              <button type="button" aria-label="Next image" onClick={e => { e.stopPropagation(); setLightbox(l => Math.min(images.length - 1, (l ?? 0) + 1)); }}
+                className="absolute right-4 grid h-10 w-10 place-items-center rounded-control text-on-inverse hover:bg-n-700">
+                <ChevronRight size={22} aria-hidden />
               </button>
             </>
           )}
-          <img src={images[lightbox]} alt="" style={{ maxWidth: "90vw", maxHeight: "90vh", objectFit: "contain", borderRadius: 4 }} onClick={e => e.stopPropagation()} />
-          <div style={{ position: "absolute", bottom: 16, left: "50%", transform: "translateX(-50%)", display: "flex", gap: 6 }}>
-            {images.map((_: string, i: number) => (
-              <div key={i} onClick={e => { e.stopPropagation(); setLightbox(i); }} style={{ width: i === lightbox ? 20 : 7, height: 7, borderRadius: 99, background: i === lightbox ? "#FFD400" : "rgba(255,255,255,.35)", cursor: "pointer", transition: "all .2s" }} />
-            ))}
-          </div>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={images[lightbox]} alt={artwork.title} className="max-h-[88vh] max-w-[90vw] object-contain" onClick={e => e.stopPropagation()} />
+          <span className="absolute bottom-5 left-1/2 -translate-x-1/2 font-ui text-label tabular-nums text-n-400">
+            {lightbox + 1} / {images.length}
+          </span>
         </div>
       )}
 
       {/* ── HEADER ── */}
-      <div className="aw-detail-header">
-        <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
-          <Link href="/dashboard/artworks" style={{ textDecoration: "none" }}>
-            <button style={{ width: 36, height: 36, borderRadius: 11, border: "2px solid #E8E0D0", background: "#fff", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}>
-              <ArrowLeft size={16} color="#9B8F7A" />
-            </button>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="flex min-w-0 items-start gap-3">
+          <Link href="/dashboard/artworks" aria-label="Back to artworks"
+            className="mt-1 grid h-9 w-9 shrink-0 place-items-center rounded-control border-hair border-line bg-surface text-fg-2 transition-colors hover:border-ink hover:text-fg">
+            <ArrowLeft size={17} aria-hidden />
           </Link>
-          <div style={{ minWidth: 0 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-              {/* Art type badge */}
-              <span style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "3px 9px", borderRadius: 99, background: atCfg.bg, border: `1.5px solid ${atCfg.color}40`, fontSize: 10, fontWeight: 800, color: atCfg.color, textTransform: "uppercase", letterSpacing: ".1em", flexShrink: 0 }}>
-                {atCfg.emoji} {atCfg.label}
-              </span>
-              {/* Stage badge */}
-              <span style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "3px 10px", borderRadius: 99, background: stage.bg, border: `1.5px solid ${stage.color}40`, fontSize: 10, fontWeight: 800, color: stage.color, flexShrink: 0 }}>
-                <span style={{ width: 5, height: 5, borderRadius: "50%", background: stage.color }} />
-                {stage.label}
-              </span>
+          <div className="flex min-w-0 flex-col gap-1.5">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge tone={stage.tone} dot>{stage.label}</Badge>
+              <Tag>{typeLabel}</Tag>
             </div>
-            <h1 style={{ fontSize: "clamp(17px,2.5vw,24px)", fontWeight: 900, color: "#111110", letterSpacing: "-.5px", margin: "4px 0 0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{artwork.title}</h1>
+            <Heading level={1} className="break-words">{artwork.title}</Heading>
+            {meta && <p className="font-ui text-body text-fg-2">{meta}</p>}
           </div>
         </div>
 
-        {/* Action buttons */}
-        <div className="aw-detail-actions">
+        <div className="flex flex-wrap items-center gap-2">
           {/* Stage changer */}
-          <div style={{ position: "relative" }}>
-            <button onClick={() => setStageOpen(p => !p)} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 13px", border: "2px solid #E8E0D0", borderRadius: 11, background: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", color: "#111110", transition: "all .15s" }}
-              onMouseEnter={e => (e.currentTarget.style.borderColor="#111110")}
-              onMouseLeave={e => { if (!stageOpen) e.currentTarget.style.borderColor="#E8E0D0"; }}>
-              <div style={{ width: 7, height: 7, borderRadius: "50%", background: stage.color }} />
-              {stage.label}
-            </button>
+          <div className="relative">
+            <Button aria-haspopup="menu" aria-expanded={stageOpen} onClick={() => setStageOpen(p => !p)}>
+              Stage: {stage.label} <ChevronDown size={15} aria-hidden className={cn("transition-transform duration-fast", stageOpen && "rotate-180")} />
+            </Button>
             {stageOpen && (
-              <div style={{ position: "absolute", top: "calc(100% + 6px)", right: 0, background: "#fff", border: "2px solid #111110", borderRadius: 14, boxShadow: "5px 5px 0 #111110", zIndex: 100, minWidth: 160, overflow: "hidden", padding: 4 }}>
+              <div role="menu" className="absolute right-0 top-[calc(100%+6px)] z-dropdown min-w-[180px] overflow-hidden rounded-control border-outline border-ink bg-surface p-1 shadow-hard-3 animate-drop-in">
                 {STAGES.map(s => (
-                  <button key={s.key} onClick={() => moveToStage(s.key)}
-                    style={{ display: "flex", alignItems: "center", gap: 9, width: "100%", padding: "9px 12px", border: "none", borderRadius: 9, background: sk === s.key ? "#FFFBEA" : "none", cursor: "pointer", fontFamily: "inherit", fontSize: 13, fontWeight: sk === s.key ? 800 : 600, color: "#111110" }}
-                    onMouseEnter={e => (e.currentTarget.style.background="#FFFBEA")}
-                    onMouseLeave={e => { if (sk !== s.key) e.currentTarget.style.background="none"; }}>
-                    <div style={{ width: 7, height: 7, borderRadius: "50%", background: s.color, flexShrink: 0 }} />
-                    {s.label}
-                    {sk === s.key && <Check size={11} color="#CA8A04" style={{ marginLeft: "auto" }} />}
+                  <button key={s.key} type="button" role="menuitemradio" aria-checked={sk === s.key} onClick={() => moveToStage(s.key)}
+                    className={cn("flex w-full items-center gap-2.5 rounded-chip px-3 py-2 text-left font-ui text-body-sm text-fg hover:bg-sunken", sk === s.key && "font-semibold")}>
+                    <Badge tone={s.tone} dot className="pointer-events-none">{s.label}</Badge>
+                    {sk === s.key && <Check size={15} aria-hidden className="ml-auto" />}
                   </button>
                 ))}
               </div>
             )}
           </div>
 
-          <Link href={`/dashboard/artworks/${id}/edit`} style={{ textDecoration: "none" }}>
-            <button style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", background: "#FFD400", border: "2.5px solid #111110", borderRadius: 11, fontSize: 12, fontWeight: 800, cursor: "pointer", fontFamily: "inherit", color: "#111110", boxShadow: "3px 3px 0 #111110", transition: "all .15s" }}
-              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.boxShadow="4px 4px 0 #111110"; (e.currentTarget as HTMLElement).style.transform="translate(-1px,-1px)"; }}
-              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.boxShadow="3px 3px 0 #111110"; (e.currentTarget as HTMLElement).style.transform="none"; }}>
-              <Edit2 size={12} /> Edit
-            </button>
-          </Link>
-
-          <button onClick={handleDuplicate} style={{ width: 36, height: 36, borderRadius: 11, border: "2px solid #E8E0D0", background: "#fff", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", transition: "all .15s" }}
-            title="Duplicate"
-            onMouseEnter={e => (e.currentTarget.style.borderColor="#111110")}
-            onMouseLeave={e => (e.currentTarget.style.borderColor="#E8E0D0")}>
-            <Copy size={13} color="#9B8F7A" />
-          </button>
-
-          <button onClick={handleDelete} style={{ width: 36, height: 36, borderRadius: 11, border: "2px solid #FFE4E6", background: "#FFF5F5", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", transition: "all .15s" }}
-            title="Delete"
-            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor="#EF4444"; (e.currentTarget as HTMLElement).style.background="#FEF2F2"; }}
-            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor="#FFE4E6"; (e.currentTarget as HTMLElement).style.background="#FFF5F5"; }}>
-            <Trash2 size={13} color="#EF4444" />
-          </button>
+          <ButtonLink href={`/dashboard/artworks/${id}/edit`} variant="primary">
+            <Edit2 size={15} aria-hidden /> Edit
+          </ButtonLink>
+          <Button variant="secondary" aria-label="Duplicate" title="Duplicate" onClick={handleDuplicate} size="icon">
+            <Copy size={16} aria-hidden />
+          </Button>
+          <Button variant="danger" aria-label="Delete" title="Delete" onClick={() => setConfirmDel(true)} size="icon">
+            <Trash2 size={16} aria-hidden />
+          </Button>
         </div>
       </div>
 
       {/* ── MAIN LAYOUT ── */}
-      <div className="aw-detail-grid">
+      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
 
-        {/* ════ LEFT: Images ════ */}
-        <div>
-          {/* Main image */}
-          <div style={{ borderRadius: 20, border: "2.5px solid #111110", boxShadow: "4px 5px 0 #D4C9A8", overflow: "hidden", marginBottom: 10, cursor: images.length > 0 ? "zoom-in" : "default", position: "relative" }}
-            onClick={() => images.length > 0 && setLightbox(activeImg)}>
+        {/* ════ LEFT: the work ════ */}
+        <div className="flex min-w-0 flex-col gap-4">
+          <div className="overflow-hidden rounded-card border-hair border-line bg-surface">
             {images[activeImg] ? (
-              <>
-                <img src={images[activeImg]} alt={artwork.title} style={{ width: "100%", aspectRatio: "4/3", objectFit: "cover", display: "block" }} />
-                <div style={{ position: "absolute", bottom: 10, right: 10, display: "flex", alignItems: "center", gap: 5, padding: "5px 10px", borderRadius: 99, background: "rgba(255,255,255,.15)", border: "1.5px solid rgba(255,255,255,.3)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)", fontSize: 10, fontWeight: 800, color: "#fff" }}>
-                  <Maximize2 size={10} /> Expand
-                </div>
-              </>
+              <button type="button" onClick={() => setLightbox(activeImg)} aria-label="View full size"
+                className="group relative block w-full cursor-zoom-in bg-sunken">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={images[activeImg]} alt={artwork.title} className="mx-auto max-h-[72vh] w-full object-contain" />
+                <span className="absolute bottom-3 right-3 inline-flex items-center gap-1.5 rounded-pill bg-surface px-3 py-1.5 font-ui text-caption font-semibold text-fg opacity-0 transition-opacity duration-fast group-hover:opacity-100 group-focus-visible:opacity-100">
+                  <Maximize2 size={13} aria-hidden /> View full size
+                </span>
+              </button>
             ) : (
-              <div style={{ width: "100%", aspectRatio: "4/3", background: `linear-gradient(${stage.grad})`, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <ImageIcon size={52} color="rgba(255,255,255,.3)" />
+              <div className="grid aspect-[4/3] w-full place-items-center bg-sunken text-n-400">
+                <div className="flex flex-col items-center gap-2">
+                  <ImageIcon size={40} aria-hidden />
+                  <Link href={`/dashboard/artworks/${id}/edit`} className="font-ui text-label font-semibold text-fg-2 underline-offset-2 hover:text-fg hover:underline">
+                    Add photos
+                  </Link>
+                </div>
               </div>
             )}
           </div>
 
-          {/* Thumbnail strip */}
           {images.length > 1 && (
-            <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 4 }}>
-              {images.map((img: string, i: number) => (
-                <div key={i} onClick={() => setActiveImg(i)}
-                  style={{ width: 72, height: 56, borderRadius: 10, border: `2px solid ${i === activeImg ? "#111110" : "#E8E0D0"}`, overflow: "hidden", flexShrink: 0, cursor: "pointer", transition: "border-color .15s", boxShadow: i === activeImg ? "2px 2px 0 #111110" : "none" }}>
-                  <img src={img} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                </div>
+            <div className="flex gap-2 overflow-x-auto pb-1" role="list" aria-label="Images">
+              {images.map((img, i) => (
+                <button key={i} type="button" role="listitem" onClick={() => setActiveImg(i)} aria-label={`Show image ${i + 1}`} aria-current={i === activeImg}
+                  className={cn("h-16 w-20 shrink-0 overflow-hidden rounded-chip border-outline transition-colors",
+                    i === activeImg ? "border-ink" : "border-transparent opacity-70 hover:opacity-100")}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={img} alt="" className="h-full w-full object-cover" />
+                </button>
               ))}
             </div>
           )}
 
-          {/* Passport preview CTA */}
-          <Link href={`/dashboard/artworks/${id}/passport`} style={{ textDecoration: "none", display: "block", marginTop: 16 }}>
-            <div style={{ background: "#111110", borderRadius: 16, padding: "14px 18px", display: "flex", alignItems: "center", gap: 14, cursor: "pointer", border: "2px solid #111110", boxShadow: "3px 3px 0 #D4C9A8", transition: "all .2s" }}
-              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.boxShadow="5px 5px 0 #111110"; (e.currentTarget as HTMLElement).style.transform="translate(-1px,-1px)"; }}
-              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.boxShadow="3px 3px 0 #D4C9A8"; (e.currentTarget as HTMLElement).style.transform="none"; }}>
-              <div style={{ width: 38, height: 38, borderRadius: 10, background: artwork.certificate_id ? "#16A34A" : "#FFD400", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                <Shield size={18} color="#111110" />
-              </div>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 13, fontWeight: 900, color: "#FFD400" }}>
-                  {artwork.certificate_id ? "View Digital Passport" : "Create Digital Passport"}
-                </div>
-                <div style={{ fontSize: 10, color: "rgba(255,212,0,.5)", fontWeight: 600 }}>
-                  {artwork.certificate_id ? `Certificate · ${artwork.certificate_id}` : "Authentication, provenance & certificate"}
-                </div>
-              </div>
-              <ExternalLink size={14} color="rgba(255,212,0,.5)" />
+          {artwork.description && (
+            <div className="flex flex-col gap-2 pt-2">
+              <Eyebrow>About this work</Eyebrow>
+              <p className="max-w-[68ch] whitespace-pre-line font-ui text-body text-fg-2">{artwork.description}</p>
             </div>
-          </Link>
+          )}
 
-          {/* ── MOODBOARDS (storytelling) ── */}
+          {/* ── Moodboards: the story behind the work ── */}
           {moodboards.length > 0 && (
-            <div style={{ marginTop: 16 }}>
-              <Card>
-                <CardHeader title="Story Behind This Work" emoji="🗂️"
-                  right={
-                    <Link href={`/dashboard/artworks/${id}/edit`} style={{ textDecoration: "none", fontSize: 11, fontWeight: 700, color: "#9B8F7A" }}>
-                      Manage
-                    </Link>
-                  }
-                />
-                <div style={{ padding: "12px 14px", display: "flex", flexDirection: "column", gap: 8 }}>
-                  {moodboards.map(mb => {
-                    const thumb = mb.thumbnail_url || mb.og_image;
-                    const grad = PROV_GRAD[mb.provider] || PROV_GRAD.other;
-                    const emoji = PROV_EMOJI[mb.provider] || "🔗";
-                    return (
-                      <a key={mb.id} href={mb.url} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none" }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 11, padding: "10px 12px", background: "#FAF7F3", borderRadius: 13, border: "1.5px solid #E8E0D0", cursor: "pointer", transition: "all .15s" }}
-                          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor="#111110"; (e.currentTarget as HTMLElement).style.background="#FFFBEA"; }}
-                          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor="#E8E0D0"; (e.currentTarget as HTMLElement).style.background="#FAF7F3"; }}>
-                          <div style={{ width: 44, height: 44, borderRadius: 10, overflow: "hidden", flexShrink: 0, background: `linear-gradient(${grad})`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20 }}>
-                            {thumb ? <img src={thumb} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : emoji}
-                          </div>
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontSize: 13, fontWeight: 800, color: "#111110", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{mb.title}</div>
-                            {mb.description && <div style={{ fontSize: 11, color: "#9B8F7A", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{mb.description}</div>}
-                            <div style={{ fontSize: 10, fontWeight: 700, color: "#C0B8A8", marginTop: 2 }}>{emoji} {mb.provider}</div>
-                          </div>
-                          <ExternalLink size={12} color="#C0B8A8" style={{ flexShrink: 0 }} />
-                        </div>
-                      </a>
-                    );
-                  })}
-                </div>
-              </Card>
-            </div>
+            <Section
+              title="Story behind this work"
+              right={<Link href={`/dashboard/artworks/${id}/edit`} className="font-ui text-label font-semibold text-fg-3 hover:text-fg">Manage</Link>}
+            >
+              <div className="flex flex-col gap-2 py-2">
+                {moodboards.map(mb => {
+                  const thumb = mb.thumbnail_url || mb.og_image;
+                  return (
+                    <a key={mb.id} href={mb.url} target="_blank" rel="noopener noreferrer"
+                      className="flex items-center gap-3 rounded-control border-hair border-line p-2.5 transition-colors hover:border-ink">
+                      <span className="grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-chip bg-sunken text-fg-3">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        {thumb ? <img src={thumb} alt="" className="h-full w-full object-cover" /> : <Link2 size={18} aria-hidden />}
+                      </span>
+                      <span className="flex min-w-0 flex-1 flex-col">
+                        <span className="truncate font-ui text-body-sm font-semibold text-fg">{mb.title}</span>
+                        {mb.description && <span className="truncate font-ui text-caption text-fg-3">{mb.description}</span>}
+                        <span className="font-ui text-caption capitalize text-fg-3">{mb.provider}</span>
+                      </span>
+                      <ExternalLink size={14} aria-hidden className="shrink-0 text-fg-3" />
+                    </a>
+                  );
+                })}
+              </div>
+            </Section>
           )}
         </div>
 
-        {/* ════ RIGHT: Details ════ */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        {/* ════ RIGHT: details ════ */}
+        <div className="flex flex-col gap-4">
 
-          {/* Core info */}
-          <Card>
-            <CardHeader title="Artwork Details" emoji="📝" />
-            <div style={{ padding: "6px 18px 14px" }}>
-              {artwork.description && (
-                <p style={{ fontSize: 13, fontWeight: 500, color: "#5C5346", lineHeight: 1.75, margin: "12px 0 14px", paddingBottom: 14, borderBottom: "1px solid #F5F0E8" }}>
-                  {artwork.description}
-                </p>
-              )}
-              {artwork.year && <InfoRow label="Year" value={artwork.year} />}
-              {artwork.medium && <InfoRow label="Medium" value={artwork.medium} />}
-              {/* Auth type */}
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 0", borderBottom: "1px solid #F5F0E8" }}>
-                <span style={{ fontSize: 11, fontWeight: 800, color: "#9B8F7A", textTransform: "uppercase", letterSpacing: ".12em" }}>Type</span>
-                <span style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "3px 10px", borderRadius: 99, background: authCfg.bg, border: `1.5px solid ${authCfg.color}40`, fontSize: 11, fontWeight: 800, color: authCfg.color }}>
-                  {authCfg.emoji} {authCfg.label}
-                </span>
-              </div>
-              {/* Edition code */}
-              {artwork.edition_code && (
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 0", borderBottom: "1px solid #F5F0E8" }}>
-                  <span style={{ fontSize: 11, fontWeight: 800, color: "#9B8F7A", textTransform: "uppercase", letterSpacing: ".12em" }}>Edition</span>
-                  <span style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "4px 10px", borderRadius: 8, background: "#111110", fontSize: 12, fontWeight: 900, color: "#FFD400", fontFamily: "monospace" }}>
-                    <Hash size={10} color="#FFD400" /> {artwork.edition_code}
-                  </span>
-                </div>
-              )}
-              {artwork.edition_total && !artwork.edition_code && (
-                <InfoRow label="Editions" value={`${artwork.edition_number ? `#${artwork.edition_number} of ` : ""}${artwork.edition_total}`} mono />
-              )}
-            </div>
+          {/* Price */}
+          <Card padding="lg" className="flex flex-col gap-1">
+            <Eyebrow>Price</Eyebrow>
+            {price
+              ? <span className="font-display text-h1 tabular-nums leading-none text-fg">{price}</span>
+              : <span className="font-ui text-body text-fg-3">No price yet</span>}
+            {saleLabel && <span className="pt-1 font-ui text-label text-fg-2">{saleLabel}</span>}
           </Card>
 
-          {/* Physical properties */}
-          {(hasDims || artwork.framed !== undefined) && (
-            <Card>
-              <CardHeader title="Physical" emoji="📐" />
-              <div style={{ padding: "6px 18px 14px" }}>
-                {hasDims && <InfoRow label="Dimensions" value={`${dims} cm`} mono />}
-                {artwork.framed !== null && artwork.framed !== undefined && (
-                  <InfoRow label="Framed" value={artwork.framed ? "Yes ✓" : "No"} />
-                )}
-              </div>
-            </Card>
-          )}
+          {/* Passport */}
+          <Link href={`/dashboard/artworks/${id}/passport`}
+            className="group flex items-center gap-3.5 rounded-card border-hair border-line bg-surface p-4 transition-[transform,box-shadow,border-color] duration-base ease-out hover:-translate-x-0.5 hover:-translate-y-0.5 hover:border-ink hover:shadow-hard-2">
+            <span className={cn("grid h-10 w-10 shrink-0 place-items-center rounded-control", artwork.certificate_id ? "bg-ok-well text-ok" : "bg-mango-soft text-fg")}>
+              <Shield size={19} aria-hidden />
+            </span>
+            <span className="flex min-w-0 flex-1 flex-col">
+              <span className="font-ui text-body-sm font-semibold text-fg">
+                {artwork.certificate_id ? "Digital passport" : "Create a digital passport"}
+              </span>
+              <span className="truncate font-ui text-caption text-fg-3">
+                {artwork.certificate_id ? `Certificate ${artwork.certificate_id}` : "Authentication, provenance and certificate"}
+              </span>
+            </span>
+            <ChevronRight size={17} aria-hidden className="shrink-0 text-fg-3 transition-transform group-hover:translate-x-0.5" />
+          </Link>
 
-          {/* Digital properties */}
+          {/* Details */}
+          <Section title="Details">
+            <dl>
+              {artwork.year && <InfoRow label="Year" value={artwork.year} mono />}
+              {artwork.medium && <InfoRow label="Medium" value={artwork.medium} />}
+              {hasDims && <InfoRow label="Dimensions" value={`${dims} cm`} mono />}
+              {artwork.framed !== null && artwork.framed !== undefined && (
+                <InfoRow label="Framed" value={artwork.framed ? "Yes" : "No"} />
+              )}
+              <InfoRow label="Authenticity" value={<Badge tone={authCfg.tone}>{authCfg.label}</Badge>} />
+              {artwork.edition_code && (
+                <InfoRow label="Edition" value={
+                  <span className="inline-flex items-center gap-1 rounded-chip bg-sunken px-2 py-0.5 font-code text-caption text-fg">
+                    <Hash size={12} aria-hidden /> {artwork.edition_code}
+                  </span>
+                } />
+              )}
+              {artwork.edition_total && !artwork.edition_code && (
+                <InfoRow label="Edition" value={`${artwork.edition_number ? `${artwork.edition_number} of ` : ""}${artwork.edition_total}`} mono />
+              )}
+              {artwork.venue_location && <InfoRow label="Location" value={artwork.venue_location} />}
+            </dl>
+          </Section>
+
+          {/* Digital file */}
           {isDigital && (artwork.file_format || artwork.resolution || artwork.digital_file_url) && (
-            <Card>
-              <CardHeader title="Digital File" emoji="💻" />
-              <div style={{ padding: "6px 18px 14px" }}>
+            <Section title="Digital file">
+              <dl>
                 {artwork.file_format && <InfoRow label="Format" value={artwork.file_format} />}
                 {artwork.resolution && <InfoRow label="Resolution" value={artwork.resolution} mono />}
                 {artwork.digital_file_url && (
-                  <div style={{ padding: "10px 0", borderBottom: "1px solid #F5F0E8" }}>
-                    <div style={{ fontSize: 11, fontWeight: 800, color: "#9B8F7A", textTransform: "uppercase", letterSpacing: ".12em", marginBottom: 6 }}>File URL</div>
-                    <a href={artwork.digital_file_url} target="_blank" rel="noopener noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, fontWeight: 700, color: "#0EA5E9", textDecoration: "none" }}>
-                      <ExternalLink size={11} /> Open file <ExternalLink size={10} />
+                  <InfoRow label="File" value={
+                    <a href={artwork.digital_file_url} target="_blank" rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 font-semibold text-info underline-offset-2 hover:underline">
+                      Open file <ExternalLink size={13} aria-hidden />
                     </a>
-                  </div>
+                  } />
                 )}
-              </div>
-            </Card>
+              </dl>
+            </Section>
           )}
 
-          {/* Sales & Pricing */}
-          <Card>
-            <CardHeader title="Sales & Pricing" emoji="💰" />
-            <div style={{ padding: "6px 18px 14px" }}>
-              {artwork.price ? (
-                <div style={{ padding: "14px 0 10px", borderBottom: "1px solid #F5F0E8" }}>
-                  <div style={{ fontSize: 32, fontWeight: 900, color: "#111110", letterSpacing: "-1.5px", fontFamily: "monospace" }}>
-                    {artwork.currency || "€"}{Number(artwork.price).toLocaleString()}
-                  </div>
-                </div>
-              ) : (
-                <InfoRow label="Price" value="Not set" />
-              )}
-              {saleCfg && <InfoRow label="Sale method" value={`${saleCfg.emoji} ${saleCfg.label}`} />}
-              {artwork.venue_location && <InfoRow label="Location" value={artwork.venue_location} />}
-            </div>
-          </Card>
-
-          {/* Business (internal) */}
+          {/* Internal (only the artist sees this) */}
           {(artwork.materials_cost || artwork.time_spent || artwork.notes) && (
-            <Card>
-              <CardHeader title="Internal Notes" emoji="🔒" />
-              <div style={{ padding: "6px 18px 14px" }}>
-                {artwork.materials_cost && <InfoRow label="Materials cost" value={`${artwork.currency || "€"}${Number(artwork.materials_cost).toLocaleString()}`} mono />}
-                {artwork.time_spent && <InfoRow label="Time spent" value={`${artwork.time_spent}h`} />}
+            <Section title="Private notes" right={<span className="font-ui text-caption text-fg-3">Only you see this</span>}>
+              <dl>
+                {artwork.materials_cost && <InfoRow label="Materials cost" value={formatPrice(artwork.materials_cost, artwork.currency)} mono />}
+                {artwork.time_spent && <InfoRow label="Time spent" value={`${artwork.time_spent} h`} mono />}
                 {artwork.price && artwork.materials_cost && (
-                  <div style={{ padding: "10px 0", borderBottom: "1px solid #F5F0E8" }}>
-                    <div style={{ fontSize: 11, fontWeight: 800, color: "#9B8F7A", textTransform: "uppercase", letterSpacing: ".12em", marginBottom: 4 }}>Est. profit</div>
-                    <div style={{ fontSize: 18, fontWeight: 900, color: "#16A34A", fontFamily: "monospace" }}>
-                      {artwork.currency || "€"}{(Number(artwork.price) - Number(artwork.materials_cost)).toLocaleString()}
-                    </div>
-                  </div>
+                  <InfoRow label="Est. profit" value={
+                    <span className="font-semibold text-ok">{formatPrice(Number(artwork.price) - Number(artwork.materials_cost), artwork.currency)}</span>
+                  } mono />
                 )}
-                {artwork.notes && (
-                  <div style={{ paddingTop: 12 }}>
-                    <div style={{ fontSize: 11, fontWeight: 800, color: "#9B8F7A", textTransform: "uppercase", letterSpacing: ".12em", marginBottom: 6 }}>Notes</div>
-                    <p style={{ fontSize: 13, color: "#5C5346", lineHeight: 1.7, fontWeight: 500, margin: 0 }}>{artwork.notes}</p>
-                  </div>
-                )}
-              </div>
-            </Card>
+              </dl>
+              {artwork.notes && (
+                <p className="whitespace-pre-line border-t-hair border-line py-3 font-ui text-body-sm text-fg-2">{artwork.notes}</p>
+              )}
+            </Section>
           )}
-
-          {/* Quick links */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-            <Link href={`/dashboard/artworks/${id}/passport`} style={{ textDecoration: "none" }}>
-              <button style={{ width: "100%", padding: "10px 0", border: "2px solid #E8E0D0", borderRadius: 12, background: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", color: "#111110", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, transition: "all .15s" }}
-                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor="#111110"; (e.currentTarget as HTMLElement).style.boxShadow="2px 2px 0 #111110"; }}
-                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor="#E8E0D0"; (e.currentTarget as HTMLElement).style.boxShadow="none"; }}>
-                <Shield size={13} /> Passport
-              </button>
-            </Link>
-            <Link href={`/dashboard/artworks/${id}/edit`} style={{ textDecoration: "none" }}>
-              <button style={{ width: "100%", padding: "10px 0", border: "2px solid #E8E0D0", borderRadius: 12, background: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", color: "#111110", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, transition: "all .15s" }}
-                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor="#111110"; (e.currentTarget as HTMLElement).style.boxShadow="2px 2px 0 #111110"; }}
-                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor="#E8E0D0"; (e.currentTarget as HTMLElement).style.boxShadow="none"; }}>
-                <Edit2 size={13} /> Edit
-              </button>
-            </Link>
-          </div>
         </div>
       </div>
-    </>
+
+      <Modal
+        open={confirmDel}
+        onClose={() => setConfirmDel(false)}
+        title="Delete this artwork?"
+        description={`"${artwork.title}" and its details will be removed for good. This can't be undone.`}
+        footer={
+          <>
+            <Button variant="ghost" size="sm" onClick={() => setConfirmDel(false)}>Cancel</Button>
+            <Button variant="danger" size="sm" onClick={handleDelete}>Delete artwork</Button>
+          </>
+        }
+      />
+    </div>
   );
 }
-
-const CSS = `
-  @import url('https://fonts.googleapis.com/css2?family=Darker+Grotesque:wght@500;600;700;800;900&display=swap');
-  *, *::before, *::after { box-sizing: border-box; }
-  body { font-family: 'Darker Grotesque', system-ui, sans-serif; }
-  @keyframes spin { to { transform: rotate(360deg); } }
-  @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:none; } }
-
-  .aw-detail-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    margin-bottom: 22px;
-    flex-wrap: wrap;
-  }
-  .aw-detail-actions {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex-shrink: 0;
-    flex-wrap: wrap;
-  }
-  .aw-detail-grid {
-    display: grid;
-    grid-template-columns: 1fr 360px;
-    gap: 22px;
-    align-items: start;
-  }
-
-  @media (max-width: 900px) {
-    .aw-detail-grid { grid-template-columns: 1fr !important; }
-  }
-  @media (max-width: 640px) {
-    .aw-detail-header { flex-direction: column; align-items: flex-start; }
-    .aw-detail-actions { width: 100%; justify-content: flex-start; }
-  }
-`;

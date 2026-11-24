@@ -13,3 +13,8 @@ export { EmptyState } from "./EmptyState";
 export { Avatar } from "./Avatar";
 export { Tabs } from "./Tabs";
 export { Modal } from "./Modal";
+export { Menu } from "./Menu";
+export type { MenuItem } from "./Menu";
+export { SearchField } from "./SearchField";
+export { Skeleton } from "./Skeleton";
+export { Chip } from "./Chip";

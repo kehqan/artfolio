@@ -3,7 +3,7 @@ import { forwardRef, type ButtonHTMLAttributes, type ComponentProps } from "reac
 import { cn } from "./cn";
 
 export type ButtonVariant = "primary" | "secondary" | "ghost" | "danger";
-export type ButtonSize = "sm" | "md";
+export type ButtonSize = "sm" | "md" | "icon" | "icon-sm";
 
 const base =
   "inline-flex items-center justify-center gap-2 whitespace-nowrap font-ui font-semibold " +
@@ -25,6 +25,9 @@ const variants: Record<ButtonVariant, string> = {
 const sizes: Record<ButtonSize, string> = {
   sm: "h-8 px-3 text-label rounded-chip",
   md: "h-10 px-4 text-control rounded-control",
+  /** Square icon-only buttons: always pass aria-label. */
+  icon: "h-10 w-10 text-control rounded-control",
+  "icon-sm": "h-8 w-8 text-label rounded-chip",
 };
 
 /** Class string for anything that should look like a button. */

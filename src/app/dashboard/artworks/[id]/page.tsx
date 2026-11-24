@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { loadPrivate, savePrivate } from "@/lib/artwork-private";
 import {
   ArrowLeft, Edit2, Copy, Trash2, ChevronLeft, ChevronRight,
   X, ImageIcon, Shield, ExternalLink, Hash, Check, Maximize2, ChevronDown,
@@ -91,7 +92,8 @@ export default function ArtworkDetailPage() {
   async function load() {
     const sb = createClient();
     const { data } = await sb.from("artworks").select("*").eq("id", id).single();
-    setArtwork(data);
+    // Private notes, costs and the digital file live in their own, owner-only table.
+    setArtwork(data ? { ...data, ...(await loadPrivate(sb, id, data)) } : data);
 
     // Load linked moodboards if any
     if (data?.linked_moodboard_ids?.length) {
@@ -121,9 +123,14 @@ export default function ArtworkDetailPage() {
     const sb = createClient();
     const { data: { user } } = await sb.auth.getUser();
     if (!user || !artwork) return;
-    const { id: _id, created_at, updated_at, ...rest } = artwork;
+    const { id: _id, created_at, updated_at, certificate_id, notes, materials_cost, time_spent, digital_file_url, ...rest } = artwork;
     const { data } = await sb.from("artworks").insert({ ...rest, user_id: user.id, title: `${artwork.title} (copy)`, status: "concept" }).select().single();
-    if (data) router.push(`/dashboard/artworks/${data.id}`);
+    if (data) {
+      if (notes || materials_cost || time_spent || digital_file_url) {
+        await savePrivate(sb, data.id, user.id, { notes: notes ?? null, materials_cost: materials_cost ?? null, time_spent: time_spent ?? null, digital_file_url: digital_file_url ?? null });
+      }
+      router.push(`/dashboard/artworks/${data.id}`);
+    }
   }
 
   const images: string[] = Array.isArray(artwork?.images) ? artwork.images.filter(Boolean) : [];

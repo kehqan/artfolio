@@ -94,6 +94,8 @@ export default function RegisterPage() {
   const [pw, setPw] = useState("");
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
+  const [sentTo, setSentTo] = useState<string | null>(null);
+  const [resent, setResent] = useState<"" | "sending" | "sent" | "failed">("");
 
   function tog(arr: string[], set: (v: string[]) => void, val: string) {
     set(arr.includes(val) ? arr.filter(x => x !== val) : [...arr, val]);
@@ -105,19 +107,56 @@ export default function RegisterPage() {
     setLoading(true); setErr("");
     try {
       const sb = createClient();
-      const { data, error: e2 } = await sb.auth.signUp({ email, password: pw, options: { data: { full_name: name, role } } });
-      if (e2) { setErr(e2.message); setLoading(false); return; }
-      if (data.user) {
-        const p: Record<string, unknown> = { id: data.user.id, full_name: name, email, role, onboarding_done: true };
-        if (role === "artist") { p.mediums = mediums; p.style_tags = styles; p.years_active = years; p.location = city; p.lat = cityCoords?.lat || null; p.lng = cityCoords?.lng || null; p.instagram = ig; p.bio = bio; }
-        else { p.venue_name = vName; p.venue_type = vType; p.art_styles_sought = vStyles; p.location = vCity; p.lat = vCityCoords?.lat || null; p.lng = vCityCoords?.lng || null; p.instagram = vIg; }
-        await sb.from("profiles").upsert(p);
-        router.push("/dashboard");
+      const p: Record<string, unknown> = { full_name: name, email, role, onboarding_done: true };
+      if (role === "artist") { p.mediums = mediums; p.style_tags = styles; p.years_active = years; p.location = city; p.lat = cityCoords?.lat || null; p.lng = cityCoords?.lng || null; p.instagram = ig; p.bio = bio; }
+      else { p.venue_name = vName; p.venue_type = vType; p.art_styles_sought = vStyles; p.location = vCity; p.lat = vCityCoords?.lat || null; p.lng = vCityCoords?.lng || null; p.instagram = vIg; }
+      // Who invited them (/register?ref=username), if anyone.
+      const ref = new URLSearchParams(window.location.search).get("ref");
+      if (ref) {
+        const { data: inviter } = await sb.from("profiles").select("id").eq("username", ref.toLowerCase()).maybeSingle();
+        if (inviter?.id) p.referred_by = inviter.id;
       }
+      // The details also travel with the account, so nothing is lost if the
+      // email has to be confirmed before we can save them.
+      const { data, error: e2 } = await sb.auth.signUp({
+        email, password: pw,
+        options: { data: { full_name: name, role, profile: p }, emailRedirectTo: `${window.location.origin}/auth/confirm` },
+      });
+      if (e2) { setErr(e2.message); setLoading(false); return; }
+      if (data.session && data.user) {
+        await sb.from("profiles").upsert({ id: data.user.id, ...p });
+        await sb.auth.updateUser({ data: { profile: null } });
+        router.push("/dashboard");
+        return;
+      }
+      setSentTo(email);
+      setLoading(false);
     } catch { setErr("Something went wrong. Please try again."); setLoading(false); }
   }
 
+  async function resend() {
+    if (!sentTo) return;
+    setResent("sending");
+    const { error } = await createClient().auth.resend({ type: "signup", email: sentTo, options: { emailRedirectTo: `${window.location.origin}/auth/confirm` } });
+    setResent(error ? "failed" : "sent");
+  }
+
   const signIn = <>Already have an account? <AuthLink href="/login">Sign in</AuthLink></>;
+
+  // ── After sign-up: confirm the email ──
+  if (sentTo) return (
+    <AuthShell title="Check your email" description={<>We sent a link to <strong className="text-fg">{sentTo}</strong>. Open it to finish and you&rsquo;ll land in your studio.</>} footer={signIn}>
+      <div className="flex flex-col gap-4">
+        <p className="font-ui text-body-sm text-fg-2">Everything you told us is saved with your account. If the email isn&rsquo;t there in a minute, check spam or send it again.</p>
+        {resent === "sent" && <Alert tone="ok">Sent again.</Alert>}
+        {resent === "failed" && <Alert tone="bad">That didn&rsquo;t send. Wait a minute and try again.</Alert>}
+        <Button variant="secondary" onClick={resend} disabled={resent === "sending" || resent === "sent"} className="w-full">
+          {resent === "sending" ? "Sending…" : "Send the link again"}
+        </Button>
+        <Button variant="ghost" onClick={() => { setSentTo(null); setResent(""); setStep("account"); }} className="w-full">Use a different email</Button>
+      </div>
+    </AuthShell>
+  );
 
   // ── STEP 1: role ──
   if (step === "role") return (

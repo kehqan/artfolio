@@ -7,6 +7,7 @@ import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { applyPendingProfile } from "@/lib/pending-profile";
 import {
   LayoutDashboard, ImageIcon, Handshake, Wallet, CalendarDays,
   MessageSquare, Bell, BellOff, Search, X, Menu, LogOut,
@@ -215,9 +216,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   useEffect(() => {
     const supabase = createClient();
-    supabase.auth.getUser().then(({ data: { user } }) => {
+    supabase.auth.getUser().then(async ({ data: { user } }) => {
       if (!user) return;
       setUserId(user.id);
+      // Confirmed their email on another device: save what they told us at sign-up.
+      await applyPendingProfile(supabase, user);
       supabase.from("profiles").select("full_name,role,avatar_url,username")
         .eq("id", user.id).single()
         .then(({ data }) => setProfile(data));

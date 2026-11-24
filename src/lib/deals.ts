@@ -6,7 +6,9 @@
 //
 // An artist offering works to a venue and a venue requesting works from
 // an artist both create a deal. Every move also adds a line to the two
-// people's chat, so the conversation stays in one place.
+// people's chat, so the conversation stays in one place. Those lines are
+// tagged "deal" so they aren't emailed on their own: each step already has
+// its own email (database/migrations/20261124_emails.sql).
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { type PlaceArtwork, workLine } from "@/lib/places";
 
@@ -101,7 +103,7 @@ export async function loadDeals(sb: SupabaseClient, me: string): Promise<DealVie
 export async function chatLine(sb: SupabaseClient, d: Pick<Deal, "id" | "artist_id" | "venue_id" | "conversation_id">, me: string, body: string, meta?: Record<string, unknown>) {
   if (d.conversation_id) {
     await fetch(`/api/conversations/${d.conversation_id}/messages`, {
-      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ body }),
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ body, template_key: "deal" }),
     }).catch(() => null);
     return d.conversation_id;
   }
@@ -110,7 +112,7 @@ export async function chatLine(sb: SupabaseClient, d: Pick<Deal, "id" | "artist_
     body: JSON.stringify({
       recipient_id: me === d.artist_id ? d.venue_id : d.artist_id,
       context_type: "collab", context_id: d.id, context_title: (meta?.title as string) || "Works for your walls",
-      context_meta: { label: "Deal", deal_id: d.id, ...meta }, initial_message: body,
+      context_meta: { label: "Deal", deal_id: d.id, ...meta }, initial_message: body, template_key: "deal",
     }),
   }).catch(() => null);
   const json = res && res.ok ? await res.json().catch(() => ({})) : {};

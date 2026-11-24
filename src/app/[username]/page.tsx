@@ -16,7 +16,8 @@ type MessageContext = { kind: "direct" } | { kind: "artwork"; aw: SiteWork };
 
 export default function PublicProfilePage() {
   const params = useParams<{ username: string }>();
-  const username = params?.username;
+  // Older addresses may hold accents or apostrophes, which arrive encoded.
+  const username = (() => { const u = params?.username; if (!u) return u; try { return decodeURIComponent(u); } catch { return u; } })();
   const [data, setData] = useState<SiteData | null>(null);
   const [site, setSite] = useState<SiteConfig | null>(null);
   const [notFound, setNotFound] = useState(false);

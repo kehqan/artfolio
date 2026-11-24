@@ -11,6 +11,7 @@ import { type FeedItem, type Filter, FILTERS, deleteItem, isLive, isPast, loadFe
 import { SceneCard } from "./SceneCard";
 import { SceneDetail } from "./SceneDetail";
 import { Composer } from "./Composer";
+import { PostFlow } from "./PostFlow";
 import { SceneMap, type Venue } from "./SceneMap";
 
 type View = "feed" | "map";
@@ -39,7 +40,8 @@ export default function ScenePage() {
   const [search, setSearch] = useState("");
 
   const [open, setOpen] = useState<FeedItem | null>(null);
-  const [composing, setComposing] = useState(false);
+  const [composing, setComposing] = useState(false);   // editing a post
+  const [posting, setPosting] = useState(false);       // a new post
   const [editing, setEditing] = useState<FeedItem | null>(null);
   const [messaging, setMessaging] = useState<FeedItem | null>(null);
 
@@ -49,7 +51,7 @@ export default function ScenePage() {
     const f = q.get("show") as Filter | null;
     if (f && FILTERS.some(x => x.key === f)) setFilter(f);
     if (q.get("view") === "map") setView("map");
-    if (q.get("post") === "1") setComposing(true);
+    if (q.get("post") === "1") setPosting(true);
   }, []);
 
   const reload = useCallback(async (me: string) => {
@@ -113,7 +115,7 @@ export default function ScenePage() {
       <PageHeader
         title="The Scene"
         description="Shows, open calls and collabs from artists and venues, all in one place."
-        actions={<Button variant="primary" onClick={() => { setEditing(null); setComposing(true); }}><Plus size={16} aria-hidden /> Post</Button>}
+        actions={<Button variant="primary" onClick={() => setPosting(true)}><Plus size={16} aria-hidden /> Post</Button>}
       />
 
       <div className="flex flex-col gap-3">
@@ -167,7 +169,7 @@ export default function ScenePage() {
         <EmptyState
           title={q || onlineOnly ? "Nothing matches that" : copy.title}
           description={q || onlineOnly ? "Try fewer words or switch off Online only." : copy.description}
-          action={!q && !onlineOnly ? <Button variant="secondary" onClick={() => { setEditing(null); setComposing(true); }}><Plus size={15} aria-hidden /> Post</Button> : undefined}
+          action={!q && !onlineOnly ? <Button variant="secondary" onClick={() => setPosting(true)}><Plus size={15} aria-hidden /> Post</Button> : undefined}
         />
       ) : (
         <div className="columns-1 gap-4 sm:columns-2 xl:columns-3">
@@ -194,6 +196,8 @@ export default function ScenePage() {
           onSaved={() => reload(userId)}
         />
       )}
+
+      <PostFlow open={posting} onClose={() => setPosting(false)} onPosted={() => userId && reload(userId)} />
 
       {messaging?.poster && (
         <MessageModal

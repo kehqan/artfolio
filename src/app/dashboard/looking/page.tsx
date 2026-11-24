@@ -19,7 +19,7 @@ import {
 import { type FeedItem, deleteItem, isLive, isPast, loadFeed, wallDetails, wallTermsLine, wantsArt, wantsPlace, whenLine } from "../scene/feed";
 import { SceneDetail } from "../scene/SceneDetail";
 import { SceneMap } from "../scene/SceneMap";
-import { Composer, type Choice } from "../scene/Composer";
+import { PostFlow } from "../scene/PostFlow";
 import { type PlaceArtwork, WALL_LABEL, cityOf, isSold, missingForWall, sameCity, wallReady, workLine } from "@/lib/places";
 
 type View = "list" | "map";
@@ -54,7 +54,7 @@ export default function LookingPage() {
   const [offer, setOffer] = useState<OfferTarget | null>(null);
   const [messaging, setMessaging] = useState<{ id: string; name: string; avatar?: string; role?: string; title: string; contextId?: string; label: string; image?: string } | null>(null);
   const [suggesting, setSuggesting] = useState(false);
-  const [composer, setComposer] = useState<{ choice: Choice; requestType?: string } | null>(null);
+  const [posting, setPosting] = useState(false);
   const [workId, setWorkId] = useState<string | null>(null);
 
   const venue = role === "venue" || role === "gallery";
@@ -156,7 +156,7 @@ export default function LookingPage() {
           ? "Artists looking for a place to show, and works that are ready for your walls."
           : "Cafés, galleries and venues that want art on their walls right now."}
         actions={venue
-          ? <Button variant="primary" onClick={() => setComposer({ choice: "looking", requestType: "walls" })}><Plus size={16} aria-hidden /> Post your walls</Button>
+          ? <Button variant="primary" onClick={() => setPosting(true)}><Plus size={16} aria-hidden /> Post your walls</Button>
           : undefined}
       />
 
@@ -190,7 +190,7 @@ export default function LookingPage() {
                 icon={<Store size={22} aria-hidden />}
                 title={`No artists are asking ${placeName} yet`}
                 description="Post your walls and artists near you can offer their work straight away."
-                action={<Button variant="secondary" onClick={() => setComposer({ choice: "looking", requestType: "walls" })}><Plus size={15} aria-hidden /> Post your walls</Button>}
+                action={<Button variant="secondary" onClick={() => setPosting(true)}><Plus size={15} aria-hidden /> Post your walls</Button>}
               />
             ) : (
               <QuietHere city={scope === "near" ? city : ""} placeName={placeName} elsewhere={scope !== "everywhere" ? everywhereCount : 0}
@@ -263,7 +263,7 @@ export default function LookingPage() {
         onClose={() => setOpen(null)}
         onMessage={i => (venue ? messageAbout(i) : offerTo(i))}
         actionLabel={venue ? undefined : "Offer a work"}
-        onEdit={() => setComposer(null)}
+        onEdit={() => {}}
         onDelete={remove}
       />
 
@@ -286,11 +286,8 @@ export default function LookingPage() {
 
       <SuggestModal open={suggesting} onClose={() => setSuggesting(false)} city={city} />
 
-      {userId && (
-        <Composer open={!!composer} editing={null} userId={userId} role={role} start={composer}
-          onClose={() => setComposer(null)}
-          onSaved={() => loadFeed(createClient(), userId).then(setItems).catch(() => {})} />
-      )}
+      <PostFlow open={posting} start="walls" onClose={() => setPosting(false)}
+        onPosted={() => userId && loadFeed(createClient(), userId).then(setItems).catch(() => {})} />
     </div>
   );
 }

@@ -1,14 +1,17 @@
 "use client";
-// "Offer a work": an artist picks one to three of their works and sends
-// them to a venue in one message. The message carries the works as cards
-// (context_meta.works) and as plain lines with links, so it reads well
-// anywhere it shows up.
+// Offer or request works, in one sheet.
+//   offer:   an artist picks 1 to 3 of their works for a venue.
+//   request: a venue picks 1 to 3 of an artist's available works.
+// Either way it starts a deal (see lib/deals.ts) and adds the works to the
+// two people's chat as cards and as plain lines with links. If deals
+// aren't set up in the database yet, it still sends the message.
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Check, ImageOff } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { Alert, Avatar, Button, ButtonLink, EmptyState, Field, Modal, Skeleton, Textarea, cn } from "@/components/ui";
+import { Alert, Avatar, Button, ButtonLink, EmptyState, Field, Modal, Select, Skeleton, Textarea, cn } from "@/components/ui";
 import { type PlaceArtwork, WALL_LABEL, isSold, missingForWall, wallReady, workLine } from "@/lib/places";
+import { type DealTerms, chatLine, dealLink, workLines } from "@/lib/deals";
 
 const MAX = 3;
 
@@ -20,7 +23,14 @@ export type OfferTarget = {
   contextId?: string;
   contextTitle?: string;
   contextLabel?: string;
+  /** offer (artist to venue, the default) or request (venue to artist). */
+  mode?: "offer" | "request";
+  /** The venue's wall post this is for, if any. */
+  poolRequestId?: string | null;
+  terms?: DealTerms | null;
 };
+
+type WallPost = { id: string; title: string; details?: DealTerms | null };
 
 type Props = {
   open: boolean;
@@ -38,17 +48,36 @@ export function OfferWorkModal({ open, onClose, target, preselect = [] }: Props)
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
   const [sent, setSent] = useState<string | null>(null);
+  const [dealId, setDealId] = useState<string | null>(null);
+  const [me, setMe] = useState<{ id: string; name: string } | null>(null);
+  const [posts, setPosts] = useState<WallPost[]>([]);
+  const [postId, setPostId] = useState<string>("");
+  const request = target?.mode === "request";
 
   useEffect(() => {
     if (!open || !target) return;
-    setError(""); setSent(null); setSending(false);
-    setNote(`Hi ${target.name}, I saw you're looking for art. Here are a few works that could fit your space. Happy to send more photos or bring them by.`);
+    setError(""); setSent(null); setSending(false); setDealId(null);
+    setPostId(target.poolRequestId || "");
+    setNote(request
+      ? `Hi ${target.name}, we love these works and would like to show them in our space. Would you be up for it?`
+      : `Hi ${target.name}, I saw you're looking for art. Here are a few works that could fit your space. Happy to send more photos or bring them by.`);
     setLoading(true);
     const sb = createClient();
     sb.auth.getUser().then(async ({ data: { user } }) => {
       if (!user) { setLoading(false); return; }
-      const { data } = await sb.from("artworks").select("*").eq("user_id", user.id).order("created_at", { ascending: false });
-      const list = ((data || []) as PlaceArtwork[]).filter(a => !isSold(a));
+      const { data: prof } = await sb.from("profiles").select("full_name").eq("id", user.id).single();
+      setMe({ id: user.id, name: prof?.full_name || "" });
+      const owner = request ? target.recipientId : user.id;
+      const { data } = await sb.from("artworks").select("*").eq("user_id", owner).order("created_at", { ascending: false });
+      let list = ((data || []) as PlaceArtwork[]).filter(a => !isSold(a));
+      // A venue only sees works with a photo, and ones open to a wall first.
+      if (request) list = list.filter(a => a.images?.length);
+      if (request) {
+        const { data: mine } = await sb.from("pool_requests").select("id,title,details").eq("user_id", user.id)
+          .eq("request_type", "walls").eq("status", "open").order("created_at", { ascending: false });
+        setPosts((mine || []) as WallPost[]);
+        if (!target.poolRequestId && mine?.length) setPostId(mine[0].id);
+      }
       // Open to a wall first, then ready ones, then the rest.
       const rank = (a: PlaceArtwork) => (a.wall_terms ? 0 : 2) + (wallReady(a) ? 0 : 1);
       list.sort((a, b) => rank(a) - rank(b));
@@ -65,34 +94,50 @@ export function OfferWorkModal({ open, onClose, target, preselect = [] }: Props)
   }
 
   async function send() {
-    if (!target) return;
+    if (!target || !me) return;
     const chosen = picked.map(id => works.find(w => w.id === id)).filter(Boolean) as PlaceArtwork[];
     if (!chosen.length) { setError("Pick at least one work."); return; }
     setSending(true); setError("");
+    const sb = createClient();
     const origin = window.location.origin;
-    const lines = chosen.map(w => `• ${w.title}${workLine(w) ? ` (${workLine(w)})` : ""}\n  ${origin}/artwork/${w.id}/passport`);
-    const body = `${note.trim()}\n\n${lines.join("\n")}`;
-    const res = await fetch("/api/conversations", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        recipient_id: target.recipientId,
-        context_type: "collab",
-        context_id: target.contextId || null,
-        context_title: target.contextTitle || `${chosen.length === 1 ? "A work" : `${chosen.length} works`} for your walls`,
-        context_meta: {
-          label: "Offered works",
-          image: chosen[0].images?.[0] || null,
-          subtitle: chosen.map(w => w.title).join(", "),
-          works: chosen.map(w => ({ id: w.id, title: w.title, image: w.images?.[0] || null, line: workLine(w) })),
-        },
-        initial_message: body,
-      }),
-    }).catch(() => null);
+    const post = posts.find(p => p.id === postId);
+    const poolRequestId = request ? postId || null : target.poolRequestId || null;
+    const title = target.contextTitle || post?.title || `${chosen.length === 1 ? "A work" : `${chosen.length} works`} for your walls`;
+    const meta = {
+      title, label: request ? "Requested works" : "Offered works",
+      image: chosen[0].images?.[0] || null,
+      subtitle: chosen.map(w => w.title).join(", "),
+      works: chosen.map(w => ({ id: w.id, title: w.title, image: w.images?.[0] || null, line: workLine(w) })),
+    };
+
+    // 1. The deal.
+    const { data: deal } = await sb.from("deals").insert({
+      artist_id: request ? target.recipientId : me.id,
+      venue_id: request ? me.id : target.recipientId,
+      started_by: me.id,
+      pool_request_id: poolRequestId,
+      artwork_ids: chosen.map(w => w.id),
+      note: note.trim() || null,
+      terms: (request ? post?.details : target.terms) || null,
+    }).select().single();
+
+    // 2. The message, with a link to the deal when there is one.
+    const body = `${note.trim()}\n\n${workLines(chosen, origin)}${deal ? `\n\n${request ? "Answer here" : "See the offer"}: ${origin}${dealLink(deal.id)}` : ""}`;
+    let convo: string | null = null;
+    if (deal) {
+      convo = await chatLine(sb, deal, me.id, body, { ...meta, deal_id: deal.id });
+    } else {
+      const res = await fetch("/api/conversations", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ recipient_id: target.recipientId, context_type: "collab", context_id: target.contextId || null, context_title: title, context_meta: meta, initial_message: body }),
+      }).catch(() => null);
+      const json = res && res.ok ? await res.json().catch(() => ({})) : null;
+      convo = json?.conversation_id ?? null;
+    }
     setSending(false);
-    const json = res ? await res.json().catch(() => ({})) : {};
-    if (!res || !res.ok) { setError("That didn't send. Please try again."); return; }
-    setSent(json.conversation_id || "");
+    if (!deal && convo === null) { setError("That didn't send. Please try again."); return; }
+    setDealId(deal?.id || null);
+    setSent(convo || "");
   }
 
   if (!target) return null;
@@ -103,17 +148,21 @@ export function OfferWorkModal({ open, onClose, target, preselect = [] }: Props)
       <Modal open={open} onClose={onClose} size="sm" title="Sent"
         footer={<>
           <Button variant="secondary" onClick={onClose}>Done</Button>
-          <ButtonLink variant="primary" href={sent ? `/dashboard/messages?c=${sent}` : "/dashboard/messages"}>Open the chat</ButtonLink>
+          <ButtonLink variant="primary" href={dealId ? dealLink(dealId) : sent ? `/dashboard/messages?c=${sent}` : "/dashboard/messages"}>
+            {dealId ? "See it in Deals" : "Open the chat"}
+          </ButtonLink>
         </>}>
         <p className="font-ui text-body text-fg-2">
-          {name} has your {picked.length === 1 ? "work" : `${picked.length} works`}. Their reply will show up in Messages.
+          {request
+            ? `${name} will see your request with the ${picked.length === 1 ? "work" : `${picked.length} works`} you picked. You'll be notified when they answer.`
+            : `${name} has your ${picked.length === 1 ? "work" : `${picked.length} works`}. You'll be notified when they answer.`}
         </p>
       </Modal>
     );
   }
 
   return (
-    <Modal open={open} onClose={onClose} size="lg" title={`Offer a work to ${name}`}
+    <Modal open={open} onClose={onClose} size="lg" title={request ? `Ask ${name} for works` : `Offer a work to ${name}`}
       description={target.contextTitle ? <span className="font-ui text-body-sm text-fg-3">For &ldquo;{target.contextTitle}&rdquo;</span> : undefined}
       footer={<>
         <span className="mr-auto font-ui text-body-sm tabular-nums text-fg-3">{picked.length} of {MAX} picked</span>
@@ -126,18 +175,22 @@ export function OfferWorkModal({ open, onClose, target, preselect = [] }: Props)
         {loading ? (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">{[0, 1, 2].map(i => <Skeleton key={i} className="aspect-square rounded-card" />)}</div>
         ) : works.length === 0 ? (
-          <EmptyState
-            title="No works to offer yet"
-            description="Add a work with a photo, its size and a price, then come back."
-            action={<ButtonLink variant="secondary" href="/dashboard/artworks/new">Add a work</ButtonLink>}
-          />
+          request ? (
+            <EmptyState title="No works available right now" description={`${name} hasn't got works available at the moment. Send a message instead.`} />
+          ) : (
+            <EmptyState
+              title="No works to offer yet"
+              description="Add a work with a photo, its size and a price, then come back."
+              action={<ButtonLink variant="secondary" href="/dashboard/artworks/new">Add a work</ButtonLink>}
+            />
+          )
         ) : (
           <div className="flex flex-col gap-2">
             <span className="font-ui text-label font-semibold text-fg">Pick up to {MAX}</span>
             <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3">
               {works.map(w => {
                 const on = picked.includes(w.id);
-                const missing = missingForWall(w);
+                const missing = request ? [] : missingForWall(w);
                 return (
                   <li key={w.id}>
                     <button type="button" onClick={() => toggle(w.id)} aria-pressed={on}
@@ -169,6 +222,17 @@ export function OfferWorkModal({ open, onClose, target, preselect = [] }: Props)
               })}
             </ul>
           </div>
+        )}
+
+        {request && posts.length > 0 && (
+          <Field label="For which wall?" hint="Your wall size, timing and commission go with the request.">
+            {p => (
+              <Select {...p} value={postId} onChange={e => setPostId(e.target.value)}>
+                {posts.map(x => <option key={x.id} value={x.id}>{x.title}</option>)}
+                <option value="">Not for a specific post</option>
+              </Select>
+            )}
+          </Field>
         )}
 
         <Field label="Your note">

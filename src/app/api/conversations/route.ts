@@ -106,20 +106,23 @@ export async function POST(request: NextRequest) {
     if (senderId) {
       const { data: existing } = await supabase
         .from("conversations")
-        .select("id")
+        .select("id, participant_a")
         .or(
           `and(participant_a.eq.${senderId},participant_b.eq.${recipient_id}),and(participant_a.eq.${recipient_id},participant_b.eq.${senderId})`
         )
         .eq("context_type", context_type)
+        .limit(1)
         .maybeSingle();
 
       if (existing) {
+        // The sender has read it; the other person hasn't.
+        const senderIsA = existing.participant_a === senderId;
         await supabase.from("messages").insert({
           conversation_id: existing.id,
           sender_id: senderId,
           body: initial_message.trim(),
-          read_by_a: true,
-          read_by_b: false,
+          read_by_a: senderIsA,
+          read_by_b: !senderIsA,
         });
         await supabase.from("conversations").update({
           last_message_at: new Date().toISOString(),

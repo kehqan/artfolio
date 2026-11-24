@@ -1,10 +1,12 @@
 "use client";
 // Messages: every conversation on the left, the open one on the right.
-// On a phone the list and the chat take turns.
+// On a phone the list and the chat take turns. A second tab, Deals, holds
+// every offer and request between artists and venues.
 import { useState, useEffect, useRef, useCallback } from "react";
+import { DealsPanel } from "@/components/deals/DealsPanel";
 import { createClient } from "@/lib/supabase/client";
 import { ArrowLeft, Check, CheckCheck, ChevronRight, MessageSquare, Send, Sparkles } from "lucide-react";
-import { Avatar, Badge, ButtonLink, Chip, EmptyState, SearchField, Skeleton, cn } from "@/components/ui";
+import { Avatar, Badge, ButtonLink, Chip, EmptyState, SearchField, Skeleton, Tabs, cn } from "@/components/ui";
 import type { BadgeTone } from "@/components/ui";
 
 type OtherProfile = { id: string; full_name: string; username?: string; avatar_url?: string; role?: string };
@@ -83,7 +85,38 @@ function ContextCard({ convo }: { convo: Conversation }) {
     : <div className={cls}>{body}</div>;
 }
 
+type View = "chats" | "deals";
+
 export default function MessagesPage() {
+  const [view, setView] = useState<View>("chats");
+  const [needs, setNeeds] = useState<number | undefined>(undefined);
+  const [chatKey, setChatKey] = useState(0);
+
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("tab") === "deals") setView("deals");
+  }, []);
+
+  function go(v: View, query = "") {
+    setView(v);
+    const url = new URL(window.location.href);
+    url.search = query || (v === "deals" ? "?tab=deals" : "");
+    window.history.replaceState(null, "", url.toString());
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      <Tabs label="Messages" value={view} onChange={v => go(v)} className="self-start"
+        items={[{ value: "chats", label: "Chats" }, { value: "deals", label: "Deals", count: needs || undefined }]} />
+      {/* Deals stays mounted so its "needs you" count shows on the tab. */}
+      <div className={view === "deals" ? "" : "hidden"}>
+        <DealsPanel onCount={setNeeds} onOpenChat={id => { go("chats", `?c=${id}`); setChatKey(k => k + 1); }} />
+      </div>
+      {view === "chats" && <ChatsView key={chatKey} />}
+    </div>
+  );
+}
+
+function ChatsView() {
   const [myId, setMyId] = useState("");
   const [convos, setConvos] = useState<Conversation[]>([]);
   const [active, setActive] = useState<Conversation | null>(null);
@@ -178,7 +211,7 @@ export default function MessagesPage() {
   const totalUnread = convos.reduce((n, c) => n + (c.unread_count || 0), 0);
 
   return (
-    <div className="flex h-[calc(100dvh-var(--shell-header)-3rem)] min-h-[420px] overflow-hidden rounded-card border-outline border-ink bg-surface shadow-hard-2 lg:h-[calc(100dvh-var(--shell-header)-4rem)]">
+    <div className="flex h-[calc(100dvh-var(--shell-header)-6rem)] min-h-[420px] overflow-hidden rounded-card border-outline border-ink bg-surface shadow-hard-2 lg:h-[calc(100dvh-var(--shell-header)-7rem)]">
       {/* ── List ── */}
       <section aria-label="Conversations" className={cn("flex w-full flex-col border-r-hair border-line md:w-80 md:shrink-0", active && "hidden md:flex")}>
         <div className="flex flex-col gap-3 border-b-hair border-line p-4">

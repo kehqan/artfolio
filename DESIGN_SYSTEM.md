@@ -70,7 +70,7 @@ Colors are CSS variables, so Tailwind opacity modifiers (`bg-ink/40`) don't work
 
 | Component | Use for |
 |---|---|
-| `Button`, `ButtonLink`, `buttonClasses()` | Actions. Variants `primary`, `secondary`, `ghost`, `danger`; sizes `sm`, `md`. |
+| `Button`, `ButtonLink`, `buttonClasses()` | Actions. Variants `primary`, `secondary`, `ghost`, `danger`; sizes `sm`, `md`, `icon`, `icon-sm` (icon sizes need `aria-label`). |
 | `Card` | Panels. `interactive` for clickable cards, `padding="none"` for edge-to-edge images. |
 | `Field` + `Input`, `Select`, `Textarea`, `Label` | Forms. `Field` wires the label, hint and error. |
 | `Badge` | Status (Available, Sold, Draft). Tones `ok`, `warn`, `bad`, `info`, `neutral`, `mango`. |
@@ -82,6 +82,14 @@ Colors are CSS variables, so Tailwind opacity modifiers (`bg-ink/40`) don't work
 | `EmptyState` | Empty lists: say what will appear and how to add the first one. |
 | `Modal` | Confirmations and short forms. |
 | `Avatar` | People, with initials fallback. |
+| `Menu` | The "⋯" actions menu on cards and table rows. |
+| `SearchField` | Search box with clear button. |
+| `Chip` | Toggleable filter chips (stages, categories). |
+| `Skeleton` | Loading placeholders. |
+
+Shared helpers: `src/lib/artwork-stage.ts` holds the artwork stages (label + badge tone) and `formatPrice()`, which formats prices in the artwork's own currency.
+
+Note: there is no class-merging helper, so passing a class that conflicts with a component's own (e.g. `px-0` on a Button) may not win. Use a size or variant prop, or wrap the component.
 
 ```tsx
 import { Button, Card, Field, Input, PageHeader } from "@/components/ui";
@@ -103,7 +111,7 @@ Existing pages still use the legacy styles (`globals.css` classes, `bg-paper`, i
 
 1. Foundation: tokens, fonts, Tailwind mapping, component kit, reference page
 2. App shell: dashboard nav, dropdowns, page header, new page color
-3. Artworks and collections
+3. Artworks: list and detail (done), then forms and passport
 4. Business pages: sales, clients, contracts, exhibitions, calendar, tasks
 5. Public pages: landing, explore, profile, passport, login, register
 6. Cleanup: remove legacy globals and the font override, add a lint guard

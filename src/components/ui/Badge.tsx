@@ -1,7 +1,7 @@
 import type { HTMLAttributes } from "react";
 import { cn } from "./cn";
 
-export type BadgeTone = "neutral" | "ok" | "warn" | "bad" | "info" | "mango";
+export type BadgeTone = "neutral" | "ok" | "warn" | "bad" | "info" | "violet" | "inverse" | "mango";
 
 const tones: Record<BadgeTone, string> = {
   neutral: "bg-n-100 text-fg-2",
@@ -9,6 +9,8 @@ const tones: Record<BadgeTone, string> = {
   warn: "bg-warn-well text-warn",
   bad: "bg-bad-well text-bad",
   info: "bg-info-well text-info",
+  violet: "bg-tag-violet-well text-tag-violet",
+  inverse: "bg-inverse text-on-inverse",
   mango: "bg-mango text-on-mango border-outline border-ink",
 };
 

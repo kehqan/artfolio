@@ -409,9 +409,9 @@ export default function ProfilePage() {
           </Card>
           <Card padding="md" className="flex flex-col gap-2">
             <span className="font-ui text-label font-semibold text-fg">Choose what&rsquo;s on show</span>
-            <p className="font-ui text-body-sm text-fg-2">Pick the works for sale, banner and sections on your page in My Front Door.</p>
+            <p className="font-ui text-body-sm text-fg-2">Pick the works for sale, banner and sections on your page in Studio, under Public page.</p>
             <Link href="/dashboard/mystore" className="mt-1 self-start font-ui text-label font-semibold text-fg underline decoration-line-strong underline-offset-4 hover:decoration-ink">
-              Go to My Front Door
+              Edit your public page
             </Link>
           </Card>
         </aside>

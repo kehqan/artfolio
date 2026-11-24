@@ -31,10 +31,10 @@ const AREAS: Area[] = [
   {
     key: "studio", label: "My Studio", icon: ImageIcon, href: "/dashboard/artworks",
     pages: [
-      { href: "/dashboard/artworks", label: "My Works" },
-      { href: "/dashboard/mystore", label: "My Front Door" },
-      { href: "/dashboard/moodboard", label: "Moodboard" },
+      { href: "/dashboard/artworks", label: "Works" },
+      { href: "/dashboard/mystore", label: "Public page" },
     ],
+    match: ["/dashboard/moodboard"],
   },
   {
     key: "scene", label: "The Scene", icon: Handshake, href: "/dashboard/scene",
@@ -77,6 +77,7 @@ const SEARCHABLE: (Page & { area: string })[] = [
       : [{ href: a.href, label: a.label, area: "" }],
   ),
   { href: "/dashboard/profile", label: "Your profile", area: "" },
+  { href: "/dashboard/mystore?tab=moodboards", label: "Moodboards", area: "My Studio" },
   { href: "/dashboard/scene?show=show", label: "Shows and events", area: "The Scene" },
   { href: "/dashboard/scene?show=opportunity", label: "Open calls and opportunities", area: "The Scene" },
   { href: "/dashboard/scene?view=map", label: "Scene map", area: "The Scene" },

@@ -17,4 +17,7 @@ export { Menu } from "./Menu";
 export type { MenuItem } from "./Menu";
 export { SearchField } from "./SearchField";
 export { Skeleton } from "./Skeleton";
+export { Alert } from "./Alert";
+export type { AlertTone } from "./Alert";
+export { PasswordInput } from "./PasswordInput";
 export { Chip } from "./Chip";

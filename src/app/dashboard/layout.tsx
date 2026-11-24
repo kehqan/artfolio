@@ -13,6 +13,7 @@ import {
   UserRound, ExternalLink, ChevronDown, type LucideIcon,
 } from "lucide-react";
 import { cn, Avatar } from "@/components/ui";
+import { Wordmark as BrandWordmark } from "@/components/brand/Wordmark";
 
 // ── Navigation model ───────────────────────────────────────────────
 type Page = { href: string; label: string };
@@ -110,12 +111,7 @@ const iconBtn = (on: boolean) => cn(
 
 // ── Pieces ─────────────────────────────────────────────────────────
 function Wordmark() {
-  return (
-    <Link href="/dashboard" aria-label="Artomango home" className={cn("flex items-center gap-2 rounded-control", focusRing)}>
-      <span aria-hidden className="h-4 w-4 rounded-full border-outline border-ink bg-mango" />
-      <span className="font-display text-h3 text-fg">Artomango</span>
-    </Link>
-  );
+  return <BrandWordmark href="/dashboard" />;
 }
 
 function CountBadge({ n }: { n: number }) {

@@ -83,35 +83,30 @@ function loadScript(cb: () => void) {
 
 // ── Inject Google's dropdown styles scoped to #am-pac wrapper ─────
 const PAC_STYLE = `
-  .am-input-wrap .pac-container {
-    border: 2px solid #111110 !important;
-    box-shadow: 4px 4px 0 #111110 !important;
-    border-radius: 0 !important;
-    font-family: 'Darker Grotesque', system-ui, sans-serif !important;
-    margin-top: 2px !important;
+  /* Google appends its suggestion list to <body>, so these are global. */
+  .pac-container {
+    border: var(--border-outline) solid var(--color-ink) !important;
+    box-shadow: var(--shadow-hard-3) !important;
+    border-radius: var(--radius-control) !important;
+    background: var(--color-surface) !important;
+    font-family: var(--font-ui) !important;
+    margin-top: 6px !important;
+    padding: 4px !important;
     z-index: 99999 !important;
   }
-  .am-input-wrap .pac-item {
-    padding: 9px 14px !important;
-    font-size: 13px !important;
+  .pac-item {
+    padding: 8px 10px !important;
+    font-size: var(--text-body-sm) !important;
     font-family: inherit !important;
-    border-top: 1px solid #F5F0E8 !important;
+    border: none !important;
+    border-radius: var(--radius-chip) !important;
     cursor: pointer !important;
-    color: #111110 !important;
+    color: var(--color-fg-2) !important;
   }
-  .am-input-wrap .pac-item:first-child { border-top: none !important; }
-  .am-input-wrap .pac-item:hover,
-  .am-input-wrap .pac-item-selected {
-    background: #FFFBEA !important;
-  }
-  .am-input-wrap .pac-item-query {
-    font-size: 13px !important;
-    font-weight: 700 !important;
-    color: #111110 !important;
-    font-family: inherit !important;
-  }
-  .am-input-wrap .pac-matched { font-weight: 900 !important; }
-  .am-input-wrap .pac-icon { display: none !important; }
+  .pac-item:hover, .pac-item-selected { background: var(--color-sunken) !important; }
+  .pac-item-query { font-size: var(--text-body-sm) !important; font-weight: 600 !important; color: var(--color-fg) !important; font-family: inherit !important; }
+  .pac-matched { font-weight: 700 !important; }
+  .pac-icon { display: none !important; }
   .pac-logo::after { display: none !important; }
 `;
 
@@ -277,30 +272,22 @@ export default function PlacesAutocomplete({
     <>
       <style>{PAC_STYLE}{`@keyframes am-spin{to{transform:rotate(360deg)}}`}</style>
 
-      <div className="am-input-wrap" style={{ position: "relative" }}>
+      <div className="am-input-wrap relative">
         {label && (
-          <div style={{ fontSize: 10, fontWeight: 800, color: "#9B8F7A", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 6 }}>
-            {label}{required && <span style={{ color: "#FF6B6B" }}> *</span>}
+          <div className="mb-1.5 font-ui text-label font-semibold text-fg">
+            {label}{required && <span className="text-bad"> *</span>}
           </div>
         )}
 
-        {/* Input row */}
+        {/* Input row: matches the kit's Input */}
         <div
-          style={{
-            display: "flex", alignItems: "center", gap: 6,
-            padding: "0 10px",
-            border: "2px solid #E0D8CA",
-            background: "#fff",
-            height: 44,
-            transition: "border-color 0.15s",
-          }}
-          onFocusCapture={e => (e.currentTarget.style.borderColor = "#FFD400")}
-          onBlurCapture={e => {
-            if (!e.currentTarget.contains(e.relatedTarget as Node))
-              e.currentTarget.style.borderColor = "#E0D8CA";
-          }}
+          className={
+            "flex h-10 items-center gap-2 rounded-control border-hair border-line-strong bg-surface px-3 " +
+            "transition-[border-color,box-shadow] duration-fast ease-out hover:border-n-400 " +
+            "focus-within:border-ink focus-within:shadow-hard-1"
+          }
         >
-          <MapPin size={15} color={hasVal ? "#FF6B6B" : "#C0B8A8"} style={{ flexShrink: 0 }} />
+          <MapPin size={16} aria-hidden className={hasVal ? "shrink-0 text-fg" : "shrink-0 text-fg-3"} />
 
           <input
             ref={inputRef}
@@ -310,44 +297,36 @@ export default function PlacesAutocomplete({
               setInputVal(e.target.value);
               if (!e.target.value.trim()) onChange(null, "");
             }}
-            placeholder={noKey ? "Maps API key not set" : placeholder}
+            placeholder={noKey ? "Location search is not set up yet" : placeholder}
             required={required}
             disabled={noKey}
             autoComplete="off"
-            style={{
-              flex: 1, border: "none", outline: "none",
-              fontSize: 14, fontFamily: "inherit", fontWeight: 500,
-              background: "transparent", color: "#111110", minWidth: 0,
-            }}
+            className="min-w-0 flex-1 bg-transparent font-ui text-control text-fg outline-none placeholder:text-fg-3 disabled:cursor-not-allowed"
           />
 
           {hasVal && (
-            <button type="button" onClick={clear}
-              style={{ background: "none", border: "none", cursor: "pointer", color: "#C0B8A8", padding: 0, display: "flex", alignItems: "center" }}
-              onMouseEnter={e => (e.currentTarget.style.color = "#9B8F7A")}
-              onMouseLeave={e => (e.currentTarget.style.color = "#C0B8A8")}>
-              <X size={13} />
+            <button type="button" onClick={clear} aria-label="Clear location"
+              className="grid h-6 w-6 place-items-center rounded-chip text-fg-3 hover:bg-sunken hover:text-fg">
+              <X size={14} aria-hidden />
             </button>
           )}
 
           {ready && (
             <>
-              <div style={{ width: 1, height: 22, background: "#E0D8CA", flexShrink: 0, margin: "0 4px" }} />
+              <span aria-hidden className="mx-0.5 h-5 w-px shrink-0 bg-line" />
               <button type="button" onClick={() => { setMapAddr(inputVal); setShowMap(true); }}
-                title="Pick on map"
-                style={{ background: "none", border: "none", cursor: "pointer", color: "#9B8F7A", padding: "2px 0", display: "flex", alignItems: "center" }}
-                onMouseEnter={e => (e.currentTarget.style.color = "#111110")}
-                onMouseLeave={e => (e.currentTarget.style.color = "#9B8F7A")}>
-                <Map size={14} />
+                title="Pick on map" aria-label="Pick the location on a map"
+                className="grid h-6 w-6 place-items-center rounded-chip text-fg-3 hover:bg-sunken hover:text-fg">
+                <Map size={15} aria-hidden />
               </button>
             </>
           )}
         </div>
 
-        {noKey && (
-          <div style={{ fontSize: 11, color: "#FF6B6B", fontWeight: 700, marginTop: 4 }}>
-            ⚠ Set NEXT_PUBLIC_GOOGLE_MAPS_API_KEY in Vercel → Settings → Environment Variables
-          </div>
+        {noKey && process.env.NODE_ENV !== "production" && (
+          <p className="mt-1.5 font-ui text-caption text-warn">
+            Set NEXT_PUBLIC_GOOGLE_MAPS_API_KEY to turn on location search.
+          </p>
         )}
       </div>
 

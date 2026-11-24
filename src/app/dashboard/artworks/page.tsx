@@ -4,11 +4,15 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import {
-  Plus, Search, X, LayoutGrid, List, ImageIcon,
-  Package, Tag, TrendingUp, ChevronUp, ChevronDown,
-  ArrowUpDown, Edit2, Trash2, Copy, MoreHorizontal,
+  Plus, LayoutGrid, List, ImageIcon,
+  ChevronUp, ChevronDown, ArrowUpDown, Edit2, Trash2, Copy,
   Check, PencilLine,
 } from "lucide-react";
+import {
+  Badge, Button, ButtonLink, Card, Chip, EmptyState, Menu, Modal,
+  PageHeader, SearchField, Select, Skeleton, StatTile, Tabs, cn,
+} from "@/components/ui";
+import { STAGES, STAGE_MAP, toStageKey, formatPrice } from "@/lib/artwork-stage";
 
 // ── Types ──────────────────────────────────────────────────────
 type Artwork = {
@@ -25,66 +29,45 @@ type SortDir  = "asc" | "desc";
 type ViewMode = "grid" | "table";
 type EditCell = { id: string; field: string } | null;
 
-// ── Stage config ───────────────────────────────────────────────
-const STAGES = [
-  { key: "concept",     label: "Concept",     color: "#9B8F7A", bg: "#F5F0E8",
-    grad: "135deg, #57534E 0%, #9B8F7A 60%, #D4C9A8 100%" },
-  { key: "in_progress", label: "In Progress", color: "#7C3AED", bg: "#EDE9FE",
-    grad: "135deg, #4C1D95 0%, #7C3AED 55%, #A78BFA 100%" },
-  { key: "complete",    label: "Complete",    color: "#0EA5E9", bg: "#E0F2FE",
-    grad: "135deg, #075985 0%, #0EA5E9 55%, #38BDF8 100%" },
-  { key: "available",   label: "Available",   color: "#16A34A", bg: "#DCFCE7",
-    grad: "135deg, #14532D 0%, #16A34A 55%, #4ADE80 100%" },
-  { key: "reserved",    label: "Reserved",    color: "#CA8A04", bg: "#FEF9C3",
-    grad: "135deg, #713F12 0%, #CA8A04 55%, #FDE047 100%" },
-  { key: "sold",        label: "Sold",        color: "#111110", bg: "#E5E5E5",
-    grad: "135deg, #000 0%, #374151 55%, #6B7280 100%" },
-];
-const STAGE_MAP = Object.fromEntries(STAGES.map(s => [s.key, s]));
+// ── Table cell styles ──────────────────────────────────────────
+const TH = "whitespace-nowrap border-b-hair border-line bg-sunken px-3.5 py-2.5 text-left font-ui text-caption font-semibold uppercase tracking-[0.06em] text-fg-3";
+const TD = "border-b-hair border-line px-3.5 py-3 align-middle font-ui text-body-sm text-fg";
 
-function toStageKey(status: string | null | undefined) {
-  const s = String(status || "").toLowerCase().replace(/ /g, "_");
-  return STAGE_MAP[s] ? s : "available";
+function dims(aw: Artwork) {
+  if (!aw.width_cm || !aw.height_cm) return null;
+  return `${aw.width_cm} × ${aw.height_cm}${aw.depth_cm ? ` × ${aw.depth_cm}` : ""} cm`;
 }
 
-// ── Shared table styles (Ripe standard) ───────────────────────
-const TH: React.CSSProperties = {
-  padding: "11px 14px", textAlign: "left", fontSize: 10, fontWeight: 800,
-  color: "#9B8F7A", textTransform: "uppercase", letterSpacing: ".13em",
-  background: "#F5F0E8", borderBottom: "2px solid #E8E0D0",
-  whiteSpace: "nowrap", userSelect: "none", cursor: "pointer",
-};
-const TD: React.CSSProperties = {
-  padding: "11px 14px", fontSize: 13, fontWeight: 600, color: "#111110",
-  borderBottom: "1px solid #F0EAE0", verticalAlign: "middle",
-};
-
-// ── Status pill ────────────────────────────────────────────────
-function StatusPill({ stageKey }: { stageKey: string }) {
-  const st = STAGE_MAP[stageKey] || STAGE_MAP["available"];
-  return (
-    <span style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "3px 10px", background: st.bg, color: st.color, borderRadius: 9999, border: `1.5px solid ${st.color}40`, fontSize: 10, fontWeight: 800, textTransform: "uppercase", letterSpacing: ".06em", whiteSpace: "nowrap" }}>
-      <span style={{ width: 5, height: 5, borderRadius: "50%", background: st.color, flexShrink: 0 }} />
-      {st.label}
-    </span>
-  );
-}
-
-// ── SortTh ─────────────────────────────────────────────────────
+// ── Sortable header cell ───────────────────────────────────────
 function SortTh({ k, label, sortKey, sortDir, onSort }: { k: SortKey; label: string; sortKey: SortKey; sortDir: SortDir; onSort: (k: SortKey) => void }) {
   const active = sortKey === k;
   return (
-    <th onClick={() => onSort(k)} style={{ ...TH, color: active ? "#111110" : "#9B8F7A" }}>
-      <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+    <th className={TH} aria-sort={active ? (sortDir === "asc" ? "ascending" : "descending") : undefined}>
+      <button type="button" onClick={() => onSort(k)} className={cn("inline-flex items-center gap-1 uppercase hover:text-fg", active && "text-fg")}>
         {label}
-        {active ? sortDir === "asc" ? <ChevronUp size={11} color="#FFD400" /> : <ChevronDown size={11} color="#FFD400" /> : <ArrowUpDown size={10} color="#D4C9A8" />}
-      </span>
+        {active
+          ? sortDir === "asc" ? <ChevronUp size={13} aria-hidden /> : <ChevronDown size={13} aria-hidden />
+          : <ArrowUpDown size={12} aria-hidden className="text-n-400" />}
+      </button>
     </th>
   );
 }
 
+// ── Image or quiet placeholder ─────────────────────────────────
+function ArtImage({ src, alt, className, iconSize = 28 }: { src: string | null; alt: string; className?: string; iconSize?: number }) {
+  if (src) {
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img src={src} alt={alt} className={cn("h-full w-full object-cover", className)} />;
+  }
+  return (
+    <div className={cn("grid h-full w-full place-items-center bg-sunken text-n-400", className)}>
+      <ImageIcon size={iconSize} aria-hidden />
+    </div>
+  );
+}
+
 // ══════════════════════════════════════════════════════════════
-// ARTWORK CARD — Ripe × liquid glass standard
+// ARTWORK CARD: image clean on top, details below
 // ══════════════════════════════════════════════════════════════
 function ArtworkCard({ aw, onEdit, onDelete, onDuplicate }: {
   aw: Artwork;
@@ -92,105 +75,40 @@ function ArtworkCard({ aw, onEdit, onDelete, onDuplicate }: {
   onDelete: () => void;
   onDuplicate: () => void;
 }) {
-  const [hov, setHov]       = useState(false);
-  const [menu, setMenu]     = useState(false);
-  const sk  = toStageKey(aw.status);
-  const st  = STAGE_MAP[sk];
+  const st  = STAGE_MAP[toStageKey(aw.status)];
   const img = Array.isArray(aw.images) ? aw.images[0] : null;
+  const price = formatPrice(aw.price, aw.currency);
+  const meta = [aw.medium, dims(aw), aw.year].filter(Boolean).join(" · ");
 
   return (
-    <div
-      onMouseEnter={() => setHov(true)}
-      onMouseLeave={() => { setHov(false); setMenu(false); }}
-      style={{
-        background: "#fff",
-        border: `2.5px solid ${hov ? "#111110" : "#E8E0D0"}`,
-        borderRadius: 20,
-        overflow: "hidden",
-        cursor: "pointer",
-        position: "relative",
-        boxShadow: hov ? "5px 6px 0 #111110" : "3px 4px 0 #D4C9A8",
-        transform: hov ? "translate(-2px,-3px)" : "none",
-        transition: "all .25s cubic-bezier(.16,1,.3,1)",
-      }}
-    >
-      {/* ── Hero image (200px unified height) ── */}
-      <Link href={`/dashboard/artworks/${aw.id}`} style={{ textDecoration: "none", display: "block" }}>
-        <div style={{ height: 200, position: "relative", overflow: "hidden", flexShrink: 0 }}>
-          {img ? (
-            <img src={img} alt={aw.title} style={{ width: "100%", height: "100%", objectFit: "cover", transform: hov ? "scale(1.04)" : "scale(1)", transition: "transform .5s cubic-bezier(.16,1,.3,1)" }} />
-          ) : (
-            <div style={{ width: "100%", height: "100%", background: `linear-gradient(${st.grad})`, display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <ImageIcon size={40} color="rgba(255,255,255,0.3)" />
-            </div>
-          )}
-
-          {/* Dark gradient overlay (for text readability) */}
-          <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to bottom, rgba(0,0,0,0) 30%, rgba(0,0,0,0.65) 100%)" }} />
-
-          {/* Liquid glass status badge — top left */}
-          <div style={{ position: "absolute", top: 10, left: 10, display: "inline-flex", alignItems: "center", gap: 4, padding: "4px 10px", borderRadius: 9999, background: "rgba(255,255,255,0.15)", border: "1.5px solid rgba(255,255,255,0.3)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)", fontSize: 9, fontWeight: 800, color: "#fff", textTransform: "uppercase", letterSpacing: ".1em" }}>
-            <span style={{ width: 5, height: 5, borderRadius: "50%", background: st.color, flexShrink: 0 }} />
+    <Card interactive padding="none" className="group flex h-full flex-col">
+      <Link href={`/dashboard/artworks/${aw.id}`} className="block focus-visible:outline-none">
+        <div className="relative aspect-[4/3] overflow-hidden bg-sunken">
+          <ArtImage src={img} alt={aw.title} className="transition-transform duration-base ease-out group-hover:scale-[1.03]" />
+          <Badge tone={st.tone} dot className="absolute left-2.5 top-2.5">
             {st.label}
-          </div>
-
-          {/* Price badge — top right (liquid glass) */}
-          {aw.price && (
-            <div style={{ position: "absolute", top: 10, right: 10, padding: "4px 9px", borderRadius: 9999, background: "rgba(255,255,255,0.15)", border: "1.5px solid rgba(255,255,255,0.3)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)", fontSize: 11, fontWeight: 900, color: "#fff", fontFamily: "monospace" }}>
-              ${aw.price.toLocaleString()}
-            </div>
-          )}
-
-          {/* Title overlaid on image */}
-          <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "10px 12px 11px" }}>
-            <div style={{ fontSize: 14, fontWeight: 900, color: "#fff", textShadow: "0 1px 6px rgba(0,0,0,0.5)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", letterSpacing: "-0.2px" }}>{aw.title}</div>
-            {(aw.medium || aw.year) && (
-              <div style={{ fontSize: 11, color: "rgba(255,255,255,0.75)", fontWeight: 600, marginTop: 2 }}>
-                {[aw.medium, aw.year].filter(Boolean).join(" · ")}
-              </div>
-            )}
-          </div>
+          </Badge>
+        </div>
+        <div className="flex flex-col gap-1 px-4 pt-3.5">
+          <h3 className="truncate font-display text-h3 text-fg">{aw.title}</h3>
+          {meta && <p className="truncate font-ui text-label text-fg-3">{meta}</p>}
         </div>
       </Link>
-
-      {/* ── Footer ── */}
-      <div style={{ padding: "10px 12px 12px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-        <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", minWidth: 0 }}>
-          {aw.medium && (
-            <span style={{ fontSize: 10, fontWeight: 700, color: "#9B8F7A", background: "#F5F0E8", padding: "2px 8px", borderRadius: 99, border: "1px solid #E8E0D0", whiteSpace: "nowrap" }}>{aw.medium}</span>
-          )}
-          {aw.year && (
-            <span style={{ fontSize: 10, fontWeight: 700, color: "#9B8F7A" }}>{aw.year}</span>
-          )}
-        </div>
-
-        {/* ⋯ menu */}
-        <div style={{ position: "relative", flexShrink: 0 }} onClick={e => e.stopPropagation()}>
-          <button onClick={() => setMenu(p => !p)}
-            style={{ width: 28, height: 28, borderRadius: 8, border: "1.5px solid #E8E0D0", background: "#FAF7F3", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", transition: "all .12s" }}
-            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = "#111110"; (e.currentTarget as HTMLElement).style.background = "#FFD400"; }}
-            onMouseLeave={e => { if (!menu) { (e.currentTarget as HTMLElement).style.borderColor = "#E8E0D0"; (e.currentTarget as HTMLElement).style.background = "#FAF7F3"; } }}>
-            <MoreHorizontal size={13} color="#9B8F7A" />
-          </button>
-          {menu && (
-            <div style={{ position: "absolute", bottom: "calc(100% + 6px)", right: 0, background: "#fff", border: "2px solid #111110", borderRadius: 12, boxShadow: "4px 5px 0 #111110", zIndex: 50, minWidth: 140, overflow: "hidden", padding: 4 }}>
-              {[
-                { label: "Edit", icon: Edit2, fn: onEdit },
-                { label: "Duplicate", icon: Copy, fn: onDuplicate },
-                { label: "Delete", icon: Trash2, fn: onDelete, danger: true },
-              ].map(item => (
-                <button key={item.label} onClick={() => { item.fn(); setMenu(false); }}
-                  style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "8px 12px", border: "none", borderRadius: 8, background: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, color: item.danger ? "#EF4444" : "#111110", fontFamily: "inherit", textAlign: "left" }}
-                  onMouseEnter={e => (e.currentTarget.style.background = item.danger ? "#FEF2F2" : "#FFFBEA")}
-                  onMouseLeave={e => (e.currentTarget.style.background = "none")}>
-                  <item.icon size={12} /> {item.label}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+      <div className="mt-auto flex items-center justify-between gap-2 px-4 pb-3.5 pt-2.5">
+        <span className={cn("font-ui text-body font-bold tabular-nums", price ? "text-fg" : "text-fg-3 font-medium text-label")}>
+          {price ?? "No price yet"}
+        </span>
+        <Menu
+          label={`Actions for ${aw.title}`}
+          placement="top"
+          items={[
+            { label: "Edit", icon: Edit2, onSelect: onEdit },
+            { label: "Duplicate", icon: Copy, onSelect: onDuplicate },
+            { label: "Delete", icon: Trash2, onSelect: onDelete, danger: true },
+          ]}
+        />
       </div>
-    </div>
+    </Card>
   );
 }
 
@@ -210,7 +128,7 @@ export default function ArtworksPage() {
   const [editCell,    setEditCell]    = useState<EditCell>(null);
   const [editValue,   setEditValue]   = useState("");
   const [savingCell,  setSavingCell]  = useState(false);
-  const [rowMenu,     setRowMenu]     = useState<string | null>(null);
+  const [toDelete,    setToDelete]    = useState<Artwork | null>(null);
   const editInputRef = useRef<HTMLInputElement | HTMLSelectElement | null>(null);
 
   useEffect(() => { load(); }, []);
@@ -237,7 +155,6 @@ export default function ArtworksPage() {
   }
 
   async function handleDelete(id: string) {
-    if (!confirm("Delete this artwork permanently?")) return;
     const sb = createClient();
     await sb.from("artworks").delete().eq("id", id);
     setArtworks(p => p.filter(a => a.id !== id));
@@ -275,361 +192,226 @@ export default function ArtworksPage() {
       return sortDir === "asc" ? cmp : -cmp;
     });
 
+  const filtering = Boolean(search) || stageFilter !== "All";
+
   // ── Inline-edit cell renderer (table view)
   function EditableCell({ aw, field, children }: { aw: Artwork; field: string; children: React.ReactNode }) {
     const isEditing = editCell?.id === aw.id && editCell?.field === field;
-    if (!editMode) return <td style={TD}>{children}</td>;
+    if (!editMode) return <td className={TD}>{children}</td>;
+    const cellInput = "h-8 w-full rounded-chip border-hair border-ink bg-surface px-2 font-ui text-body-sm text-fg shadow-hard-1 outline-none";
     if (isEditing) {
       if (field === "status") {
         return (
-          <td style={{ ...TD, padding: 6 }}>
-            <select ref={editInputRef as any} value={editValue} onChange={e => setEditValue(e.target.value)}
-              onBlur={commitEdit} style={{ width: "100%", padding: "5px 8px", border: "2px solid #FFD400", borderRadius: 8, fontFamily: "inherit", fontSize: 12, fontWeight: 700, outline: "none" }}>
+          <td className={cn(TD, "py-1.5")}>
+            <select ref={editInputRef as any} value={editValue} onChange={e => setEditValue(e.target.value)} onBlur={commitEdit} className={cellInput} aria-label="Stage">
               {STAGES.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
             </select>
           </td>
         );
       }
       return (
-        <td style={{ ...TD, padding: 6 }}>
-          <input ref={editInputRef as any} value={editValue} onChange={e => setEditValue(e.target.value)}
+        <td className={cn(TD, "py-1.5")}>
+          <input ref={editInputRef as any} value={editValue} onChange={e => setEditValue(e.target.value)} aria-label={field}
             onBlur={commitEdit} onKeyDown={e => { if (e.key === "Enter") commitEdit(); if (e.key === "Escape") setEditCell(null); }}
-            style={{ width: "100%", padding: "5px 8px", border: "2px solid #FFD400", borderRadius: 8, fontFamily: "inherit", fontSize: 12, fontWeight: 700, outline: "none" }} />
+            className={cellInput} />
         </td>
       );
     }
     return (
-      <td style={{ ...TD, cursor: "text", background: "#FFFEF8" }} onClick={e => { e.stopPropagation(); setEditCell({ id: aw.id, field }); setEditValue(String((aw as any)[field] ?? "")); }}>
+      <td className={cn(TD, "cursor-text hover:bg-mango-soft")} onClick={e => { e.stopPropagation(); setEditCell({ id: aw.id, field }); setEditValue(String((aw as any)[field] ?? "")); }}>
         {children}
       </td>
     );
   }
 
   return (
-    <>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Darker+Grotesque:wght@500;600;700;800;900&display=swap');
-        * { box-sizing: border-box; }
-        body { font-family: 'Darker Grotesque', system-ui, sans-serif; }
-
-        .aw-search { display:flex; align-items:center; gap:8px; background:#fff; border:2px solid #E8E0D0; border-radius:11px; padding:0 12px; height:38px; flex:1; min-width:160px; max-width:260px; transition:border-color .15s; }
-        .aw-search:focus-within { border-color:#FFD400; box-shadow:0 0 0 3px rgba(255,212,0,.14); }
-        .aw-search-input { flex:1; border:none; outline:none; font-family:inherit; font-size:13px; font-weight:600; color:#111110; background:transparent; }
-        .aw-search-input::placeholder { color:#C0B8A8; }
-
-        .aw-filter-btn { display:inline-flex; align-items:center; gap:5px; padding:6px 12px; border-radius:99px; border:2px solid #E8E0D0; background:#fff; font-size:12px; font-weight:700; color:#9B8F7A; cursor:pointer; transition:all .12s; white-space:nowrap; font-family:inherit; }
-        .aw-filter-btn:hover { border-color:#111110; color:#111110; }
-        .aw-filter-btn.active { background:#111110; border-color:#111110; color:#FFD400; }
-
-        .ripe-table-wrap { background:#fff; border:2.5px solid #111110; border-radius:18px; overflow:hidden; box-shadow:4px 5px 0 #D4C9A8; margin-bottom:8px; overflow-x:auto; }
-        .ripe-table { width:100%; border-collapse:collapse; min-width:880px; }
-        .ripe-row { cursor:pointer; transition:background .1s; }
-        .ripe-row:hover td { background:#FFFBEA !important; }
-        .ripe-row:last-child td { border-bottom:none !important; }
-
-        .ripe-menu-btn { width:28px; height:28px; border-radius:8px; border:1.5px solid #E8E0D0; background:#FAF7F3; display:flex; align-items:center; justify-content:center; cursor:pointer; transition:all .12s; }
-        .ripe-menu-btn:hover { border-color:#111110; background:#FFD400; }
-        .ripe-dropdown { position:absolute; top:calc(100% + 4px); right:0; background:#fff; border:2px solid #111110; border-radius:12px; box-shadow:4px 5px 0 #111110; z-index:50; min-width:140px; overflow:hidden; padding:4px; }
-        .ripe-dropdown-item { display:flex; align-items:center; gap:8px; width:100%; padding:8px 12px; border:none; border-radius:8px; background:none; cursor:pointer; font-size:13px; font-weight:600; color:#111110; font-family:inherit; text-align:left; transition:background .1s; }
-        .ripe-dropdown-item:hover { background:#FFFBEA; }
-        .ripe-dropdown-item.danger { color:#EF4444; }
-        .ripe-dropdown-item.danger:hover { background:#FEF2F2; }
-
-        @keyframes fadeUp { from{opacity:0;transform:translateY(14px)} to{opacity:1;transform:none} }
-        .aw-card-enter { animation:fadeUp .3s cubic-bezier(.16,1,.3,1) both; }
-
-        /* ── RESPONSIVE ── */
-        @media (max-width: 640px) {
-          .aw-toolbar { flex-wrap: wrap !important; gap: 8px !important; }
-          .aw-filters { flex-wrap: wrap !important; gap: 6px !important; }
-          .aw-search { max-width: 100% !important; flex: 1 1 100% !important; }
-          .aw-grid { grid-template-columns: repeat(2, 1fr) !important; gap: 12px !important; }
-          .aw-stats { grid-template-columns: repeat(2, 1fr) !important; gap: 10px !important; }
-          .aw-header { flex-direction: column !important; align-items: flex-start !important; gap: 12px !important; }
-          .aw-header-actions { width: 100%; display: flex; gap: 8px; }
-          .aw-header-actions a, .aw-header-actions button { flex: 1; justify-content: center !important; }
-        }
-        @media (max-width: 420px) {
-          .aw-grid { grid-template-columns: 1fr !important; }
-        }
-      `}</style>
-
+    <div className="flex flex-col gap-6 font-ui">
       {/* ── HEADER ── */}
-      <div className="aw-header" style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 20, gap: 14 }}>
-        <div>
-          <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 3 }}>
-            <div style={{ width: 32, height: 32, borderRadius: 10, background: "#FFD400", border: "2.5px solid #111110", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "2px 2px 0 #111110" }}><ImageIcon size={16} color="#111110" /></div>
-            <h1 style={{ fontSize: 24, fontWeight: 900, color: "#111110", letterSpacing: "-.6px", margin: 0 }}>Artworks</h1>
-          </div>
-          <p style={{ fontSize: 13, fontWeight: 600, color: "#9B8F7A", margin: 0 }}>{artworks.length} works · {availableCount} available · {soldCount} sold</p>
-        </div>
-        <div className="aw-header-actions" style={{ display: "flex", gap: 8, alignItems: "center", flexShrink: 0 }}>
-          <Link href="/dashboard/artworks/new" style={{ textDecoration: "none" }}>
-            <button style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 18px", background: "#FFD400", border: "2.5px solid #111110", borderRadius: 12, fontSize: 13, fontWeight: 800, cursor: "pointer", boxShadow: "3px 3px 0 #111110", transition: "all .15s", fontFamily: "inherit", color: "#111110" }}
-              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.boxShadow="5px 5px 0 #111110"; (e.currentTarget as HTMLElement).style.transform="translate(-1px,-1px)"; }}
-              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.boxShadow="3px 3px 0 #111110"; (e.currentTarget as HTMLElement).style.transform="none"; }}>
-              <Plus size={14} strokeWidth={3} /> Add Artwork
-            </button>
-          </Link>
-        </div>
-      </div>
+      <PageHeader
+        title="Artworks"
+        description={`${artworks.length} works · ${availableCount} available · ${soldCount} sold`}
+        actions={
+          <ButtonLink href="/dashboard/artworks/new" variant="primary">
+            <Plus size={16} aria-hidden /> Add artwork
+          </ButtonLink>
+        }
+      />
 
-      {/* ── STAT CARDS ── */}
-      <div className="aw-stats" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 20 }}>
-        {[
-          { label: "Total Works",  value: artworks.length,                  icon: Package,    color: "#8B5CF6", bg: "#EDE9FE", grad: "135deg,#4C1D95,#7C3AED" },
-          { label: "Available",    value: availableCount,                   icon: Tag,        color: "#16A34A", bg: "#DCFCE7", grad: "135deg,#14532D,#16A34A" },
-          { label: "Sold",         value: soldCount,                        icon: Check,      color: "#111110", bg: "#E5E5E5", grad: "135deg,#000,#374151" },
-          { label: "Inventory",    value: `$${totalValue.toLocaleString()}`, icon: TrendingUp, color: "#D97706", bg: "#FEF9C3", grad: "135deg,#713F12,#D97706" },
-        ].map(s => (
-          <div key={s.label} style={{ background: "#fff", border: "2px solid #E8E0D0", borderRadius: 16, overflow: "hidden", boxShadow: "2px 3px 0 #E0D8CA" }}>
-            <div style={{ height: 4, background: `linear-gradient(${s.grad})` }} />
-            <div style={{ padding: "13px 15px", display: "flex", alignItems: "center", gap: 11 }}>
-              <div style={{ width: 34, height: 34, borderRadius: 10, background: s.bg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                <s.icon size={15} color={s.color} />
-              </div>
-              <div>
-                <div style={{ fontSize: 20, fontWeight: 900, color: "#111110", fontFamily: "monospace", letterSpacing: "-.4px", lineHeight: 1 }}>{s.value}</div>
-                <div style={{ fontSize: 10, fontWeight: 700, color: "#9B8F7A", marginTop: 2 }}>{s.label}</div>
-              </div>
-            </div>
-          </div>
-        ))}
+      {/* ── STATS ── */}
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <StatTile label="Total works" value={artworks.length} />
+        <StatTile label="Available" value={availableCount} />
+        <StatTile label="Sold" value={soldCount} />
+        <StatTile label="Inventory value" value={formatPrice(totalValue) ?? "$0"} />
       </div>
 
       {/* ── TOOLBAR ── */}
-      <div className="aw-toolbar" style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
-        {/* Search */}
-        <div className="aw-search">
-          <Search size={13} color="#9B8F7A" />
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search artworks…" className="aw-search-input" />
-          {search && <button onClick={() => setSearch("")} style={{ background: "none", border: "none", cursor: "pointer", color: "#9B8F7A", display: "flex", padding: 0 }}><X size={12} /></button>}
+      <div className="flex flex-col gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <SearchField value={search} onChange={setSearch} placeholder="Search by title or medium" className="min-w-[200px] flex-1 sm:max-w-[320px]" />
+          <div className="ml-auto flex flex-wrap items-center gap-2">
+            {view === "table" && (
+              <Button size="sm" variant={editMode ? "primary" : "secondary"} onClick={() => { setEditMode(p => !p); setEditCell(null); }}>
+                {editMode ? <Check size={15} aria-hidden /> : <PencilLine size={15} aria-hidden />}
+                {editMode ? "Done editing" : "Edit cells"}
+              </Button>
+            )}
+            {view === "grid" && (
+              <div className="w-40">
+              <Select aria-label="Sort artworks" value={sortKey} onChange={e => setSortKey(e.target.value as SortKey)}>
+                <option value="created_at">Newest first</option>
+                <option value="title">Title A–Z</option>
+                <option value="year">Year</option>
+                <option value="price">Price</option>
+                <option value="status">Stage</option>
+              </Select>
+              </div>
+            )}
+            <Tabs<ViewMode>
+              label="View"
+              value={view}
+              onChange={setView}
+              items={[{ value: "grid", label: "Grid" }, { value: "table", label: "Table" }]}
+            />
+          </div>
         </div>
-
-        {/* Stage filters */}
-        <div className="aw-filters" style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-          <button onClick={() => setStageFilter("All")} className={`aw-filter-btn${stageFilter === "All" ? " active" : ""}`}>All <span style={{ opacity: .6, fontSize: 10 }}>({artworks.length})</span></button>
+        <div className="flex flex-wrap gap-2" role="group" aria-label="Filter by stage">
+          <Chip selected={stageFilter === "All"} onClick={() => setStageFilter("All")}>
+            All <span className="tabular-nums opacity-60">{artworks.length}</span>
+          </Chip>
           {STAGES.map(s => {
             const count = artworks.filter(a => toStageKey(a.status) === s.key).length;
             if (count === 0) return null;
             return (
-              <button key={s.key} onClick={() => setStageFilter(s.key)} className={`aw-filter-btn${stageFilter === s.key ? " active" : ""}`}>
-                <span style={{ width: 6, height: 6, borderRadius: "50%", background: s.color, flexShrink: 0 }} />
-                {s.label} <span style={{ opacity: .6, fontSize: 10 }}>({count})</span>
-              </button>
+              <Chip key={s.key} selected={stageFilter === s.key} onClick={() => setStageFilter(s.key)}>
+                {s.label} <span className="tabular-nums opacity-60">{count}</span>
+              </Chip>
             );
           })}
         </div>
-
-        {/* Right controls */}
-        <div style={{ marginLeft: "auto", display: "flex", gap: 8, alignItems: "center", flexShrink: 0 }}>
-          {/* Edit cells — table only */}
-          {view === "table" && (
-            <button onClick={() => { setEditMode(p => !p); setEditCell(null); }}
-              style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 13px", border: "2px solid", borderColor: editMode ? "#111110" : "#E8E0D0", borderRadius: 10, background: editMode ? "#FFD400" : "#fff", color: "#111110", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", boxShadow: editMode ? "2px 2px 0 #111110" : "none", transition: "all .12s" }}>
-              <PencilLine size={13} /> {editMode ? "Done" : "Edit cells"}
-            </button>
-          )}
-
-          {/* Sort — grid only */}
-          {view === "grid" && (
-            <select value={sortKey} onChange={e => setSortKey(e.target.value as SortKey)}
-              style={{ height: 38, padding: "0 12px", border: "2px solid #E8E0D0", borderRadius: 10, background: "#fff", fontSize: 12, fontWeight: 700, color: "#111110", cursor: "pointer", fontFamily: "inherit", outline: "none" }}>
-              <option value="created_at">Newest first</option>
-              <option value="title">Title A→Z</option>
-              <option value="year">Year</option>
-              <option value="price">Price</option>
-              <option value="status">Stage</option>
-            </select>
-          )}
-
-          {/* View toggle */}
-          <div style={{ display: "flex", border: "2px solid #111110", borderRadius: 11, overflow: "hidden" }}>
-            <button onClick={() => setView("grid")} style={{ display: "flex", alignItems: "center", gap: 5, padding: "7px 12px", border: "none", borderRight: "1px solid #E8E0D0", background: view === "grid" ? "#111110" : "#fff", color: view === "grid" ? "#FFD400" : "#9B8F7A", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
-              <LayoutGrid size={13} /> Grid
-            </button>
-            <button onClick={() => setView("table")} style={{ display: "flex", alignItems: "center", gap: 5, padding: "7px 12px", border: "none", background: view === "table" ? "#111110" : "#fff", color: view === "table" ? "#FFD400" : "#9B8F7A", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
-              <List size={13} /> Table
-            </button>
-          </div>
-        </div>
       </div>
 
-      {/* ── LOADING SKELETONS ── */}
+      {/* ── LOADING ── */}
       {loading && (
-        <div className="aw-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 18 }}>
+        <div className="grid grid-cols-1 gap-5 min-[480px]:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {[1,2,3,4,5,6].map(i => (
-            <div key={i} style={{ borderRadius: 20, background: "#F5F0E8", border: "2px solid #E8E0D0", overflow: "hidden", height: 260, animation: `fadeUp .3s ease both`, animationDelay: `${i*.05}s` }}>
-              <div style={{ height: 200, background: "linear-gradient(135deg, #E8E0D0, #F5F0E8)" }} />
-              <div style={{ padding: "10px 12px" }}>
-                <div style={{ height: 12, borderRadius: 6, background: "#E8E0D0", width: "70%", marginBottom: 6 }} />
-                <div style={{ height: 10, borderRadius: 6, background: "#F0EAE0", width: "40%" }} />
+            <Card key={i} padding="none">
+              <Skeleton className="aspect-[4/3] rounded-none" />
+              <div className="flex flex-col gap-2 p-4">
+                <Skeleton className="h-5 w-3/4" />
+                <Skeleton className="h-3.5 w-1/2" />
               </div>
-            </div>
+            </Card>
           ))}
         </div>
       )}
 
-      {/* ── EMPTY STATE ── */}
+      {/* ── EMPTY ── */}
       {!loading && filtered.length === 0 && (
-        <div style={{ textAlign: "center", padding: "80px 40px", background: "#fff", borderRadius: 20, border: "2px solid #E8E0D0", boxShadow: "3px 4px 0 #E0D8CA" }}>
-          <div style={{ fontSize: 52, marginBottom: 16 }}>🥭</div>
-          <div style={{ fontSize: 22, fontWeight: 900, color: "#111110", letterSpacing: "-.5px", marginBottom: 8 }}>
-            {search || stageFilter !== "All" ? "No artworks match your filters" : "Your inventory is empty"}
-          </div>
-          <div style={{ fontSize: 14, color: "#9B8F7A", fontWeight: 600, marginBottom: 28 }}>
-            {search || stageFilter !== "All" ? "Try clearing your filters." : "Add your first artwork to get started."}
-          </div>
-          {!search && stageFilter === "All" && (
-            <Link href="/dashboard/artworks/new" style={{ textDecoration: "none" }}>
-              <button style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "12px 24px", background: "#FFD400", border: "2px solid #111110", borderRadius: 12, fontSize: 14, fontWeight: 800, cursor: "pointer", fontFamily: "inherit", color: "#111110", boxShadow: "3px 3px 0 #111110" }}>
-                <Plus size={16} strokeWidth={3} /> Add first artwork
-              </button>
-            </Link>
-          )}
-        </div>
+        <EmptyState
+          icon={<ImageIcon size={22} aria-hidden />}
+          title={filtering ? "No artworks match these filters" : "Your inventory is empty"}
+          description={filtering
+            ? "Try another search, or show all stages."
+            : "Add your first artwork with its photos, size and price. You can keep it private until it's ready."}
+          action={filtering
+            ? <Button size="sm" onClick={() => { setSearch(""); setStageFilter("All"); }}>Clear filters</Button>
+            : <ButtonLink href="/dashboard/artworks/new" variant="primary" size="sm"><Plus size={15} aria-hidden /> Add first artwork</ButtonLink>}
+        />
       )}
 
-      {/* ══════════════════════════════════════════════════════
-          GRID VIEW
-      ══════════════════════════════════════════════════════ */}
+      {/* ── GRID VIEW ── */}
       {!loading && filtered.length > 0 && view === "grid" && (
-        <div className="aw-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 18 }}>
-          {/* Add card */}
-          <Link href="/dashboard/artworks/new" style={{ textDecoration: "none" }}>
-            <div style={{ borderRadius: 20, border: "2px dashed #C0B8A8", background: "#FAF7F3", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 10, height: 280, cursor: "pointer", transition: "all .15s" }}
-              onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.borderColor = "#111110"; el.style.background = "#FFF7E0"; }}
-              onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.borderColor = "#C0B8A8"; el.style.background = "#FAF7F3"; }}>
-              <div style={{ width: 44, height: 44, borderRadius: 14, background: "#FFD400", border: "2px solid #111110", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "2px 2px 0 #111110" }}>
-                <Plus size={20} strokeWidth={3} />
-              </div>
-              <span style={{ fontSize: 13, fontWeight: 700, color: "#9B8F7A" }}>Add artwork</span>
-            </div>
-          </Link>
-
-          {filtered.map((aw, i) => (
-            <div key={aw.id} className="aw-card-enter" style={{ animationDelay: `${Math.min(i, 10) * 0.04}s` }}>
-              <ArtworkCard
-                aw={aw}
-                onEdit={() => router.push(`/dashboard/artworks/${aw.id}/edit`)}
-                onDelete={() => handleDelete(aw.id)}
-                onDuplicate={() => handleDuplicate(aw)}
-              />
-            </div>
+        <div className="grid grid-cols-1 gap-5 min-[480px]:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {filtered.map(aw => (
+            <ArtworkCard
+              key={aw.id}
+              aw={aw}
+              onEdit={() => router.push(`/dashboard/artworks/${aw.id}/edit`)}
+              onDelete={() => setToDelete(aw)}
+              onDuplicate={() => handleDuplicate(aw)}
+            />
           ))}
+          <Link
+            href="/dashboard/artworks/new"
+            className="flex min-h-[240px] flex-col items-center justify-center gap-3 rounded-card border-outline border-dashed border-line-strong text-fg-3 transition-colors duration-fast hover:border-ink hover:text-fg"
+          >
+            <span className="grid h-11 w-11 place-items-center rounded-control border-outline border-ink bg-mango text-on-mango shadow-hard-1">
+              <Plus size={20} aria-hidden />
+            </span>
+            <span className="font-ui text-label font-semibold">Add artwork</span>
+          </Link>
         </div>
       )}
 
-      {/* ══════════════════════════════════════════════════════
-          TABLE VIEW — Ripe standard
-      ══════════════════════════════════════════════════════ */}
+      {/* ── TABLE VIEW ── */}
       {!loading && filtered.length > 0 && view === "table" && (
-        <>
-          {/* Edit mode banner */}
+        <div className="flex flex-col gap-3">
           {editMode && (
-            <div style={{ padding: "10px 16px", background: "#FFD400", border: "2px solid #111110", borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, fontWeight: 800 }}>
-                <PencilLine size={14} /> Click any highlighted cell to edit inline
-              </div>
-              <button onClick={() => { setEditMode(false); setEditCell(null); }}
-                style={{ display: "flex", alignItems: "center", gap: 5, padding: "5px 12px", border: "2px solid #111110", borderRadius: 8, background: "#111110", color: "#FFD400", fontSize: 12, fontWeight: 800, cursor: "pointer", fontFamily: "inherit" }}>
-                <Check size={12} /> Done
-              </button>
+            <div className="flex items-center gap-2 rounded-control bg-mango-soft px-4 py-2.5 font-ui text-body-sm text-fg">
+              <PencilLine size={15} aria-hidden /> Click a cell to edit it. Press Enter to save or Esc to cancel.
             </div>
           )}
 
-          <div className="ripe-table-wrap">
-            <table className="ripe-table">
+          <div className="overflow-x-auto rounded-card border-hair border-line bg-surface">
+            <table className="w-full min-w-[880px] border-collapse">
               <thead>
                 <tr>
-                  <th style={{ ...TH, width: 52, cursor: "default" }}>Image</th>
-                  <SortTh k="title"      label="Title"    sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
-                  <SortTh k="medium"     label="Medium"   sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
-                  <SortTh k="year"       label="Year"     sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
-                  <SortTh k="price"      label="Price"    sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
-                  <SortTh k="status"     label="Stage"    sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
-                  <th style={{ ...TH, cursor: "default" }}>Location</th>
-                  <SortTh k="created_at" label="Added"    sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
-                  <th style={{ ...TH, width: 44, cursor: "default" }}></th>
+                  <th className={cn(TH, "w-14")}><span className="sr-only">Image</span></th>
+                  <SortTh k="title"      label="Title"  sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
+                  <SortTh k="medium"     label="Medium" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
+                  <SortTh k="year"       label="Year"   sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
+                  <SortTh k="price"      label="Price"  sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
+                  <SortTh k="status"     label="Stage"  sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
+                  <th className={TH}>Location</th>
+                  <SortTh k="created_at" label="Added"  sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
+                  <th className={cn(TH, "w-12")}><span className="sr-only">Actions</span></th>
                 </tr>
               </thead>
               <tbody>
                 {filtered.map(aw => {
                   const img = Array.isArray(aw.images) ? aw.images[0] : null;
-                  const sk = toStageKey(aw.status);
-                  const st = STAGE_MAP[sk];
+                  const st = STAGE_MAP[toStageKey(aw.status)];
+                  const price = formatPrice(aw.price, aw.currency);
+                  const loc = aw.venue_location || aw.location;
                   return (
-                    <tr key={aw.id} className="ripe-row" onClick={() => router.push(`/dashboard/artworks/${aw.id}`)}>
-
-                      {/* Thumbnail */}
-                      <td style={{ ...TD, padding: "8px 10px", width: 52 }}>
-                        <div style={{ width: 36, height: 36, borderRadius: 9, overflow: "hidden", border: "1.5px solid #E8E0D0", flexShrink: 0, background: img ? "#000" : `linear-gradient(${st.grad})` }}>
-                          {img ? <img src={img} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}><ImageIcon size={13} color="rgba(255,255,255,0.5)" /></div>}
+                    <tr key={aw.id} className="cursor-pointer transition-colors duration-fast hover:bg-sunken [&:last-child>td]:border-b-0" onClick={() => router.push(`/dashboard/artworks/${aw.id}`)}>
+                      <td className={cn(TD, "py-2")}>
+                        <div className="h-10 w-10 overflow-hidden rounded-chip border-hair border-line">
+                          <ArtImage src={img} alt="" iconSize={15} />
                         </div>
                       </td>
-
-                      {/* Title */}
                       <EditableCell aw={aw} field="title">
-                        <div style={{ fontWeight: 800, color: "#111110", maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{aw.title}</div>
+                        <span className="block max-w-[220px] truncate font-semibold">{aw.title}</span>
                       </EditableCell>
-
-                      {/* Medium */}
                       <EditableCell aw={aw} field="medium">
-                        <span style={{ color: "#9B8F7A", fontSize: 12 }}>{aw.medium || "—"}</span>
+                        <span className="text-fg-2">{aw.medium || "—"}</span>
                       </EditableCell>
-
-                      {/* Year */}
                       <EditableCell aw={aw} field="year">
-                        <span style={{ color: "#9B8F7A", fontSize: 12 }}>{aw.year || "—"}</span>
+                        <span className="tabular-nums text-fg-2">{aw.year || "—"}</span>
                       </EditableCell>
-
-                      {/* Price */}
                       <EditableCell aw={aw} field="price">
-                        <span style={{ fontFamily: "monospace", fontWeight: 800, fontSize: 13, color: aw.price ? "#111110" : "#D4C9A8" }}>
-                          {aw.price ? `$${aw.price.toLocaleString()}` : "—"}
-                        </span>
+                        <span className={cn("tabular-nums", price ? "font-semibold" : "text-fg-3")}>{price ?? "—"}</span>
                       </EditableCell>
-
-                      {/* Stage */}
                       <EditableCell aw={aw} field="status">
-                        <StatusPill stageKey={sk} />
+                        <Badge tone={st.tone} dot>{st.label}</Badge>
                       </EditableCell>
-
-                      {/* Location */}
-                      <td style={{ ...TD, fontSize: 12, color: "#9B8F7A", maxWidth: 180 }}>
-                        {(() => {
-                          const loc = aw.venue_location || aw.location;
-                          if (!loc) return <span style={{ color: "#D4C9A8" }}>—</span>;
-                          return <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "block", maxWidth: 170 }} title={loc}>{loc}</span>;
-                        })()}
+                      <td className={cn(TD, "max-w-[180px] text-fg-2")}>
+                        {loc ? <span className="block truncate" title={loc}>{loc}</span> : <span className="text-fg-3">—</span>}
                       </td>
-
-                      {/* Added */}
-                      <td style={{ ...TD, fontSize: 12, color: "#9B8F7A" }}>
+                      <td className={cn(TD, "whitespace-nowrap tabular-nums text-fg-2")}>
                         {new Date(aw.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
                       </td>
-
-                      {/* Actions */}
-                      <td style={{ ...TD, padding: "11px 10px" }} onClick={e => e.stopPropagation()}>
-                        <div style={{ position: "relative" }}>
-                          <button onClick={() => setRowMenu(rowMenu === aw.id ? null : aw.id)} className="ripe-menu-btn">
-                            <MoreHorizontal size={14} color="#9B8F7A" />
-                          </button>
-                          {rowMenu === aw.id && (
-                            <div className="ripe-dropdown">
-                              {[
-                                { label: "View",      icon: ImageIcon, fn: () => { router.push(`/dashboard/artworks/${aw.id}`); setRowMenu(null); } },
-                                { label: "Edit",      icon: Edit2,     fn: () => { router.push(`/dashboard/artworks/${aw.id}/edit`); setRowMenu(null); } },
-                                { label: "Duplicate", icon: Copy,      fn: () => { handleDuplicate(aw); setRowMenu(null); } },
-                                { label: "Delete",    icon: Trash2,    fn: () => { handleDelete(aw.id); setRowMenu(null); }, danger: true },
-                              ].map(item => (
-                                <button key={item.label} onClick={item.fn} className={`ripe-dropdown-item${(item as any).danger ? " danger" : ""}`}>
-                                  <item.icon size={12} /> {item.label}
-                                </button>
-                              ))}
-                            </div>
-                          )}
-                        </div>
+                      <td className={cn(TD, "py-2")} onClick={e => e.stopPropagation()}>
+                        <Menu
+                          label={`Actions for ${aw.title}`}
+                          items={[
+                            { label: "View", icon: ImageIcon, onSelect: () => router.push(`/dashboard/artworks/${aw.id}`) },
+                            { label: "Edit", icon: Edit2, onSelect: () => router.push(`/dashboard/artworks/${aw.id}/edit`) },
+                            { label: "Duplicate", icon: Copy, onSelect: () => handleDuplicate(aw) },
+                            { label: "Delete", icon: Trash2, onSelect: () => setToDelete(aw), danger: true },
+                          ]}
+                        />
                       </td>
                     </tr>
                   );
@@ -637,8 +419,24 @@ export default function ArtworksPage() {
               </tbody>
             </table>
           </div>
-        </>
+        </div>
       )}
-    </>
+
+      {/* ── DELETE CONFIRMATION ── */}
+      <Modal
+        open={toDelete !== null}
+        onClose={() => setToDelete(null)}
+        title="Delete this artwork?"
+        description={toDelete ? `"${toDelete.title}" and its details will be removed for good. This can't be undone.` : undefined}
+        footer={
+          <>
+            <Button variant="ghost" size="sm" onClick={() => setToDelete(null)}>Cancel</Button>
+            <Button variant="danger" size="sm" onClick={() => { if (toDelete) handleDelete(toDelete.id); setToDelete(null); }}>
+              Delete artwork
+            </Button>
+          </>
+        }
+      />
+    </div>
   );
 }

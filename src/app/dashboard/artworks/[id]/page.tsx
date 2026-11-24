@@ -12,7 +12,7 @@ import {
   Badge, Button, ButtonLink, Card, EmptyState, Eyebrow, Heading, Modal, Skeleton, Tag, cn,
 } from "@/components/ui";
 import { STAGES, STAGE_MAP, toStageKey, formatPrice } from "@/lib/artwork-stage";
-import { isSold } from "@/lib/places";
+import { isSold, missingForWall } from "@/lib/places";
 
 const ART_TYPE_LABEL: Record<string, string> = {
   physical: "Physical",
@@ -266,7 +266,7 @@ export default function ArtworkDetailPage() {
               <div className="grid aspect-[4/3] w-full place-items-center bg-sunken text-n-400">
                 <div className="flex flex-col items-center gap-2">
                   <ImageIcon size={40} aria-hidden />
-                  <Link href={`/dashboard/artworks/${id}/edit`} className="font-ui text-label font-semibold text-fg-2 underline-offset-2 hover:text-fg hover:underline">
+                  <Link href={`/dashboard/artworks/new?finish=${id}`} className="font-ui text-label font-semibold text-fg-2 underline-offset-2 hover:text-fg hover:underline">
                     Add photos
                   </Link>
                 </div>
@@ -326,6 +326,15 @@ export default function ArtworkDetailPage() {
 
         {/* ════ RIGHT: details ════ */}
         <div className="flex flex-col gap-4">
+
+          {/* Gentle nudge: what's left before a venue can say yes */}
+          {!isSold(artwork) && missingForWall(artwork).length > 0 && (
+            <Card padding="md" className="flex flex-col gap-2 bg-mango-soft">
+              <span className="font-ui text-body font-semibold text-fg">Almost ready to place</span>
+              <span className="font-ui text-body-sm text-fg-2">Add {missingForWall(artwork).join(" and ")} and cafés and venues can say yes to it.</span>
+              <ButtonLink href={`/dashboard/artworks/new?finish=${id}`} variant="secondary" size="sm" className="self-start">Add now</ButtonLink>
+            </Card>
+          )}
 
           {/* Price */}
           <Card padding="lg" className="flex flex-col gap-1">

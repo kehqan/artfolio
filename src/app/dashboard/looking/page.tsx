@@ -389,7 +389,7 @@ function ReadyCard({ works, ready, open, loading }: { works: PlaceArtwork[]; rea
             <ul className="flex flex-col divide-y divide-line">
               {todo.map(a => (
                 <li key={a.id}>
-                  <Link href={`/dashboard/artworks/${a.id}/edit`} className="flex items-center gap-3 py-2.5 hover:bg-sunken">
+                  <Link href={`/dashboard/artworks/new?finish=${a.id}`} className="flex items-center gap-3 py-2.5 hover:bg-sunken">
                     <span className="grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-control border-hair border-line bg-sunken">
                       {a.images?.[0]
                         // eslint-disable-next-line @next/next/no-img-element

@@ -4,11 +4,11 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import CampaignCarousel from "@/components/CampaignCarousel";
 import {
-  ArrowRight, BarChart3, CalendarDays, Globe, Handshake, ImageIcon, MapPin, Menu as MenuIcon,
-  Package, X,
+  ArrowRight, BarChart3, CalendarDays, Globe, Handshake, MapPin,
+  Package,
 } from "lucide-react";
 import { Avatar, Badge, ButtonLink, Chip, Eyebrow, Heading, cn } from "@/components/ui";
-import { Wordmark } from "@/components/brand/Wordmark";
+import { Mat, PublicFooter, PublicHeader, formatPrice, publicWrap, textLink } from "@/components/public/PublicChrome";
 
 // ── Types ──────────────────────────────────────────────────────────
 type Artwork = {
@@ -45,15 +45,6 @@ function isUpcoming(ev: Event) {
   if (!ref) return true;
   return new Date(ref) >= new Date(new Date().setHours(0, 0, 0, 0));
 }
-function formatPrice(value?: number, currency?: string) {
-  if (!value) return "";
-  try {
-    return new Intl.NumberFormat("en-US", { style: "currency", currency: (currency || "EUR").toUpperCase(), maximumFractionDigits: 0 }).format(value);
-  } catch {
-    return `${value.toLocaleString("en-US")} ${currency ?? ""}`.trim();
-  }
-}
-
 // ── Copy ───────────────────────────────────────────────────────────
 const FEATURES = [
   { icon: Package, label: "Studio", title: "Every work, always tracked",
@@ -83,19 +74,6 @@ const STEPS = [
 ];
 
 // ── Pieces ─────────────────────────────────────────────────────────
-function Mat({ src, alt, className }: { src?: string | null; alt: string; className?: string }) {
-  return (
-    <div className={cn("relative overflow-hidden bg-sunken", className)}>
-      {src ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={src} alt={alt} loading="lazy" className="absolute inset-0 h-full w-full object-contain p-3" />
-      ) : (
-        <div className="absolute inset-0 grid place-items-center text-fg-disabled"><ImageIcon size={28} aria-hidden /></div>
-      )}
-    </div>
-  );
-}
-
 function SectionHead({ eyebrow, title, action }: { eyebrow: string; title: string; action?: React.ReactNode }) {
   return (
     <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
@@ -108,8 +86,7 @@ function SectionHead({ eyebrow, title, action }: { eyebrow: string; title: strin
   );
 }
 
-const wrap = "mx-auto w-full max-w-content px-4 sm:px-6 lg:px-8";
-const textLink = "inline-flex items-center gap-1.5 font-ui text-label font-semibold text-fg underline decoration-line-strong underline-offset-4 hover:decoration-ink";
+const wrap = publicWrap;
 
 // ══════════════════════════════════════════════════════════════════
 export default function HomePage() {
@@ -119,7 +96,6 @@ export default function HomePage() {
   const [events, setEvents] = useState<Event[]>([]);
   const [medium, setMedium] = useState("All");
   const [loading, setLoading] = useState(true);
-  const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => { loadData(); }, []);
 
@@ -182,37 +158,7 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-page text-fg">
-      {/* ── HEADER ── */}
-      <header className="sticky top-0 z-nav border-b-hair border-line bg-surface">
-        <div className={cn(wrap, "flex h-header items-center gap-6")}>
-          <Wordmark />
-          <nav aria-label="Main" className="hidden items-center gap-1 md:flex">
-            {[["Explore", "/explore"], ["Features", "#features"], ["How it works", "#how"]].map(([label, href]) => (
-              <a key={href} href={href} className="rounded-pill px-3 py-2 font-ui text-label font-semibold text-fg-2 hover:bg-sunken hover:text-fg">{label}</a>
-            ))}
-          </nav>
-          <div className="ml-auto flex items-center gap-2">
-            <ButtonLink href="/login" variant="ghost" className="hidden sm:inline-flex">Sign in</ButtonLink>
-            <ButtonLink href="/register" variant="primary">Get started</ButtonLink>
-            <button
-              type="button"
-              aria-label={menuOpen ? "Close menu" : "Open menu"}
-              aria-expanded={menuOpen}
-              onClick={() => setMenuOpen(o => !o)}
-              className="grid h-10 w-10 place-items-center rounded-pill text-fg-2 hover:bg-sunken md:hidden"
-            >
-              {menuOpen ? <X size={18} aria-hidden /> : <MenuIcon size={18} aria-hidden />}
-            </button>
-          </div>
-        </div>
-        {menuOpen && (
-          <nav aria-label="Main" className="border-t-hair border-line px-4 py-3 md:hidden">
-            {[["Explore", "/explore"], ["Features", "#features"], ["How it works", "#how"], ["Sign in", "/login"]].map(([label, href]) => (
-              <a key={href} href={href} onClick={() => setMenuOpen(false)} className="block rounded-control px-3 py-2.5 font-ui text-body font-semibold text-fg hover:bg-sunken">{label}</a>
-            ))}
-          </nav>
-        )}
-      </header>
+      <PublicHeader />
 
       <main>
         {/* ── HERO ── */}
@@ -411,26 +357,7 @@ export default function HomePage() {
         </section>
       </main>
 
-      {/* ── FOOTER ── */}
-      <footer className="border-t-hair border-line bg-page">
-        <div className={cn(wrap, "flex flex-col gap-8 py-10 md:flex-row md:justify-between")}>
-          <div className="flex max-w-[320px] flex-col gap-3">
-            <Wordmark />
-            <p className="font-ui text-body-sm text-fg-3">The platform for artists and venues to manage work, show it and grow in the art scene.</p>
-          </div>
-          <div className="grid grid-cols-2 gap-x-12 gap-y-2 font-ui text-body-sm">
-            <span className="mb-1 font-semibold text-fg">Platform</span>
-            <span className="mb-1 font-semibold text-fg">Account</span>
-            <a href="/explore" className="text-fg-2 hover:text-fg">Explore</a>
-            <a href="/register" className="text-fg-2 hover:text-fg">Create an account</a>
-            <a href="#features" className="text-fg-2 hover:text-fg">Features</a>
-            <a href="/login" className="text-fg-2 hover:text-fg">Sign in</a>
-          </div>
-        </div>
-        <div className={cn(wrap, "border-t-hair border-line py-5 font-ui text-caption text-fg-3")}>
-          © {new Date().getFullYear()} Artomango
-        </div>
-      </footer>
+      <PublicFooter />
     </div>
   );
 }

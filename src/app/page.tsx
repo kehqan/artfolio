@@ -1,358 +1,188 @@
 "use client";
-import { useState, useEffect } from "react";
+// The landing page. It shows, step by step, how little an artist has to
+// do: add a work, make it your site, offer it to a wall, agree and sell.
+// Every number or name on it is real; the small app moments are examples.
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import CampaignCarousel from "@/components/CampaignCarousel";
-import {
-  ArrowRight, BarChart3, CalendarDays, Globe, Handshake, MapPin,
-  Package,
-} from "lucide-react";
-import { Avatar, Badge, ButtonLink, Chip, Eyebrow, Heading, cn } from "@/components/ui";
+import { ArrowRight, Check } from "lucide-react";
+import { ButtonLink, cn } from "@/components/ui";
 import { Mat, PublicFooter, PublicHeader, formatPrice, publicWrap, textLink } from "@/components/public/PublicChrome";
+import { AddWorkMoment, DealMoment, OfferMoment, SiteMoment } from "@/components/landing/Moments";
 
-// ── Types ──────────────────────────────────────────────────────────
 type Artwork = {
-  id: string; title: string; medium?: string; year?: number;
-  price?: number; currency?: string; images?: string[];
-  venue_location?: string; location?: string;
-  artist_name?: string; artist_avatar?: string; artist_username?: string;
-  user_id?: string;
+  id: string; title: string; medium?: string | null; price?: number | null; currency?: string | null; images?: string[] | null;
+  user_id?: string; artist_name?: string; artist_username?: string | null;
 };
-type Person = {
-  id: string; full_name: string; username?: string; role?: string;
-  bio?: string; location?: string; avatar_url?: string;
-  artwork_count?: number; cover_image?: string;
-};
-type Event = {
-  id: string; title: string; venue?: string; start_date?: string;
-  end_date?: string; event_type?: string; is_online?: boolean;
-  online_url?: string; cover_image?: string; location_name?: string;
-};
-
-const MEDIUMS = ["All", "Oil", "Photography", "Sculpture", "Digital", "Printmaking", "Mixed media"];
-
-const EVENT_LABEL: Record<string, string> = {
-  exhibition: "Exhibition", workshop: "Workshop", online_workshop: "Online workshop", drink_draw: "Drink and draw",
-  artist_talk: "Artist talk", open_studio: "Open studio", gathering: "Gathering", popup: "Pop-up", other: "Event",
-};
-
-function fmtDate(d?: string | null) {
-  if (!d) return "";
-  return new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
-}
-function isUpcoming(ev: Event) {
-  const ref = ev.end_date || ev.start_date;
-  if (!ref) return true;
-  return new Date(ref) >= new Date(new Date().setHours(0, 0, 0, 0));
-}
-// ── Copy ───────────────────────────────────────────────────────────
-const FEATURES = [
-  { icon: Package, label: "Studio", title: "Every work, always tracked",
-    body: "Add a piece once: photos, medium, size, price, where it hangs. Know what you have, who holds it and what it sold for.",
-    pain: "“My spreadsheet is always out of date.”" },
-  { icon: Globe, label: "Your page", title: "Your gallery, live on the web",
-    body: "Your works become a public page at artomango.com/you. Send one link to galleries, curators and collectors.",
-    pain: "“I have nowhere to send people to see my work.”" },
-  { icon: Handshake, label: "The Pool", title: "Artists and venues, matched",
-    body: "Artists post that they want wall space. Venues post that they need work. The Pool puts the two together.",
-    pain: "“Finding a place to show is all cold emails.”" },
-  { icon: BarChart3, label: "Sales", title: "Know your numbers",
-    body: "Log each sale and commission, keep your collectors close, and see who to follow up with next.",
-    pain: "“I don’t know what I made this year.”" },
-  { icon: MapPin, label: "The Scene", title: "The local scene on one map",
-    body: "Shows, open studios, venues and collabs near you, in one place instead of scattered across Instagram.",
-    pain: "“I hear about openings after they happen.”" },
-  { icon: CalendarDays, label: "Planning", title: "Shows without the chaos",
-    body: "Plan exhibitions, pick the works, track venues, dates and tasks on one timeline.",
-    pain: "“Dates in email, lists in WhatsApp, tasks in Notes.”" },
-];
-
-const STEPS = [
-  { n: "1", title: "Add your work", body: "Upload photos with the details that matter: medium, size, price, location." },
-  { n: "2", title: "Go public", body: "Your page goes live straight away. Share it, or let galleries and collectors find you." },
-  { n: "3", title: "Show and sell", body: "Answer open calls, plan shows, record sales and keep track of every collector." },
-];
-
-// ── Pieces ─────────────────────────────────────────────────────────
-function SectionHead({ eyebrow, title, action }: { eyebrow: string; title: string; action?: React.ReactNode }) {
-  return (
-    <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
-      <div className="flex max-w-[640px] flex-col gap-2">
-        <Eyebrow>{eyebrow}</Eyebrow>
-        <Heading level={2} size="h1">{title}</Heading>
-      </div>
-      {action}
-    </div>
-  );
-}
 
 const wrap = publicWrap;
 
-// ══════════════════════════════════════════════════════════════════
+const PROMISES = [
+  { title: "You choose what's shown", body: "Your works, in the order you pick. Nothing is pushed up or buried." },
+  { title: "No algorithm, no AI", body: "No ranking, no feed to keep up with, nothing written or judged by a machine." },
+  { title: "Free to start", body: "Make your page and add your work without paying anything." },
+];
+
+const STEPS = [
+  { n: "1", title: "Add a work", body: "A photo and a title is enough. Size and price can wait until you know them.", Moment: AddWorkMoment },
+  { n: "2", title: "Make it your site", body: "Pick a colour, a header and a layout. Every choice is designed to look good, so you can't get it wrong.", Moment: () => <SiteMoment /> },
+  { n: "3", title: "Offer it to a wall", body: "See the cafés and venues looking for art right now, and offer a work in one tap.", Moment: OfferMoment },
+  { n: "4", title: "Agree and sell", body: "A one-page agreement, signed in the app. When it sells, record it in a few taps and see what you keep.", Moment: DealMoment },
+];
+
+const VENUE_POINTS = [
+  "Post your wall: size, how long, and whether work can sell.",
+  "Artists offer works with photos, sizes and prices attached.",
+  "Pick one, sign a one-page agreement, and hang it.",
+];
+
 export default function HomePage() {
-  const [artworks, setArtworks] = useState<Artwork[]>([]);
-  const [artists, setArtists] = useState<Person[]>([]);
-  const [venues, setVenues] = useState<Person[]>([]);
-  const [events, setEvents] = useState<Event[]>([]);
-  const [medium, setMedium] = useState("All");
-  const [loading, setLoading] = useState(true);
+  const [works, setWorks] = useState<Artwork[]>([]);
+  const [loaded, setLoaded] = useState(false);
 
-  useEffect(() => { loadData(); }, []);
+  useEffect(() => {
+    (async () => {
+      const sb = createClient();
+      const { data } = await sb.from("artworks")
+        .select("id,title,medium,price,currency,images,user_id")
+        .in("status", ["available", "Available"]).not("images", "is", null)
+        .order("created_at", { ascending: false }).limit(24);
+      const rows = ((data || []) as Artwork[]).filter(a => a.images?.[0]);
+      if (rows.length) {
+        const ids = Array.from(new Set(rows.map(a => a.user_id).filter(Boolean))) as string[];
+        const { data: ps } = await sb.from("profiles").select("id,full_name,username").in("id", ids);
+        const pm = new Map((ps || []).map(p => [p.id as string, p as { full_name: string | null; username: string | null }]));
+        setWorks(rows.map(a => ({ ...a, artist_name: pm.get(a.user_id!)?.full_name || "", artist_username: pm.get(a.user_id!)?.username || null })));
+      }
+      setLoaded(true);
+    })();
+  }, []);
 
-  async function loadData() {
-    const sb = createClient();
-
-    // Artworks
-    const { data: awData } = await sb.from("artworks")
-      .select("id,title,medium,year,price,currency,images,venue_location,location,user_id")
-      .in("status", ["available", "Available"]).not("images", "is", null)
-      .order("created_at", { ascending: false }).limit(36);
-    if (awData?.length) {
-      const userIds = Array.from(new Set(awData.map((a: Artwork) => a.user_id).filter(Boolean)));
-      const { data: profs } = await sb.from("profiles").select("id,full_name,avatar_url,username").in("id", userIds);
-      const pm: Record<string, any> = {};
-      profs?.forEach((p: any) => { pm[p.id] = p; });
-      setArtworks(awData.map((a: Artwork) => ({
-        ...a,
-        artist_name: pm[a.user_id!]?.full_name || "Artist",
-        artist_avatar: pm[a.user_id!]?.avatar_url || null,
-        artist_username: pm[a.user_id!]?.username || null,
-      })));
-    }
-
-    // Artists (12 is all the row shows)
-    const { data: artistData } = await sb.from("profiles")
-      .select("id,full_name,username,role,bio,location,avatar_url")
-      .eq("role", "artist").not("full_name", "is", null).neq("full_name", "").limit(12);
-    if (artistData?.length) {
-      const enriched = await Promise.all(artistData.map(async (p: Person) => {
-        const [{ count }, { data: cover }] = await Promise.all([
-          sb.from("artworks").select("*", { count: "exact", head: true }).eq("user_id", p.id),
-          sb.from("artworks").select("images").eq("user_id", p.id).not("images", "is", null).limit(1).maybeSingle(),
-        ]);
-        return { ...p, artwork_count: count || 0, cover_image: cover?.images?.[0] || null };
-      }));
-      setArtists(enriched);
-    }
-
-    // Venues: sign-up saves "venue"; older accounts use "gallery"
-    const { data: venueData } = await sb.from("profiles")
-      .select("id,full_name,username,bio,location,avatar_url")
-      .in("role", ["venue", "gallery"]).not("full_name", "is", null).limit(8);
-    setVenues(venueData || []);
-
-    // Events (public, upcoming)
-    const { data: evData } = await sb.from("exhibitions")
-      .select("id,title,venue,start_date,end_date,event_type,is_online,online_url,cover_image,location_name")
-      .eq("is_public", true).order("start_date", { ascending: true }).limit(20);
-    setEvents((evData || []).filter(isUpcoming));
-
-    setLoading(false);
-  }
-
-  const hero = artworks.find(a => Array.isArray(a.images) && a.images[0]);
-  const shownArtworks = artworks
-    .filter(a => medium === "All" || (a.medium || "").toLowerCase().includes(medium.toLowerCase()))
-    .slice(0, 8);
-  const people = [...artists, ...venues.map(v => ({ ...v, role: "venue" }))].slice(0, 10);
+  const hero = works[0];
+  const grid = works.slice(0, works.length >= 8 ? 8 : 4);
 
   return (
     <div className="min-h-screen bg-page text-fg">
       <PublicHeader />
 
       <main>
-        {/* ── HERO ── */}
-        <section className={cn(wrap, "grid items-center gap-12 py-14 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)] lg:py-24")}>
-          <div className="flex flex-col gap-6">
-            <Eyebrow>For artists and venues</Eyebrow>
-            <Heading level={1} size="display" className="max-w-[12ch] sm:text-[72px] sm:leading-[0.95]">
-              Your art practice, in one place.
-            </Heading>
-            <p className="max-w-[46ch] font-ui text-lead text-fg-2">
-              Keep track of every work, put it in front of collectors, find places to show and record every sale. Built with artists, for artists.
+        {/* ── Top ── */}
+        <section className={cn(wrap, "grid items-center gap-12 py-14 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)] lg:gap-16 lg:py-24")}>
+          <div className="flex flex-col gap-7">
+            <span className="inline-flex items-center gap-2 self-start rounded-pill border-hair border-ink bg-surface px-3 py-1 font-ui text-caption font-semibold text-fg">
+              <span aria-hidden className="h-1.5 w-1.5 rounded-pill bg-mango ring-1 ring-ink" /> Made with artists
+            </span>
+            <h1 className="max-w-[12ch] font-display text-[52px] font-extrabold leading-[0.95] tracking-[-0.01em] text-fg sm:text-[76px]">
+              Made for artists, not&nbsp;algorithms.
+            </h1>
+            <p className="max-w-[44ch] font-ui text-lead text-fg-2">
+              Show your work, find it a wall and sell it, in a few simple steps. No algorithm deciding who sees you, no AI, nothing to keep up with.
             </p>
             <div className="flex flex-wrap items-center gap-3">
-              <ButtonLink href="/register" variant="primary">Create your free account <ArrowRight size={16} aria-hidden /></ButtonLink>
-              <ButtonLink href="/explore" variant="secondary">Explore the scene</ButtonLink>
+              <ButtonLink href="/register" variant="primary">Create your free page <ArrowRight size={16} aria-hidden /></ButtonLink>
+              <ButtonLink href="/register?role=venue" variant="secondary">I run a venue</ButtonLink>
             </div>
           </div>
-
-          {/* The work leads: a real piece from the platform, credited */}
-          <figure className="mx-auto w-full max-w-[460px]">
-            <div className="rounded-card border-hair border-line bg-surface p-3">
-              {hero ? (
-                <Link href={hero.artist_username ? `/${hero.artist_username}` : "/explore"} className="block">
-                  <Mat src={hero.images?.[0]} alt={hero.title} className="aspect-[4/5] rounded-control" />
-                </Link>
-              ) : (
-                <div className={cn("aspect-[4/5] rounded-control bg-sunken", loading && "animate-pulse")} />
-              )}
-            </div>
+          <div className="relative mx-auto w-full max-w-[520px]">
+            <span aria-hidden className="absolute -right-3 -top-3 hidden h-24 w-24 rounded-pill bg-mango sm:block" />
+            <SiteMoment image={hero?.images?.[0]} name={hero?.artist_name || "Your name"} className="relative" />
             {hero && (
-              <figcaption className="mt-3 flex items-baseline justify-between gap-3 px-1">
-                <span className="min-w-0">
-                  <span className="block truncate font-ui text-body font-semibold text-fg">{hero.title}</span>
-                  <span className="block truncate font-ui text-caption text-fg-3">
-                    {[hero.artist_name, hero.medium, hero.year].filter(Boolean).join(", ")}
-                  </span>
-                </span>
-                <Badge tone="ok" dot>Available</Badge>
-              </figcaption>
+              <p className="mt-3 px-1 font-ui text-caption text-fg-3">
+                On the page: <Link href={hero.artist_username ? `/${hero.artist_username}` : "/explore"} className="font-semibold text-fg-2 underline-offset-4 hover:underline">{hero.title}</Link>
+                {hero.artist_name ? `, by ${hero.artist_name}` : ""}, from Artomango.
+              </p>
             )}
-          </figure>
-        </section>
-
-        {/* ── FEATURES ── */}
-        <section id="features" className="scroll-mt-20 border-y-hair border-line bg-surface py-16 lg:py-24">
-          <div className={wrap}>
-            <SectionHead eyebrow="What you get" title="Built for how artists actually work" />
-            <div className="grid gap-px overflow-hidden rounded-card border-hair border-line bg-line sm:grid-cols-2 lg:grid-cols-3">
-              {FEATURES.map(({ icon: Icon, label, title, body, pain }) => (
-                <article key={title} className="flex flex-col gap-3 bg-surface p-6">
-                  <div className="flex items-center gap-2.5">
-                    <span className="grid h-9 w-9 place-items-center rounded-control bg-sunken text-fg"><Icon size={18} aria-hidden /></span>
-                    <Eyebrow>{label}</Eyebrow>
-                  </div>
-                  <Heading level={3}>{title}</Heading>
-                  <p className="font-ui text-body-sm text-fg-2">{body}</p>
-                  <p className="mt-auto pt-2 font-ui text-caption italic text-fg-3">{pain}</p>
-                </article>
-              ))}
-            </div>
           </div>
         </section>
 
-        {/* ── CAMPAIGN (managed by admin) ── */}
-        <CampaignCarousel />
+        {/* ── Promises ── */}
+        <section aria-label="Our promises" className="border-y-hair border-line bg-surface">
+          <ul className={cn(wrap, "grid divide-y divide-line md:grid-cols-3 md:divide-x md:divide-y-0")}>
+            {PROMISES.map(p => (
+              <li key={p.title} className="flex gap-4 py-7 md:px-7 md:first:pl-0 md:last:pr-0">
+                <span className="grid h-7 w-7 shrink-0 place-items-center rounded-pill border-hair border-ink bg-mango text-on-mango"><Check size={14} strokeWidth={3} aria-hidden /></span>
+                <span className="flex flex-col gap-1">
+                  <span className="font-ui text-body font-semibold text-fg">{p.title}</span>
+                  <span className="font-ui text-body-sm text-fg-2">{p.body}</span>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
 
-        {/* ── HOW IT WORKS ── */}
-        <section id="how" className={cn(wrap, "scroll-mt-20 py-16 lg:py-24")}>
-          <SectionHead eyebrow="How it works" title="Three steps to a working studio" />
-          <ol className="grid gap-6 md:grid-cols-3">
-            {STEPS.map(s => (
-              <li key={s.n} className="flex flex-col gap-3 border-t-outline border-ink pt-5">
-                <span className="font-display text-display leading-none text-fg">{s.n}</span>
-                <Heading level={3}>{s.title}</Heading>
-                <p className="font-ui text-body text-fg-2">{s.body}</p>
+        {/* ── How easy it is ── */}
+        <section id="how" className={cn(wrap, "scroll-mt-20 py-20 lg:py-28")}>
+          <div className="mb-14 flex max-w-[640px] flex-col gap-3">
+            <span className="font-ui text-caption font-semibold uppercase tracking-[0.12em] text-fg-3">How it works</span>
+            <h2 className="font-display text-[40px] font-extrabold leading-[1.02] text-fg sm:text-[56px]">This is how easy it is.</h2>
+            <p className="font-ui text-lead text-fg-2">Four steps, one question at a time. Skip anything you don&rsquo;t know yet.</p>
+          </div>
+          <ol className="flex flex-col gap-16 lg:gap-24">
+            {STEPS.map(({ n, title, body, Moment }, k) => (
+              <li key={n} className="grid items-center gap-8 md:grid-cols-2 md:gap-14 lg:gap-20">
+                <div className={cn("flex flex-col gap-4", k % 2 === 1 && "md:order-2")}>
+                  <span className="grid h-12 w-12 place-items-center rounded-pill border-outline border-ink bg-surface font-display text-h3 text-fg">{n}</span>
+                  <h3 className="font-display text-[32px] font-extrabold leading-tight text-fg sm:text-[40px]">{title}</h3>
+                  <p className="max-w-[40ch] font-ui text-lead text-fg-2">{body}</p>
+                </div>
+                <div className={cn("mx-auto w-full max-w-[460px]", k % 2 === 1 && "md:order-1")}><Moment /></div>
               </li>
             ))}
           </ol>
         </section>
 
-        {/* ── FRESH WORK ── */}
-        <section id="explore" className="border-t-hair border-line bg-surface py-16 lg:py-24">
-          <div className={wrap}>
-            <SectionHead
-              eyebrow="Discover"
-              title="Fresh from the studios"
-              action={<Link href="/explore" className={textLink}>See everything <ArrowRight size={14} aria-hidden /></Link>}
-            />
-            <div className="mb-6 flex flex-wrap gap-2" role="group" aria-label="Filter by medium">
-              {MEDIUMS.map(m => <Chip key={m} selected={medium === m} onClick={() => setMedium(m)}>{m}</Chip>)}
+        {/* ── For venues ── */}
+        <section id="venues" className="scroll-mt-20 bg-inverse py-20 lg:py-24">
+          <div className={cn(wrap, "grid gap-10 md:grid-cols-[1fr_1fr] md:items-center md:gap-16")}>
+            <div className="flex flex-col gap-4">
+              <span className="font-ui text-caption font-semibold uppercase tracking-[0.12em] text-on-inverse opacity-70">For cafés, bars, shops and galleries</span>
+              <h2 className="font-display text-[40px] font-extrabold leading-[1.02] text-on-inverse sm:text-[56px]">Have walls? Show local artists.</h2>
+              <p className="max-w-[42ch] font-ui text-lead text-on-inverse opacity-80">Fresh art on your walls, changed when you like, at no cost to you.</p>
+              <div className="pt-2"><ButtonLink href="/register?role=venue" variant="primary">Post your wall <ArrowRight size={16} aria-hidden /></ButtonLink></div>
             </div>
-
-            {loading ? (
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-[repeat(auto-fill,minmax(200px,1fr))] sm:gap-5" aria-hidden>
-                {Array.from({ length: 8 }).map((_, i) => <div key={i} className="aspect-[4/5] animate-pulse rounded-card bg-sunken" />)}
-              </div>
-            ) : shownArtworks.length === 0 ? (
-              <p className="rounded-card border-hair border-line bg-page px-5 py-10 text-center font-ui text-body text-fg-2">
-                No works in this medium yet. Try another, or <Link href="/explore" className={textLink}>browse everything</Link>.
-              </p>
-            ) : (
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-[repeat(auto-fill,minmax(200px,1fr))] sm:gap-5">
-                {shownArtworks.map(aw => (
-                  <Link
-                    key={aw.id}
-                    href={aw.artist_username ? `/${aw.artist_username}` : "/explore"}
-                    className="group flex flex-col overflow-hidden rounded-card border-hair border-line bg-surface transition-[transform,box-shadow,border-color] duration-base ease-out hover:-translate-x-0.5 hover:-translate-y-0.5 hover:border-ink hover:shadow-hard-2"
-                  >
-                    <Mat src={aw.images?.[0]} alt={aw.title} className="aspect-[4/5] border-b-hair border-line" />
-                    <div className="flex flex-col gap-0.5 p-3.5">
-                      <span className="truncate font-ui text-body font-semibold text-fg">{aw.title}</span>
-                      <span className="truncate font-ui text-caption text-fg-3">{[aw.artist_name, aw.medium].filter(Boolean).join(", ")}</span>
-                      {aw.price ? <span className="mt-1.5 font-ui text-label font-semibold tabular-nums text-fg">{formatPrice(aw.price, aw.currency)}</span> : null}
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            )}
-
-            {/* People */}
-            {people.length > 0 && (
-              <div className="mt-14">
-                <div className="mb-4 flex items-baseline justify-between gap-4">
-                  <Heading level={3}>Artists and venues</Heading>
-                  <Link href="/explore" className={textLink}>Meet everyone</Link>
-                </div>
-                <div className="-mx-4 flex snap-x gap-4 overflow-x-auto px-4 pb-2 sm:mx-0 sm:px-0">
-                  {people.map(p => (
-                    <Link
-                      key={p.id}
-                      href={p.username ? `/${p.username}` : "/explore"}
-                      className="flex w-[220px] shrink-0 snap-start flex-col gap-3 rounded-card border-hair border-line bg-surface p-4 transition-[border-color,box-shadow] duration-base hover:border-ink hover:shadow-hard-2"
-                    >
-                      <div className="flex items-center gap-3">
-                        <Avatar name={p.full_name} src={p.avatar_url} />
-                        <span className="min-w-0">
-                          <span className="block truncate font-ui text-label font-semibold text-fg">{p.full_name}</span>
-                          <span className="block truncate font-ui text-caption text-fg-3">
-                            {p.role === "venue" ? "Venue" : `${p.artwork_count ?? 0} works`}{p.location ? `, ${p.location}` : ""}
-                          </span>
-                        </span>
-                      </div>
-                      {p.bio && <p className="line-clamp-2 font-ui text-caption text-fg-2">{p.bio}</p>}
-                    </Link>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Events */}
-            {events.length > 0 && (
-              <div className="mt-14">
-                <div className="mb-4 flex items-baseline justify-between gap-4">
-                  <Heading level={3}>Coming up</Heading>
-                </div>
-                <ul className="divide-y divide-line overflow-hidden rounded-card border-hair border-line bg-surface">
-                  {events.slice(0, 5).map(ev => (
-                    <li key={ev.id} className="flex items-center gap-4 px-4 py-3.5">
-                      <span className="flex w-14 shrink-0 flex-col items-center rounded-control bg-sunken py-1.5">
-                        <span className="font-ui text-caption font-semibold uppercase text-fg-3">
-                          {ev.start_date ? new Date(ev.start_date).toLocaleDateString("en-GB", { month: "short" }) : "TBA"}
-                        </span>
-                        <span className="font-display text-h3 leading-none text-fg">
-                          {ev.start_date ? new Date(ev.start_date).getDate() : "–"}
-                        </span>
-                      </span>
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate font-ui text-body font-semibold text-fg">{ev.title}</span>
-                        <span className="block truncate font-ui text-caption text-fg-3">
-                          {[
-                            EVENT_LABEL[ev.event_type || "other"] ?? "Event",
-                            ev.is_online ? "Online" : ev.venue || ev.location_name,
-                            ev.end_date && ev.end_date !== ev.start_date ? `until ${fmtDate(ev.end_date)}` : "",
-                          ].filter(Boolean).join(" · ")}
-                        </span>
-                      </span>
-                      {ev.is_online && ev.online_url && (
-                        <a href={ev.online_url} target="_blank" rel="noopener noreferrer" className={textLink}>Join</a>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
+            <ol className="flex flex-col gap-3">
+              {VENUE_POINTS.map((t, k) => (
+                <li key={t} className="flex items-start gap-4 rounded-card border-hair border-[rgba(255,255,255,0.18)] p-5">
+                  <span className="grid h-8 w-8 shrink-0 place-items-center rounded-pill bg-mango font-display text-body font-extrabold text-on-mango">{k + 1}</span>
+                  <span className="pt-1 font-ui text-body text-on-inverse">{t}</span>
+                </li>
+              ))}
+            </ol>
           </div>
         </section>
 
-        {/* ── CLOSING CTA ── */}
-        <section className="bg-inverse py-16 lg:py-20">
-          <div className={cn(wrap, "flex flex-col items-start gap-6 md:flex-row md:items-end md:justify-between")}>
-            <h2 className="max-w-[16ch] font-display text-h1 text-on-inverse sm:text-display">
-              Your studio deserves better than a spreadsheet.
+        {/* ── Real work ── */}
+        {loaded && grid.length >= 4 && (
+          <section id="explore" className={cn(wrap, "py-20 lg:py-24")}>
+            <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
+              <h2 className="font-display text-[36px] font-extrabold leading-tight text-fg sm:text-[44px]">Fresh from the studios</h2>
+              <Link href="/explore" className={textLink}>See everything <ArrowRight size={14} aria-hidden /></Link>
+            </div>
+            <div className="grid grid-cols-2 gap-3 sm:gap-5 md:grid-cols-4">
+              {grid.map(aw => (
+                <Link key={aw.id} href={aw.artist_username ? `/${aw.artist_username}` : "/explore"}
+                  className="group flex flex-col gap-2.5">
+                  <Mat src={aw.images?.[0]} alt={aw.title} className="aspect-[4/5] rounded-card border-hair border-line transition-[border-color,box-shadow] duration-base group-hover:border-ink group-hover:shadow-hard-2" />
+                  <span className="flex flex-col gap-0.5 px-0.5">
+                    <span className="truncate font-ui text-body-sm font-semibold text-fg">{aw.title}</span>
+                    <span className="truncate font-ui text-caption text-fg-3">{[aw.artist_name, aw.price ? formatPrice(aw.price, aw.currency) : null].filter(Boolean).join(" · ")}</span>
+                  </span>
+                </Link>
+              ))}
+            </div>
+          </section>
+        )}
+
+        <CampaignCarousel />
+
+        {/* ── Close ── */}
+        <section className="border-t-hair border-line bg-mango py-20 lg:py-24">
+          <div className={cn(wrap, "flex flex-col items-start gap-8 md:flex-row md:items-end md:justify-between")}>
+            <h2 className="max-w-[18ch] font-display text-[40px] font-extrabold leading-[1.02] text-on-mango sm:text-[56px]">
+              Your art deserves a better home than a spreadsheet and a feed.
             </h2>
-            <ButtonLink href="/register" variant="primary">Create your free account <ArrowRight size={16} aria-hidden /></ButtonLink>
+            <ButtonLink href="/register" variant="secondary" className="shrink-0">Create your free page <ArrowRight size={16} aria-hidden /></ButtonLink>
           </div>
         </section>
       </main>

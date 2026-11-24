@@ -30,7 +30,7 @@ declare global {
 
 const PRAGUE = { lat: 50.0755, lng: 14.4378 };
 
-const MAP_STYLE = [
+export const MAP_STYLE = [
   { elementType: "geometry",         stylers: [{ color: "#F5F0E8" }] },
   { elementType: "labels.text.fill", stylers: [{ color: "#5C5346" }] },
   { featureType: "water",     elementType: "geometry", stylers: [{ color: "#A8C8E0" }] },
@@ -38,7 +38,7 @@ const MAP_STYLE = [
   { featureType: "poi.park",  elementType: "geometry", stylers: [{ color: "#D4E8C8" }] },
 ];
 
-function getApiKey(): string {
+export function getApiKey(): string {
   const env = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
   if (env && env.length > 10 && env !== "undefined") return env;
   if (typeof document !== "undefined") {
@@ -53,7 +53,7 @@ function getApiKey(): string {
   return "";
 }
 
-function loadScript(cb: () => void) {
+export function loadScript(cb: () => void) {
   if (typeof window === "undefined") return;
   if (window.__amLoaded && window.google?.maps?.places) { cb(); return; }
   if (!window.__amQueue) window.__amQueue = [];

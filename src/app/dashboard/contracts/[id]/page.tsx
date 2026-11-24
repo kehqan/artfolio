@@ -1,167 +1,127 @@
 "use client";
+// One agreement: the terms on the left, who signed and the key dates on
+// the right. Signing itself is recorded by the database.
 import { useState, useEffect } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import Link from "next/link";
+import { ArrowLeft, Calendar, Check, CheckCircle2, ChevronRight, Clock, Copy, ImageIcon, Send, Shield, XCircle } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import {
-  ArrowLeft, Check, Copy, ExternalLink, Shield,
-  ImageIcon, Calendar, Handshake, FileText,
-  CheckCircle2, Clock, XCircle, Edit2, Trash2,
-  Hash, AlertCircle, Send,
-} from "lucide-react";
+import { Alert, Avatar, Badge, Button, ButtonLink, Card, EmptyState, Input, Modal, Skeleton, cn } from "@/components/ui";
+import type { BadgeTone } from "@/components/ui";
+import { formatPrice } from "@/components/public/PublicChrome";
 
-// ── Config ─────────────────────────────────────────────────────────
-const CONTRACT_TYPES: Record<string, { label: string; emoji: string; color: string; bg: string; grad: string }> = {
-  exhibition:    { label: "Exhibition Agreement",    emoji: "🖼️", color: "#7C3AED", bg: "#EDE9FE", grad: "135deg,#4C1D95,#7C3AED" },
-  collaboration: { label: "Collaboration Agreement", emoji: "🤝", color: "#0EA5E9", bg: "#E0F2FE", grad: "135deg,#075985,#0EA5E9" },
-  commission:    { label: "Commission Agreement",    emoji: "🎨", color: "#CA8A04", bg: "#FEF9C3", grad: "135deg,#713F12,#CA8A04" },
-  general:       { label: "General Partnership",     emoji: "📋", color: "#16A34A", bg: "#DCFCE7", grad: "135deg,#14532D,#16A34A" },
+const TYPE_LABEL: Record<string, string> = {
+  exhibition: "Exhibition agreement", collaboration: "Collaboration agreement", commission: "Commission agreement", general: "General agreement",
 };
-
-const STATUS_CFG: Record<string, { label: string; color: string; bg: string; icon: any }> = {
-  draft:            { label: "Draft",            color: "#9B8F7A", bg: "#F5F0E8", icon: FileText     },
-  sent:             { label: "Sent",             color: "#CA8A04", bg: "#FEF9C3", icon: Send          },
-  partially_signed: { label: "Partially Signed", color: "#0EA5E9", bg: "#E0F2FE", icon: Clock         },
-  signed:           { label: "Fully Signed",     color: "#16A34A", bg: "#DCFCE7", icon: CheckCircle2  },
-  cancelled:        { label: "Cancelled",        color: "#EF4444", bg: "#FEF2F2", icon: XCircle       },
+const STATUS: Record<string, { label: string; tone: BadgeTone }> = {
+  draft: { label: "Draft", tone: "neutral" },
+  sent: { label: "Waiting for signature", tone: "warn" },
+  partially_signed: { label: "Partly signed", tone: "info" },
+  signed: { label: "Signed", tone: "ok" },
+  cancelled: { label: "Cancelled", tone: "neutral" },
+  expired: { label: "Expired", tone: "neutral" },
 };
+const TRANSPORT: Record<string, string> = { artist: "The artist", venue: "The venue", shared: "Shared, cost split" };
+const IP: Record<string, string> = { "50/50": "Both, equally", initiator: "The person who wrote it", counterparty: "The other side", custom: "See extra terms" };
+const DELIVERY: Record<string, string> = { pickup: "Picked up in person", shipping: "Shipped by the artist", digital: "Digital", venue: "Collected by the venue" };
 
-// ── Helpers ────────────────────────────────────────────────────────
-function fmtDate(d?: string | null) {
-  if (!d) return "—";
-  return new Date(d).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
-}
-function fmtDateShort(d?: string | null) {
-  if (!d) return "—";
-  return new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-}
-function fmtDateTime(d?: string | null) {
-  if (!d) return "—";
-  return new Date(d).toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" });
-}
+const day = (d?: string | null) => d ? new Date(d.length === 10 ? d + "T12:00:00" : d).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" }) : null;
+const stamp = (d?: string | null) => d ? new Date(d).toLocaleString("en-GB", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "";
+const roleWord = (r?: string | null) => r === "gallery" ? "venue" : r || "";
 
-// ── Info row ───────────────────────────────────────────────────────
-function Row({ label, value, mono }: { label: string; value: React.ReactNode; mono?: boolean }) {
-  if (!value || value === "—") return null;
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", padding: "9px 0", borderBottom: "1px solid #F5F0E8", gap: 16 }}>
-      <span style={{ fontSize: 11, fontWeight: 800, color: "#9B8F7A", textTransform: "uppercase", letterSpacing: ".12em", flexShrink: 0 }}>{label}</span>
-      <span style={{ fontSize: 13, fontWeight: 700, color: "#111110", textAlign: "right", fontFamily: mono ? "monospace" : "inherit" }}>{value}</span>
+    <Card padding="lg">
+      <h2 className="mb-3 font-display text-h3 text-fg">{title}</h2>
+      {children}
+    </Card>
+  );
+}
+
+/** A label and value; rows with nothing in them aren't shown. */
+function Terms({ rows }: { rows: [string, React.ReactNode][] }) {
+  const shown = rows.filter(([, v]) => v !== null && v !== undefined && v !== "");
+  if (!shown.length) return <p className="font-ui text-body-sm text-fg-3">Nothing filled in.</p>;
+  return (
+    <dl className="divide-y divide-line">
+      {shown.map(([k, v]) => (
+        <div key={k} className="flex items-baseline justify-between gap-4 py-2.5">
+          <dt className="font-ui text-body-sm text-fg-2">{k}</dt>
+          <dd className="text-right font-ui text-body-sm font-semibold text-fg">{v}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+const Prose = ({ children }: { children: React.ReactNode }) => <p className="whitespace-pre-wrap font-ui text-body leading-relaxed text-fg-2">{children}</p>;
+
+function SignBlock({ name, role, signed, signedAt, signature, canSign, sigName, onSigChange, onSign, signing }: {
+  name: string; role: string; signed: boolean; signedAt?: string | null; signature?: string | null; canSign: boolean;
+  sigName: string; onSigChange: (v: string) => void; onSign: () => void; signing: boolean;
+}) {
+  const [agreed, setAgreed] = useState(false);
+  return (
+    <div className={cn("flex flex-col gap-3 rounded-control border-hair p-4", signed ? "border-ok bg-ok-well" : "border-line bg-surface")}>
+      <div className="flex items-start justify-between gap-3">
+        <span className="flex min-w-0 flex-col">
+          <span className="truncate font-ui text-label font-semibold text-fg">{name}</span>
+          <span className="font-ui text-caption capitalize text-fg-3">{roleWord(role)}</span>
+        </span>
+        {signed
+          ? <Badge tone="ok"><CheckCircle2 size={12} aria-hidden /> Signed</Badge>
+          : <Badge tone="neutral"><Clock size={12} aria-hidden /> Not yet</Badge>}
+      </div>
+      {signed ? (
+        <div>
+          <p className="font-serif text-h3 italic text-fg">{signature}</p>
+          <p className="font-ui text-caption text-fg-3">{stamp(signedAt)}</p>
+        </div>
+      ) : canSign ? (
+        <>
+          <label className="flex flex-col gap-1.5">
+            <span className="font-ui text-label font-semibold text-fg">Type your full name to sign</span>
+            <Input value={sigName} onChange={e => onSigChange(e.target.value)} placeholder="Your full name" className="font-serif italic" />
+          </label>
+          <label className="flex cursor-pointer items-start gap-2.5">
+            <input type="checkbox" checked={agreed} onChange={e => setAgreed(e.target.checked)} className="mt-0.5 h-4 w-4 shrink-0 accent-ink" />
+            <span className="font-ui text-body-sm text-fg-2">
+              I&apos;ve read all the terms and agree to them. I understand my typed name is a legally binding digital signature.
+            </span>
+          </label>
+          <Button variant="primary" onClick={onSign} disabled={!sigName.trim() || !agreed || signing}>
+            <Check size={15} aria-hidden /> {signing ? "Signing…" : "Sign"}
+          </Button>
+        </>
+      ) : (
+        <p className="font-ui text-body-sm text-fg-3">Waiting for them to sign.</p>
+      )}
     </div>
   );
 }
 
-// ── Section card ───────────────────────────────────────────────────
-function Card({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
-  return <div style={{ background: "#fff", border: "2.5px solid #111110", borderRadius: 20, overflow: "hidden", boxShadow: "3px 4px 0 #D4C9A8", ...style }}>{children}</div>;
-}
-function CardHead({ title, emoji }: { title: string; emoji?: string }) {
-  return (
-    <div style={{ padding: "12px 18px", borderBottom: "2px solid #E8E0D0", background: "#FAF7F3", display: "flex", alignItems: "center", gap: 8 }}>
-      {emoji && <span style={{ fontSize: 15 }}>{emoji}</span>}
-      <span style={{ fontSize: 13, fontWeight: 900, color: "#111110" }}>{title}</span>
-    </div>
-  );
-}
-
-// ── Signing record (audit trail) ───────────────────────────────────
 function SigningRecord({ signatures, termsHash }: { signatures: any[]; termsHash: string }) {
   if (!termsHash && signatures.length === 0) return null;
   const mismatch = signatures.some(s => termsHash && s.terms_hash !== termsHash);
   return (
-    <div style={{ border: "2px solid #E8E0D0", borderRadius: 14, padding: "12px 14px", background: "#fff" }}>
-      <div style={{ fontSize: 10, fontWeight: 800, color: "#9B8F7A", textTransform: "uppercase", letterSpacing: ".12em", marginBottom: 6 }}>Signing record</div>
-      {termsHash && (
-        <div style={{ fontSize: 11, fontWeight: 600, color: "#5C5346", marginBottom: signatures.length ? 8 : 0, wordBreak: "break-all" }}>
-          Terms fingerprint (SHA-256): <code style={{ fontSize: 10 }}>{termsHash}</code>
-        </div>
-      )}
-      {signatures.map(sig => (
-        <div key={sig.party} style={{ fontSize: 11, fontWeight: 600, color: "#5C5346", lineHeight: 1.6 }}>
-          <strong style={{ color: "#111110" }}>{sig.signer_name}</strong>
-          {sig.signer_email ? ` (${sig.signer_email})` : ""} signed {fmtDateTime(sig.signed_at)}
-          {" · "}{sig.signed_via === "account" ? "from their Artomango account" : "via signing link"}
-          {sig.ip_address ? ` · IP ${sig.ip_address}` : ""}
-        </div>
-      ))}
-      {mismatch && (
-        <div style={{ fontSize: 11, fontWeight: 800, color: "#B91C1C", marginTop: 6 }}>Warning: the terms no longer match what was signed.</div>
-      )}
-    </div>
-  );
-}
-
-// ── Signing block ──────────────────────────────────────────────────
-function SignBlock({
-  label, role, signed, signedAt, signature, canSign,
-  sigName, onSigChange, onSign, signing,
-}: {
-  label: string; role: string; signed: boolean; signedAt?: string | null;
-  signature?: string | null; canSign: boolean;
-  sigName: string; onSigChange: (v: string) => void;
-  onSign: () => void; signing: boolean;
-}) {
-  const [agreed, setAgreed] = useState(false);
-
-  return (
-    <div style={{ background: signed ? "#F0FDF4" : "#FAF7F3", border: `2px solid ${signed ? "#86EFAC" : "#E8E0D0"}`, borderRadius: 16, padding: "16px" }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-        <div>
-          <div style={{ fontSize: 11, fontWeight: 800, color: "#9B8F7A", textTransform: "uppercase", letterSpacing: ".12em" }}>{role}</div>
-          <div style={{ fontSize: 14, fontWeight: 900, color: "#111110" }}>{label}</div>
-        </div>
-        {signed
-          ? <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "5px 12px", borderRadius: 99, background: "#DCFCE7", border: "1.5px solid #86EFAC" }}>
-              <CheckCircle2 size={13} color="#16A34A" />
-              <span style={{ fontSize: 11, fontWeight: 800, color: "#16A34A" }}>Signed</span>
-            </div>
-          : <div style={{ display: "flex", alignItems: "center", gap: 5, padding: "5px 12px", borderRadius: 99, background: "#F5F0E8", border: "1.5px solid #E8E0D0" }}>
-              <Clock size={11} color="#9B8F7A" />
-              <span style={{ fontSize: 11, fontWeight: 700, color: "#9B8F7A" }}>Pending</span>
-            </div>
-        }
+    <details className="rounded-control border-hair border-line bg-sunken px-3 py-2.5">
+      <summary className="cursor-pointer font-ui text-label font-semibold text-fg">Signing record</summary>
+      <div className="mt-2 flex flex-col gap-1.5 font-ui text-caption text-fg-2">
+        {signatures.map(sig => (
+          <p key={sig.party}>
+            <span className="font-semibold text-fg">{sig.signer_name}</span>
+            {sig.signer_email ? ` (${sig.signer_email})` : ""} signed {stamp(sig.signed_at)}, {sig.signed_via === "account" ? "from their Artomango account" : "with the signing link"}
+            {sig.ip_address ? `, IP ${sig.ip_address}` : ""}.
+          </p>
+        ))}
+        {termsHash && <p className="break-all">Terms fingerprint (SHA-256): <code>{termsHash}</code></p>}
+        {mismatch && <p className="font-semibold text-bad">The terms no longer match what was signed.</p>}
       </div>
-
-      {signed ? (
-        <div>
-          <div style={{ fontFamily: "Georgia, serif", fontSize: 22, color: "#111110", fontStyle: "italic", marginBottom: 4 }}>{signature}</div>
-          <div style={{ fontSize: 10, fontWeight: 700, color: "#9B8F7A" }}>Signed {fmtDateTime(signedAt)}</div>
-        </div>
-      ) : canSign ? (
-        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          <div>
-            <div style={{ fontSize: 10, fontWeight: 800, color: "#9B8F7A", textTransform: "uppercase", letterSpacing: ".12em", marginBottom: 6 }}>Type your full name to sign</div>
-            <input value={sigName} onChange={e => onSigChange(e.target.value)}
-              placeholder="Your full legal name…"
-              style={{ width: "100%", padding: "10px 13px", background: "#fff", border: "2px solid #E8E0D0", borderRadius: 11, fontSize: 15, fontFamily: "Georgia, serif", fontStyle: "italic", color: "#111110", outline: "none", boxSizing: "border-box" }}
-              onFocus={e => (e.target.style.borderColor = "#FFD400")}
-              onBlur={e => (e.target.style.borderColor = "#E8E0D0")} />
-          </div>
-          <div style={{ display: "flex", alignItems: "flex-start", gap: 10, cursor: "pointer" }} onClick={() => setAgreed(p => !p)}>
-            <div style={{ width: 20, height: 20, borderRadius: 6, border: `2px solid ${agreed ? "#FFD400" : "#E8E0D0"}`, background: agreed ? "#FFD400" : "#fff", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: 1, transition: "all .15s" }}>
-              {agreed && <Check size={11} strokeWidth={3} color="#111110" />}
-            </div>
-            <span style={{ fontSize: 12, fontWeight: 600, color: "#5C5346", lineHeight: 1.5 }}>
-              I have read and agree to all the terms in this contract. I understand that my typed name constitutes a legally binding digital signature.
-            </span>
-          </div>
-          <button onClick={onSign} disabled={!sigName.trim() || !agreed || signing}
-            style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 7, padding: "11px", border: "2.5px solid #111110", borderRadius: 12, background: sigName.trim() && agreed && !signing ? "#FFD400" : "#F5F0E8", fontSize: 13, fontWeight: 800, cursor: sigName.trim() && agreed && !signing ? "pointer" : "not-allowed", fontFamily: "inherit", color: "#111110", boxShadow: sigName.trim() && agreed && !signing ? "3px 3px 0 #111110" : "none", transition: "all .15s" }}>
-            {signing ? "Signing…" : <><Check size={13} /> Sign Contract</>}
-          </button>
-        </div>
-      ) : (
-        <div style={{ fontSize: 12, fontWeight: 600, color: "#9B8F7A" }}>Waiting for this party to sign…</div>
-      )}
-    </div>
+    </details>
   );
 }
 
-// ══════════════════════════════════════════════════════════════════
 export default function ContractDetailPage() {
-  const { id }  = useParams<{ id: string }>();
-  const router  = useRouter();
-
+  const { id } = useParams<{ id: string }>();
   const [contract,  setContract]  = useState<any>(null);
   const [artworks,  setArtworks]  = useState<any[]>([]);
   const [myId,      setMyId]      = useState("");
@@ -170,6 +130,8 @@ export default function ContractDetailPage() {
   const [signing,   setSigning]   = useState(false);
   const [mySig,     setMySig]     = useState("");
   const [cancelling, setCancelling] = useState(false);
+  const [confirmCancel, setConfirmCancel] = useState(false);
+  const [sendingDraft, setSendingDraft] = useState(false);
   const [signError, setSignError] = useState("");
   const [signatures, setSignatures] = useState<any[]>([]);
   const [termsHash, setTermsHash] = useState("");
@@ -179,7 +141,7 @@ export default function ContractDetailPage() {
   async function load() {
     const sb = createClient();
     const { data: { user } } = await sb.auth.getUser();
-    if (!user) return;
+    if (!user) { setLoading(false); return; }
     setMyId(user.id);
 
     const { data: c } = await sb.from("contracts").select("*").eq("id", id).single();
@@ -218,403 +180,227 @@ export default function ContractDetailPage() {
     const { data, error } = await sb.from("contracts").update(update).eq("id", id).select("id");
     setSigning(false);
     if (error || !data?.length) {
-      setSignError(error?.message || "Your signature couldn't be saved. Please reload and try again.");
+      setSignError("Your signature couldn't be saved. Please reload and try again.");
       return;
     }
     load();
   }
 
   async function handleCancel() {
-    if (!confirm("Cancel this contract? Both parties will be notified.")) return;
     setCancelling(true);
     const sb = createClient();
     await sb.from("contracts").update({ status: "cancelled" }).eq("id", id);
     setCancelling(false);
+    setConfirmCancel(false);
     load();
   }
 
   function copySigningLink() {
     const url = `${window.location.origin}/contracts/sign/${id}${contract?.counterparty_token ? `?t=${encodeURIComponent(contract.counterparty_token)}` : ""}`;
-    navigator.clipboard.writeText(url);
+    navigator.clipboard?.writeText(url);
     setCopied(true);
     setTimeout(() => setCopied(false), 2500);
   }
 
+  async function sendDraft() {
+    setSendingDraft(true);
+    await createClient().from("contracts").update({ status: "sent" }).eq("id", id);
+    setSendingDraft(false);
+    load();
+  }
+
   if (loading) return (
-    <>
-      <style>{CSS}</style>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "60vh", flexDirection: "column", gap: 12 }}>
-        <div style={{ width: 36, height: 36, borderRadius: "50%", border: "3px solid #FFD400", borderTopColor: "transparent", animation: "spin .7s linear infinite" }} />
-        <div style={{ fontSize: 13, fontWeight: 700, color: "#9B8F7A" }}>Loading contract…</div>
-      </div>
-    </>
+    <div className="flex flex-col gap-4"><Skeleton className="h-10 w-1/2 rounded-control" /><Skeleton className="h-64 rounded-card" /></div>
   );
 
   if (!contract) return (
-    <>
-      <style>{CSS}</style>
-      <div style={{ textAlign: "center", padding: "80px 24px" }}>
-        <div style={{ fontSize: 48, marginBottom: 12 }}>📋</div>
-        <div style={{ fontSize: 18, fontWeight: 800, color: "#111110", marginBottom: 16 }}>Contract not found</div>
-        <Link href="/dashboard/contracts"><button style={{ padding: "10px 20px", background: "#FFD400", border: "2px solid #111110", borderRadius: 11, fontWeight: 800, cursor: "pointer", fontFamily: "inherit", boxShadow: "3px 3px 0 #111110" }}>← Back</button></Link>
-      </div>
-    </>
+    <EmptyState title="Agreement not found" description="It may have been removed, or it isn't shared with you."
+      action={<ButtonLink href="/dashboard/contracts" variant="secondary"><ArrowLeft size={15} aria-hidden /> Back to papers</ButtonLink>} />
   );
 
-  const typeCfg     = CONTRACT_TYPES[contract.contract_type] || CONTRACT_TYPES.general;
-  const statusCfg   = STATUS_CFG[contract.status] || STATUS_CFG.draft;
-  const isInitiator = contract.initiator_id === myId;
-  const iSigned     = !!contract.initiator_signed_at;
-  const theySigned  = !!contract.counterparty_signed_at;
-  const iFullySigned = contract.status === "signed";
-  const canISign    = isInitiator ? !iSigned : !theySigned;
-  const isExternal  = !contract.counterparty_id;
-  const isDraft     = contract.status === "draft";
-  const isCancelled = contract.status === "cancelled";
+  const c = contract;
+  const st = STATUS[c.status] || STATUS.draft;
+  const isInitiator = c.initiator_id === myId;
+  const iSigned = !!c.initiator_signed_at;
+  const theySigned = !!c.counterparty_signed_at;
+  const executed = c.status === "signed";
+  const isExternal = !c.counterparty_id;
+  const isDraft = c.status === "draft";
+  const isCancelled = c.status === "cancelled";
+  const needsMe = !isDraft && !isCancelled && !executed && (isInitiator ? !iSigned : !theySigned);
+  const eur = (v: any) => v != null && v !== "" ? formatPrice(Number(v), "EUR") : null;
 
-  const StatusIcon = statusCfg.icon;
+  const dates = ([
+    ["Starts", c.start_date], ["Hanging", c.installation_date], ["Opening", c.opening_event_date],
+    ["Deposit due", c.deposit_due_date], ["Rest due", c.final_payment_date], ["Ends", c.end_date],
+    ["Taking down", c.deinstallation_date], ["Unsold works back by", c.unsold_return_by],
+  ] as [string, string | null][]).filter(([, d]) => d).sort((a, b) => (a[1] || "").localeCompare(b[1] || ""));
 
   return (
-    <>
-      <style>{CSS}</style>
-
-      {/* ── HEADER ── */}
-      <div className="cd-header">
-        <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
-          <Link href="/dashboard/contracts" style={{ textDecoration: "none" }}>
-            <button style={{ width: 36, height: 36, borderRadius: 11, border: "2px solid #E8E0D0", background: "#fff", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}>
-              <ArrowLeft size={16} color="#9B8F7A" />
-            </button>
-          </Link>
-          <div style={{ minWidth: 0 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 3, flexWrap: "wrap" }}>
-              <span style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "3px 9px", borderRadius: 99, background: typeCfg.bg, border: `1.5px solid ${typeCfg.color}30`, fontSize: 10, fontWeight: 800, color: typeCfg.color }}>
-                {typeCfg.emoji} {typeCfg.label}
-              </span>
-              <span style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "3px 9px", borderRadius: 99, background: statusCfg.bg, border: `1.5px solid ${statusCfg.color}30`, fontSize: 10, fontWeight: 800, color: statusCfg.color }}>
-                <StatusIcon size={10} /> {statusCfg.label}
-              </span>
-              {contract.reference_number && (
-                <span style={{ fontSize: 10, fontWeight: 700, color: "#C0B8A8", fontFamily: "monospace" }}>{contract.reference_number}</span>
-              )}
+    <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex min-w-0 items-start gap-3">
+          <ButtonLink href="/dashboard/contracts" variant="ghost" size="sm" aria-label="Back to papers" className="mt-1"><ArrowLeft size={16} aria-hidden /></ButtonLink>
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge tone={st.tone}>{st.label}</Badge>
+              <span className="font-ui text-caption text-fg-3">{TYPE_LABEL[c.contract_type] || "Agreement"}</span>
+              {c.reference_number && <span className="font-mono text-caption text-fg-3">{c.reference_number}</span>}
             </div>
-            <h1 style={{ fontSize: "clamp(16px,2.5vw,22px)", fontWeight: 900, color: "#111110", margin: 0, letterSpacing: "-.4px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{contract.title}</h1>
+            <h1 className="mt-1 font-display text-h2 text-fg">{c.title}</h1>
           </div>
         </div>
-
-        <div className="cd-actions">
-          {/* Copy external signing link */}
-          {isExternal && !iFullySigned && !isCancelled && (
-            <button onClick={copySigningLink} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", border: "2px solid #E8E0D0", borderRadius: 11, background: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", color: copied ? "#16A34A" : "#9B8F7A", transition: "all .15s" }}>
-              {copied ? <><Check size={12} /> Copied!</> : <><Copy size={12} /> Copy signing link</>}
-            </button>
-          )}
-          {/* Cancel */}
-          {!iFullySigned && !isCancelled && isInitiator && (
-            <button onClick={handleCancel} disabled={cancelling} style={{ display: "flex", alignItems: "center", gap: 5, padding: "8px 12px", border: "2px solid #FFE4E6", borderRadius: 11, background: "#FFF5F5", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", color: "#EF4444" }}>
-              <XCircle size={12} /> {cancelling ? "Cancelling…" : "Cancel contract"}
-            </button>
-          )}
-        </div>
+        {!executed && !isCancelled && isInitiator && (
+          <Button variant="ghost" onClick={() => setConfirmCancel(true)} className="shrink-0"><XCircle size={15} aria-hidden /> Cancel agreement</Button>
+        )}
       </div>
 
-      {/* ── Fully signed celebration banner ── */}
-      {iFullySigned && (
-        <div style={{ marginBottom: 18, padding: "14px 18px", background: "#111110", border: "2.5px solid #16A34A", borderRadius: 16, display: "flex", alignItems: "center", gap: 14, boxShadow: "3px 3px 0 #16A34A" }}>
-          <div style={{ fontSize: 32, flexShrink: 0 }}>🎉</div>
-          <div>
-            <div style={{ fontSize: 15, fontWeight: 900, color: "#FFD400" }}>Contract fully executed!</div>
-            <div style={{ fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,.5)" }}>
-              Both parties signed on {fmtDateShort(contract.executed_at)}. Key dates have been added to your calendar.
-            </div>
-          </div>
-          <CheckCircle2 size={28} color="#16A34A" style={{ marginLeft: "auto", flexShrink: 0 }} />
-        </div>
+      {executed && (
+        <Alert tone="ok">Signed by both of you on {day(c.executed_at)}. The key dates are in your planner.</Alert>
       )}
 
-      {/* ── MAIN GRID ── */}
-      <div className="cd-grid">
+      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
+        <div className="flex flex-col gap-6">
+          <Section title="The basics">
+            {c.description && <div className="mb-3"><Prose>{c.description}</Prose></div>}
+            <Terms rows={[["Starts", day(c.start_date)], ["Ends", day(c.end_date)], ["Venue or place", c.venue_name], ["Address", c.venue_address]]} />
+          </Section>
 
-        {/* ── LEFT: Contract content ── */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-
-          {/* Overview */}
-          <Card>
-            <CardHead title="Contract Overview" emoji="📋" />
-            <div style={{ padding: "6px 18px 14px" }}>
-              {contract.description && (
-                <p style={{ fontSize: 13, fontWeight: 500, color: "#5C5346", lineHeight: 1.75, margin: "12px 0 14px", paddingBottom: 14, borderBottom: "1px solid #F5F0E8" }}>
-                  {contract.description}
-                </p>
-              )}
-              <Row label="Start Date"    value={fmtDate(contract.start_date)} />
-              <Row label="End Date"      value={fmtDate(contract.end_date)} />
-              <Row label="Venue"         value={contract.venue_name} />
-              <Row label="Venue Address" value={contract.venue_address} />
-            </div>
-          </Card>
-
-          {/* Exhibition terms */}
-          {contract.contract_type === "exhibition" && (
-            <Card>
-              <CardHead title="Exhibition Terms" emoji="🖼️" />
-              <div style={{ padding: "6px 18px 14px" }}>
-                <Row label="Gallery Commission" value={contract.commission_pct ? `${contract.commission_pct}%` : null} />
-                <Row label="Transport"          value={contract.transport_by} />
-                <Row label="Insurance"          value={contract.artwork_insurance ? `Yes — €${Number(contract.insurance_value || 0).toLocaleString()} insured` : "Not included"} />
-                <Row label="Installation"       value={fmtDate(contract.installation_date)} />
-                <Row label="Opening Event"      value={fmtDate(contract.opening_event_date)} />
-                <Row label="Deinstallation"     value={fmtDate(contract.deinstallation_date)} />
-                <Row label="Unsold Return By"   value={fmtDate(contract.unsold_return_by)} />
-              </div>
-            </Card>
+          {c.contract_type === "exhibition" && (
+            <Section title="The show">
+              <Terms rows={[
+                ["Venue's commission", c.commission_pct != null ? `${c.commission_pct}%` : null],
+                ["Transport", TRANSPORT[c.transport_by] || c.transport_by],
+                ["Insurance", c.artwork_insurance ? `The venue insures the works${c.insurance_value ? `, ${eur(c.insurance_value)}` : ""}` : "Not included"],
+                ["Hanging", day(c.installation_date)], ["Opening", day(c.opening_event_date)],
+                ["Taking down", day(c.deinstallation_date)], ["Unsold works back by", day(c.unsold_return_by)],
+              ]} />
+            </Section>
           )}
 
-          {/* Collaboration terms */}
-          {contract.contract_type === "collaboration" && (
-            <Card>
-              <CardHead title="Collaboration Terms" emoji="🤝" />
-              <div style={{ padding: "6px 18px 14px" }}>
-                <Row label="IP / Ownership" value={contract.ip_split} />
-                <Row label="Revenue Split"  value={contract.revenue_split} />
-                <Row label="Credit Line"    value={contract.credit_line} />
-                {contract.deliverables && (
-                  <div style={{ paddingTop: 10 }}>
-                    <div style={{ fontSize: 11, fontWeight: 800, color: "#9B8F7A", textTransform: "uppercase", letterSpacing: ".12em", marginBottom: 6 }}>Deliverables</div>
-                    <p style={{ fontSize: 13, fontWeight: 600, color: "#5C5346", lineHeight: 1.7, margin: 0 }}>{contract.deliverables}</p>
-                  </div>
-                )}
-              </div>
-            </Card>
+          {c.contract_type === "collaboration" && (
+            <Section title="Working together">
+              <Terms rows={[["Who owns the work", IP[c.ip_split] || c.ip_split], ["How money is split", c.revenue_split], ["Credit line", c.credit_line]]} />
+              {c.deliverables && <div className="mt-3 border-t-hair border-line pt-3"><p className="mb-1 font-ui text-label font-semibold text-fg">Who delivers what</p><Prose>{c.deliverables}</Prose></div>}
+            </Section>
           )}
 
-          {/* Commission terms */}
-          {contract.contract_type === "commission" && (
-            <Card>
-              <CardHead title="Commission Terms" emoji="🎨" />
-              <div style={{ padding: "6px 18px 14px" }}>
-                <Row label="Commission Fee"    value={contract.commission_fee ? `€${Number(contract.commission_fee).toLocaleString()}` : null} />
-                <Row label="Deposit"           value={contract.deposit_pct ? `${contract.deposit_pct}% — €${Math.round(contract.commission_fee * contract.deposit_pct / 100).toLocaleString()}` : null} />
-                <Row label="Deposit Due"       value={fmtDate(contract.deposit_due_date)} />
-                <Row label="Final Payment"     value={fmtDate(contract.final_payment_date)} />
-                <Row label="Revision Rounds"   value={contract.revision_rounds} />
-                <Row label="Delivery"          value={contract.delivery_method} />
-                {contract.artwork_specs && (
-                  <div style={{ paddingTop: 10 }}>
-                    <div style={{ fontSize: 11, fontWeight: 800, color: "#9B8F7A", textTransform: "uppercase", letterSpacing: ".12em", marginBottom: 6 }}>Artwork Specs</div>
-                    <p style={{ fontSize: 13, fontWeight: 600, color: "#5C5346", lineHeight: 1.7, margin: 0 }}>{contract.artwork_specs}</p>
-                  </div>
-                )}
-              </div>
-            </Card>
+          {c.contract_type === "commission" && (
+            <Section title="The commission">
+              <Terms rows={[
+                ["Fee", eur(c.commission_fee)],
+                ["Deposit", c.deposit_pct != null ? `${c.deposit_pct}%${c.commission_fee ? `, ${eur(Math.round(c.commission_fee * c.deposit_pct / 100))}` : ""}` : null],
+                ["Deposit due", day(c.deposit_due_date)], ["Rest due", day(c.final_payment_date)],
+                ["Rounds of changes", c.revision_rounds], ["Delivery", DELIVERY[c.delivery_method] || c.delivery_method],
+              ]} />
+              {c.artwork_specs && <div className="mt-3 border-t-hair border-line pt-3"><p className="mb-1 font-ui text-label font-semibold text-fg">The work</p><Prose>{c.artwork_specs}</Prose></div>}
+            </Section>
           )}
 
-          {/* General terms */}
-          {contract.contract_type === "general" && contract.agreed_terms && (
-            <Card>
-              <CardHead title="Agreed Terms" emoji="📋" />
-              <div style={{ padding: "14px 18px" }}>
-                <p style={{ fontSize: 13, fontWeight: 600, color: "#5C5346", lineHeight: 1.8, margin: 0, whiteSpace: "pre-wrap" }}>{contract.agreed_terms}</p>
-              </div>
-            </Card>
-          )}
+          {c.contract_type === "general" && c.agreed_terms && <Section title="What you agreed"><Prose>{c.agreed_terms}</Prose></Section>}
+          {c.special_conditions && <Section title="Extra terms"><Prose>{c.special_conditions}</Prose></Section>}
 
-          {/* Special conditions */}
-          {contract.special_conditions && (
-            <Card>
-              <CardHead title="Special Conditions" emoji="📝" />
-              <div style={{ padding: "14px 18px" }}>
-                <p style={{ fontSize: 13, fontWeight: 600, color: "#5C5346", lineHeight: 1.8, margin: 0 }}>{contract.special_conditions}</p>
-              </div>
-            </Card>
-          )}
-
-          {/* Linked artworks */}
           {artworks.length > 0 && (
-            <Card>
-              <CardHead title={`Linked Artworks (${artworks.length})`} emoji="🖼️" />
-              <div style={{ padding: "12px 14px", display: "flex", flexDirection: "column", gap: 8 }}>
+            <Section title={`Works (${artworks.length})`}>
+              <ul className="flex flex-col gap-2">
                 {artworks.map((aw: any) => {
                   const img = Array.isArray(aw.images) ? aw.images[0] : null;
                   return (
-                    <Link key={aw.id} href={`/dashboard/artworks/${aw.id}`} style={{ textDecoration: "none" }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", background: "#FAF7F3", borderRadius: 12, border: "1.5px solid #E8E0D0", transition: "all .15s", cursor: "pointer" }}
-                        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor="#111110"; }}
-                        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor="#E8E0D0"; }}>
-                        <div style={{ width: 42, height: 42, borderRadius: 10, overflow: "hidden", border: "1.5px solid #E8E0D0", flexShrink: 0, background: "#F5F0E8", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                          {img ? <img src={img} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <ImageIcon size={14} color="#D4C9A8" />}
-                        </div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: 13, fontWeight: 800, color: "#111110", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{aw.title}</div>
-                          <div style={{ fontSize: 10, fontWeight: 600, color: "#9B8F7A" }}>{aw.medium || "—"}{aw.price ? ` · €${Number(aw.price).toLocaleString()}` : ""}</div>
-                        </div>
-                        <div style={{ display: "flex", alignItems: "center", gap: 5, padding: "3px 8px", borderRadius: 8, background: "#DCFCE7", border: "1px solid #86EFAC" }}>
-                          <Shield size={10} color="#16A34A" />
-                          <span style={{ fontSize: 9, fontWeight: 800, color: "#16A34A" }}>In passport</span>
-                        </div>
-                        <ExternalLink size={11} color="#C0B8A8" style={{ flexShrink: 0 }} />
-                      </div>
-                    </Link>
+                    <li key={aw.id}>
+                      <Link href={`/dashboard/artworks/${aw.id}`} className="flex items-center gap-3 rounded-control border-hair border-line px-2.5 py-2 hover:border-ink">
+                        <span className="grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-chip bg-sunken">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          {img ? <img src={img} alt="" className="h-full w-full object-contain" /> : <ImageIcon size={15} aria-hidden className="text-fg-3" />}
+                        </span>
+                        <span className="flex min-w-0 flex-1 flex-col">
+                          <span className="truncate font-ui text-label font-semibold text-fg">{aw.title}</span>
+                          <span className="truncate font-ui text-caption text-fg-3">{[aw.medium, aw.price ? formatPrice(Number(aw.price), "EUR") : null].filter(Boolean).join(" · ") || "No details"}</span>
+                        </span>
+                        {executed && <Badge tone="ok"><Shield size={11} aria-hidden /> In passport</Badge>}
+                        <ChevronRight size={15} aria-hidden className="shrink-0 text-fg-3" />
+                      </Link>
+                    </li>
                   );
                 })}
-              </div>
-            </Card>
+              </ul>
+            </Section>
           )}
         </div>
 
-        {/* ── RIGHT: Parties + Signing ── */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-
-          {/* Parties summary */}
-          <Card>
-            <CardHead title="The Parties" emoji="🤝" />
-            <div style={{ padding: "14px" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", background: "#111110", borderRadius: 12, marginBottom: 10 }}>
-                <div style={{ width: 34, height: 34, borderRadius: 10, background: "#FFD400", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 900, color: "#111110", flexShrink: 0 }}>
-                  {contract.initiator_name.split(" ").map((w: string) => w[0]).join("").slice(0, 2)}
-                </div>
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 800, color: "#FFD400" }}>{contract.initiator_name}</div>
-                  <div style={{ fontSize: 10, fontWeight: 600, color: "rgba(255,212,0,.4)" }}>{contract.initiator_role} · Initiator</div>
-                </div>
-                {iSigned && <CheckCircle2 size={16} color="#16A34A" style={{ marginLeft: "auto", flexShrink: 0 }} />}
+        {/* On a phone, put signing first when it's waiting on you. */}
+        <div className={cn("flex flex-col gap-6", needsMe && "order-first lg:order-none")}>
+          <Section title="Between">
+            <ul className="flex flex-col gap-2">
+              {[
+                { name: c.initiator_name, role: c.initiator_role, done: iSigned, you: isInitiator, ext: false },
+                { name: c.counterparty_name, role: c.counterparty_role, done: theySigned, you: !isInitiator, ext: isExternal },
+              ].map((p, i) => (
+                <li key={i} className="flex items-center gap-3 rounded-control border-hair border-line px-3 py-2.5">
+                  <Avatar name={p.name || "?"} size="sm" />
+                  <span className="flex min-w-0 flex-1 flex-col">
+                    <span className="truncate font-ui text-label font-semibold text-fg">{p.name}{p.you ? " (you)" : ""}</span>
+                    <span className="truncate font-ui text-caption capitalize text-fg-3">{roleWord(p.role)}{p.ext ? " · not on Artomango" : ""}</span>
+                  </span>
+                  {p.done && <CheckCircle2 size={17} aria-label="Signed" className="shrink-0 text-ok" />}
+                </li>
+              ))}
+            </ul>
+            {isExternal && isInitiator && !executed && !isCancelled && !isDraft && (
+              <div className="mt-3 flex flex-col gap-2 rounded-control bg-sunken p-3">
+                <p className="font-ui text-body-sm text-fg-2">{c.counterparty_name} isn&apos;t on Artomango. Send them this link to read and sign.</p>
+                <Button variant="secondary" size="sm" onClick={copySigningLink} aria-live="polite">
+                  {copied ? <><Check size={14} aria-hidden /> Copied</> : <><Copy size={14} aria-hidden /> Copy signing link</>}
+                </Button>
               </div>
+            )}
+          </Section>
 
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 10 }}>
-                <div style={{ height: 1, flex: 1, background: "#E8E0D0" }} />
-                <Handshake size={16} color="#D4C9A8" />
-                <div style={{ height: 1, flex: 1, background: "#E8E0D0" }} />
-              </div>
+          {isDraft && isInitiator && (
+            <Card padding="lg">
+              <p className="mb-3 font-ui text-body-sm text-fg-2">This is a draft. When it&apos;s ready, send it to {c.counterparty_name} to sign.</p>
+              <Button variant="primary" onClick={sendDraft} disabled={sendingDraft} className="w-full">
+                <Send size={15} aria-hidden /> {sendingDraft ? "Sending…" : "Send for signature"}
+              </Button>
+            </Card>
+          )}
 
-              <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", background: "#FAF7F3", border: "1.5px solid #E8E0D0", borderRadius: 12 }}>
-                <div style={{ width: 34, height: 34, borderRadius: 10, background: "#F5F0E8", border: "1.5px solid #E8E0D0", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 900, color: "#9B8F7A", flexShrink: 0 }}>
-                  {contract.counterparty_name.split(" ").map((w: string) => w[0]).join("").slice(0, 2)}
-                </div>
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 800, color: "#111110" }}>{contract.counterparty_name}</div>
-                  <div style={{ fontSize: 10, fontWeight: 600, color: "#9B8F7A" }}>
-                    {contract.counterparty_role}
-                    {isExternal ? " · ⚡ External" : ""}
-                  </div>
-                </div>
-                {theySigned && <CheckCircle2 size={16} color="#16A34A" style={{ marginLeft: "auto", flexShrink: 0 }} />}
-              </div>
-
-              {/* External link copy */}
-              {isExternal && !iFullySigned && !isCancelled && (
-                <div style={{ marginTop: 12, padding: "10px 12px", background: "#FEF9C3", border: "1.5px solid #FDE047", borderRadius: 11 }}>
-                  <div style={{ fontSize: 11, fontWeight: 800, color: "#713F12", marginBottom: 6 }}>External party — share signing link</div>
-                  <button onClick={copySigningLink} style={{ display: "flex", alignItems: "center", gap: 6, width: "100%", padding: "7px 10px", border: "1.5px solid #FDE047", borderRadius: 9, background: "#fff", fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", color: copied ? "#16A34A" : "#92400E" }}>
-                    {copied ? <><Check size={11} /> Copied to clipboard!</> : <><Copy size={11} /> Copy signing link</>}
-                  </button>
-                </div>
-              )}
-            </div>
-          </Card>
-
-          {/* Signing section */}
-          {!isCancelled && contract.status !== "draft" && (
-            <Card>
-              <CardHead title="Signatures" emoji="✍️" />
-              <div style={{ padding: "14px", display: "flex", flexDirection: "column", gap: 12 }}>
-                <SignBlock
-                  label={contract.initiator_name}
-                  role={contract.initiator_role}
-                  signed={iSigned}
-                  signedAt={contract.initiator_signed_at}
-                  signature={contract.initiator_signature}
-                  canSign={isInitiator && !iSigned}
-                  sigName={mySig}
-                  onSigChange={setMySig}
-                  onSign={handleSign}
-                  signing={signing}
-                />
-                <SignBlock
-                  label={contract.counterparty_name}
-                  role={contract.counterparty_role}
-                  signed={theySigned}
-                  signedAt={contract.counterparty_signed_at}
-                  signature={contract.counterparty_signature}
-                  canSign={!isInitiator && !theySigned && !!myId}
-                  sigName={mySig}
-                  onSigChange={setMySig}
-                  onSign={handleSign}
-                  signing={signing}
-                />
-                {signError && (
-                  <div style={{ fontSize: 12, fontWeight: 700, color: "#B91C1C" }}>{signError}</div>
-                )}
+          {!isCancelled && !isDraft && (
+            <Section title="Signatures">
+              <div className="flex flex-col gap-3">
+                <SignBlock name={c.initiator_name} role={c.initiator_role} signed={iSigned} signedAt={c.initiator_signed_at}
+                  signature={c.initiator_signature} canSign={isInitiator && !iSigned}
+                  sigName={mySig} onSigChange={setMySig} onSign={handleSign} signing={signing} />
+                <SignBlock name={c.counterparty_name} role={c.counterparty_role} signed={theySigned} signedAt={c.counterparty_signed_at}
+                  signature={c.counterparty_signature} canSign={!isInitiator && !theySigned && !!myId}
+                  sigName={mySig} onSigChange={setMySig} onSign={handleSign} signing={signing} />
+                {signError && <Alert tone="bad">{signError}</Alert>}
                 <SigningRecord signatures={signatures} termsHash={termsHash} />
               </div>
-            </Card>
+            </Section>
           )}
 
-          {/* Draft — send button */}
-          {isDraft && isInitiator && (
-            <Card>
-              <div style={{ padding: "16px" }}>
-                <div style={{ fontSize: 13, fontWeight: 700, color: "#9B8F7A", marginBottom: 12 }}>
-                  This contract is saved as a draft. When you're ready, send it to {contract.counterparty_name} for signature.
-                </div>
-                <button onClick={async () => {
-                  const sb = createClient();
-                  await sb.from("contracts").update({ status: "sent" }).eq("id", id);
-                  load();
-                }} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 7, width: "100%", padding: "12px", border: "2.5px solid #111110", borderRadius: 12, background: "#FFD400", fontSize: 14, fontWeight: 800, cursor: "pointer", fontFamily: "inherit", color: "#111110", boxShadow: "3px 3px 0 #111110" }}>
-                  <Send size={13} /> Send for Signature
-                </button>
-              </div>
-            </Card>
-          )}
-
-          {/* Calendar events */}
-          <div style={{ padding: "14px 16px", background: "#FAF7F3", border: "2px solid #E8E0D0", borderRadius: 16, boxShadow: "2px 3px 0 #E0D8CA" }}>
-            <div style={{ fontSize: 12, fontWeight: 900, color: "#111110", marginBottom: 10, display: "flex", alignItems: "center", gap: 7 }}>
-              <Calendar size={14} color="#9B8F7A" /> Key Dates
-            </div>
-            {[
-              { label: "Start",         date: contract.start_date },
-              { label: "End",           date: contract.end_date },
-              { label: "Opening",       date: contract.opening_event_date },
-              { label: "Installation",  date: contract.installation_date },
-              { label: "Deinstall",     date: contract.deinstallation_date },
-              { label: "Deposit Due",   date: contract.deposit_due_date },
-              { label: "Final Payment", date: contract.final_payment_date },
-              { label: "Return By",     date: contract.unsold_return_by },
-            ].filter(d => d.date).map(d => (
-              <div key={d.label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 0", borderBottom: "1px solid #F5F0E8" }}>
-                <span style={{ fontSize: 11, fontWeight: 700, color: "#9B8F7A" }}>{d.label}</span>
-                <span style={{ fontSize: 12, fontWeight: 800, color: "#111110", fontFamily: "monospace" }}>{fmtDateShort(d.date)}</span>
-              </div>
-            ))}
-            {![contract.start_date, contract.end_date, contract.opening_event_date, contract.installation_date, contract.deposit_due_date].some(Boolean) && (
-              <div style={{ fontSize: 12, fontWeight: 600, color: "#C0B8A8" }}>No key dates set</div>
+          <Section title="Key dates">
+            {dates.length === 0 ? <p className="font-ui text-body-sm text-fg-3">No dates set.</p> : (
+              <ul className="divide-y divide-line">
+                {dates.map(([label, d]) => (
+                  <li key={label} className="flex items-center justify-between gap-3 py-2">
+                    <span className="flex items-center gap-2 font-ui text-body-sm text-fg-2"><Calendar size={14} aria-hidden className="text-fg-3" /> {label}</span>
+                    <span className="font-ui text-body-sm font-semibold tabular-nums text-fg">{day(d)}</span>
+                  </li>
+                ))}
+              </ul>
             )}
-            {iFullySigned && (
-              <div style={{ marginTop: 10, fontSize: 10, fontWeight: 700, color: "#16A34A", display: "flex", alignItems: "center", gap: 5 }}>
-                <Check size={10} /> Dates added to both parties' calendars
-              </div>
-            )}
-          </div>
+          </Section>
         </div>
       </div>
-    </>
+
+      <Modal open={confirmCancel} onClose={() => setConfirmCancel(false)} size="sm" title="Cancel this agreement?"
+        footer={<>
+          <Button variant="ghost" onClick={() => setConfirmCancel(false)}>Keep it</Button>
+          <Button variant="danger" onClick={handleCancel} disabled={cancelling}>{cancelling ? "Cancelling…" : "Cancel agreement"}</Button>
+        </>}>
+        <p className="font-ui text-body text-fg-2">It stays in your papers marked as cancelled, and no one can sign it any more.</p>
+      </Modal>
+    </div>
   );
 }
-
-const CSS = `
-  @import url('https://fonts.googleapis.com/css2?family=Darker+Grotesque:wght@500;600;700;800;900&display=swap');
-  *, *::before, *::after { box-sizing: border-box; }
-  body { font-family: 'Darker Grotesque', system-ui, sans-serif; }
-  @keyframes spin { to { transform: rotate(360deg); } }
-
-  .cd-header { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:22px; flex-wrap:wrap; }
-  .cd-actions { display:flex; gap:8px; align-items:center; flex-shrink:0; flex-wrap:wrap; }
-  .cd-grid { display:grid; grid-template-columns:1fr 360px; gap:20px; align-items:start; }
-
-  @media (max-width:900px) { .cd-grid { grid-template-columns:1fr !important; } }
-  @media (max-width:640px) {
-    .cd-header { flex-direction:column; align-items:flex-start; }
-    .cd-actions { width:100%; flex-wrap:wrap; }
-  }
-`;

@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { loadPrivate, savePrivate } from "@/lib/artwork-private";
 import { ArrowLeft, ChevronRight, Shield } from "lucide-react";
 import { Button, ButtonLink, Eyebrow, Heading, Skeleton } from "@/components/ui";
 import {
@@ -89,6 +90,15 @@ export default function EditArtworkPage() {
         wall_terms:            data.wall_terms           || "",
       });
 
+      // Private details live in their own table; fill them in when they arrive.
+      loadPrivate(sb, data.id, data).then(pv => setForm(f => ({
+        ...f,
+        notes: pv.notes || "",
+        digital_file_url: pv.digital_file_url || "",
+        materials_cost: pv.materials_cost != null ? String(pv.materials_cost) : "",
+        time_spent: pv.time_spent != null ? String(pv.time_spent) : "",
+      })));
+
       if (data.location_lat && data.location_lng) {
         setVenueCoords({ lat: data.location_lat, lng: data.location_lng });
       }
@@ -152,14 +162,12 @@ export default function EditArtworkPage() {
       year:                  numOrNull(form.year),
       medium:                form.medium               || null,
       description:           form.description          || null,
-      notes:                 form.notes                || null,
       width_cm:              numOrNull(form.width_cm),
       height_cm:             numOrNull(form.height_cm),
       depth_cm:              numOrNull(form.depth_cm),
       framed:                form.framed,
       file_format:           form.file_format          || null,
       resolution:            form.resolution           || null,
-      digital_file_url:      form.digital_file_url     || null,
       edition_total:         numOrNull(form.edition_total),
       edition_number:        numOrNull(form.edition_number),
       edition_code:          form.edition_code         || null,
@@ -172,12 +180,17 @@ export default function EditArtworkPage() {
       location_name:         form.location_name        || form.venue_location || null,
       location_lat:          venueCoords?.lat          ?? null,
       location_lng:          venueCoords?.lng          ?? null,
-      materials_cost:        numOrNull(form.materials_cost),
-      time_spent:            numOrNull(form.time_spent),
       linked_moodboard_ids:  linkedMb.length > 0 ? linkedMb : null,
       images:                [...existingImages, ...uploadedUrls],
       updated_at:            new Date().toISOString(),
     }).eq("id", id);
+    // Only the artist can read these, so they're saved apart from the work.
+    if (user) await savePrivate(sb, id, user.id, {
+      notes: form.notes.trim() || null,
+      digital_file_url: form.digital_file_url.trim() || null,
+      materials_cost: numOrNull(form.materials_cost),
+      time_spent: numOrNull(form.time_spent),
+    });
     // Saved on its own so a database without this column still saves the work.
     try { await sb.from("artworks").update({ wall_terms: form.wall_terms || null }).eq("id", id); } catch { /* ignore */ }
 

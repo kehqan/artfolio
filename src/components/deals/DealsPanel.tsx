@@ -7,6 +7,7 @@ import Link from "next/link";
 import { Check, FileSignature, ImageOff, MessageSquare } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Alert, Avatar, Button, ButtonLink, Chip, EmptyState, Modal, Skeleton, cn } from "@/components/ui";
+import { AgreementSheet } from "./AgreementSheet";
 import { type DealView, STEPS, headline, isClosed, loadDeals, needsMe, nextLine, setStatus, stepIndex } from "@/lib/deals";
 import { workLine } from "@/lib/places";
 
@@ -32,6 +33,8 @@ export function DealsPanel({ onOpenChat, onCount }: { onOpenChat: (conversationI
   const [confirm, setConfirm] = useState<{ deal: DealView; kind: "declined" | "withdrawn" } | null>(null);
   const [focus, setFocus] = useState<string | null>(null);
   const [setupMissing, setSetupMissing] = useState(false);
+  const [agreeing, setAgreeing] = useState<DealView | null>(null);
+  const [filled, setFilled] = useState<Record<string, boolean>>({});
   const focused = useRef<HTMLLIElement | null>(null);
 
   const reload = useCallback(async (uid: string) => {
@@ -55,6 +58,13 @@ export function DealsPanel({ onOpenChat, onCount }: { onOpenChat: (conversationI
       setSignedByMe(mine);
     }
   }, []);
+
+  // After a signed deal, the venue can close its wall post in one tap.
+  async function fillPost(d: DealView) {
+    if (!d.pool_request_id) return;
+    const { error } = await createClient().from("pool_requests").update({ status: "matched" }).eq("id", d.pool_request_id);
+    if (!error) setFilled(p => ({ ...p, [d.pool_request_id!]: true }));
+  }
 
   useEffect(() => {
     const q = new URLSearchParams(window.location.search);
@@ -162,6 +172,7 @@ export function DealsPanel({ onOpenChat, onCount }: { onOpenChat: (conversationI
               <DealCard key={d.id} d={d} me={me!} busy={busy === d.id} focused={focus === d.id} liRef={focus === d.id ? focused : undefined}
                 signed={d.contract_id ? !!signedByMe[d.contract_id] : false}
                 onMove={s => (s === "interested" ? move(d, s) : setConfirm({ deal: d, kind: s }))}
+                onAgree={() => setAgreeing(d)} filled={!!(d.pool_request_id && filled[d.pool_request_id])} onFill={() => fillPost(d)}
                 onChat={() => d.conversation_id && onOpenChat(d.conversation_id)} />
             ))}
           </ul>
@@ -183,6 +194,7 @@ export function DealsPanel({ onOpenChat, onCount }: { onOpenChat: (conversationI
         )}
       </div>
 
+      {me && <AgreementSheet deal={agreeing} me={me} onClose={() => setAgreeing(null)} onSent={() => { reload(me); setFilter("waiting"); }} />}
       <Modal open={!!confirm} onClose={() => setConfirm(null)} size="sm"
         title={confirm?.kind === "declined" ? "Pass on this?" : "Withdraw this?"}
         footer={<>
@@ -201,9 +213,10 @@ export function DealsPanel({ onOpenChat, onCount }: { onOpenChat: (conversationI
   );
 }
 
-function DealCard({ d, me, busy, focused, liRef, signed, onMove, onChat }: {
+function DealCard({ d, me, busy, focused, liRef, signed, onMove, onChat, onAgree, filled, onFill }: {
   d: DealView; me: string; busy: boolean; focused: boolean; liRef?: React.Ref<HTMLLIElement>; signed: boolean;
   onMove: (s: "interested" | "declined" | "withdrawn") => void; onChat: () => void;
+  onAgree?: () => void; filled?: boolean; onFill?: () => void;
 }) {
   const step = stepIndex(d.status);
   const iStarted = d.started_by === me;
@@ -224,14 +237,19 @@ function DealCard({ d, me, busy, focused, liRef, signed, onMove, onChat }: {
   }
   if (d.status === "interested" && iAmVenue) {
     actions = <>
-      <ButtonLink variant="primary" size="sm" href={`/dashboard/contracts/new?deal=${d.id}`}><FileSignature size={14} aria-hidden /> Send agreement</ButtonLink>
+      <Button variant="primary" size="sm" onClick={onAgree}><FileSignature size={14} aria-hidden /> Send agreement</Button>
       {iStarted && <Button variant="ghost" size="sm" disabled={busy} onClick={() => onMove("withdrawn")}>Withdraw</Button>}
     </>;
   }
   if ((d.status === "agreement_sent" || d.status === "signed") && d.contract_id) {
-    actions = <ButtonLink variant={d.status === "agreement_sent" && !signed ? "primary" : "secondary"} size="sm" href={`/dashboard/contracts/${d.contract_id}`}>
+    actions = <>
+      {d.status === "signed" && iAmVenue && d.post && d.post.status === "open" && !filled && onFill && (
+        <Button variant="secondary" size="sm" onClick={onFill}><Check size={14} aria-hidden /> Mark the wall as filled</Button>
+      )}
+      <ButtonLink variant={d.status === "agreement_sent" && !signed ? "primary" : "secondary"} size="sm" href={`/dashboard/contracts/${d.contract_id}`}>
       <FileSignature size={14} aria-hidden /> {d.status === "signed" ? "See the agreement" : signed ? "See the agreement" : "Review and sign"}
-    </ButtonLink>;
+    </ButtonLink>
+    </>;
   }
 
   return (

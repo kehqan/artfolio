@@ -7,6 +7,7 @@ import { ArrowRight, Bell, CalendarDays, Circle, Plus } from "lucide-react";
 import { Avatar, Badge, ButtonLink, Card, Eyebrow, Heading, StatTile, Tabs, cn } from "@/components/ui";
 import type { BadgeTone } from "@/components/ui";
 import { Mat, formatPrice } from "@/components/public/PublicChrome";
+import { mainCurrency } from "./sales/money";
 
 /* ── Labels ─────────────────────────────────────────────────────── */
 type ScenePostType = "event" | "exhibition" | "collab" | "opencall" | "commission";
@@ -96,6 +97,7 @@ export default function DashboardPage() {
   /* ── Data state ─────────────────────────────────────── */
   const [profile, setProfile] = useState<{ full_name?: string; username?: string; avatar_url?: string } | null>(null);
   const [artworks, setArtworks] = useState<any[]>([]);
+  const [cur, setCur] = useState("EUR");
   const [stats, setStats] = useState({
     total: 0, available: 0, in_progress: 0, sold: 0,
     sales_month: 0, sales_total: 0, sales_prev_month: 0,
@@ -188,7 +190,7 @@ export default function DashboardPage() {
           // Sales — FIXED: use sale_price column, filter status=completed
           supabase
             .from("sales")
-            .select("sale_price,sale_date,status")
+            .select("sale_price,sale_date,status,currency")
             .eq("user_id", user.id)
             .ilike("status", "completed"),
           supabase
@@ -298,6 +300,7 @@ export default function DashboardPage() {
             (s: number, r: any) => s + (Number(r.sale_price) || 0),
             0
           );
+          setCur(mainCurrency(salesAll || []));
           setStats({
             total,
             available,
@@ -425,7 +428,7 @@ export default function DashboardPage() {
   const wall = artworks.slice(0, 5);
   const monthName = new Date().toLocaleDateString("en-GB", { month: "long" });
   const salesDelta = stats.sales_prev_month > 0
-    ? `${formatPrice(stats.sales_prev_month, "EUR")} in the month before`
+    ? `${formatPrice(stats.sales_prev_month, cur)} in the month before`
     : undefined;
 
   return (
@@ -444,7 +447,7 @@ export default function DashboardPage() {
       <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
         <StatTile label="Works" value={loaded ? stats.total : "–"} delta={loaded && stats.in_progress > 0 ? `${stats.in_progress} in progress` : undefined} />
         <StatTile label="For sale" value={loaded ? stats.available : "–"} delta={loaded && stats.sold > 0 ? `${stats.sold} sold so far` : undefined} />
-        <StatTile label={`Sales in ${monthName}`} value={loaded ? formatPrice(stats.sales_month, "EUR") || "€0" : "–"} delta={loaded ? salesDelta : undefined} />
+        <StatTile label={`Sales in ${monthName}`} value={loaded ? formatPrice(stats.sales_month, cur) : "–"} delta={loaded ? salesDelta : undefined} />
         <StatTile label="Followers" value={loaded ? stats.followers : "–"} />
       </div>
 
@@ -618,7 +621,7 @@ export default function DashboardPage() {
         <Panel title="Deals and papers" eyebrow="Deals & Money" action={<PanelLink href="/dashboard/sales">Sales</PanelLink>}>
           <dl className="divide-y divide-line">
             {[
-              { label: "Sold in total", value: loaded ? formatPrice(stats.sales_total, "EUR") || "€0" : "–", href: "/dashboard/sales" },
+              { label: "Sold in total", value: loaded ? formatPrice(stats.sales_total, cur) : "–", href: "/dashboard/sales" },
               { label: "Contracts out", value: String(contractsOut.out), href: "/dashboard/contracts", note: contractsOut.awaiting > 0 ? `${contractsOut.awaiting} waiting for a signature` : null },
               { label: "Your public page", value: profile?.username ? "Open" : "Set up", href: profile?.username ? `/${profile.username}` : "/dashboard/profile" },
             ].map(row => (

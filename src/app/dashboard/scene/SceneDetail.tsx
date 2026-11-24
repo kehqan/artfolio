@@ -1,7 +1,8 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { createClient } from "@/lib/supabase/client";
 import Link from "next/link";
-import { ChevronLeft, ChevronRight, ExternalLink, MessageSquare, Pencil, Trash2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, ChevronRight as Arrow, ExternalLink, Inbox, MessageSquare, Pencil, Trash2 } from "lucide-react";
 import { Avatar, Badge, Button, Modal } from "@/components/ui";
 import { Mat } from "@/components/public/PublicChrome";
 import { type FeedItem, fullDate, wallDetails } from "./feed";
@@ -22,6 +23,19 @@ export function SceneDetail({ item, mine, onClose, onMessage, actionLabel, onEdi
   const [idx, setIdx] = useState(0);
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [offers, setOffers] = useState<{ total: number; fresh: number } | null>(null);
+
+  // On your own wall post: how many works people have offered for it.
+  const poolId = mine && item?.source === "pool" ? item.id : null;
+  useEffect(() => {
+    setOffers(null);
+    if (!poolId) return;
+    createClient().from("deals").select("id,status,started_by,venue_id").eq("pool_request_id", poolId).then(({ data, error }) => {
+      if (error || !data) return;
+      const live = data.filter(d => d.status !== "withdrawn");
+      setOffers({ total: live.length, fresh: live.filter(d => d.status === "sent" && d.started_by !== d.venue_id).length });
+    });
+  }, [poolId]);
 
   if (!item) return null;
   const imgs = item.images;
@@ -95,6 +109,18 @@ export function SceneDetail({ item, mine, onClose, onMessage, actionLabel, onEdi
         )}
 
         {item.description && <p className="whitespace-pre-line font-ui text-body text-fg-2">{item.description}</p>}
+
+        {offers && offers.total > 0 && (
+          <Link href="/dashboard/messages?tab=deals" onClick={close}
+            className="flex items-center gap-3 rounded-card border-outline border-ink bg-mango-soft p-3 shadow-hard-1 transition hover:-translate-y-px">
+            <Inbox size={18} aria-hidden className="shrink-0 text-fg" />
+            <span className="flex min-w-0 flex-1 flex-col">
+              <span className="font-ui text-body font-semibold text-fg">{offers.total} {offers.total === 1 ? "offer" : "offers"} for this wall</span>
+              <span className="font-ui text-caption text-fg-2">{offers.fresh ? `${offers.fresh} waiting for your answer` : "See who offered what"}</span>
+            </span>
+            <Arrow size={16} aria-hidden className="text-fg-2" />
+          </Link>
+        )}
 
         <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 border-t-hair border-line pt-4 font-ui text-body-sm">
           {rows.map(([k, v]) => (

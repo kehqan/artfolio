@@ -56,6 +56,7 @@ export default function LookingPage() {
   const [suggesting, setSuggesting] = useState(false);
   const [posting, setPosting] = useState(false);
   const [workId, setWorkId] = useState<string | null>(null);
+  const [requestWork, setRequestWork] = useState<string[]>([]);
 
   const venue = role === "venue" || role === "gallery";
 
@@ -133,7 +134,17 @@ export default function LookingPage() {
 
   function offerTo(i: FeedItem) {
     if (!i.poster) return;
-    setOffer({ recipientId: i.userId, name: i.poster.full_name || "this venue", avatar: i.poster.avatar_url, contextId: i.id, contextTitle: i.title, contextLabel: i.typeLabel });
+    setOffer({
+      recipientId: i.userId, name: i.poster.full_name || "this venue", avatar: i.poster.avatar_url,
+      contextId: i.id, contextTitle: i.title, contextLabel: i.typeLabel,
+      poolRequestId: i.source === "pool" ? i.id : null, terms: i.source === "pool" ? i.raw?.details || null : null,
+    });
+  }
+  // A venue answers an artist's "looking for a place" post by requesting the works in it.
+  function requestFrom(i: FeedItem) {
+    if (!i.poster) return;
+    setRequestWork(i.raw?.details?.works || []);
+    setOffer({ mode: "request", recipientId: i.userId, name: i.poster.full_name || "this artist", avatar: i.poster.avatar_url, contextTitle: i.title });
   }
   function messageAbout(i: FeedItem) {
     if (!i.poster) return;
@@ -204,7 +215,7 @@ export default function LookingPage() {
               <ul className="flex flex-col gap-4">
                 {posts.map(i => (
                   <WantCard key={i.key} item={i} venueView={venue} onOpen={() => setOpen(i)}
-                    onAct={() => (venue ? messageAbout(i) : offerTo(i))} />
+                    onAct={() => (venue ? requestFrom(i) : offerTo(i))} />
                 ))}
               </ul>
             </>
@@ -232,8 +243,8 @@ export default function LookingPage() {
                         <span className="truncate font-ui text-caption text-fg-3">{a.artist?.full_name || "Artist"}{a.artist?.location ? ` · ${cityOf(a.artist.location)}` : ""}</span>
                         {a.artist && (
                           <Button size="sm" variant="secondary" className="mt-2"
-                            onClick={() => setMessaging({ id: a.artist!.id, name: a.artist!.full_name || "Artist", avatar: a.artist!.avatar_url, title: a.title, contextId: a.id, label: WALL_LABEL[a.wall_terms || "either"], image: a.images?.[0] })}>
-                            <MessageSquare size={14} aria-hidden /> Ask about it
+                            onClick={() => { setRequestWork([a.id]); setOffer({ mode: "request", recipientId: a.artist!.id, name: a.artist!.full_name || "this artist", avatar: a.artist!.avatar_url }); }}>
+                            Request this work
                           </Button>
                         )}
                       </div>
@@ -261,13 +272,13 @@ export default function LookingPage() {
         item={open}
         mine={!!open && open.userId === userId}
         onClose={() => setOpen(null)}
-        onMessage={i => (venue ? messageAbout(i) : offerTo(i))}
-        actionLabel={venue ? undefined : "Offer a work"}
+        onMessage={i => (venue ? requestFrom(i) : offerTo(i))}
+        actionLabel={venue ? "Request works" : "Offer a work"}
         onEdit={() => {}}
         onDelete={remove}
       />
 
-      <OfferWorkModal open={!!offer} target={offer} onClose={() => setOffer(null)} preselect={workId ? [workId] : []} />
+      <OfferWorkModal open={!!offer} target={offer} onClose={() => setOffer(null)} preselect={offer?.mode === "request" ? requestWork : workId ? [workId] : []} />
 
       {messaging && (
         <MessageModal
@@ -323,7 +334,7 @@ function WantCard({ item, venueView, onOpen, onAct }: { item: FeedItem; venueVie
         {!terms && item.description && <p className="line-clamp-2 font-ui text-body-sm text-fg-3">{item.description}</p>}
         <div className="mt-auto flex flex-wrap gap-2 pt-1">
           <Button variant="primary" size="sm" onClick={onAct}>
-            {venueView ? <><MessageSquare size={14} aria-hidden /> Message</> : "Offer a work"}
+            {venueView ? "Request works" : "Offer a work"}
           </Button>
           <Button variant="ghost" size="sm" onClick={onOpen}>Details</Button>
         </div>

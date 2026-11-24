@@ -21,3 +21,4 @@ export { Alert } from "./Alert";
 export type { AlertTone } from "./Alert";
 export { PasswordInput } from "./PasswordInput";
 export { Chip } from "./Chip";
+export { Switch } from "./Switch";

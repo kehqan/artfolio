@@ -1,189 +1,159 @@
 "use client";
-import { useState, useEffect, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import PlacesAutocomplete from "@/components/PlacesAutocomplete";
 import {
-  Save, Upload, ExternalLink, LogOut, ShoppingBag,
-  Copy, Check, Users, Link as LinkIcon, Gift,
-  Instagram, Globe, Palette, Linkedin,
-  ChevronDown, X, Camera, Eye, Settings,
-  TrendingUp, ImageIcon, Handshake,
+  Building2, Camera, Check, Copy, ExternalLink, Globe, Instagram, Linkedin, Mail, MessageCircle, Palette,
 } from "lucide-react";
+import {
+  Alert, Avatar, Button, ButtonLink, Card, Field, Input, Label, PageHeader, Select, Skeleton, Tabs, Textarea, cn,
+} from "@/components/ui";
 
-type Tab = "account" | "social" | "store" | "referrals";
+type Tab = "profile" | "links" | "invite";
 
-type Profile = {
-  id: string; full_name: string; username: string; bio: string;
-  location: string; website: string; role: string; avatar_url?: string;
-  instagram?: string; behance?: string; linkedin?: string;
-  referral_code?: string;
+const VENUE_TYPES = ["Gallery", "Café", "Restaurant", "Hotel", "Office", "Cultural center", "Studio", "Pop-up space", "Museum", "Theater"];
+const isVenueRole = (r?: string) => r === "venue" || r === "gallery";
+
+type Form = {
+  full_name: string; username: string; bio: string; location: string;
+  website: string; role: string; instagram: string; behance: string; linkedin: string;
+  venue_name: string; venue_type: string;
+};
+const EMPTY: Form = {
+  full_name: "", username: "", bio: "", location: "", website: "", role: "artist",
+  instagram: "", behance: "", linkedin: "", venue_name: "", venue_type: "",
 };
 
-const ROLE_OPTIONS = [
-  { key: "artist",  label: "Artist",  emoji: "🎨", desc: "Painter, sculptor, photographer…" },
-  { key: "gallery", label: "Venue",   emoji: "🏛️", desc: "Gallery, café, studio, hotel…" },
-];
+function useCopy() {
+  const [copied, setCopied] = useState<string | null>(null);
+  return {
+    copied,
+    copy: (key: string, text: string) => {
+      navigator.clipboard?.writeText(text);
+      setCopied(key);
+      setTimeout(() => setCopied(c => (c === key ? null : c)), 2000);
+    },
+  };
+}
 
-// ── Stat mini card ──────────────────────────────────────────────
-function StatPill({ label, value, color }: { label: string; value: number; color: string }) {
+/** Input with a fixed prefix, e.g. instagram.com/ */
+function PrefixInput({ prefix, icon, ...props }: React.InputHTMLAttributes<HTMLInputElement> & { prefix?: string; icon: React.ReactNode }) {
   return (
-    <div style={{ background: "#fff", border: "2px solid #E8E0D0", borderRadius: 12, padding: "10px 14px", textAlign: "center", minWidth: 70 }}>
-      <div style={{ fontSize: 22, fontWeight: 900, color, letterSpacing: "-0.5px" }}>{value}</div>
-      <div style={{ fontSize: 9, fontWeight: 700, color: "#9B8F7A", textTransform: "uppercase", letterSpacing: "0.12em", marginTop: 2 }}>{label}</div>
+    <div className="flex h-10 items-center gap-2 rounded-control border-hair border-line-strong bg-surface px-3 transition-[border-color,box-shadow] duration-fast hover:border-n-400 focus-within:border-ink focus-within:shadow-hard-1">
+      <span className="shrink-0 text-fg-3">{icon}</span>
+      {prefix && <span className="shrink-0 font-ui text-control text-fg-3">{prefix}</span>}
+      <input {...props} className="min-w-0 flex-1 bg-transparent font-ui text-control text-fg outline-none placeholder:text-fg-3" />
     </div>
   );
 }
 
-// ── Social input row ─────────────────────────────────────────────
-function SocialRow({
-  icon, label, placeholder, value, onChange, prefix, accent,
-}: {
-  icon: React.ReactNode; label: string; placeholder: string;
-  value: string; onChange: (v: string) => void; prefix?: string; accent?: string;
-}) {
-  const [focused, setFocused] = useState(false);
+function CopyRow({ value, copied, onCopy, openHref }: { value: string; copied: boolean; onCopy: () => void; openHref?: string }) {
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 16px", background: "#fff", border: `2px solid ${focused ? (accent || "#FFD400") : "#E8E0D0"}`, borderRadius: 14, transition: "border-color .15s, box-shadow .15s", boxShadow: focused ? `0 0 0 3px ${accent || "#FFD400"}33` : "none" }}>
-      <div style={{ width: 34, height: 34, borderRadius: 10, background: focused ? (accent || "#FFD400") : "#F5F0E8", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "background .15s", border: `1.5px solid ${focused ? "#111110" : "#E8E0D0"}` }}>
-        {icon}
+    <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+      <code className="min-w-0 flex-1 truncate rounded-control bg-sunken px-3 py-2.5 font-code text-body-sm text-fg">{value}</code>
+      <div className="flex gap-2">
+        <Button variant="secondary" onClick={onCopy} aria-live="polite">
+          {copied ? <><Check size={15} aria-hidden /> Copied</> : <><Copy size={15} aria-hidden /> Copy</>}
+        </Button>
+        {openHref && (
+          <a href={openHref} target="_blank" rel="noopener noreferrer" className="inline-flex h-10 items-center gap-2 rounded-control px-3 font-ui text-control font-semibold text-fg-2 hover:bg-sunken hover:text-fg">
+            <ExternalLink size={15} aria-hidden /> Open
+          </a>
+        )}
       </div>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 9, fontWeight: 800, color: "#9B8F7A", textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 2 }}>{label}</div>
-        <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-          {prefix && <span style={{ fontSize: 13, fontWeight: 600, color: "#C0B8A8", flexShrink: 0 }}>{prefix}</span>}
-          <input
-            value={value}
-            onChange={e => onChange(e.target.value)}
-            placeholder={placeholder}
-            onFocus={() => setFocused(true)}
-            onBlur={() => setFocused(false)}
-            style={{ flex: 1, border: "none", outline: "none", fontSize: 14, fontWeight: 600, color: "#111110", fontFamily: "inherit", background: "transparent", minWidth: 0 }}
-          />
-        </div>
-      </div>
-      {value && (
-        <button type="button" onClick={() => onChange("")} style={{ background: "none", border: "none", cursor: "pointer", color: "#C0B8A8", padding: 0, display: "flex" }}>
-          <X size={13} />
-        </button>
-      )}
     </div>
   );
 }
 
 // ══════════════════════════════════════════════════════════════════
 export default function ProfilePage() {
-  const router = useRouter();
-  const [tab, setTab]         = useState<Tab>("account");
-  const [profile, setProfile] = useState<Profile | null>(null);
-  const [form, setForm]       = useState({
-    full_name: "", username: "", bio: "", location: "",
-    website: "", role: "artist",
-    instagram: "", behance: "", linkedin: "",
-  });
-  const [avatar, setAvatar]       = useState<string | null>(null);
-  const [saving, setSaving]       = useState(false);
-  const [saved, setSaved]         = useState(false);
-  const [saveErr, setSaveErr]     = useState("");
-  const [uploading, setUploading] = useState(false);
-  const [stats, setStats]         = useState({ artworks: 0, followers: 0, exhibitions: 0, sales: 0 });
-  const [actionsOpen, setActionsOpen] = useState(false);
-  const [referralCopied, setReferralCopied] = useState(false);
-  const [inviteCopied, setInviteCopied]     = useState(false);
-  const [referralCount, setReferralCount]   = useState(0);
-  const actionsRef = useRef<HTMLDivElement>(null);
-  const fileRef    = useRef<HTMLInputElement>(null);
-
   const sb = createClient();
-  const origin = typeof window !== "undefined" ? window.location.origin : "https://artfolio-tawny.vercel.app";
+  const [tab, setTab] = useState<Tab>("profile");
+  const [loading, setLoading] = useState(true);
+  const [form, setForm] = useState<Form>(EMPTY);
+  const [savedForm, setSavedForm] = useState<Form>(EMPTY);
+  const [avatar, setAvatar] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [notice, setNotice] = useState<{ tone: "ok" | "bad"; text: string } | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [referralCount, setReferralCount] = useState(0);
+  const [origin, setOrigin] = useState("");
+  const fileRef = useRef<HTMLInputElement>(null);
+  const { copied, copy } = useCopy();
 
-  useEffect(() => {
-    load();
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
-  function handleClickOutside(e: MouseEvent) {
-    if (actionsRef.current && !(actionsRef.current as any).contains(e.target)) {
-      setActionsOpen(false);
-    }
-  }
+  useEffect(() => { setOrigin(window.location.origin); load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function load() {
     const { data: { user } } = await sb.auth.getUser();
-    if (!user) return;
-
-    const { data } = await sb.from("profiles").select("*").eq("id", user.id).single();
+    if (!user) { setLoading(false); return; }
+    const [{ data }, { count }] = await Promise.all([
+      sb.from("profiles").select("*").eq("id", user.id).single(),
+      sb.from("profiles").select("id", { count: "exact", head: true }).eq("referred_by", user.id),
+    ]);
     if (data) {
-      setProfile(data);
-      setForm({
-        full_name:  data.full_name  || "",
-        username:   data.username   || "",
-        bio:        data.bio        || "",
-        location:   data.location   || "",
-        website:    data.website    || "",
-        role:       data.role       || "artist",
-        instagram:  data.instagram  || "",
-        behance:    data.behance    || "",
-        linkedin:   data.linkedin   || "",
-      });
+      const f: Form = {
+        full_name: data.full_name || "", username: data.username || "", bio: data.bio || "",
+        location: data.location || "", website: data.website || "", role: data.role || "artist",
+        instagram: data.instagram || "", behance: data.behance || "", linkedin: data.linkedin || "",
+        venue_name: data.venue_name || "", venue_type: data.venue_type || "",
+      };
+      setForm(f); setSavedForm(f);
       setAvatar(data.avatar_url || null);
     }
-
-    // Stats
-    const [{ count: aw }, { count: fo }, { count: ex }, { count: sa }] = await Promise.all([
-      sb.from("artworks").select("id",    { count: "exact", head: true }).eq("user_id", user.id),
-      sb.from("followers").select("id",     { count: "exact", head: true }).eq("following_id", user.id),
-      sb.from("exhibitions").select("id", { count: "exact", head: true }).eq("user_id", user.id),
-      sb.from("sales").select("id",       { count: "exact", head: true }).eq("user_id", user.id),
-    ]);
-    setStats({ artworks: aw ?? 0, followers: fo ?? 0, exhibitions: ex ?? 0, sales: sa ?? 0 });
-
-    // Referral count — profiles referred by this user
-    const { count: rc } = await sb.from("profiles")
-      .select("id", { count: "exact", head: true })
-      .eq("referred_by", user.id);
-    setReferralCount(rc ?? 0);
+    setReferralCount(count ?? 0);
+    setLoading(false);
   }
 
-  async function handleSave(e?: React.FormEvent) {
+  const set = <K extends keyof Form>(k: K) => (v: Form[K]) => setForm(p => ({ ...p, [k]: v }));
+  const setE = (k: keyof Form) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => set(k)(e.target.value);
+  const dirty = JSON.stringify(form) !== JSON.stringify(savedForm);
+  const isVenue = isVenueRole(form.role);
+
+  async function save(e?: React.FormEvent) {
     e?.preventDefault();
-    setSaving(true); setSaveErr("");
+    setSaving(true); setNotice(null);
     const { data: { user } } = await sb.auth.getUser();
     if (!user) { setSaving(false); return; }
-
+    const clean = { ...form, username: form.username.toLowerCase().trim() };
     const { error } = await sb.from("profiles").update({
-      full_name:  form.full_name,
-      username:   form.username.toLowerCase().trim(),
-      bio:        form.bio        || null,
-      location:   form.location   || null,
-      website:    form.website    || null,
-      role:       form.role,
-      instagram:  form.instagram  || null,
-      behance:    form.behance    || null,
-      linkedin:   form.linkedin   || null,
+      full_name: clean.full_name,
+      username: clean.username || null,
+      bio: clean.bio || null,
+      location: clean.location || null,
+      website: clean.website || null,
+      role: clean.role,
+      instagram: clean.instagram.replace(/^@/, "") || null,
+      behance: clean.behance || null,
+      linkedin: clean.linkedin || null,
+      venue_name: clean.venue_name || null,
+      venue_type: clean.venue_type || null,
       updated_at: new Date().toISOString(),
     }).eq("id", user.id);
-
     if (error) {
-      setSaveErr(error.message.includes("username") ? "That username is already taken." : error.message);
+      setNotice({ tone: "bad", text: /username|duplicate|unique/i.test(error.message) ? "That username is taken. Try another." : error.message });
     } else {
-      setSaved(true);
-      setTimeout(() => setSaved(false), 2500);
-      setProfile(p => p ? { ...p, ...form } : p);
+      setForm(clean); setSavedForm(clean);
+      setNotice({ tone: "ok", text: "Saved. Your public page is up to date." });
+      setTimeout(() => setNotice(n => (n?.tone === "ok" ? null : n)), 3000);
     }
     setSaving(false);
   }
 
-  async function handleAvatarUpload(file: File) {
+  async function uploadAvatar(file: File) {
+    setNotice(null);
+    if (!file.type.startsWith("image/")) { setNotice({ tone: "bad", text: "Choose an image file (JPG, PNG or WebP)." }); return; }
+    if (file.size > 10 * 1024 * 1024) { setNotice({ tone: "bad", text: "That image is over 10 MB. Try a smaller one." }); return; }
     setUploading(true);
     const { data: { user } } = await sb.auth.getUser();
     if (!user) { setUploading(false); return; }
-    const ext  = file.name.split(".").pop();
-    const path = `avatars/${user.id}.${ext}`;
-    const { error } = await sb.storage.from("avatars").upload(path, file, { upsert: true });
-    if (!error) {
+    const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
+    // Storage rules need the user id as the second path segment; a fresh name per upload avoids stale caches
+    const path = `avatars/${user.id}/avatar-${Date.now()}.${ext}`;
+    const { error } = await sb.storage.from("avatars").upload(path, file, { upsert: false, contentType: file.type });
+    if (error) {
+      setNotice({ tone: "bad", text: "The photo didn't upload. Please try again." });
+    } else {
       const { data: { publicUrl } } = sb.storage.from("avatars").getPublicUrl(path);
       await sb.from("profiles").update({ avatar_url: publicUrl }).eq("id", user.id);
       setAvatar(publicUrl);
@@ -191,595 +161,261 @@ export default function ProfilePage() {
     setUploading(false);
   }
 
-  async function handleSignOut() {
-    await sb.auth.signOut();
-    router.push("/login");
+  const publicUrl = savedForm.username && origin ? `${origin}/${savedForm.username}` : "";
+  const referralUrl = savedForm.username && origin ? `${origin}/register?ref=${savedForm.username}` : "";
+  const inviteText = `I'm using Artomango to keep track of my work, show it and find places to exhibit. Join with my link: ${referralUrl}`;
+
+  const saveBar = (
+    <div className="flex flex-col-reverse gap-3 border-t-hair border-line pt-5 sm:flex-row sm:items-center sm:justify-between">
+      <span className="font-ui text-body-sm text-fg-3">{dirty ? "You have unsaved changes." : "Everything is saved."}</span>
+      <Button type="submit" variant="primary" disabled={saving || !dirty}>{saving ? "Saving…" : "Save changes"}</Button>
+    </div>
+  );
+
+  if (loading) {
+    return (
+      <div className="flex flex-col gap-6" aria-busy>
+        <Skeleton className="h-10 w-64" />
+        <Skeleton className="h-10 w-80" />
+        <Skeleton className="h-96 w-full max-w-[760px] rounded-card" />
+      </div>
+    );
   }
 
-  const sf = (k: string) => (v: string) => setForm(p => ({ ...p, [k]: v }));
-  const sfE = (k: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setForm(p => ({ ...p, [k]: e.target.value }));
-
-  const initials   = form.full_name ? form.full_name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase() : "A";
-  const publicUrl  = form.username ? `${origin}/${form.username}` : null;
-  const referralUrl = form.username ? `${origin}/register?ref=${form.username}` : null;
-
-  const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
-    { id: "account",  label: "Account",  icon: <Settings size={14} /> },
-    { id: "social",   label: "Social",   icon: <Globe size={14} /> },
-    { id: "store",    label: "My Store", icon: <ShoppingBag size={14} /> },
-    { id: "referrals",label: "Referrals",icon: <Gift size={14} /> },
-  ];
-
   return (
-    <>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Darker+Grotesque:wght@400;500;600;700;800;900&display=swap');
-        *{box-sizing:border-box}
-        body{font-family:'Darker Grotesque',system-ui,sans-serif}
+    <div className="flex flex-col gap-6">
+      <PageHeader
+        title="Your profile"
+        description="What artists, venues and collectors see on your public page."
+        actions={publicUrl ? (
+          <ButtonLink href={`/${savedForm.username}`} target="_blank" variant="secondary">
+            <ExternalLink size={15} aria-hidden /> View public page
+          </ButtonLink>
+        ) : undefined}
+      />
 
-        .prf-input{
-          width:100%;padding:11px 14px;
-          border:2px solid #E8E0D0;border-radius:12px;
-          font-size:14px;font-family:'Darker Grotesque',system-ui,sans-serif;
-          font-weight:600;color:#111110;background:#fff;
-          outline:none;transition:border-color .15s,box-shadow .15s;
-        }
-        .prf-input:focus{border-color:#FFD400;box-shadow:0 0 0 3px rgba(255,212,0,.2)}
-        .prf-label{display:block;font-size:10px;font-weight:800;color:#9B8F7A;text-transform:uppercase;letter-spacing:.14em;margin-bottom:6px}
-        .prf-hint{font-size:11px;font-weight:600;color:#C0B8A8;margin-top:5px}
+      <Tabs
+        items={[
+          { value: "profile", label: "Profile" },
+          { value: "links", label: "Links" },
+          { value: "invite", label: "Invite", count: referralCount || undefined },
+        ]}
+        value={tab}
+        onChange={setTab}
+        label="Profile sections"
+        className="max-w-full self-start overflow-x-auto"
+      />
 
-        .prf-tab{
-          display:flex;align-items:center;gap:7px;
-          padding:10px 18px;border:none;
-          font-family:inherit;font-size:13px;font-weight:700;
-          cursor:pointer;transition:all .15s;white-space:nowrap;
-          background:transparent;color:#9B8F7A;
-          border-bottom:3px solid transparent;margin-bottom:-2px;
-        }
-        .prf-tab:hover{color:#111110}
-        .prf-tab.active{color:#111110;border-bottom-color:#FFD400;background:transparent}
+      {notice && <Alert tone={notice.tone}>{notice.text}</Alert>}
 
-        .prf-section{background:#fff;border:2px solid #E8E0D0;border-radius:18px;padding:24px;margin-bottom:20px}
-        .prf-section-title{font-size:13px;font-weight:900;color:#111110;text-transform:uppercase;letter-spacing:.1em;margin-bottom:20px;display:flex;align-items:center;gap:8px}
-        .prf-section-title::after{content:'';flex:1;height:1.5px;background:#F0EBE3}
-
-        .prf-save{
-          display:flex;align-items:center;gap:8px;
-          padding:12px 28px;border:2.5px solid #111110;border-radius:14px;
-          font-family:inherit;font-size:14px;font-weight:800;cursor:pointer;
-          transition:all .2s cubic-bezier(.16,1,.3,1);
-          box-shadow:4px 4px 0 #111110;
-        }
-        .prf-save:hover:not(:disabled){box-shadow:6px 6px 0 #111110;transform:translate(-1px,-1px)}
-        .prf-save:disabled{opacity:.6;cursor:not-allowed}
-
-        .role-card{
-          display:flex;align-items:center;gap:12px;
-          padding:14px 16px;border:2.5px solid #E8E0D0;border-radius:14px;
-          cursor:pointer;transition:all .15s cubic-bezier(.16,1,.3,1);background:#fff;
-          flex:1;
-        }
-        .role-card:hover{border-color:#111110}
-        .role-card.active{border-color:#FFD400;background:#FFFBEA;box-shadow:3px 3px 0 #111110}
-
-        .referral-box{
-          background:linear-gradient(135deg,#111110 0%,#1a1a1a 100%);
-          border:2.5px solid #111110;border-radius:18px;padding:28px;
-          box-shadow:6px 6px 0 #FFD400;
-        }
-
-        .copy-btn{
-          display:flex;align-items:center;gap:6px;
-          padding:8px 14px;border:2px solid #333;border-radius:9999px;
-          background:rgba(255,255,255,.08);color:#fff;
-          font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;
-          transition:all .15s;
-        }
-        .copy-btn:hover{background:rgba(255,255,255,.15);border-color:#FFD400}
-
-        .store-preview{
-          border:2.5px solid #111110;border-radius:18px;overflow:hidden;
-          box-shadow:4px 4px 0 #D4C9A8;transition:all .2s cubic-bezier(.16,1,.3,1);
-          text-decoration:none;display:block;background:#fff;
-        }
-        .store-preview:hover{box-shadow:6px 7px 0 #111110;transform:translate(-1px,-2px)}
-
-        @keyframes savedBounce{0%{transform:scale(1)}50%{transform:scale(1.08)}100%{transform:scale(1)}}
-        .saved-anim{animation:savedBounce .3s ease}
-      `}</style>
-
-      <div style={{ maxWidth: 860, margin: "0 auto" }}>
-
-        {/* ── TOP HEADER ── */}
-        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 28, flexWrap: "wrap", gap: 16 }}>
-          <div>
-            <h1 style={{ fontSize: 30, fontWeight: 900, color: "#111110", letterSpacing: "-0.8px", margin: 0 }}>Profile Settings</h1>
-            <p style={{ fontSize: 14, color: "#9B8F7A", margin: "4px 0 0", fontWeight: 600 }}>
-              Manage your public profile and account preferences
-            </p>
-          </div>
-
-          {/* Actions dropdown */}
-          <div style={{ position: "relative" }} ref={actionsRef as any}>
-            <div style={{ display: "flex", gap: 8 }}>
-              {/* View public profile */}
-              {publicUrl && (
-                <a href={publicUrl} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none" }}>
-                  <button style={{ display: "flex", alignItems: "center", gap: 6, padding: "10px 16px", border: "2px solid #E8E0D0", borderRadius: 12, background: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", color: "#111110", transition: "all .15s" }}
-                    onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = "#111110"; }}
-                    onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = "#E8E0D0"; }}>
-                    <Eye size={13} /> View Profile
-                  </button>
-                </a>
-              )}
-
-              {/* Actions menu */}
-              <button
-                onClick={() => setActionsOpen(p => !p)}
-                style={{ display: "flex", alignItems: "center", gap: 6, padding: "10px 16px", border: "2.5px solid #111110", borderRadius: 12, background: actionsOpen ? "#111110" : "#fff", color: actionsOpen ? "#FFD400" : "#111110", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", transition: "all .15s", boxShadow: actionsOpen ? "3px 3px 0 #FFD400" : "2px 2px 0 #111110" }}
-              >
-                <Settings size={13} /> Options <ChevronDown size={12} style={{ transform: actionsOpen ? "rotate(180deg)" : "none", transition: "transform .2s" }} />
-              </button>
-            </div>
-
-            {/* Dropdown */}
-            {actionsOpen && (
-              <div style={{ position: "absolute", top: "calc(100% + 8px)", right: 0, background: "#fff", border: "2.5px solid #111110", borderRadius: 16, boxShadow: "6px 6px 0 #111110", minWidth: 220, overflow: "hidden", zIndex: 50 }}>
-                {[
-                  { icon: <ShoppingBag size={14} />, label: "Go to MyStore",    action: () => { router.push("/dashboard/mystore"); setActionsOpen(false); } },
-                  { icon: <Eye size={14} />,          label: "View public profile", action: () => { if (publicUrl) window.open(publicUrl, "_blank"); setActionsOpen(false); } },
-                  { icon: <TrendingUp size={14} />,  label: "Analytics",        action: () => { router.push("/dashboard/analytics"); setActionsOpen(false); } },
-                  { icon: <ImageIcon size={14} />,   label: "My Artworks",      action: () => { router.push("/dashboard/artworks"); setActionsOpen(false); } },
-                ].map((item, i) => (
-                  <button key={i} onClick={item.action}
-                    style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "11px 16px", border: "none", borderBottom: "1px solid #F5F0E8", background: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, color: "#111110", textAlign: "left", fontFamily: "inherit" }}
-                    onMouseEnter={e => (e.currentTarget.style.background = "#FFFBEA")}
-                    onMouseLeave={e => (e.currentTarget.style.background = "none")}>
-                    {item.icon}{item.label}
-                  </button>
-                ))}
-                {/* Divider + Sign out */}
-                <div style={{ borderTop: "2px solid #111110" }}>
-                  <button onClick={handleSignOut}
-                    style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "12px 16px", border: "none", background: "none", cursor: "pointer", fontSize: 13, fontWeight: 700, color: "#EF4444", textAlign: "left", fontFamily: "inherit" }}
-                    onMouseEnter={e => (e.currentTarget.style.background = "#FEF2F2")}
-                    onMouseLeave={e => (e.currentTarget.style.background = "none")}>
-                    <LogOut size={14} /> Sign out
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* ── AVATAR + STATS ROW ── */}
-        <div style={{ display: "flex", gap: 20, alignItems: "center", marginBottom: 28, background: "#fff", border: "2.5px solid #111110", borderRadius: 22, padding: "20px 24px", boxShadow: "4px 4px 0 #D4C9A8" }}>
-          {/* Avatar */}
-          <div style={{ position: "relative", flexShrink: 0 }}>
-            <div style={{ width: 76, height: 76, borderRadius: 18, border: "3px solid #111110", background: "#FFD400", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, fontWeight: 900, color: "#111110", boxShadow: "3px 3px 0 #111110", cursor: "pointer" }}
-              onClick={() => fileRef.current?.click()}>
-              {avatar
-                ? <img src={avatar} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                : initials
-              }
-              {/* Hover overlay */}
-              <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "center", justifyContent: "center", opacity: 0, transition: "opacity .15s", borderRadius: 16 }}
-                onMouseEnter={e => (e.currentTarget.style.opacity = "1")}
-                onMouseLeave={e => (e.currentTarget.style.opacity = "0")}>
-                <Camera size={18} color="#FFD400" />
-              </div>
-            </div>
-            {uploading && (
-              <div style={{ position: "absolute", inset: 0, background: "rgba(255,251,234,0.85)", borderRadius: 18, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <div style={{ width: 18, height: 18, border: "2px solid #FFD400", borderTop: "2px solid transparent", borderRadius: "50%", animation: "spin .7s linear infinite" }} />
-              </div>
-            )}
-            <button onClick={() => fileRef.current?.click()}
-              style={{ position: "absolute", bottom: -4, right: -4, width: 24, height: 24, borderRadius: 8, background: "#FFD400", border: "2px solid #111110", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
-              <Upload size={11} />
-            </button>
-            <input ref={fileRef} type="file" accept="image/*" hidden onChange={e => e.target.files?.[0] && handleAvatarUpload(e.target.files[0])} />
-          </div>
-
-          {/* Name + username */}
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 20, fontWeight: 900, color: "#111110", letterSpacing: "-0.3px", marginBottom: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-              {form.full_name || "Your Name"}
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span style={{ fontSize: 13, fontWeight: 600, color: "#9B8F7A" }}>@{form.username || "username"}</span>
-              {form.role && (
-                <span style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "2px 9px", borderRadius: 9999, background: form.role === "gallery" ? "#E0F2FE" : "#FFD400", color: form.role === "gallery" ? "#0C4A6E" : "#111110", fontSize: 9, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.1em", border: "1.5px solid #111110" }}>
-                  {form.role === "gallery" ? "🏛️ Venue" : "🎨 Artist"}
-                </span>
-              )}
-            </div>
-            {publicUrl && (
-              <div style={{ fontSize: 11, fontWeight: 600, color: "#C0B8A8", marginTop: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {publicUrl}
-              </div>
-            )}
-          </div>
-
-          {/* Stats */}
-          <div style={{ display: "flex", gap: 10, flexShrink: 0 }}>
-            <StatPill label="Works"     value={stats.artworks}    color="#111110" />
-            <StatPill label="Followers" value={stats.followers}   color="#FF6B6B" />
-            <StatPill label="Shows"     value={stats.exhibitions} color="#4ECDC4" />
-            <StatPill label="Sales"     value={stats.sales}       color="#16A34A" />
-          </div>
-        </div>
-        <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
-
-        {/* ── TAB BAR ── */}
-        <div style={{ display: "flex", borderBottom: "2px solid #E8E0D0", marginBottom: 24, gap: 0, overflowX: "auto" }}>
-          {TABS.map(t => (
-            <button key={t.id} className={`prf-tab${tab === t.id ? " active" : ""}`} onClick={() => setTab(t.id)}>
-              {t.icon}{t.label}
-            </button>
-          ))}
-        </div>
-
-        {/* ════════════════════════════
-            TAB: ACCOUNT
-        ════════════════════════════ */}
-        {tab === "account" && (
-          <form onSubmit={handleSave}>
-            {/* Identity */}
-            <div className="prf-section">
-              <div className="prf-section-title"><Settings size={14} /> Identity</div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18, marginBottom: 18 }}>
-                <div>
-                  <label className="prf-label">Full name *</label>
-                  <input className="prf-input" required value={form.full_name} onChange={sfE("full_name")} placeholder="Your name" />
-                </div>
-                <div>
-                  <label className="prf-label">Username *</label>
-                  <div style={{ position: "relative" }}>
-                    <span style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", fontSize: 13, fontWeight: 700, color: "#C0B8A8", pointerEvents: "none" }}>@</span>
-                    <input className="prf-input" required value={form.username} onChange={e => setForm(p => ({ ...p, username: e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, "") }))} placeholder="yourname" style={{ paddingLeft: 28 }} />
-                  </div>
-                  <div className="prf-hint">Only lowercase letters, numbers, underscores</div>
-                </div>
-              </div>
-
-              {/* Role picker */}
-              <div style={{ marginBottom: 18 }}>
-                <label className="prf-label">I am a…</label>
-                <div style={{ display: "flex", gap: 10 }}>
-                  {ROLE_OPTIONS.map(r => (
-                    <div key={r.key} className={`role-card${form.role === r.key ? " active" : ""}`} onClick={() => setForm(p => ({ ...p, role: r.key }))}>
-                      <span style={{ fontSize: 26, lineHeight: 1, flexShrink: 0 }}>{r.emoji}</span>
-                      <div>
-                        <div style={{ fontSize: 14, fontWeight: 800, color: "#111110" }}>{r.label}</div>
-                        <div style={{ fontSize: 11, color: "#9B8F7A", fontWeight: 500 }}>{r.desc}</div>
-                      </div>
-                      {form.role === r.key && (
-                        <div style={{ marginLeft: "auto", width: 20, height: 20, borderRadius: "50%", background: "#FFD400", border: "2px solid #111110", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                          <Check size={11} strokeWidth={3} />
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Bio */}
-              <div style={{ marginBottom: 18 }}>
-                <label className="prf-label">Bio</label>
-                <textarea className="prf-input" rows={3} value={form.bio} onChange={sfE("bio")} placeholder="A few words about your work and practice…" style={{ resize: "vertical" }} />
-                <div className="prf-hint" style={{ display: "flex", justifyContent: "space-between" }}>
-                  <span>Shown on your public profile</span>
-                  <span>{form.bio.length}/300</span>
-                </div>
-              </div>
-
-              {/* Location */}
-              <div>
-                <label className="prf-label">Location</label>
-                <PlacesAutocomplete
-                  value={form.location}
-                  placeholder="Search your city…"
-                  onChange={(result, raw) => setForm(p => ({ ...p, location: raw }))}
-                />
-                <div className="prf-hint">Just your city is fine — no full address needed</div>
-              </div>
-            </div>
-
-            {/* Save bar */}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
-              {saveErr && (
-                <div style={{ fontSize: 13, fontWeight: 700, color: "#EF4444", display: "flex", alignItems: "center", gap: 6 }}>
-                  ✕ {saveErr}
-                </div>
-              )}
-              <div style={{ marginLeft: "auto", display: "flex", gap: 10, alignItems: "center" }}>
-                {saved && <span style={{ fontSize: 13, fontWeight: 700, color: "#16A34A" }}>✓ Saved!</span>}
-                <button type="submit" className={`prf-save${saved ? " saved-anim" : ""}`} disabled={saving}
-                  style={{ background: saved ? "#16A34A" : "#FFD400", color: saved ? "#fff" : "#111110" }}>
-                  <Save size={14} /> {saving ? "Saving…" : saved ? "Saved!" : "Save changes"}
-                </button>
-              </div>
-            </div>
-          </form>
-        )}
-
-        {/* ════════════════════════════
-            TAB: SOCIAL
-        ════════════════════════════ */}
-        {tab === "social" && (
-          <div>
-            <div className="prf-section">
-              <div className="prf-section-title"><Globe size={14} /> Links & Social Media</div>
-              <p style={{ fontSize: 13, fontWeight: 600, color: "#9B8F7A", marginBottom: 20 }}>
-                Add your social links so collectors, galleries and collaborators can find you everywhere.
-              </p>
-              <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 28 }}>
-                <SocialRow
-                  icon={<Globe size={15} color="#111110" />}
-                  label="Website"
-                  placeholder="yoursite.com"
-                  prefix="https://"
-                  value={form.website.replace(/^https?:\/\//, "")}
-                  onChange={v => setForm(p => ({ ...p, website: v ? `https://${v}` : "" }))}
-                  accent="#4ECDC4"
-                />
-                <SocialRow
-                  icon={<Instagram size={15} color="#E1306C" />}
-                  label="Instagram"
-                  placeholder="yourhandle"
-                  prefix="@"
-                  value={form.instagram.replace(/^@/, "")}
-                  onChange={v => setForm(p => ({ ...p, instagram: v }))}
-                  accent="#E1306C"
-                />
-                <SocialRow
-                  icon={<Palette size={15} color="#1769ff" />}
-                  label="Behance"
-                  placeholder="your-name"
-                  prefix="behance.net/"
-                  value={form.behance}
-                  onChange={sf("behance")}
-                  accent="#1769ff"
-                />
-                <SocialRow
-                  icon={<Linkedin size={15} color="#0A66C2" />}
-                  label="LinkedIn"
-                  placeholder="your-name"
-                  prefix="linkedin.com/in/"
-                  value={form.linkedin}
-                  onChange={sf("linkedin")}
-                  accent="#0A66C2"
-                />
-              </div>
-
-              {/* Public profile link */}
-              {publicUrl && (
-                <div style={{ background: "#FAF7F3", border: "2px solid #E8E0D0", borderRadius: 14, padding: "14px 16px" }}>
-                  <div style={{ fontSize: 10, fontWeight: 800, color: "#9B8F7A", textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 8 }}>Your public Artomango profile</div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                    <div style={{ flex: 1, fontSize: 13, fontWeight: 700, color: "#111110", fontFamily: "monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{publicUrl}</div>
-                    <button onClick={() => { navigator.clipboard.writeText(publicUrl); }}
-                      style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", border: "2px solid #E8E0D0", borderRadius: 9999, background: "#fff", fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", color: "#111110", flexShrink: 0 }}>
-                      <Copy size={11} /> Copy
-                    </button>
-                    <a href={publicUrl} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none" }}>
-                      <button style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", border: "2px solid #111110", borderRadius: 9999, background: "#FFD400", fontSize: 11, fontWeight: 800, cursor: "pointer", fontFamily: "inherit", color: "#111110", flexShrink: 0 }}>
-                        <ExternalLink size={11} /> Open
-                      </button>
-                    </a>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div style={{ display: "flex", justifyContent: "flex-end" }}>
-              <button className="prf-save" disabled={saving} onClick={handleSave}
-                style={{ background: saved ? "#16A34A" : "#FFD400", color: saved ? "#fff" : "#111110" }}>
-                <Save size={14} /> {saving ? "Saving…" : saved ? "Saved!" : "Save Social Links"}
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* ════════════════════════════
-            TAB: MY STORE
-        ════════════════════════════ */}
-        {tab === "store" && (
-          <div>
-            {/* Store preview card */}
-            <a href="/dashboard/mystore" className="store-preview" style={{ marginBottom: 20 }}>
-              <div style={{ background: "#111110", padding: "18px 24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                  <div style={{ width: 40, height: 40, borderRadius: 12, background: "#FFD400", border: "2px solid #FFD400", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    <ShoppingBag size={20} color="#111110" />
-                  </div>
-                  <div>
-                    <div style={{ fontSize: 16, fontWeight: 900, color: "#FFD400" }}>MyStore</div>
-                    <div style={{ fontSize: 11, color: "#666" }}>Your public storefront on Artomango</div>
-                  </div>
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <div style={{ padding: "3px 10px", borderRadius: 9999, background: "#1a1a1a", border: "1px solid #333", fontSize: 10, fontWeight: 800, color: "#4ECDC4" }}>
-                    Manage →
-                  </div>
-                </div>
-              </div>
-              <div style={{ padding: "18px 24px", display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 14 }}>
-                {[
-                  { label: "Artworks in store", icon: <ImageIcon size={16} color="#FFD400" />, desc: "Curate what buyers see" },
-                  { label: "Collab & events",   icon: <Handshake size={16} color="#4ECDC4" />, desc: "Showcase partnerships" },
-                  { label: "Accent & layout",   icon: <Palette size={16} color="#FF6B6B" />,  desc: "Brand your page" },
-                ].map(item => (
-                  <div key={item.label} style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
-                    <div style={{ width: 32, height: 32, borderRadius: 9, background: "#F5F0E8", border: "1.5px solid #E8E0D0", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                      {item.icon}
-                    </div>
-                    <div>
-                      <div style={{ fontSize: 12, fontWeight: 800, color: "#111110" }}>{item.label}</div>
-                      <div style={{ fontSize: 11, color: "#9B8F7A", fontWeight: 500 }}>{item.desc}</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </a>
-
-            {/* Public URL */}
-            {publicUrl && (
-              <div className="prf-section">
-                <div className="prf-section-title"><LinkIcon size={14} /> Your public URL</div>
-                <p style={{ fontSize: 13, color: "#9B8F7A", fontWeight: 600, marginBottom: 16 }}>
-                  This is your unified public page — it shows your store, artworks, collabs and events all in one place.
-                </p>
-                <div style={{ display: "flex", gap: 10, alignItems: "center", background: "#FAF7F3", border: "2px solid #E8E0D0", borderRadius: 12, padding: "12px 16px" }}>
-                  <div style={{ flex: 1, fontSize: 14, fontWeight: 700, color: "#111110", fontFamily: "monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{publicUrl}</div>
-                  <button onClick={() => { navigator.clipboard.writeText(publicUrl); }}
-                    style={{ display: "flex", alignItems: "center", gap: 5, padding: "7px 14px", border: "2px solid #E8E0D0", borderRadius: 10, background: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", color: "#111110", flexShrink: 0 }}>
-                    <Copy size={12} /> Copy link
-                  </button>
-                  <a href={publicUrl} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none", flexShrink: 0 }}>
-                    <button style={{ display: "flex", alignItems: "center", gap: 5, padding: "7px 14px", border: "2.5px solid #111110", borderRadius: 10, background: "#FFD400", fontSize: 12, fontWeight: 800, cursor: "pointer", fontFamily: "inherit", color: "#111110" }}>
-                      <ExternalLink size={12} /> Open
-                    </button>
-                  </a>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* ════════════════════════════
-            TAB: REFERRALS
-        ════════════════════════════ */}
-        {tab === "referrals" && (
-          <div>
-            {/* Hero referral card */}
-            <div className="referral-box" style={{ marginBottom: 20 }}>
-              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
-                <div>
-                  <div style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "3px 12px", borderRadius: 9999, background: "rgba(255,212,0,.12)", border: "1px solid rgba(255,212,0,.25)", fontSize: 10, fontWeight: 800, color: "#FFD400", textTransform: "uppercase", letterSpacing: "0.14em", marginBottom: 10 }}>
-                    🥭 Artomango Referrals
-                  </div>
-                  <h3 style={{ fontSize: 26, fontWeight: 900, color: "#fff", letterSpacing: "-0.5px", margin: 0, lineHeight: 1.1, marginBottom: 6 }}>
-                    Invite your artist friends
-                  </h3>
-                  <p style={{ fontSize: 14, color: "#666", fontWeight: 600, maxWidth: 440, lineHeight: 1.6, margin: 0 }}>
-                    Share your personal invite link. When someone signs up through it, they join with your name attached — and you build your network on Artomango.
-                  </p>
-                </div>
-                <div style={{ textAlign: "center", background: "rgba(255,212,0,.08)", border: "1.5px solid rgba(255,212,0,.2)", borderRadius: 16, padding: "16px 24px", flexShrink: 0 }}>
-                  <div style={{ fontSize: 42, fontWeight: 900, color: "#FFD400", letterSpacing: "-2px" }}>{referralCount}</div>
-                  <div style={{ fontSize: 10, fontWeight: 800, color: "#555", textTransform: "uppercase", letterSpacing: "0.12em" }}>Artists invited</div>
-                </div>
-              </div>
-
-              {/* Referral link */}
-              {referralUrl ? (
-                <div style={{ background: "rgba(255,255,255,.06)", border: "1.5px solid rgba(255,255,255,.1)", borderRadius: 14, padding: "14px 16px" }}>
-                  <div style={{ fontSize: 10, fontWeight: 800, color: "#555", textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 8 }}>Your invite link</div>
-                  <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-                    <div style={{ flex: 1, minWidth: 0, fontSize: 13, fontWeight: 700, color: "#fff", fontFamily: "monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{referralUrl}</div>
-                    <button className="copy-btn"
-                      onClick={() => { navigator.clipboard.writeText(referralUrl); setReferralCopied(true); setTimeout(() => setReferralCopied(false), 2000); }}>
-                      {referralCopied ? <><Check size={12} color="#FFD400" /> Copied!</> : <><Copy size={12} /> Copy link</>}
-                    </button>
-                    <button className="copy-btn"
-                      onClick={() => {
-                        const text = `Hey! I'm using Artomango to manage my art practice and thought you'd love it. Join with my invite link: ${referralUrl}`;
-                        navigator.clipboard.writeText(text);
-                        setInviteCopied(true);
-                        setTimeout(() => setInviteCopied(false), 2000);
-                      }}>
-                      {inviteCopied ? <><Check size={12} color="#FFD400" /> Copied!</> : <><Users size={12} /> Copy invite message</>}
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div style={{ background: "rgba(255,255,255,.06)", border: "1.5px solid rgba(255,212,0,.2)", borderRadius: 14, padding: "14px 16px", fontSize: 13, fontWeight: 700, color: "#FFD400" }}>
-                  ⚠ Set a username in Account tab to get your invite link.
-                </div>
-              )}
-            </div>
-
-            {/* How it works */}
-            <div className="prf-section">
-              <div className="prf-section-title"><Gift size={14} /> How referrals work</div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 14 }}>
-                {[
-                  { n: "01", emoji: "🔗", title: "Share your link", desc: "Send your unique invite link to artist friends, galleries, or post it on your social media." },
-                  { n: "02", emoji: "✍️", title: "They sign up", desc: "When someone joins Artomango through your link, they're connected to you as the referrer." },
-                  { n: "03", emoji: "🥭", title: "Your network grows", desc: "Your referral count goes up, and you build a genuine network on the platform." },
-                ].map(step => (
-                  <div key={step.n} style={{ padding: "18px", background: "#FAF7F3", border: "2px solid #E8E0D0", borderRadius: 16 }}>
-                    <div style={{ fontSize: 9, fontWeight: 800, color: "#C0B8A8", textTransform: "uppercase", letterSpacing: "0.16em", marginBottom: 12, display: "flex", alignItems: "center", gap: 6 }}>
-                      {step.n} <div style={{ flex: 1, height: 1, background: "#E8E0D0" }} />
-                    </div>
-                    <div style={{ fontSize: 24, lineHeight: 1, marginBottom: 10 }}>{step.emoji}</div>
-                    <div style={{ fontSize: 14, fontWeight: 800, color: "#111110", marginBottom: 6 }}>{step.title}</div>
-                    <div style={{ fontSize: 12, color: "#9B8F7A", fontWeight: 500, lineHeight: 1.6 }}>{step.desc}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Share via platforms */}
-            {referralUrl && (
-              <div className="prf-section">
-                <div className="prf-section-title"><Users size={14} /> Share via</div>
-                <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                  {[
-                    {
-                      label: "WhatsApp",
-                      icon: "💬",
-                      color: "#25D366",
-                      href: `https://wa.me/?text=${encodeURIComponent(`I'm on Artomango — the platform for artists to manage work, find venues and grow. Join with my link: ${referralUrl}`)}`,
-                    },
-                    {
-                      label: "Instagram DM",
-                      icon: "📸",
-                      color: "#E1306C",
-                      action: () => { navigator.clipboard.writeText(referralUrl); alert("Link copied! Paste it in your Instagram DM or bio."); },
-                    },
-                    {
-                      label: "Email",
-                      icon: "✉️",
-                      color: "#EA4335",
-                      href: `mailto:?subject=Join me on Artomango&body=${encodeURIComponent(`Hey!\n\nI've been using Artomango to manage my art practice — it's great for inventory, exhibitions, and finding venues to collaborate with.\n\nJoin with my invite link: ${referralUrl}\n\nSee you there!`)}`,
-                    },
-                    {
-                      label: "Copy message",
-                      icon: "📋",
-                      color: "#111110",
-                      action: () => {
-                        navigator.clipboard.writeText(`Hey! Join me on Artomango — a platform for artists to manage work, exhibit and collaborate. Use my invite link: ${referralUrl}`);
-                        setInviteCopied(true);
-                        setTimeout(() => setInviteCopied(false), 2000);
-                      },
-                    },
-                  ].map(item => (
-                    item.href ? (
-                      <a key={item.label} href={item.href} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none" }}>
-                        <button style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 16px", border: "2px solid #E8E0D0", borderRadius: 12, background: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", color: "#111110", transition: "all .15s" }}
-                          onMouseEnter={e => { const el = e.currentTarget; el.style.borderColor = item.color; el.style.background = item.color + "10"; }}
-                          onMouseLeave={e => { const el = e.currentTarget; el.style.borderColor = "#E8E0D0"; el.style.background = "#fff"; }}>
-                          <span style={{ fontSize: 16 }}>{item.icon}</span> {item.label}
-                        </button>
-                      </a>
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start">
+        {/* ── Main column ── */}
+        <div className="min-w-0">
+          {tab === "profile" && (
+            <form onSubmit={save}>
+              <Card padding="lg" className="flex flex-col gap-6">
+                {/* Photo */}
+                <div className="flex items-center gap-4">
+                  <button
+                    type="button"
+                    onClick={() => fileRef.current?.click()}
+                    className="group relative h-20 w-20 shrink-0 overflow-hidden rounded-card border-hair border-line bg-mango-soft"
+                    aria-label="Change photo"
+                  >
+                    {avatar ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={avatar} alt="" className="h-full w-full object-cover" />
                     ) : (
-                      <button key={item.label} onClick={item.action}
-                        style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 16px", border: "2px solid #E8E0D0", borderRadius: 12, background: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", color: "#111110", transition: "all .15s" }}
-                        onMouseEnter={e => { const el = e.currentTarget; el.style.borderColor = item.color; el.style.background = item.color + "10"; }}
-                        onMouseLeave={e => { const el = e.currentTarget; el.style.borderColor = "#E8E0D0"; el.style.background = "#fff"; }}>
-                        <span style={{ fontSize: 16 }}>{item.icon}</span> {item.label}
-                      </button>
-                    )
-                  ))}
+                      <span className="grid h-full w-full place-items-center font-display text-h2 font-bold text-fg">{(form.full_name || "?")[0]}</span>
+                    )}
+                    <span className="absolute inset-0 grid place-items-center bg-inverse text-on-inverse opacity-0 transition-opacity duration-fast group-hover:opacity-80 group-focus-visible:opacity-80">
+                      <Camera size={18} aria-hidden />
+                    </span>
+                  </button>
+                  <div className="flex flex-col items-start gap-1.5">
+                    <Button variant="secondary" size="sm" onClick={() => fileRef.current?.click()} disabled={uploading}>
+                      {uploading ? "Uploading…" : avatar ? "Change photo" : "Add a photo"}
+                    </Button>
+                    <span className="font-ui text-caption text-fg-3">Square works best. Up to 10 MB.</span>
+                  </div>
+                  <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) uploadAvatar(f); e.target.value = ""; }} />
                 </div>
+
+                {/* Identity */}
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <Field label="Name" hint={isVenue ? "The person running the account." : "As you sign your work."}>
+                    {p => <Input {...p} required value={form.full_name} onChange={setE("full_name")} placeholder="Your name" />}
+                  </Field>
+                  <Field label="Username" hint={form.username ? `Your page: artomango…/${form.username}` : "Letters, numbers and underscores."}>
+                    {p => (
+                      <Input {...p} required value={form.username} placeholder="yourname"
+                        onChange={e => set("username")(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ""))} />
+                    )}
+                  </Field>
+                </div>
+
+                {/* Role */}
+                <fieldset className="flex flex-col gap-2">
+                  <legend className="mb-2 font-ui text-label font-semibold text-fg">You are</legend>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {[
+                      { venue: false, label: "An artist", desc: "Painter, sculptor, photographer and more", Icon: Palette },
+                      { venue: true, label: "A venue", desc: "Gallery, café, studio, hotel and more", Icon: Building2 },
+                    ].map(o => {
+                      const active = isVenue === o.venue;
+                      return (
+                        <button
+                          key={o.label}
+                          type="button"
+                          aria-pressed={active}
+                          onClick={() => set("role")(o.venue ? (isVenueRole(savedForm.role) ? savedForm.role : "venue") : "artist")}
+                          className={cn(
+                            "flex items-start gap-3 rounded-control border-hair p-4 text-left transition-colors duration-fast",
+                            active ? "border-ink bg-mango-soft" : "border-line bg-surface hover:border-n-400",
+                          )}
+                        >
+                          <o.Icon size={18} aria-hidden className="mt-0.5 shrink-0 text-fg" />
+                          <span className="flex flex-col gap-0.5">
+                            <span className="font-ui text-body font-semibold text-fg">{o.label}</span>
+                            <span className="font-ui text-body-sm text-fg-3">{o.desc}</span>
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </fieldset>
+
+                {isVenue && (
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <Field label="Venue name">
+                      {p => <Input {...p} value={form.venue_name} onChange={setE("venue_name")} placeholder="e.g. Galerie Nord" />}
+                    </Field>
+                    <Field label="Kind of place">
+                      {p => (
+                        <Select {...p} value={form.venue_type} onChange={setE("venue_type")}>
+                          <option value="">Choose one</option>
+                          {VENUE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                        </Select>
+                      )}
+                    </Field>
+                  </div>
+                )}
+
+                <Field label="Bio" hint="A few lines. Shown at the top of your public page.">
+                  {p => <Textarea {...p} rows={4} value={form.bio} onChange={setE("bio")} placeholder={isVenue ? "What your space is and what you like to show" : "What you make and how you work"} />}
+                </Field>
+
+                <div className="flex flex-col gap-1.5">
+                  <Label>{isVenue ? "Address" : "City"}</Label>
+                  <PlacesAutocomplete
+                    value={form.location}
+                    placeholder={isVenue ? "Search your venue's address" : "Search your city"}
+                    onChange={(_, raw) => set("location")(raw)}
+                  />
+                  <span className="font-ui text-caption text-fg-3">{isVenue ? "Helps artists find you on the map." : "Just the city is fine."}</span>
+                </div>
+
+                {saveBar}
+              </Card>
+            </form>
+          )}
+
+          {tab === "links" && (
+            <form onSubmit={save}>
+              <Card padding="lg" className="flex flex-col gap-5">
+                <p className="font-ui text-body text-fg-2">Links show on your public page so people can see more of your work.</p>
+                {[
+                  { k: "website" as const, label: "Website", icon: <Globe size={16} />, prefix: "", ph: "yoursite.com" },
+                  { k: "instagram" as const, label: "Instagram", icon: <Instagram size={16} />, prefix: "@", ph: "yourhandle" },
+                  { k: "behance" as const, label: "Behance", icon: <Palette size={16} />, prefix: "behance.net/", ph: "your-name" },
+                  { k: "linkedin" as const, label: "LinkedIn", icon: <Linkedin size={16} />, prefix: "linkedin.com/in/", ph: "your-name" },
+                ].map(l => (
+                  <div key={l.k} className="flex flex-col gap-1.5">
+                    <Label htmlFor={`link-${l.k}`}>{l.label}</Label>
+                    <PrefixInput id={`link-${l.k}`} icon={l.icon} prefix={l.prefix} placeholder={l.ph} value={form[l.k]} onChange={setE(l.k)} />
+                  </div>
+                ))}
+                {saveBar}
+              </Card>
+            </form>
+          )}
+
+          {tab === "invite" && (
+            <Card padding="lg" className="flex flex-col gap-6">
+              <div className="flex flex-col gap-1.5">
+                <span className="font-display text-h3 font-bold text-fg">Invite artists you know</span>
+                <p className="font-ui text-body text-fg-2">
+                  Share your link. When someone joins through it, they&rsquo;re linked to you, and you start out connected.
+                </p>
               </div>
+              {referralUrl ? (
+                <>
+                  <div className="flex flex-col gap-1.5">
+                    <Label>Your invite link</Label>
+                    <CopyRow value={referralUrl} copied={copied === "ref"} onCopy={() => copy("ref", referralUrl)} />
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <Label>Send it</Label>
+                    <div className="flex flex-wrap gap-2">
+                      <a href={`https://wa.me/?text=${encodeURIComponent(inviteText)}`} target="_blank" rel="noopener noreferrer"
+                        className="inline-flex h-10 items-center gap-2 rounded-control border-outline border-ink bg-surface px-4 font-ui text-control font-semibold text-fg hover:bg-sunken">
+                        <MessageCircle size={15} aria-hidden /> WhatsApp
+                      </a>
+                      <a href={`mailto:?subject=${encodeURIComponent("Join me on Artomango")}&body=${encodeURIComponent(inviteText)}`}
+                        className="inline-flex h-10 items-center gap-2 rounded-control border-outline border-ink bg-surface px-4 font-ui text-control font-semibold text-fg hover:bg-sunken">
+                        <Mail size={15} aria-hidden /> Email
+                      </a>
+                      <Button variant="secondary" onClick={() => copy("msg", inviteText)} aria-live="polite">
+                        {copied === "msg" ? <><Check size={15} aria-hidden /> Message copied</> : <><Copy size={15} aria-hidden /> Copy a message</>}
+                      </Button>
+                    </div>
+                    <span className="font-ui text-caption text-fg-3">For Instagram, copy the message and paste it in a DM or your bio.</span>
+                  </div>
+                  <div className="flex items-baseline gap-2 border-t-hair border-line pt-5">
+                    <span className="font-display text-h2 font-bold tabular-nums text-fg">{referralCount}</span>
+                    <span className="font-ui text-body-sm text-fg-2">{referralCount === 1 ? "person has" : "people have"} joined with your link</span>
+                  </div>
+                </>
+              ) : (
+                <Alert tone="warn">Pick a username on the Profile tab first. Your invite link uses it.</Alert>
+              )}
+            </Card>
+          )}
+        </div>
+
+        {/* ── Side column: public page ── */}
+        <aside className="flex flex-col gap-4">
+          <Card padding="md" className="flex flex-col gap-4">
+            <div className="flex items-center gap-3">
+              <Avatar name={form.full_name || "You"} src={avatar} size="md" />
+              <div className="flex min-w-0 flex-col">
+                <span className="truncate font-ui text-body font-semibold text-fg">{(isVenue && form.venue_name) || form.full_name || "Your name"}</span>
+                <span className="truncate font-ui text-body-sm text-fg-3">{[isVenue ? "Venue" : "Artist", form.location].filter(Boolean).join(" · ")}</span>
+              </div>
+            </div>
+            {publicUrl ? (
+              <>
+                <code className="truncate rounded-control bg-sunken px-3 py-2 font-code text-caption text-fg">{publicUrl.replace(/^https?:\/\//, "")}</code>
+                <div className="flex gap-2">
+                  <Button variant="secondary" size="sm" onClick={() => copy("pub", publicUrl)} aria-live="polite">
+                    {copied === "pub" ? <><Check size={14} aria-hidden /> Copied</> : <><Copy size={14} aria-hidden /> Copy link</>}
+                  </Button>
+                  <ButtonLink href={`/${savedForm.username}`} target="_blank" variant="ghost" size="sm">Open</ButtonLink>
+                </div>
+              </>
+            ) : (
+              <p className="font-ui text-body-sm text-fg-3">Save a username to get your public page link.</p>
             )}
-          </div>
-        )}
+          </Card>
+          <Card padding="md" className="flex flex-col gap-2">
+            <span className="font-ui text-label font-semibold text-fg">Choose what&rsquo;s on show</span>
+            <p className="font-ui text-body-sm text-fg-2">Pick the works for sale, banner and sections on your page in My Front Door.</p>
+            <Link href="/dashboard/mystore" className="mt-1 self-start font-ui text-label font-semibold text-fg underline decoration-line-strong underline-offset-4 hover:decoration-ink">
+              Go to My Front Door
+            </Link>
+          </Card>
+        </aside>
       </div>
-    </>
+    </div>
   );
 }

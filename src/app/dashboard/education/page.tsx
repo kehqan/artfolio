@@ -1,892 +1,233 @@
 "use client";
-import { useState, useEffect, useRef } from "react";
+// Learn: videos, articles and tips that artists share with each other.
+import { useEffect, useState } from "react";
+import { ExternalLink, FileText, MessageSquare, Play, Plus, Trash2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import {
-  Play, BookOpen, FileText, MessageSquare, Plus, X, ExternalLink,
-  Youtube, Search, Filter, ArrowRight, Trash2, Globe, Clock,
-  Star, Users, ChevronDown, Sparkles, TrendingUp, Award,
-  Video, Newspaper, Hash, Eye,
-} from "lucide-react";
+  Alert, Avatar, Badge, Button, Chip, EmptyState, Field, Input, Menu, Modal, PageHeader, SearchField, Skeleton, Textarea, cn,
+} from "@/components/ui";
+import type { BadgeTone } from "@/components/ui";
 
-/* ─── Types ───────────────────────────────────────────────────────── */
 type ResourceType = "video" | "article" | "post";
 type Resource = {
-  id: string; type: ResourceType; title: string; url?: string;
-  description?: string; thumbnail_url?: string; created_at: string;
-  user_id?: string;
-  poster_name?: string; poster_avatar?: string; poster_username?: string;
+  id: string; type: ResourceType; title: string; url?: string; description?: string; thumbnail_url?: string;
+  created_at: string; user_id?: string; poster_name?: string | null; poster_avatar?: string | null;
 };
 
-/* ─── Resource type config ────────────────────────────────────────── */
-const RES_TYPES: Record<ResourceType, { label: string; icon: React.ReactNode; color: string; bg: string; accent: string }> = {
-  video:   { label: "Video",   icon: <Play size={13} />,        color: "#FF6B6B", bg: "#FFF0F0", accent: "#FF6B6B" },
-  article: { label: "Article", icon: <FileText size={13} />,    color: "#0EA5E9", bg: "#E0F2FE", accent: "#0EA5E9" },
-  post:    { label: "Post",    icon: <MessageSquare size={13} />, color: "#8B5CF6", bg: "#EDE9FE", accent: "#8B5CF6" },
+const TYPES: Record<ResourceType, { label: string; plural: string; tone: BadgeTone; icon: typeof Play }> = {
+  video: { label: "Video", plural: "Videos", tone: "bad", icon: Play },
+  article: { label: "Article", plural: "Articles", tone: "info", icon: FileText },
+  post: { label: "Tip", plural: "Tips", tone: "violet", icon: MessageSquare },
 };
 
-/* ─── Curated topic categories (Udemy-style browse) ──────────────── */
-const TOPICS = [
-  { key: "all",       label: "All",              emoji: "✨" },
-  { key: "pricing",   label: "Pricing & Sales",  emoji: "💰" },
-  { key: "gallery",   label: "Galleries & Shows", emoji: "🏛️" },
-  { key: "marketing", label: "Marketing",         emoji: "📣" },
-  { key: "technique", label: "Technique",         emoji: "🎨" },
-  { key: "business",  label: "Art Business",      emoji: "📊" },
-  { key: "digital",   label: "Digital Art",       emoji: "💻" },
-  { key: "legal",     label: "Contracts & Legal", emoji: "📋" },
-];
-
-/* ─── Curated featured "courses" (static, Udemy-style hero cards) ── */
-const FEATURED = [
-  {
-    title: "Pricing Your Artwork Confidently",
-    desc: "Stop undercharging. Learn cost-based, market-based, and value-based pricing strategies that work for visual artists.",
-    emoji: "💰", topic: "pricing",
-    color: "#FFD400", bg: "#111110",
-    level: "Beginner", duration: "45 min",
-  },
-  {
-    title: "Working With Galleries: The Inside Guide",
-    desc: "Consignment rates, commission structures, contract red flags, and how to build long-term gallery relationships.",
-    emoji: "🏛️", topic: "gallery",
-    color: "#4ECDC4", bg: "#0D3330",
-    level: "Intermediate", duration: "1.5 hrs",
-  },
-  {
-    title: "Building a Collector Base from Scratch",
-    desc: "Your first 10 collectors, CRM basics, follow-up strategies, and turning one-time buyers into lifelong patrons.",
-    emoji: "👥", topic: "business",
-    color: "#FF6B6B", bg: "#1A0A0A",
-    level: "Beginner", duration: "1 hr",
-  },
-  {
-    title: "Instagram for Artists: What Actually Works",
-    desc: "Algorithm-proof posting strategies, story formats that convert followers into buyers, and what to never post.",
-    emoji: "📣", topic: "marketing",
-    color: "#8B5CF6", bg: "#1A1025",
-    level: "All levels", duration: "2 hrs",
-  },
-];
-
-/* ─── Curated reading list (static, always visible) ──────────────── */
-const READING_LIST = [
-  { title: "How to Price Art (And Stop Guessing)", tag: "pricing", emoji: "💰" },
-  { title: "The Artist's Guide to Contracts",      tag: "legal",   emoji: "📋" },
-  { title: "Social Media Without Burning Out",      tag: "marketing", emoji: "📣" },
-  { title: "What Galleries Look for in an Artist",  tag: "gallery", emoji: "🏛️" },
-  { title: "Setting Up Your First Open Studio",     tag: "business", emoji: "🎨" },
-  { title: "Digital Tools Every Artist Should Know", tag: "digital", emoji: "💻" },
-];
-
-/* ─── YouTube ID extractor ────────────────────────────────────────── */
-function getYtId(url?: string) {
-  if (!url) return null;
-  const m = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&?\s]+)/);
+function ytId(url?: string) {
+  const m = url?.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/shorts\/)([^&?\s/]+)/);
   return m ? m[1] : null;
 }
 
-/* ══════════════════════════════════════════════════════════════════ */
-export default function EducationHub() {
-  const sb = createClient();
+const EMPTY_FORM = { type: "video" as ResourceType, title: "", url: "", description: "" };
 
-  /* ── Data ─────────────────────────────────────────────────────── */
+export default function LearnPage() {
   const [resources, setResources] = useState<Resource[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const [userId, setUserId] = useState<string | null>(null);
-
-  /* ── UI ───────────────────────────────────────────────────────── */
   const [search, setSearch] = useState("");
-  const [typeFilter, setTypeFilter] = useState<"all" | ResourceType>("all");
-  const [topicFilter, setTopicFilter] = useState("all");
-  const [showAddForm, setShowAddForm] = useState(false);
+  const [type, setType] = useState<"all" | ResourceType>("all");
+  const [sharing, setSharing] = useState(false);
+  const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState<"browse" | "community">("browse");
-
-  /* ── Add form ─────────────────────────────────────────────────── */
-  const [form, setForm] = useState({ type: "video" as ResourceType, title: "", url: "", description: "" });
-
-  /* ─── Load ────────────────────────────────────────────────────── */
-  useEffect(() => {
-    sb.auth.getUser().then(({ data: { user } }) => {
-      if (user) setUserId(user.id);
-    });
-    load();
-  }, []);
+  const [formError, setFormError] = useState("");
+  const [removing, setRemoving] = useState<Resource | null>(null);
 
   async function load() {
-    setLoading(true);
-    const { data: ress } = await sb
-      .from("education_resources")
+    const sb = createClient();
+    const { data, error: err } = await sb.from("education_resources")
       .select("id,type,title,url,description,thumbnail_url,created_at,user_id")
       .order("created_at", { ascending: false });
-
-    if (ress && ress.length > 0) {
-      const uids = Array.from(new Set(ress.map((r: any) => r.user_id).filter(Boolean)));
-      let profileMap: Record<string, any> = {};
-      if (uids.length) {
-        const { data: profs } = await sb.from("profiles").select("id,full_name,username,avatar_url").in("id", uids);
-        (profs || []).forEach((p: any) => { profileMap[p.id] = p; });
-      }
-      setResources(ress.map((r: any) => ({
-        ...r,
-        poster_name: profileMap[r.user_id]?.full_name || null,
-        poster_avatar: profileMap[r.user_id]?.avatar_url || null,
-        poster_username: profileMap[r.user_id]?.username || null,
-      })));
-    } else {
-      setResources([]);
+    if (err) setError("These didn't load. Please refresh the page.");
+    const rows = (data || []) as Resource[];
+    const ids = Array.from(new Set(rows.map(r => r.user_id).filter(Boolean))) as string[];
+    const people: Record<string, { full_name?: string; avatar_url?: string }> = {};
+    if (ids.length) {
+      const { data: profs } = await sb.from("profiles").select("id,full_name,avatar_url").in("id", ids);
+      (profs || []).forEach((p: any) => { people[p.id] = p; });
     }
+    setResources(rows.map(r => ({ ...r, poster_name: people[r.user_id || ""]?.full_name || null, poster_avatar: people[r.user_id || ""]?.avatar_url || null })));
     setLoading(false);
   }
 
-  async function handleAdd(e: React.FormEvent) {
-    e.preventDefault();
-    if (!form.title.trim()) return;
-    setSaving(true);
+  useEffect(() => {
+    createClient().auth.getUser().then(({ data: { user } }) => setUserId(user?.id || null));
+    load();
+  }, []);
+
+  function openShare() { setForm(EMPTY_FORM); setFormError(""); setSharing(true); }
+
+  async function share() {
+    if (!form.title.trim()) { setFormError("Give it a title."); return; }
+    if (form.type !== "post" && !form.url.trim()) { setFormError(form.type === "video" ? "Add the video link." : "Add the link to the article."); return; }
+    setSaving(true); setFormError("");
+    const sb = createClient();
     const { data: { user } } = await sb.auth.getUser();
-    if (user) {
-      await sb.from("education_resources").insert({ ...form, user_id: user.id });
-    }
-    setForm({ type: "video", title: "", url: "", description: "" });
-    setShowAddForm(false);
+    const { error: err } = user
+      ? await sb.from("education_resources").insert({
+          type: form.type, title: form.title.trim(), url: form.url.trim() || null, description: form.description.trim() || null, user_id: user.id,
+        })
+      : { error: new Error("signed out") };
     setSaving(false);
+    if (err) { setFormError("That didn't share. Please try again."); return; }
+    setSharing(false);
     load();
   }
 
-  async function handleDelete(id: string) {
-    if (!confirm("Remove this resource?")) return;
-    await sb.from("education_resources").delete().eq("id", id);
-    setResources(prev => prev.filter(r => r.id !== id));
+  async function remove() {
+    if (!removing) return;
+    const { error: err } = await createClient().from("education_resources").delete().eq("id", removing.id);
+    if (err) { setError("That didn't remove. Please try again."); setRemoving(null); return; }
+    setResources(p => p.filter(r => r.id !== removing.id));
+    setRemoving(null);
   }
 
-  /* ─── Filtered community resources ───────────────────────────── */
-  const filtered = resources.filter(r => {
-    const q = search.toLowerCase();
-    const matchSearch = !search || r.title.toLowerCase().includes(q) || (r.description || "").toLowerCase().includes(q);
-    const matchType = typeFilter === "all" || r.type === typeFilter;
-    return matchSearch && matchType;
-  });
-
-  const videoCount   = resources.filter(r => r.type === "video").length;
-  const articleCount = resources.filter(r => r.type === "article").length;
-  const postCount    = resources.filter(r => r.type === "post").length;
+  const q = search.toLowerCase().trim();
+  const list = resources
+    .filter(r => type === "all" || r.type === type)
+    .filter(r => !q || [r.title, r.description, r.poster_name].some(v => (v || "").toLowerCase().includes(q)));
+  const count = (t: ResourceType) => resources.filter(r => r.type === t).length;
 
   return (
-    <>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Darker+Grotesque:wght@400;600;700;800;900&display=swap');
+    <div className="flex flex-col gap-6">
+      <PageHeader
+        title="Learn"
+        description="Videos, articles and tips other artists found useful: pricing, shows, contracts, technique. Share what helped you."
+        actions={<Button variant="primary" onClick={openShare}><Plus size={16} aria-hidden /> Share something</Button>}
+      />
 
-        :root {
-          --cream: #FAF7F3;
-          --warm: #F5F0E8;
-          --border: #E8E0D0;
-          --ink: #111110;
-          --muted: #9B8F7A;
-          --yellow: #FFD400;
-          --font: 'Darker Grotesque', sans-serif;
-          --r: 20px;
-          --shadow: 4px 5px 0 #111110;
-        }
+      {error && <Alert tone="bad">{error}</Alert>}
 
-        .edu-wrap { padding-bottom: 80px; font-family: var(--font); }
-
-        /* ── Hero banner ── */
-        .edu-hero {
-          background: var(--ink);
-          border-radius: var(--r);
-          border: 2.5px solid var(--ink);
-          box-shadow: var(--shadow);
-          padding: 36px 40px;
-          margin-bottom: 28px;
-          position: relative;
-          overflow: hidden;
-        }
-        .edu-hero::before {
-          content: "";
-          position: absolute; inset: 0;
-          background: radial-gradient(ellipse 60% 80% at 80% 50%, rgba(255,212,0,0.08), transparent),
-                      radial-gradient(ellipse 40% 60% at 20% 80%, rgba(78,205,196,0.06), transparent);
-          pointer-events: none;
-        }
-        .edu-hero-inner { position: relative; display: flex; align-items: center; justify-content: space-between; gap: 24px; flex-wrap: wrap; }
-        .edu-hero-eyebrow { font-size: 10px; font-weight: 800; color: rgba(255,212,0,0.6); text-transform: uppercase; letter-spacing: 0.2em; margin-bottom: 8px; }
-        .edu-hero-title { font-size: clamp(26px, 3vw, 40px); font-weight: 900; color: #fff; letter-spacing: -1.2px; line-height: 1.1; margin-bottom: 10px; }
-        .edu-hero-title span { color: var(--yellow); }
-        .edu-hero-sub { font-size: 14px; font-weight: 600; color: rgba(255,255,255,0.45); line-height: 1.6; max-width: 440px; }
-        .edu-hero-stats { display: flex; gap: 28px; margin-top: 20px; }
-        .edu-hero-stat-n { font-size: 28px; font-weight: 900; color: var(--yellow); letter-spacing: -1px; line-height: 1; }
-        .edu-hero-stat-l { font-size: 11px; font-weight: 700; color: rgba(255,255,255,0.35); margin-top: 2px; }
-        .edu-hero-cta {
-          display: flex; align-items: center; gap: 7px;
-          padding: 12px 22px;
-          background: var(--yellow); color: var(--ink);
-          border: 2.5px solid var(--yellow); border-radius: 12px;
-          font-size: 14px; font-weight: 900; cursor: pointer;
-          font-family: inherit; text-decoration: none; flex-shrink: 0;
-          box-shadow: 3px 3px 0 rgba(255,255,255,0.15);
-          transition: transform 0.15s, box-shadow 0.15s;
-        }
-        .edu-hero-cta:hover { transform: translate(-1px, -1px); box-shadow: 4px 4px 0 rgba(255,255,255,0.2); }
-
-        /* ── Tabs ── */
-        .edu-tabs {
-          display: flex; gap: 0;
-          border-bottom: 2.5px solid var(--border);
-          margin-bottom: 28px;
-        }
-        .edu-tab {
-          display: flex; align-items: center; gap: 6px;
-          padding: 10px 22px; border: none; background: transparent;
-          font-family: inherit; font-size: 14px; font-weight: 700;
-          cursor: pointer; color: var(--muted);
-          border-bottom: 2.5px solid transparent; margin-bottom: -2.5px;
-          transition: color 0.15s;
-        }
-        .edu-tab.active { color: var(--ink); border-bottom-color: var(--yellow); }
-        .edu-tab-badge {
-          font-size: 10px; font-weight: 800;
-          background: var(--warm); color: var(--muted);
-          padding: 1px 7px; border-radius: 99px;
-        }
-        .edu-tab.active .edu-tab-badge { background: var(--yellow); color: var(--ink); }
-
-        /* ── Section headers ── */
-        .edu-section-head {
-          display: flex; align-items: center; justify-content: space-between;
-          margin-bottom: 16px;
-        }
-        .edu-section-title {
-          font-size: 18px; font-weight: 900; color: var(--ink); letter-spacing: -0.4px;
-          display: flex; align-items: center; gap: 8px;
-        }
-
-        /* ── Featured cards ── */
-        .featured-grid {
-          display: grid;
-          grid-template-columns: repeat(4, 1fr);
-          gap: 14px;
-          margin-bottom: 36px;
-        }
-        .featured-card {
-          border-radius: var(--r); overflow: hidden;
-          border: 2.5px solid var(--ink);
-          box-shadow: var(--shadow);
-          cursor: pointer; position: relative;
-          transition: transform 0.2s, box-shadow 0.2s;
-          text-decoration: none; display: block;
-        }
-        .featured-card:hover { transform: translate(-2px, -2px); box-shadow: 6px 7px 0 var(--ink); }
-        .featured-card-top {
-          padding: 22px 20px 16px;
-          position: relative; min-height: 160px;
-          display: flex; flex-direction: column; justify-content: space-between;
-        }
-        .featured-card-emoji { font-size: 32px; margin-bottom: 10px; display: block; }
-        .featured-card-title { font-size: 15px; font-weight: 900; line-height: 1.25; letter-spacing: -0.3px; }
-        .featured-card-meta { display: flex; align-items: center; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
-        .featured-card-pill {
-          font-size: 9px; font-weight: 800; text-transform: uppercase;
-          letter-spacing: 0.1em; padding: 3px 8px; border-radius: 99px;
-          background: rgba(255,255,255,0.12); color: rgba(255,255,255,0.7);
-        }
-        .featured-card-bottom {
-          background: #fff; padding: 14px 20px;
-          border-top: 2px solid var(--ink);
-        }
-        .featured-card-desc { font-size: 12px; font-weight: 600; color: var(--muted); line-height: 1.5; }
-        .featured-card-arrow {
-          display: inline-flex; align-items: center; gap: 4px;
-          margin-top: 10px; font-size: 12px; font-weight: 800; color: var(--ink);
-        }
-
-        /* ── Topic filter pills ── */
-        .topic-pills {
-          display: flex; gap: 8px; flex-wrap: wrap;
-          margin-bottom: 20px;
-        }
-        .topic-pill {
-          display: flex; align-items: center; gap: 5px;
-          padding: 6px 14px; border-radius: 99px;
-          border: 2px solid var(--border); background: #fff;
-          font-size: 12px; font-weight: 800; color: var(--muted);
-          cursor: pointer; font-family: inherit;
-          transition: all 0.15s;
-        }
-        .topic-pill:hover { border-color: var(--ink); color: var(--ink); }
-        .topic-pill.active { background: var(--ink); border-color: var(--ink); color: var(--yellow); }
-
-        /* ── Reading list ── */
-        .reading-grid {
-          display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;
-          margin-bottom: 36px;
-        }
-        .reading-card {
-          display: flex; align-items: center; gap: 12px;
-          padding: 14px 16px;
-          background: #fff; border: 2px solid var(--border);
-          border-radius: 14px; cursor: pointer;
-          transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
-        }
-        .reading-card:hover { border-color: var(--ink); box-shadow: 2px 2px 0 var(--ink); transform: translate(-1px, -1px); }
-        .reading-card-emoji { font-size: 20px; flex-shrink: 0; }
-        .reading-card-title { font-size: 13px; font-weight: 800; color: var(--ink); line-height: 1.3; }
-        .reading-card-tag { font-size: 10px; font-weight: 700; color: var(--muted); margin-top: 2px; }
-
-        /* ── Progress banner ── */
-        .progress-banner {
-          background: linear-gradient(135deg, #FFFBEA 0%, #FFF8D6 100%);
-          border: 2.5px solid var(--ink);
-          border-radius: var(--r);
-          box-shadow: var(--shadow);
-          padding: 24px 28px;
-          margin-bottom: 36px;
-          display: flex; align-items: center; gap: 24px; flex-wrap: wrap;
-        }
-        .progress-banner-icon {
-          width: 52px; height: 52px; border-radius: 16px;
-          background: var(--yellow); border: 2.5px solid var(--ink);
-          display: flex; align-items: center; justify-content: center;
-          flex-shrink: 0;
-        }
-        .progress-banner-title { font-size: 17px; font-weight: 900; color: var(--ink); letter-spacing: -0.4px; }
-        .progress-banner-sub { font-size: 13px; font-weight: 600; color: var(--muted); margin-top: 3px; }
-        .progress-bar-wrap { flex: 1; min-width: 180px; }
-        .progress-bar-track {
-          height: 8px; background: var(--border); border-radius: 99px;
-          border: 1.5px solid var(--ink); overflow: hidden; margin-top: 8px;
-        }
-        .progress-bar-fill { height: 100%; background: var(--yellow); border-radius: 99px; transition: width 0.6s ease; }
-
-        /* ── Community search + filters ── */
-        .community-bar {
-          display: flex; gap: 10px; align-items: center;
-          margin-bottom: 20px; flex-wrap: wrap;
-        }
-        .edu-search {
-          flex: 1; min-width: 200px;
-          display: flex; align-items: center; gap: 8px;
-          padding: 9px 14px;
-          background: #fff; border: 2.5px solid var(--border);
-          border-radius: 12px;
-          transition: border-color 0.15s;
-        }
-        .edu-search:focus-within { border-color: var(--ink); }
-        .edu-search input {
-          flex: 1; border: none; background: transparent;
-          font-family: inherit; font-size: 13px; font-weight: 600; color: var(--ink);
-          outline: none;
-        }
-        .edu-search input::placeholder { color: var(--muted); }
-        .type-filter-group { display: flex; gap: 6px; }
-        .type-filter-btn {
-          display: flex; align-items: center; gap: 5px;
-          padding: 7px 12px; border-radius: 10px;
-          border: 2px solid var(--border); background: #fff;
-          font-size: 12px; font-weight: 800; color: var(--muted);
-          cursor: pointer; font-family: inherit; transition: all 0.15s;
-        }
-        .type-filter-btn:hover { border-color: var(--ink); color: var(--ink); }
-        .type-filter-btn.active { background: var(--ink); border-color: var(--ink); color: var(--yellow); }
-        .add-resource-btn {
-          display: flex; align-items: center; gap: 6px;
-          padding: 9px 16px;
-          background: var(--yellow); color: var(--ink);
-          border: 2.5px solid var(--ink); border-radius: 12px;
-          font-size: 13px; font-weight: 800; cursor: pointer;
-          font-family: inherit; box-shadow: 3px 3px 0 var(--ink);
-          transition: transform 0.15s, box-shadow 0.15s; white-space: nowrap;
-        }
-        .add-resource-btn:hover { transform: translate(-1px, -1px); box-shadow: 4px 4px 0 var(--ink); }
-
-        /* ── Resource cards (community) ── */
-        .resource-grid {
-          display: grid; grid-template-columns: repeat(3, 1fr);
-          gap: 14px;
-        }
-        .res-card {
-          background: #fff; border: 2.5px solid var(--ink);
-          border-radius: var(--r);
-          box-shadow: 3px 4px 0 var(--ink);
-          overflow: hidden; display: flex; flex-direction: column;
-          transition: transform 0.2s, box-shadow 0.2s;
-        }
-        .res-card:hover { transform: translate(-1px, -2px); box-shadow: 5px 6px 0 var(--ink); }
-
-        /* Video thumbnail */
-        .res-card-thumb {
-          width: 100%; aspect-ratio: 16/9;
-          background: #111; position: relative; overflow: hidden;
-          flex-shrink: 0;
-        }
-        .res-card-thumb img { width: 100%; height: 100%; object-fit: cover; }
-        .res-card-thumb-empty {
-          width: 100%; height: 100%;
-          display: flex; align-items: center; justify-content: center;
-          background: var(--warm);
-        }
-        .res-card-play {
-          position: absolute; inset: 0;
-          display: flex; align-items: center; justify-content: center;
-          background: rgba(0,0,0,0.3);
-          transition: background 0.15s;
-        }
-        .res-card:hover .res-card-play { background: rgba(0,0,0,0.5); }
-        .res-card-play-btn {
-          width: 44px; height: 44px; border-radius: 50%;
-          background: var(--yellow); border: 3px solid var(--ink);
-          display: flex; align-items: center; justify-content: center;
-          box-shadow: 2px 2px 0 rgba(0,0,0,0.3);
-        }
-
-        .res-card-body { padding: 16px 18px; flex: 1; display: flex; flex-direction: column; }
-        .res-card-type-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
-        .res-card-type-badge {
-          display: inline-flex; align-items: center; gap: 4px;
-          padding: 3px 9px; border-radius: 99px;
-          font-size: 10px; font-weight: 800;
-        }
-        .res-card-title { font-size: 14px; font-weight: 900; color: var(--ink); line-height: 1.3; letter-spacing: -0.2px; margin-bottom: 8px; }
-        .res-card-desc { font-size: 12px; font-weight: 600; color: var(--muted); line-height: 1.55; flex: 1; }
-        .res-card-footer {
-          display: flex; align-items: center; justify-content: space-between;
-          margin-top: 14px; padding-top: 12px;
-          border-top: 1.5px solid var(--border);
-        }
-        .res-card-poster { display: flex; align-items: center; gap: 7px; min-width: 0; }
-        .res-card-avatar {
-          width: 22px; height: 22px; border-radius: 50%;
-          background: var(--yellow); border: 2px solid var(--ink);
-          display: flex; align-items: center; justify-content: center;
-          font-size: 8px; font-weight: 900; color: var(--ink);
-          overflow: hidden; flex-shrink: 0;
-        }
-        .res-card-poster-name { font-size: 11px; font-weight: 700; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .res-card-link {
-          display: flex; align-items: center; gap: 4px;
-          font-size: 11px; font-weight: 800; color: var(--ink);
-          text-decoration: none; flex-shrink: 0;
-          padding: 4px 10px; border-radius: 8px;
-          border: 1.5px solid var(--border);
-          transition: border-color 0.15s, background 0.15s;
-        }
-        .res-card-link:hover { border-color: var(--ink); background: var(--warm); }
-
-        /* Delete btn (owner only) */
-        .res-card-delete {
-          background: none; border: none; cursor: pointer;
-          color: var(--muted); padding: 4px; display: flex;
-          transition: color 0.15s;
-        }
-        .res-card-delete:hover { color: #EF4444; }
-
-        /* ── Empty state ── */
-        .edu-empty {
-          padding: 60px 24px; text-align: center;
-          background: #fff; border: 2.5px dashed var(--border);
-          border-radius: var(--r);
-        }
-        .edu-empty-emoji { font-size: 40px; margin-bottom: 12px; }
-        .edu-empty-title { font-size: 18px; font-weight: 900; color: var(--ink); margin-bottom: 6px; }
-        .edu-empty-sub { font-size: 13px; font-weight: 600; color: var(--muted); }
-
-        /* ── Modal overlay ── */
-        .modal-overlay {
-          position: fixed; inset: 0;
-          background: rgba(17,17,16,0.6); backdrop-filter: blur(4px);
-          z-index: 500; display: flex; align-items: center; justify-content: center;
-          padding: 24px; animation: fadeIn 0.15s ease;
-        }
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-        .modal-box {
-          background: #fff; border: 2.5px solid var(--ink);
-          border-radius: var(--r); box-shadow: 8px 8px 0 var(--ink);
-          width: 100%; max-width: 480px;
-          animation: slideUp 0.2s ease;
-        }
-        @keyframes slideUp { from { transform: translateY(16px); opacity: 0; } to { transform: none; opacity: 1; } }
-        .modal-head {
-          padding: 20px 24px; border-bottom: 2px solid var(--border);
-          display: flex; align-items: center; justify-content: space-between;
-          background: var(--cream);
-        }
-        .modal-title { font-size: 17px; font-weight: 900; color: var(--ink); letter-spacing: -0.4px; }
-        .modal-close {
-          width: 30px; height: 30px; border-radius: 8px;
-          border: 2px solid var(--border); background: #fff;
-          display: flex; align-items: center; justify-content: center;
-          cursor: pointer; font-family: inherit; transition: border-color 0.15s;
-        }
-        .modal-close:hover { border-color: var(--ink); }
-        .modal-body { padding: 24px; }
-        .modal-label { font-size: 11px; font-weight: 800; color: var(--muted); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 6px; display: block; }
-        .modal-input {
-          width: 100%; padding: 10px 14px;
-          border: 2.5px solid var(--border); border-radius: 12px;
-          font-family: inherit; font-size: 14px; font-weight: 600; color: var(--ink);
-          background: #fff; outline: none; transition: border-color 0.15s;
-          box-sizing: border-box;
-        }
-        .modal-input:focus { border-color: var(--ink); }
-        .modal-input::placeholder { color: var(--muted); }
-        .modal-field { margin-bottom: 16px; }
-        .modal-type-row { display: flex; gap: 8px; margin-bottom: 18px; }
-        .modal-type-btn {
-          flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px;
-          padding: 9px 12px; border-radius: 10px;
-          border: 2px solid var(--border); background: #fff;
-          font-size: 12px; font-weight: 800; color: var(--muted);
-          cursor: pointer; font-family: inherit; transition: all 0.15s;
-        }
-        .modal-type-btn.active { background: var(--ink); border-color: var(--ink); color: var(--yellow); }
-        .modal-footer {
-          display: flex; gap: 10px;
-          padding: 16px 24px; border-top: 2px solid var(--border);
-          background: var(--cream);
-        }
-        .modal-btn-cancel {
-          flex: 1; padding: 11px; border: 2px solid var(--border); border-radius: 12px;
-          background: #fff; font-family: inherit; font-size: 13px; font-weight: 700;
-          cursor: pointer; color: var(--muted); transition: border-color 0.15s;
-        }
-        .modal-btn-cancel:hover { border-color: var(--ink); color: var(--ink); }
-        .modal-btn-save {
-          flex: 1; padding: 11px; border: 2.5px solid var(--ink); border-radius: 12px;
-          background: var(--yellow); font-family: inherit; font-size: 13px; font-weight: 800;
-          cursor: pointer; color: var(--ink); box-shadow: 3px 3px 0 var(--ink);
-          transition: transform 0.15s, box-shadow 0.15s;
-        }
-        .modal-btn-save:hover { transform: translate(-1px,-1px); box-shadow: 4px 4px 0 var(--ink); }
-        .modal-btn-save:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
-
-        /* ── Responsive ── */
-        @media (max-width: 1100px) {
-          .featured-grid { grid-template-columns: repeat(2, 1fr); }
-          .resource-grid { grid-template-columns: repeat(2, 1fr); }
-          .reading-grid { grid-template-columns: repeat(2, 1fr); }
-        }
-        @media (max-width: 680px) {
-          .featured-grid { grid-template-columns: 1fr; }
-          .resource-grid { grid-template-columns: 1fr; }
-          .reading-grid { grid-template-columns: 1fr; }
-          .edu-hero { padding: 24px 20px; }
-          .edu-hero-title { font-size: 24px; }
-        }
-      `}</style>
-
-      <div className="edu-wrap">
-
-        {/* ══════════════════════════════════════
-            HERO
-        ══════════════════════════════════════ */}
-        <div className="edu-hero">
-          <div className="edu-hero-inner">
-            <div>
-              <div className="edu-hero-eyebrow">📚 Education Hub</div>
-              <h1 className="edu-hero-title">
-                The business of art<br />
-                <span>is a learnable skill.</span>
-              </h1>
-              <p className="edu-hero-sub">
-                Curated resources, community-shared knowledge, and practical guides for artists who want to sustain their practice.
-              </p>
-              <div className="edu-hero-stats">
-                <div>
-                  <div className="edu-hero-stat-n">{resources.length || "—"}</div>
-                  <div className="edu-hero-stat-l">Community resources</div>
-                </div>
-                <div>
-                  <div className="edu-hero-stat-n">{videoCount}</div>
-                  <div className="edu-hero-stat-l">Videos</div>
-                </div>
-                <div>
-                  <div className="edu-hero-stat-n">{articleCount}</div>
-                  <div className="edu-hero-stat-l">Articles</div>
-                </div>
-              </div>
-            </div>
-            <button className="edu-hero-cta" onClick={() => { setActiveTab("community"); setShowAddForm(true); }}>
-              <Plus size={15} strokeWidth={3} /> Share a resource
-            </button>
-          </div>
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:px-0" role="group" aria-label="Show">
+          <Chip selected={type === "all"} onClick={() => setType("all")} className="shrink-0">All</Chip>
+          {(Object.keys(TYPES) as ResourceType[]).filter(t => count(t) > 0 || type === t).map(t => (
+            <Chip key={t} selected={type === t} onClick={() => setType(t)} className="shrink-0">
+              {TYPES[t].plural}<span className="tabular-nums opacity-70"> {count(t)}</span>
+            </Chip>
+          ))}
         </div>
-
-        {/* ══════════════════════════════════════
-            TABS
-        ══════════════════════════════════════ */}
-        <div className="edu-tabs">
-          <button className={`edu-tab${activeTab === "browse" ? " active" : ""}`} onClick={() => setActiveTab("browse")}>
-            <BookOpen size={14} /> Browse
-          </button>
-          <button className={`edu-tab${activeTab === "community" ? " active" : ""}`} onClick={() => setActiveTab("community")}>
-            <Users size={14} /> Community
-            <span className="edu-tab-badge">{resources.length}</span>
-          </button>
-        </div>
-
-        {/* ══════════════════════════════════════
-            BROWSE TAB
-        ══════════════════════════════════════ */}
-        {activeTab === "browse" && (
-          <div>
-
-            {/* Progress banner */}
-            <div className="progress-banner">
-              <div className="progress-banner-icon">
-                <Award size={24} color="#111110" />
-              </div>
-              <div style={{ flex: 1 }}>
-                <div className="progress-banner-title">Your Learning Journey</div>
-                <div className="progress-banner-sub">Explore topics below — each resource you open counts toward your growth</div>
-                <div className="progress-bar-wrap">
-                  <div className="progress-bar-track">
-                    <div className="progress-bar-fill" style={{ width: `${Math.min(100, (resources.length / 20) * 100)}%` }} />
-                  </div>
-                </div>
-              </div>
-              <div style={{ textAlign: "right", flexShrink: 0 }}>
-                <div style={{ fontSize: 22, fontWeight: 900, color: "var(--ink)", letterSpacing: "-0.8px" }}>{resources.length}</div>
-                <div style={{ fontSize: 11, fontWeight: 700, color: "var(--muted)" }}>resources shared</div>
-              </div>
-            </div>
-
-            {/* Featured guides */}
-            <div className="edu-section-head">
-              <div className="edu-section-title">
-                <Sparkles size={16} color="#FFD400" /> Featured Guides
-              </div>
-            </div>
-            <div className="featured-grid" style={{ marginBottom: 36 }}>
-              {FEATURED.map((f, i) => (
-                <div key={i} className="featured-card">
-                  <div className="featured-card-top" style={{ background: f.bg }}>
-                    <div>
-                      <span className="featured-card-emoji">{f.emoji}</span>
-                      <div className="featured-card-title" style={{ color: f.color }}>{f.title}</div>
-                    </div>
-                    <div className="featured-card-meta">
-                      <span className="featured-card-pill">{f.level}</span>
-                      <span className="featured-card-pill">⏱ {f.duration}</span>
-                    </div>
-                  </div>
-                  <div className="featured-card-bottom">
-                    <div className="featured-card-desc">{f.desc}</div>
-                    <div className="featured-card-arrow">
-                      Explore <ArrowRight size={12} />
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Browse by topic */}
-            <div className="edu-section-head">
-              <div className="edu-section-title">
-                <Hash size={16} /> Browse by Topic
-              </div>
-            </div>
-            <div className="topic-pills">
-              {TOPICS.map(t => (
-                <button
-                  key={t.key}
-                  className={`topic-pill${topicFilter === t.key ? " active" : ""}`}
-                  onClick={() => setTopicFilter(t.key)}
-                >
-                  {t.emoji} {t.label}
-                </button>
-              ))}
-            </div>
-
-            {/* Reading list */}
-            <div className="reading-grid">
-              {READING_LIST
-                .filter(r => topicFilter === "all" || r.tag === topicFilter)
-                .map((r, i) => (
-                  <div key={i} className="reading-card">
-                    <div className="reading-card-emoji">{r.emoji}</div>
-                    <div>
-                      <div className="reading-card-title">{r.title}</div>
-                      <div className="reading-card-tag">{TOPICS.find(t => t.key === r.tag)?.label}</div>
-                    </div>
-                    <ArrowRight size={14} color="var(--muted)" style={{ marginLeft: "auto", flexShrink: 0 }} />
-                  </div>
-                ))}
-            </div>
-
-            {/* Trending in community */}
-            {resources.length > 0 && (
-              <div>
-                <div className="edu-section-head" style={{ marginTop: 16 }}>
-                  <div className="edu-section-title">
-                    <TrendingUp size={16} color="#16A34A" /> Trending from the Community
-                  </div>
-                  <button className="edu-tab" onClick={() => setActiveTab("community")} style={{ fontSize: 12, padding: "6px 12px", color: "var(--muted)" }}>
-                    See all <ArrowRight size={12} />
-                  </button>
-                </div>
-                <div className="resource-grid">
-                  {resources.slice(0, 3).map(r => <ResourceCard key={r.id} resource={r} userId={userId} onDelete={handleDelete} />)}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* ══════════════════════════════════════
-            COMMUNITY TAB
-        ══════════════════════════════════════ */}
-        {activeTab === "community" && (
-          <div>
-            <div className="community-bar">
-              <div className="edu-search">
-                <Search size={14} color="var(--muted)" />
-                <input
-                  placeholder="Search resources…"
-                  value={search}
-                  onChange={e => setSearch(e.target.value)}
-                />
-                {search && <button onClick={() => setSearch("")} style={{ background: "none", border: "none", cursor: "pointer", display: "flex", color: "var(--muted)" }}><X size={13} /></button>}
-              </div>
-
-              <div className="type-filter-group">
-                {(["all", "video", "article", "post"] as const).map(t => (
-                  <button
-                    key={t}
-                    className={`type-filter-btn${typeFilter === t ? " active" : ""}`}
-                    onClick={() => setTypeFilter(t)}
-                  >
-                    {t === "all" ? "All" : t === "video" ? <><Play size={11} /> Videos</> : t === "article" ? <><FileText size={11} /> Articles</> : <><MessageSquare size={11} /> Posts</>}
-                  </button>
-                ))}
-              </div>
-
-              <button className="add-resource-btn" onClick={() => setShowAddForm(true)}>
-                <Plus size={13} strokeWidth={3} /> Share resource
-              </button>
-            </div>
-
-            {loading ? (
-              <div style={{ padding: "60px 24px", textAlign: "center", color: "var(--muted)", fontSize: 14, fontWeight: 600 }}>Loading…</div>
-            ) : filtered.length === 0 ? (
-              <div className="edu-empty">
-                <div className="edu-empty-emoji">📭</div>
-                <div className="edu-empty-title">{search ? "No results found" : "No resources yet"}</div>
-                <div className="edu-empty-sub">{search ? "Try a different search term" : "Be the first to share something useful with the community"}</div>
-              </div>
-            ) : (
-              <div className="resource-grid">
-                {filtered.map(r => <ResourceCard key={r.id} resource={r} userId={userId} onDelete={handleDelete} />)}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* ══════════════════════════════════════
-            ADD RESOURCE MODAL
-        ══════════════════════════════════════ */}
-        {showAddForm && (
-          <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) setShowAddForm(false); }}>
-            <form className="modal-box" onSubmit={handleAdd}>
-              <div className="modal-head">
-                <div className="modal-title">Share a Resource</div>
-                <button type="button" className="modal-close" onClick={() => setShowAddForm(false)}><X size={14} /></button>
-              </div>
-              <div className="modal-body">
-                <div style={{ marginBottom: 16 }}>
-                  <label className="modal-label">Type</label>
-                  <div className="modal-type-row">
-                    {(["video", "article", "post"] as ResourceType[]).map(t => {
-                      const cfg = RES_TYPES[t];
-                      return (
-                        <button key={t} type="button" className={`modal-type-btn${form.type === t ? " active" : ""}`} onClick={() => setForm(p => ({ ...p, type: t }))}>
-                          {cfg.icon} {cfg.label}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-                <div className="modal-field">
-                  <label className="modal-label">Title *</label>
-                  <input className="modal-input" required value={form.title} onChange={e => setForm(p => ({ ...p, title: e.target.value }))} placeholder={form.type === "video" ? "e.g. How to price your paintings" : form.type === "article" ? "e.g. Gallery contracts explained" : "e.g. My experience at Open Studios"} />
-                </div>
-                <div className="modal-field">
-                  <label className="modal-label">{form.type === "video" ? "YouTube URL" : form.type === "article" ? "Article URL" : "Link (optional)"}</label>
-                  <input className="modal-input" type="url" value={form.url} onChange={e => setForm(p => ({ ...p, url: e.target.value }))} placeholder="https://…" />
-                </div>
-                <div className="modal-field">
-                  <label className="modal-label">Description</label>
-                  <textarea className="modal-input" rows={3} value={form.description} onChange={e => setForm(p => ({ ...p, description: e.target.value }))} placeholder="What's this about? What will someone learn?" style={{ resize: "vertical" }} />
-                </div>
-              </div>
-              <div className="modal-footer">
-                <button type="button" className="modal-btn-cancel" onClick={() => setShowAddForm(false)}>Cancel</button>
-                <button type="submit" className="modal-btn-save" disabled={saving}>{saving ? "Saving…" : "Share resource"}</button>
-              </div>
-            </form>
-          </div>
-        )}
-
+        <SearchField value={search} onChange={setSearch} placeholder="Search titles and people" className="lg:w-80" />
       </div>
-    </>
+
+      {loading ? (
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">{[0, 1, 2].map(i => <Skeleton key={i} className="h-72 rounded-card" />)}</div>
+      ) : list.length === 0 ? (
+        <EmptyState
+          title={resources.length === 0 ? "Nothing shared yet" : "Nothing here"}
+          description={resources.length === 0
+            ? "Found a talk on pricing, a guide to gallery contracts or a technique video that helped? Share it so other artists can find it too."
+            : "Try another filter or search."}
+          action={resources.length === 0 ? <Button variant="secondary" onClick={openShare}><Plus size={15} aria-hidden /> Share the first one</Button> : undefined}
+        />
+      ) : (
+        <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          {list.map(r => <ResourceCard key={r.id} r={r} mine={!!userId && r.user_id === userId} onRemove={() => setRemoving(r)} />)}
+        </ul>
+      )}
+
+      <Modal open={sharing} onClose={() => setSharing(false)} size="md" title="Share something useful"
+        footer={<>
+          <Button variant="secondary" onClick={() => setSharing(false)}>Cancel</Button>
+          <Button variant="primary" onClick={share} disabled={saving}>{saving ? "Sharing…" : "Share"}</Button>
+        </>}>
+        <div className="flex flex-col gap-4">
+          {formError && <Alert tone="bad">{formError}</Alert>}
+          <div className="flex flex-col gap-1.5">
+            <span className="font-ui text-label font-semibold text-fg">What is it?</span>
+            <div className="flex gap-2" role="group" aria-label="Type">
+              {(Object.keys(TYPES) as ResourceType[]).map(t => {
+                const Icon = TYPES[t].icon;
+                return <Chip key={t} selected={form.type === t} onClick={() => setForm(f => ({ ...f, type: t }))}><Icon size={14} aria-hidden /> {TYPES[t].label}</Chip>;
+              })}
+            </div>
+          </div>
+          <Field label="Title">
+            {p => <Input {...p} value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
+              placeholder={form.type === "video" ? "How to price your first paintings" : form.type === "article" ? "What galleries look for" : "Varnish small works before you photograph them"} />}
+          </Field>
+          <Field label={form.type === "video" ? "Video link" : "Link"} hint={form.type === "video" ? "YouTube links show a preview." : form.type === "post" ? "Optional" : undefined}>
+            {p => <Input {...p} type="url" inputMode="url" value={form.url} onChange={e => setForm(f => ({ ...f, url: e.target.value }))} placeholder="https://" />}
+          </Field>
+          <Field label="Why it's worth it" hint="Optional">
+            {p => <Textarea {...p} rows={3} value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} />}
+          </Field>
+        </div>
+      </Modal>
+
+      <Modal open={!!removing} onClose={() => setRemoving(null)} size="sm" title="Remove this?"
+        footer={<>
+          <Button variant="ghost" onClick={() => setRemoving(null)}>Keep it</Button>
+          <Button variant="danger" onClick={remove}>Remove</Button>
+        </>}>
+        <p className="font-ui text-body text-fg-2">&ldquo;{removing?.title}&rdquo; will disappear from Learn for everyone.</p>
+      </Modal>
+    </div>
   );
 }
 
-/* ─── Resource Card component ─────────────────────────────────────── */
-function ResourceCard({ resource: r, userId, onDelete }: { resource: Resource; userId: string | null; onDelete: (id: string) => void }) {
-  const cfg = RES_TYPES[r.type] || RES_TYPES.article;
-  const ytId = r.type === "video" ? getYtId(r.url) : null;
-  const thumbSrc = ytId ? `https://img.youtube.com/vi/${ytId}/mqdefault.jpg` : r.thumbnail_url || null;
-  const posterInitials = (r.poster_name || "?").split(" ").map((w: string) => w[0]).join("").slice(0, 2).toUpperCase();
-  const isOwner = userId && r.user_id === userId;
+function ResourceCard({ r, mine, onRemove }: { r: Resource; mine: boolean; onRemove: () => void }) {
+  const t = TYPES[r.type] || TYPES.article;
+  const Icon = t.icon;
+  const yt = r.type === "video" ? ytId(r.url) : null;
+  const [broken, setBroken] = useState(false);
+  const thumb = broken ? null : yt ? `https://img.youtube.com/vi/${yt}/hqdefault.jpg` : r.thumbnail_url || null;
+  let host = "";
+  try { host = r.url ? new URL(r.url).hostname.replace(/^www\./, "") : ""; } catch { /* not a url */ }
 
   return (
-    <div className="res-card">
-      {/* Thumbnail (video or article hero) */}
-      {thumbSrc ? (
-        <div className="res-card-thumb">
-          <img src={thumbSrc} alt={r.title} />
-          {r.type === "video" && (
-            <div className="res-card-play">
-              <div className="res-card-play-btn"><Play size={16} color="#111110" fill="#111110" /></div>
-            </div>
-          )}
-        </div>
-      ) : (
-        <div className="res-card-thumb res-card-thumb-empty">
-          <div style={{ fontSize: 32, opacity: 0.25 }}>
-            {r.type === "video" ? "▶" : r.type === "article" ? "📄" : "💬"}
-          </div>
-        </div>
-      )}
-
-      <div className="res-card-body">
-        <div className="res-card-type-row">
-          <span className="res-card-type-badge" style={{ background: cfg.bg, color: cfg.color }}>
-            {cfg.icon} {cfg.label}
+    <li className="group relative flex flex-col overflow-hidden rounded-card border-outline border-ink bg-surface shadow-hard-1 transition-[transform,box-shadow] duration-fast hover:-translate-y-0.5 hover:shadow-hard-2">
+      <div className="relative aspect-video bg-sunken">
+        {thumb ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={thumb} alt="" onError={() => setBroken(true)} className="h-full w-full object-cover" />
+        ) : (
+          <div className="grid h-full place-items-center text-fg-3"><Icon size={28} aria-hidden /></div>
+        )}
+        {r.type === "video" && thumb && (
+          <span aria-hidden className="absolute inset-0 grid place-items-center">
+            <span className="grid h-12 w-12 place-items-center rounded-full border-outline border-ink bg-mango text-on-mango shadow-hard-1">
+              <Play size={18} className="translate-x-px fill-current" />
+            </span>
           </span>
-          {isOwner && (
-            <button className="res-card-delete" onClick={() => onDelete(r.id)} title="Remove">
-              <Trash2 size={13} />
-            </button>
+        )}
+      </div>
+      <div className="flex flex-1 flex-col gap-2 p-4">
+        <div className="flex h-8 items-center justify-between gap-2">
+          <Badge tone={t.tone}>{t.label}</Badge>
+          {mine && (
+            <div className="relative z-10">
+              <Menu label={`Options for ${r.title}`} items={[{ label: "Remove", icon: Trash2, danger: true, onSelect: onRemove }]} />
+            </div>
           )}
         </div>
-
-        <div className="res-card-title">{r.title}</div>
-        {r.description && <div className="res-card-desc">{r.description}</div>}
-
-        <div className="res-card-footer">
-          <div className="res-card-poster">
-            <div className="res-card-avatar">
-              {r.poster_avatar ? <img src={r.poster_avatar} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : posterInitials}
-            </div>
-            <div className="res-card-poster-name">{r.poster_name || "Anonymous"}</div>
-          </div>
-          {r.url && (
-            <a href={r.url} target="_blank" rel="noopener noreferrer" className="res-card-link">
-              {r.type === "video" ? <><Play size={10} /> Watch</> : <><ExternalLink size={10} /> Open</>}
+        <h3 className="font-ui text-body font-semibold leading-snug text-fg">
+          {r.url ? (
+            <a href={r.url} target="_blank" rel="noopener noreferrer" className="after:absolute after:inset-0 focus-visible:outline-none">
+              {r.title}
             </a>
+          ) : r.title}
+        </h3>
+        {r.description && <p className="line-clamp-3 font-ui text-body-sm text-fg-2">{r.description}</p>}
+        <div className="mt-auto flex items-center justify-between gap-2 border-t-hair border-line pt-3">
+          <span className="flex min-w-0 items-center gap-2">
+            <Avatar name={r.poster_name || "Artist"} src={r.poster_avatar} size="sm" />
+            <span className="truncate font-ui text-caption text-fg-3">{r.poster_name || "An artist"}</span>
+          </span>
+          {host && (
+            <span className={cn("inline-flex shrink-0 items-center gap-1 font-ui text-caption font-semibold text-fg-2 group-hover:text-fg")}>
+              {host} <ExternalLink size={12} aria-hidden />
+            </span>
           )}
         </div>
       </div>
-    </div>
+    </li>
   );
 }

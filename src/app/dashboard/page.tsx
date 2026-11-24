@@ -370,7 +370,7 @@ export default function DashboardPage() {
       date: e.start_date,
       time: e.all_day ? null : fmtTime(e.start_time),
       where: e.location,
-      href: "/dashboard/calendar",
+      href: "/dashboard/tasks?view=month",
     })),
     ...calendarTasks.map((t: any): AgendaItem => ({
       id: `tk-${t.id}`,
@@ -393,7 +393,7 @@ export default function DashboardPage() {
       date: p.start_date,
       time: fmtTime(p.start_time),
       where: p.venue ? `${p.venue}${p.city ? `, ${p.city}` : ""}` : p.city || null,
-      href: "/dashboard/calendar",
+      href: "/dashboard/tasks?view=month",
     }))
     .slice(0, 5);
 
@@ -453,7 +453,7 @@ export default function DashboardPage() {
 
       <div className="grid gap-6 lg:grid-cols-3">
         {/* ── Studio wall ── */}
-        <Panel title="On the wall" eyebrow="My Studio" className="lg:col-span-2" action={<PanelLink href="/dashboard/artworks">All works</PanelLink>}>
+        <Panel title="On the wall" eyebrow="Studio" className="lg:col-span-2" action={<PanelLink href="/dashboard/artworks">All works</PanelLink>}>
           <div className="grid grid-cols-2 gap-3 p-5 sm:grid-cols-3">
             {wall.map(aw => (
               <Link key={aw.id} href={`/dashboard/artworks/${aw.id}`} className="group flex flex-col gap-2">
@@ -549,7 +549,7 @@ export default function DashboardPage() {
             <Quiet>{calToggle === "yours" ? "Nothing booked for the next two weeks." : "No public events nearby in the next two weeks."}</Quiet>
           )}
           <div className="mt-auto border-t-hair border-line px-5 py-3">
-            <PanelLink href="/dashboard/calendar">Open calendar</PanelLink>
+            <PanelLink href="/dashboard/tasks?view=month">Open planner</PanelLink>
           </div>
         </Panel>
 
@@ -582,7 +582,7 @@ export default function DashboardPage() {
         {/* ── Scene ── */}
         <Panel
           title="Live in the scene"
-          eyebrow="The Scene"
+          eyebrow="Scene"
           className="lg:col-span-2"
           action={<PanelLink href="/dashboard/scene">See all</PanelLink>}
         >
@@ -611,14 +611,14 @@ export default function DashboardPage() {
             <Quiet>Nothing live yet. Post an open call, a show or a collab and it appears here for everyone.</Quiet>
           )}
           <div className="mt-auto border-t-hair border-line px-5 py-3">
-            <Link href="/dashboard/scene?compose=1" className="inline-flex items-center gap-1.5 font-ui text-label font-semibold text-fg hover:underline hover:underline-offset-4">
+            <Link href="/dashboard/scene?post=1" className="inline-flex items-center gap-1.5 font-ui text-label font-semibold text-fg hover:underline hover:underline-offset-4">
               <Plus size={14} aria-hidden /> Post to the scene
             </Link>
           </div>
         </Panel>
 
         {/* ── Money & papers ── */}
-        <Panel title="Deals and papers" eyebrow="Deals & Money" action={<PanelLink href="/dashboard/sales">Sales</PanelLink>}>
+        <Panel title="Deals and papers" eyebrow="Money" action={<PanelLink href="/dashboard/sales">Sales</PanelLink>}>
           <dl className="divide-y divide-line">
             {[
               { label: "Sold in total", value: loaded ? formatPrice(stats.sales_total, cur) : "–", href: "/dashboard/sales" },

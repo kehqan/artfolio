@@ -219,7 +219,7 @@ function MoodboardPicker({ moodboards, linked, onToggle }: { moodboards: Moodboa
     <FormSection
       title="Moodboards"
       description="Link the boards behind this work."
-      right={<a href="/dashboard/moodboard" target="_blank" rel="noopener noreferrer"
+      right={<a href="/dashboard/mystore?tab=moodboards" target="_blank" rel="noopener noreferrer"
         className="inline-flex shrink-0 items-center gap-1 font-ui text-label font-semibold text-fg-3 hover:text-fg">
         Manage <ExternalLink size={12} aria-hidden />
       </a>}
@@ -228,7 +228,7 @@ function MoodboardPicker({ moodboards, linked, onToggle }: { moodboards: Moodboa
         <div className="flex flex-col items-center gap-2 py-3 text-center">
           <Layers size={22} strokeWidth={1.75} aria-hidden className="text-fg-3" />
           <p className="font-ui text-body-sm text-fg-2">No moodboards yet.</p>
-          <a href="/dashboard/moodboard" target="_blank" rel="noopener noreferrer"
+          <a href="/dashboard/mystore?tab=moodboards" target="_blank" rel="noopener noreferrer"
             className="font-ui text-label font-semibold text-fg underline underline-offset-2 hover:no-underline">
             Create one
           </a>

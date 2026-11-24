@@ -1,239 +1,227 @@
 "use client";
-import { useState, useEffect, useRef } from "react";
-import { createClient } from "@/lib/supabase/client";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { createClient } from "@/lib/supabase/client";
 import {
-  Store, Eye, EyeOff, Copy, Check, ExternalLink,
-  Plus, X, Star, GripVertical, Upload, Palette,
-  Globe, Handshake, MapPin, CalendarDays, QrCode,
-  ImageIcon, ArrowRight, Settings, Zap, Layout,
-  LayoutGrid, List, Rows3, ChevronDown, Save,
-  Sparkles, Users, ShoppingBag, Layers,
+  ArrowDown, ArrowUp, Check, Copy, ExternalLink, ImagePlus, Plus, QrCode, Star, Trash2, X,
 } from "lucide-react";
+import {
+  Alert, Badge, Button, ButtonLink, Card, EmptyState, Field, Input, Modal, PageHeader,
+  SearchField, Skeleton, Switch, Tabs, cn,
+} from "@/components/ui";
+import { Mat, formatPrice } from "@/components/public/PublicChrome";
 
 /* ── Types ────────────────────────────────────────────────────── */
 type StoreSettings = {
   id?: string;
-  store_name: string;
-  tagline: string;
-  accent_color: string;
-  banner_url: string;
-  show_bio: boolean;
-  show_collabs: boolean;
-  show_events: boolean;
-  show_location: boolean;
-  is_active: boolean;
-  layout: string;
+  store_name: string; tagline: string; banner_url: string;
+  show_bio: boolean; show_collabs: boolean; show_events: boolean; show_location: boolean;
+  // Kept as stored; no longer edited here (the public page uses the single mango accent)
+  accent_color: string; is_active: boolean; layout: string;
 };
-
 type Artwork = {
   id: string; title: string; status: string; images?: string[];
-  price?: number; medium?: string; sale_method?: string;
-  currency?: string;
+  price?: number; medium?: string; sale_method?: string; currency?: string;
 };
-
-type StoreArtwork = {
-  artwork_id: string;
-  sort_order: number;
-  featured: boolean;
-};
-
+type StoreArtwork = { artwork_id: string; sort_order: number; featured: boolean };
 type Moodboard = {
-  id: string;
-  provider: string;
-  url: string;
-  title: string;
-  description?: string;
-  thumbnail_url?: string;
-  og_image?: string;
-  tags: string[];
-  is_public: boolean;
+  id: string; provider: string; url: string; title: string;
+  thumbnail_url?: string; og_image?: string; is_public: boolean;
 };
+type Tab = "works" | "page" | "moodboards";
 
 const DEFAULT_SETTINGS: StoreSettings = {
-  store_name: "", tagline: "", accent_color: "#FFD400",
-  banner_url: "", show_bio: true, show_collabs: true,
-  show_events: true, show_location: true, is_active: false,
-  layout: "grid",
+  store_name: "", tagline: "", banner_url: "",
+  show_bio: true, show_collabs: true, show_events: true, show_location: true,
+  accent_color: "#FFD400", is_active: false, layout: "grid",
+};
+const PROVIDER_LABEL: Record<string, string> = {
+  milanote: "Milanote", pinterest: "Pinterest", figma: "Figma", miro: "Miro", notion: "Notion",
 };
 
-const COLOR_PRESETS = [
-  { hex: "#FFD400", name: "Mango" },
-  { hex: "#FF6B6B", name: "Coral" },
-  { hex: "#4ECDC4", name: "Teal" },
-  { hex: "#8B5CF6", name: "Violet" },
-  { hex: "#111110", name: "Noir" },
-  { hex: "#16A34A", name: "Forest" },
-  { hex: "#EA580C", name: "Burnt" },
-  { hex: "#0EA5E9", name: "Sky" },
-  { hex: "#D946EF", name: "Fuchsia" },
-  { hex: "#F5F0E8", name: "Cream" },
-];
+function statusBadge(status?: string) {
+  const s = (status || "").toLowerCase();
+  if (s === "sold") return <Badge tone="inverse">Sold</Badge>;
+  if (s === "reserved") return <Badge tone="warn">Reserved</Badge>;
+  return null;
+}
 
-const LAYOUT_OPTIONS = [
-  { key: "grid",    label: "Grid",    icon: LayoutGrid, desc: "Classic grid layout" },
-  { key: "masonry", label: "Masonry", icon: Rows3,      desc: "Pinterest-style flow" },
-  { key: "list",    label: "List",    icon: List,        desc: "Detailed list view" },
-];
+function WorkRow({ aw, children }: { aw: Artwork; children: React.ReactNode }) {
+  return (
+    <li className="flex items-center gap-3 px-4 py-3">
+      <Mat src={aw.images?.[0]} alt="" className="h-14 w-14 shrink-0 rounded-control" pad="p-1" />
+      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <span className="truncate font-ui text-body font-semibold text-fg">{aw.title}</span>
+        <span className="flex items-center gap-2 truncate font-ui text-body-sm text-fg-3">
+          {[aw.medium, formatPrice(aw.price, aw.currency)].filter(Boolean).join(" · ")}
+          {statusBadge(aw.status)}
+        </span>
+      </div>
+      <div className="flex shrink-0 items-center gap-1">{children}</div>
+    </li>
+  );
+}
 
-const SALE_METHOD_ICON: Record<string, string> = {
-  direct: "🛒", inquiry: "✉️", price_on_request: "💬",
-  auction: "🔨", not_for_sale: "🚫",
-};
+function IconBtn({ label, onClick, disabled, active, children }: {
+  label: string; onClick: () => void; disabled?: boolean; active?: boolean; children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      title={label}
+      aria-pressed={active}
+      onClick={onClick}
+      disabled={disabled}
+      className={cn(
+        "grid h-8 w-8 place-items-center rounded-control text-fg-2 transition-colors duration-fast hover:bg-sunken hover:text-fg disabled:opacity-30 disabled:hover:bg-transparent",
+        active && "text-fg",
+      )}
+    >
+      {children}
+    </button>
+  );
+}
+
+function ToggleRow({ id, label, hint, checked, onChange }: {
+  id: string; label: string; hint: string; checked: boolean; onChange: (v: boolean) => void;
+}) {
+  return (
+    <div className="flex items-start justify-between gap-4 py-4">
+      <div className="flex flex-col gap-0.5">
+        <span id={id} className="font-ui text-body font-semibold text-fg">{label}</span>
+        <span className="font-ui text-body-sm text-fg-3">{hint}</span>
+      </div>
+      <Switch checked={checked} onChange={onChange} label={label} />
+    </div>
+  );
+}
 
 /* ══════════════════════════════════════════════════════════════════ */
-export default function MyStorePage() {
-  const [userId, setUserId]               = useState<string | null>(null);
-  const [username, setUsername]            = useState<string | null>(null);
-  const [settings, setSettings]           = useState<StoreSettings>(DEFAULT_SETTINGS);
-  const [allArtworks, setAllArtworks]     = useState<Artwork[]>([]);
+export default function MyFrontDoorPage() {
+  const [userId, setUserId] = useState<string | null>(null);
+  const [username, setUsername] = useState<string | null>(null);
+  const [settings, setSettings] = useState<StoreSettings>(DEFAULT_SETTINGS);
+  const [allArtworks, setAllArtworks] = useState<Artwork[]>([]);
   const [storeArtworks, setStoreArtworks] = useState<StoreArtwork[]>([]);
-  const [loading, setLoading]             = useState(true);
-  const [saving, setSaving]               = useState(false);
-  const [saved, setSaved]                 = useState(false);
-  const [copied, setCopied]              = useState(false);
-  const [activeTab, setActiveTab]         = useState<"artworks" | "moodboards" | "customize" | "settings">("artworks");
-  const [moodboards, setMoodboards]       = useState<Moodboard[]>([]);
-  const [mbSaving, setMbSaving]           = useState<string | null>(null);
-  const [showQR, setShowQR]               = useState(false);
+  const [snapshot, setSnapshot] = useState("");
+  const [moodboards, setMoodboards] = useState<Moodboard[]>([]);
+  const [mbSaving, setMbSaving] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [notice, setNotice] = useState<{ tone: "ok" | "bad"; text: string } | null>(null);
+  const [tab, setTab] = useState<Tab>("works");
+  const [search, setSearch] = useState("");
+  const [copied, setCopied] = useState(false);
+  const [showQR, setShowQR] = useState(false);
   const [bannerUploading, setBannerUploading] = useState(false);
-  const [customColor, setCustomColor]     = useState("");
-  const [profileName, setProfileName]     = useState("");
+  const [origin, setOrigin] = useState("");
   const bannerInputRef = useRef<HTMLInputElement>(null);
 
-  const storeUrl = username
-    ? `${typeof window !== "undefined" ? window.location.origin : "https://artfolio-tawny.vercel.app"}/${username}`
-    : null;
-
-  const qrUrl = storeUrl
-    ? `https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(storeUrl)}&bgcolor=FFFBEA&color=111110&margin=16`
-    : null;
-
-  useEffect(() => { load(); }, []);
+  useEffect(() => { setOrigin(window.location.origin); load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function load() {
-    const supabase = createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+    const sb = createClient();
+    const { data: { user } } = await sb.auth.getUser();
+    if (!user) { setLoading(false); return; }
     setUserId(user.id);
 
-    // Profile
-    const { data: prof } = await supabase.from("profiles").select("username, full_name").eq("id", user.id).single();
+    const [{ data: prof }, { data: ss }, { data: aw }, { data: sa }, { data: mb }] = await Promise.all([
+      sb.from("profiles").select("username, full_name").eq("id", user.id).single(),
+      sb.from("store_settings").select("*").eq("user_id", user.id).single(),
+      sb.from("artworks").select("id, title, status, images, price, medium, sale_method, currency").eq("user_id", user.id).order("created_at", { ascending: false }),
+      sb.from("store_artworks").select("artwork_id, sort_order, featured").eq("user_id", user.id).order("sort_order", { ascending: true }),
+      sb.from("moodboards").select("id, provider, url, title, thumbnail_url, og_image, is_public").eq("user_id", user.id).order("created_at", { ascending: false }),
+    ]);
+
     setUsername(prof?.username || null);
-    setProfileName(prof?.full_name || "");
-
-    // Store settings
-    const { data: ss } = await supabase.from("store_settings").select("*").eq("user_id", user.id).single();
-    if (ss) {
-      setSettings({
-        id: ss.id,
-        store_name: ss.store_name || "",
-        tagline: ss.tagline || "",
-        accent_color: ss.accent_color || "#FFD400",
-        banner_url: ss.banner_url || "",
-        show_bio: ss.show_bio ?? true,
-        show_collabs: ss.show_collabs ?? true,
-        show_events: ss.show_events ?? true,
-        show_location: ss.show_location ?? true,
-        is_active: ss.is_active ?? false,
-        layout: ss.layout || "grid",
-      });
-    }
-
-    // All artworks
-    const { data: aw } = await supabase.from("artworks")
-      .select("id, title, status, images, price, medium, sale_method, currency")
-      .eq("user_id", user.id)
-      .order("created_at", { ascending: false });
+    const s: StoreSettings = ss ? {
+      id: ss.id,
+      store_name: ss.store_name || "", tagline: ss.tagline || "", banner_url: ss.banner_url || "",
+      show_bio: ss.show_bio ?? true, show_collabs: ss.show_collabs ?? true,
+      show_events: ss.show_events ?? true, show_location: ss.show_location ?? true,
+      accent_color: ss.accent_color || "#FFD400", is_active: ss.is_active ?? false, layout: ss.layout || "grid",
+    } : DEFAULT_SETTINGS;
+    const store = (sa || []).map((x: StoreArtwork) => ({ ...x, featured: !!x.featured }));
+    setSettings(s);
     setAllArtworks(aw || []);
-
-    // Store artworks
-    const { data: sa } = await supabase.from("store_artworks")
-      .select("artwork_id, sort_order, featured")
-      .eq("user_id", user.id)
-      .order("sort_order", { ascending: true });
-    setStoreArtworks(sa || []);
-
-    // Moodboards
-    const { data: mb } = await supabase.from("moodboards").select("*").eq("user_id", user.id).order("created_at", { ascending: false });
-    setMoodboards((mb || []).map((b: any) => ({ ...b, tags: b.tags || [] })));
-
+    setStoreArtworks(store);
+    setSnapshot(JSON.stringify({ s, store }));
+    setMoodboards(mb || []);
     setLoading(false);
   }
 
-  /* ── Save settings ──────────────────────────────────────────── */
+  const dirty = !loading && JSON.stringify({ s: settings, store: storeArtworks }) !== snapshot;
+
   async function saveAll() {
     if (!userId) return;
-    setSaving(true);
-    const supabase = createClient();
-
-    // Upsert store settings
-    await supabase.from("store_settings").upsert({
+    setSaving(true); setNotice(null);
+    const sb = createClient();
+    const { error: e1 } = await sb.from("store_settings").upsert({
       user_id: userId,
       store_name: settings.store_name || null,
       tagline: settings.tagline || null,
-      accent_color: settings.accent_color,
       banner_url: settings.banner_url || null,
       show_bio: settings.show_bio,
       show_collabs: settings.show_collabs,
       show_events: settings.show_events,
       show_location: settings.show_location,
+      accent_color: settings.accent_color,
       is_active: settings.is_active,
       layout: settings.layout,
       updated_at: new Date().toISOString(),
     }, { onConflict: "user_id" });
 
-    // Sync store artworks
-    await supabase.from("store_artworks").delete().eq("user_id", userId);
-    if (storeArtworks.length > 0) {
-      await supabase.from("store_artworks").insert(
-        storeArtworks.map((sa, i) => ({
-          user_id: userId,
-          artwork_id: sa.artwork_id,
-          sort_order: i,
-          featured: sa.featured,
-        }))
+    let e2 = null;
+    const { error: delErr } = await sb.from("store_artworks").delete().eq("user_id", userId);
+    e2 = delErr;
+    if (!e2 && storeArtworks.length > 0) {
+      const { error } = await sb.from("store_artworks").insert(
+        storeArtworks.map((x, i) => ({ user_id: userId, artwork_id: x.artwork_id, sort_order: i, featured: x.featured })),
       );
+      e2 = error;
     }
 
+    if (e1 || e2) {
+      setNotice({ tone: "bad", text: "Some changes didn't save. Please try again." });
+    } else {
+      const store = storeArtworks.map((x, i) => ({ ...x, sort_order: i }));
+      setStoreArtworks(store);
+      setSnapshot(JSON.stringify({ s: settings, store }));
+      setNotice({ tone: "ok", text: "Saved. Your public page shows these changes now." });
+      setTimeout(() => setNotice(n => (n?.tone === "ok" ? null : n)), 3000);
+    }
     setSaving(false);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2500);
   }
 
-  /* ── Toggle artwork in store ─────────────────────────────────── */
-  function toggleArtwork(artworkId: string) {
+  function addArtwork(id: string) {
+    setStoreArtworks(prev => (prev.some(x => x.artwork_id === id) ? prev : [...prev, { artwork_id: id, sort_order: prev.length, featured: false }]));
+  }
+  function removeArtwork(id: string) {
+    setStoreArtworks(prev => prev.filter(x => x.artwork_id !== id));
+  }
+  function toggleFeatured(id: string) {
+    setStoreArtworks(prev => prev.map(x => (x.artwork_id === id ? { ...x, featured: !x.featured } : x)));
+  }
+  function move(id: string, dir: -1 | 1) {
     setStoreArtworks(prev => {
-      const exists = prev.find(sa => sa.artwork_id === artworkId);
-      if (exists) return prev.filter(sa => sa.artwork_id !== artworkId);
-      return [...prev, { artwork_id: artworkId, sort_order: prev.length, featured: false }];
-    });
-  }
-
-  function toggleFeatured(artworkId: string) {
-    setStoreArtworks(prev =>
-      prev.map(sa => sa.artwork_id === artworkId ? { ...sa, featured: !sa.featured } : sa)
-    );
-  }
-
-  function moveArtwork(artworkId: string, dir: -1 | 1) {
-    setStoreArtworks(prev => {
-      const idx = prev.findIndex(sa => sa.artwork_id === artworkId);
-      if (idx < 0) return prev;
-      const newIdx = idx + dir;
-      if (newIdx < 0 || newIdx >= prev.length) return prev;
+      const i = prev.findIndex(x => x.artwork_id === id);
+      const j = i + dir;
+      if (i < 0 || j < 0 || j >= prev.length) return prev;
       const arr = [...prev];
-      [arr[idx], arr[newIdx]] = [arr[newIdx], arr[idx]];
-      return arr.map((sa, i) => ({ ...sa, sort_order: i }));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+      return arr.map((x, k) => ({ ...x, sort_order: k }));
     });
   }
 
-  /* ── Banner upload ──────────────────────────────────────────── */
-  async function handleBannerUpload(file: File) {
+  async function uploadBanner(file: File) {
     if (!userId) return;
+    setNotice(null);
+    if (!file.type.startsWith("image/")) { setNotice({ tone: "bad", text: "Choose an image file (JPG, PNG or WebP)." }); return; }
+    if (file.size > 10 * 1024 * 1024) { setNotice({ tone: "bad", text: "That image is over 10 MB. Try a smaller one." }); return; }
     setBannerUploading(true);
-    const supabase = createClient();
-    const ext = file.name.split(".").pop();
+    const sb = createClient();
+    const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
     const path = `${userId}/store-banner-${Date.now()}.${ext}`;
     try {
       const res = await fetch("/api/upload", {
@@ -242,530 +230,274 @@ export default function MyStorePage() {
         body: JSON.stringify({ path, contentType: file.type }),
       });
       const { signedUrl } = await res.json();
-      if (signedUrl) {
-        await fetch(signedUrl, { method: "PUT", body: file, headers: { "Content-Type": file.type } });
-        const { data: { publicUrl } } = supabase.storage.from("artwork-images").getPublicUrl(path);
-        setSettings(p => ({ ...p, banner_url: publicUrl }));
-      }
-    } catch { /* silent */ }
+      if (!signedUrl) throw new Error("no url");
+      const put = await fetch(signedUrl, { method: "PUT", body: file, headers: { "Content-Type": file.type } });
+      if (!put.ok) throw new Error("upload failed");
+      const { data: { publicUrl } } = sb.storage.from("artwork-images").getPublicUrl(path);
+      setSettings(p => ({ ...p, banner_url: publicUrl }));
+    } catch {
+      setNotice({ tone: "bad", text: "The banner didn't upload. Please try again." });
+    }
     setBannerUploading(false);
   }
 
-  /* ── Copy URL ──────────────────────────────────────────────── */
+  async function toggleMoodboard(board: Moodboard) {
+    setMbSaving(board.id);
+    const sb = createClient();
+    const { error } = await sb.from("moodboards").update({ is_public: !board.is_public }).eq("id", board.id);
+    if (!error) setMoodboards(p => p.map(b => (b.id === board.id ? { ...b, is_public: !b.is_public } : b)));
+    else setNotice({ tone: "bad", text: "Couldn't change that board. Please try again." });
+    setMbSaving(null);
+  }
+
   function copyUrl() {
-    if (!storeUrl) return;
-    navigator.clipboard.writeText(storeUrl);
+    if (!pageUrl) return;
+    navigator.clipboard?.writeText(pageUrl);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   }
 
-  /* ── Helpers ────────────────────────────────────────────────── */
-  const inStore = new Set(storeArtworks.map(sa => sa.artwork_id));
-  const storeArtworksFull = storeArtworks
-    .map(sa => ({ ...sa, artwork: allArtworks.find(a => a.id === sa.artwork_id) }))
-    .filter(sa => sa.artwork);
+  const pageUrl = username && origin ? `${origin}/${username}` : "";
+  const qrUrl = pageUrl ? `https://api.qrserver.com/v1/create-qr-code/?size=480x480&data=${encodeURIComponent(pageUrl)}&margin=16` : "";
+  const byId = new Map(allArtworks.map(a => [a.id, a]));
+  const onPage = storeArtworks.map(x => ({ ...x, aw: byId.get(x.artwork_id) })).filter(x => x.aw) as (StoreArtwork & { aw: Artwork })[];
+  const inStore = new Set(storeArtworks.map(x => x.artwork_id));
+  const q = search.toLowerCase().trim();
+  const available = allArtworks
+    .filter(a => !inStore.has(a.id))
+    .filter(a => !q || a.title.toLowerCase().includes(q) || (a.medium || "").toLowerCase().includes(q));
+  const publicBoards = moodboards.filter(b => b.is_public).length;
 
-  const sf = (k: keyof StoreSettings) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
-    setSettings(p => ({ ...p, [k]: e.target.value }));
-
-  if (loading) return (
-    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "50vh", color: "#9B8F7A", fontSize: 14, fontWeight: 700 }}>
-      Loading MyStore…
-    </div>
-  );
+  if (loading) {
+    return (
+      <div className="flex flex-col gap-6" aria-busy>
+        <Skeleton className="h-10 w-64" />
+        <Skeleton className="h-16 w-full rounded-card" />
+        <div className="grid gap-6 lg:grid-cols-2">
+          <Skeleton className="h-80 rounded-card" />
+          <Skeleton className="h-80 rounded-card" />
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <>
-      <style>{`
-        .ms-card { background:#fff; border:2.5px solid #111110; border-radius:20px; box-shadow:4px 5px 0 #D4C9A8; overflow:hidden; }
-        .ms-header { display:flex; align-items:center; justify-content:space-between; padding:16px 20px; border-bottom:2px solid #111110; background:#FAF7F3; border-radius:20px 20px 0 0; }
-        .ms-toggle { width:48px; height:26px; border-radius:13px; border:2.5px solid #111110; cursor:pointer; position:relative; transition:background 0.2s; flex-shrink:0; }
-        .ms-toggle-knob { width:18px; height:18px; border-radius:50%; background:#111110; position:absolute; top:1.5px; transition:left 0.25s cubic-bezier(0.34,1.56,0.64,1); }
-        .ms-tab { padding:10px 18px; border:none; border-bottom:3px solid transparent; background:none; font-family:inherit; font-size:13px; font-weight:700; color:#9B8F7A; cursor:pointer; transition:all 0.15s; white-space:nowrap; display:flex; align-items:center; gap:6px; }
-        .ms-tab:hover { color:#111110; }
-        .ms-tab.active { color:#111110; border-bottom-color:#FFD400; }
-        .ms-aw-card { display:flex; align-items:center; gap:14px; padding:12px 16px; border-bottom:1px solid #F5F0E8; transition:background 0.12s; }
-        .ms-aw-card:hover { background:#FFFBEA; }
-        .ms-aw-card:last-child { border-bottom:none; }
-        .ms-color-swatch { width:32px; height:32px; border-radius:10px; border:2.5px solid #E8E0D0; cursor:pointer; transition:all 0.15s cubic-bezier(0.34,1.56,0.64,1); flex-shrink:0; }
-        .ms-color-swatch:hover { transform:scale(1.12); }
-        .ms-color-swatch.active { border-color:#111110; box-shadow:2px 2px 0 #111110; transform:scale(1.08); }
-        .ms-input { width:100%; padding:10px 13px; border:2px solid #E8E0D0; border-radius:12px; font-size:14px; font-family:inherit; font-weight:600; color:#111110; outline:none; background:#fff; transition:border-color 0.15s,box-shadow 0.15s; }
-        .ms-input:focus { border-color:#FFD400; box-shadow:0 0 0 3px rgba(255,212,0,0.15); }
-        .ms-label { display:block; font-size:10px; font-weight:800; color:#9B8F7A; text-transform:uppercase; letter-spacing:0.12em; margin-bottom:7px; }
-        .ms-toggle-row { display:flex; align-items:center; justify-content:space-between; padding:14px 0; border-bottom:1px solid #F5F0E8; }
-        .ms-toggle-row:last-child { border-bottom:none; }
-        @keyframes ripeIn { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:none} }
-        .ripe-in { animation:ripeIn 0.5s cubic-bezier(0.16,1,0.3,1) both; }
-      `}</style>
-
-      <div>
-        {/* ═══ HEADER ═══ */}
-        <div className="ripe-in" style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 24, flexWrap: "wrap", gap: 16 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-            <div style={{ width: 48, height: 48, borderRadius: 14, background: settings.accent_color, border: "2.5px solid #111110", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "3px 3px 0 #111110" }}>
-              <ShoppingBag size={22} color="#111110" />
-            </div>
-            <div>
-              <h1 style={{ fontSize: 28, fontWeight: 900, color: "#111110", letterSpacing: "-0.8px", margin: 0, lineHeight: 1.1 }}>MyStore</h1>
-              <p style={{ fontSize: 13, color: "#9B8F7A", margin: "2px 0 0", fontWeight: 600 }}>
-                Your public storefront · {storeArtworks.length} artwork{storeArtworks.length !== 1 ? "s" : ""} published
-              </p>
-            </div>
-          </div>
-
-          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            {/* Store active toggle */}
-            <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 16px", background: settings.is_active ? "#DCFCE7" : "#F5F0E8", border: `2px solid ${settings.is_active ? "#16A34A" : "#E8E0D0"}`, borderRadius: 12 }}>
-              <span style={{ fontSize: 12, fontWeight: 700, color: settings.is_active ? "#16A34A" : "#9B8F7A" }}>
-                {settings.is_active ? "Store Live" : "Store Offline"}
-              </span>
-              <div className="ms-toggle"
-                style={{ background: settings.is_active ? "#16A34A" : "#E8E0D0" }}
-                onClick={() => setSettings(p => ({ ...p, is_active: !p.is_active }))}>
-                <div className="ms-toggle-knob" style={{ left: settings.is_active ? 23 : 2, background: settings.is_active ? "#fff" : "#111110" }} />
-              </div>
-            </div>
-
-            {/* Save button */}
-            <button onClick={saveAll} disabled={saving}
-              style={{ display: "flex", alignItems: "center", gap: 6, padding: "10px 22px", background: saved ? "#4ECDC4" : "#FFD400", border: "2.5px solid #111110", borderRadius: 12, fontSize: 13, fontWeight: 800, cursor: "pointer", boxShadow: "3px 3px 0 #111110", transition: "all 0.2s cubic-bezier(0.16,1,0.3,1)", fontFamily: "inherit", color: "#111110" }}>
-              {saved ? <><Check size={14} /> Saved!</> : saving ? "Saving…" : <><Save size={14} /> Save Store</>}
-            </button>
-          </div>
-        </div>
-
-        {/* ═══ STORE URL BAR ═══ */}
-        {username ? (
-          <div className="ms-card ripe-in" style={{ marginBottom: 20, animationDelay: "0.05s" }}>
-            <div style={{ padding: "16px 20px", display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-              <div style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 10, background: "#FAF7F3", border: "2px solid #E8E0D0", borderRadius: 12, padding: "10px 14px" }}>
-                <Globe size={14} color="#9B8F7A" />
-                <span style={{ fontSize: 13, fontWeight: 700, color: "#111110", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: "monospace" }}>
-                  {storeUrl}
-                </span>
-              </div>
-              <button onClick={copyUrl}
-                style={{ display: "flex", alignItems: "center", gap: 5, padding: "10px 16px", border: "2px solid #111110", borderRadius: 10, background: copied ? "#DCFCE7" : "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", transition: "all 0.15s" }}>
-                {copied ? <><Check size={13} color="#16A34A" /> Copied!</> : <><Copy size={13} /> Copy</>}
-              </button>
-              <a href={storeUrl || "#"} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none" }}>
-                <button style={{ display: "flex", alignItems: "center", gap: 5, padding: "10px 16px", border: "2px solid #111110", borderRadius: 10, background: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
-                  <ExternalLink size={13} /> Preview
-                </button>
-              </a>
-              <button onClick={() => setShowQR(p => !p)}
-                style={{ display: "flex", alignItems: "center", gap: 5, padding: "10px 16px", border: "2px solid #111110", borderRadius: 10, background: showQR ? "#FFD400" : "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", transition: "all 0.15s" }}>
-                <QrCode size={13} /> QR Code
-              </button>
-            </div>
-
-            {/* QR Code panel */}
-            {showQR && qrUrl && (
-              <div style={{ padding: "0 20px 20px", display: "flex", alignItems: "center", gap: 20, borderTop: "1px solid #F5F0E8", paddingTop: 16 }}>
-                <div style={{ border: "2.5px solid #111110", borderRadius: 16, overflow: "hidden", boxShadow: "3px 3px 0 #D4C9A8", flexShrink: 0 }}>
-                  <img src={qrUrl} alt="Store QR Code" style={{ width: 160, height: 160, display: "block" }} />
-                </div>
-                <div>
-                  <div style={{ fontSize: 15, fontWeight: 800, color: "#111110", marginBottom: 6 }}>Share your store</div>
-                  <div style={{ fontSize: 12, color: "#9B8F7A", lineHeight: 1.6, marginBottom: 12 }}>
-                    Print this QR code on business cards, exhibition labels, or anywhere your audience can scan to visit your store.
-                  </div>
-                  <a href={qrUrl} download={`mystore-${username}-qr.png`} style={{ textDecoration: "none" }}>
-                    <button style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "8px 14px", border: "2px solid #111110", borderRadius: 8, background: "#FFD400", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
-                      Download QR
-                    </button>
-                  </a>
-                </div>
-              </div>
+    <div className="flex flex-col gap-6">
+      <PageHeader
+        title="My Front Door"
+        description="Choose what people see when they open your public page."
+        actions={
+          <>
+            {username && (
+              <ButtonLink href={`/${username}`} target="_blank" variant="secondary">
+                <ExternalLink size={15} aria-hidden /> View page
+              </ButtonLink>
             )}
-          </div>
+            <Button variant="primary" onClick={saveAll} disabled={!dirty || saving}>
+              {saving ? "Saving…" : "Save changes"}
+            </Button>
+          </>
+        }
+      />
+
+      {/* ── Page link ── */}
+      <Card padding="md" className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        {pageUrl ? (
+          <>
+            <div className="flex min-w-0 flex-col gap-1">
+              <span className="font-ui text-label font-semibold text-fg">Your page</span>
+              <code className="truncate font-code text-body-sm text-fg-2">{pageUrl.replace(/^https?:\/\//, "")}</code>
+            </div>
+            <div className="flex shrink-0 gap-2">
+              <Button variant="secondary" size="sm" onClick={copyUrl} aria-live="polite">
+                {copied ? <><Check size={14} aria-hidden /> Copied</> : <><Copy size={14} aria-hidden /> Copy link</>}
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => setShowQR(true)}>
+                <QrCode size={14} aria-hidden /> QR code
+              </Button>
+            </div>
+          </>
         ) : (
-          <div className="ms-card ripe-in" style={{ marginBottom: 20, animationDelay: "0.05s" }}>
-            <div style={{ padding: "20px", display: "flex", alignItems: "center", gap: 12 }}>
-              <Sparkles size={20} color="#CA8A04" />
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 13, fontWeight: 700, color: "#854D0E" }}>Set a username first to get your store URL</div>
-                <div style={{ fontSize: 12, color: "#9B8F7A", marginTop: 2 }}>Go to Profile Settings → set your username</div>
-              </div>
-              <Link href="/dashboard/profile" style={{ textDecoration: "none" }}>
-                <button style={{ padding: "8px 14px", border: "2px solid #111110", borderRadius: 8, background: "#FFD400", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
-                  Set Username →
-                </button>
-              </Link>
-            </div>
-          </div>
+          <p className="font-ui text-body-sm text-fg-2">
+            You need a username before your page goes online. <Link href="/dashboard/profile" className="font-semibold text-fg underline underline-offset-4">Set one in your profile</Link>.
+          </p>
         )}
+      </Card>
 
-        {/* ═══ TABS ═══ */}
-        <div className="ripe-in" style={{ display: "flex", borderBottom: "2px solid #E8E0D0", marginBottom: 20, gap: 0, animationDelay: "0.1s" }}>
-          {([
-            { id: "artworks",   label: "Store Artworks", icon: ImageIcon, count: storeArtworks.length },
-            { id: "moodboards", label: "Moodboards",      icon: Layers,   count: moodboards.length },
-            { id: "customize",  label: "Customize",       icon: Palette },
-            { id: "settings",   label: "Visibility",      icon: Settings },
-          ] as const).map(tab => (
-            <button key={tab.id} className={`ms-tab${activeTab === tab.id ? " active" : ""}`} onClick={() => setActiveTab(tab.id)}>
-              <tab.icon size={14} />
-              {tab.label}
-              {"count" in tab && tab.count !== undefined && (
-                <span style={{ background: activeTab === tab.id ? "#111110" : "#E8E0D0", color: activeTab === tab.id ? "#FFD400" : "#9B8F7A", padding: "1px 7px", borderRadius: 9999, fontSize: 10, fontWeight: 800 }}>
-                  {tab.count}
-                </span>
+      {notice && <Alert tone={notice.tone}>{notice.text}</Alert>}
+
+      <Tabs
+        items={[
+          { value: "works", label: "Works for sale", count: storeArtworks.length },
+          { value: "page", label: "Page details" },
+          { value: "moodboards", label: "Moodboards", count: publicBoards || undefined },
+        ]}
+        value={tab}
+        onChange={setTab}
+        label="Front door sections"
+        className="max-w-full self-start overflow-x-auto"
+      />
+
+      {/* ── Works ── */}
+      {tab === "works" && (
+        allArtworks.length === 0 ? (
+          <EmptyState
+            title="Add a work first"
+            description="Works you add in My Works can be put up for sale here."
+            action={<ButtonLink href="/dashboard/artworks/new" variant="primary"><Plus size={15} aria-hidden /> Add a work</ButtonLink>}
+          />
+        ) : (
+          <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
+            <Card padding="none" className="overflow-hidden">
+              <div className="flex items-baseline justify-between gap-3 border-b-hair border-line px-4 py-3">
+                <span className="font-ui text-label font-semibold text-fg">On your page</span>
+                <span className="font-ui text-caption text-fg-3">Starred works show first</span>
+              </div>
+              {onPage.length === 0 ? (
+                <p className="px-4 py-10 text-center font-ui text-body-sm text-fg-3">Nothing for sale yet. Add works from the list.</p>
+              ) : (
+                <ol className="divide-y divide-line">
+                  {onPage.map((x, i) => (
+                    <WorkRow key={x.artwork_id} aw={x.aw}>
+                      <IconBtn label={x.featured ? "Unstar" : "Star (show first)"} active={x.featured} onClick={() => toggleFeatured(x.artwork_id)}>
+                        <Star size={15} aria-hidden className={x.featured ? "fill-ink" : ""} />
+                      </IconBtn>
+                      <IconBtn label="Move up" disabled={i === 0} onClick={() => move(x.artwork_id, -1)}><ArrowUp size={15} aria-hidden /></IconBtn>
+                      <IconBtn label="Move down" disabled={i === onPage.length - 1} onClick={() => move(x.artwork_id, 1)}><ArrowDown size={15} aria-hidden /></IconBtn>
+                      <IconBtn label="Take off page" onClick={() => removeArtwork(x.artwork_id)}><X size={15} aria-hidden /></IconBtn>
+                    </WorkRow>
+                  ))}
+                </ol>
               )}
-            </button>
-          ))}
+            </Card>
+
+            <Card padding="none" className="overflow-hidden">
+              <div className="flex flex-col gap-3 border-b-hair border-line px-4 py-3">
+                <span className="font-ui text-label font-semibold text-fg">Your works</span>
+                {allArtworks.length > 6 && <SearchField value={search} onChange={setSearch} placeholder="Find a work" />}
+              </div>
+              {available.length === 0 ? (
+                <p className="px-4 py-10 text-center font-ui text-body-sm text-fg-3">
+                  {q ? "No works match." : "Every work is already on your page."}
+                </p>
+              ) : (
+                <ul className="max-h-[560px] divide-y divide-line overflow-y-auto">
+                  {available.map(aw => (
+                    <WorkRow key={aw.id} aw={aw}>
+                      <Button variant="secondary" size="sm" onClick={() => addArtwork(aw.id)}>
+                        <Plus size={14} aria-hidden /> Add
+                      </Button>
+                    </WorkRow>
+                  ))}
+                </ul>
+              )}
+            </Card>
+          </div>
+        )
+      )}
+
+      {/* ── Page details ── */}
+      {tab === "page" && (
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-start">
+          <Card padding="lg" className="flex flex-col gap-5">
+            <div className="flex flex-col gap-2">
+              <span className="font-ui text-label font-semibold text-fg">Banner</span>
+              <div className="relative h-36 overflow-hidden rounded-control border-hair border-line bg-sunken">
+                {settings.banner_url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={settings.banner_url} alt="" className="h-full w-full object-cover" />
+                ) : (
+                  <div className="grid h-full place-items-center font-ui text-body-sm text-fg-3">No banner. Your page starts with your name.</div>
+                )}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button variant="secondary" size="sm" onClick={() => bannerInputRef.current?.click()} disabled={bannerUploading}>
+                  <ImagePlus size={14} aria-hidden /> {bannerUploading ? "Uploading…" : settings.banner_url ? "Change banner" : "Add a banner"}
+                </Button>
+                {settings.banner_url && (
+                  <Button variant="ghost" size="sm" onClick={() => setSettings(p => ({ ...p, banner_url: "" }))}>
+                    <Trash2 size={14} aria-hidden /> Remove
+                  </Button>
+                )}
+              </div>
+              <span className="font-ui text-caption text-fg-3">A wide image, about 3:1. It&rsquo;s cropped to fit, so keep artwork you need whole out of it.</span>
+              <input ref={bannerInputRef} type="file" accept="image/*" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) uploadBanner(f); e.target.value = ""; }} />
+            </div>
+            <Field label="Page name" hint="Leave empty to use your own name.">
+              {p => <Input {...p} value={settings.store_name} onChange={e => setSettings(s => ({ ...s, store_name: e.target.value }))} placeholder="e.g. Studio Rahimi" />}
+            </Field>
+            <Field label="Tagline" hint="One line under your name.">
+              {p => <Input {...p} value={settings.tagline} maxLength={120} onChange={e => setSettings(s => ({ ...s, tagline: e.target.value }))} placeholder="e.g. Paintings of water and evening light" />}
+            </Field>
+          </Card>
+
+          <Card padding="lg" className="flex flex-col">
+            <span className="font-ui text-label font-semibold text-fg">Show on your page</span>
+            <div className="divide-y divide-line">
+              <ToggleRow id="t-bio" label="Bio" hint="The few lines from your profile." checked={settings.show_bio} onChange={v => setSettings(s => ({ ...s, show_bio: v }))} />
+              <ToggleRow id="t-loc" label="Location" hint="Your city or address." checked={settings.show_location} onChange={v => setSettings(s => ({ ...s, show_location: v }))} />
+              <ToggleRow id="t-ev" label="Shows and events" hint="Public events you've added." checked={settings.show_events} onChange={v => setSettings(s => ({ ...s, show_events: v }))} />
+              <ToggleRow id="t-co" label="Collabs" hint="Collaborations you list." checked={settings.show_collabs} onChange={v => setSettings(s => ({ ...s, show_collabs: v }))} />
+            </div>
+          </Card>
         </div>
+      )}
 
-        {/* ═══ TAB: STORE ARTWORKS ═══ */}
-        {activeTab === "artworks" && (
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, alignItems: "start" }}>
-
-            {/* Left: Published artworks (in store) */}
-            <div className="ms-card">
-              <div className="ms-header">
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <div style={{ width: 8, height: 8, borderRadius: 3, background: "#16A34A", border: "1.5px solid #111110" }} />
-                  <span style={{ fontSize: 14, fontWeight: 900, color: "#111110" }}>In Your Store</span>
-                  <span style={{ padding: "1px 8px", borderRadius: 9999, background: "#DCFCE7", color: "#16A34A", fontSize: 11, fontWeight: 800 }}>{storeArtworks.length}</span>
-                </div>
-              </div>
-
-              {storeArtworksFull.length === 0 ? (
-                <div style={{ padding: "40px 20px", textAlign: "center" }}>
-                  <ShoppingBag size={28} color="#D4C9A8" style={{ marginBottom: 8 }} />
-                  <div style={{ fontSize: 14, fontWeight: 700, color: "#9B8F7A" }}>No artworks in your store yet</div>
-                  <div style={{ fontSize: 12, color: "#C0B8A8", marginTop: 4 }}>Select artworks from the right to add them →</div>
-                </div>
-              ) : (
-                <div>
-                  {storeArtworksFull.map((sa, idx) => {
-                    const aw = sa.artwork!;
-                    const img = Array.isArray(aw.images) ? aw.images[0] : null;
-                    return (
-                      <div key={sa.artwork_id} className="ms-aw-card">
-                        {/* Reorder handle */}
-                        <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                          <button onClick={() => moveArtwork(sa.artwork_id, -1)} disabled={idx === 0}
-                            style={{ background: "none", border: "none", cursor: idx === 0 ? "default" : "pointer", opacity: idx === 0 ? 0.2 : 0.5, padding: 0, lineHeight: 1, fontSize: 10 }}>▲</button>
-                          <button onClick={() => moveArtwork(sa.artwork_id, 1)} disabled={idx === storeArtworksFull.length - 1}
-                            style={{ background: "none", border: "none", cursor: idx === storeArtworksFull.length - 1 ? "default" : "pointer", opacity: idx === storeArtworksFull.length - 1 ? 0.2 : 0.5, padding: 0, lineHeight: 1, fontSize: 10 }}>▼</button>
-                        </div>
-
-                        {/* Thumbnail */}
-                        <div style={{ width: 48, height: 48, borderRadius: 10, overflow: "hidden", border: "2px solid #E8E0D0", flexShrink: 0, background: "#FAF7F3" }}>
-                          {img ? <img src={img} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                            : <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}><ImageIcon size={16} color="#D4C9A8" /></div>}
-                        </div>
-
-                        {/* Info */}
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: 13, fontWeight: 700, color: "#111110", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{aw.title}</div>
-                          <div style={{ fontSize: 11, color: "#9B8F7A", fontWeight: 600 }}>
-                            {aw.price ? `$${Number(aw.price).toLocaleString()}` : "No price"} · {aw.status}
-                          </div>
-                        </div>
-
-                        {/* Featured star */}
-                        <button onClick={() => toggleFeatured(sa.artwork_id)}
-                          style={{ width: 30, height: 30, borderRadius: 8, border: `2px solid ${sa.featured ? "#FFD400" : "#E8E0D0"}`, background: sa.featured ? "#FFD400" : "#fff", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", transition: "all 0.15s", flexShrink: 0 }}
-                          title={sa.featured ? "Unfeature" : "Mark as featured"}>
-                          <Star size={13} color="#111110" fill={sa.featured ? "#111110" : "none"} />
-                        </button>
-
-                        {/* Remove */}
-                        <button onClick={() => toggleArtwork(sa.artwork_id)}
-                          style={{ width: 30, height: 30, borderRadius: 8, border: "2px solid #FFE4E6", background: "#fff", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}>
-                          <X size={12} color="#FF6B6B" />
-                        </button>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-
-            {/* Right: All artworks (pick to add) */}
-            <div className="ms-card">
-              <div className="ms-header">
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <div style={{ width: 8, height: 8, borderRadius: 3, background: "#9B8F7A", border: "1.5px solid #111110" }} />
-                  <span style={{ fontSize: 14, fontWeight: 900, color: "#111110" }}>Your Inventory</span>
-                  <span style={{ padding: "1px 8px", borderRadius: 9999, background: "#F5F0E8", color: "#9B8F7A", fontSize: 11, fontWeight: 800 }}>{allArtworks.length}</span>
-                </div>
-              </div>
-
-              {allArtworks.length === 0 ? (
-                <div style={{ padding: "40px 20px", textAlign: "center" }}>
-                  <ImageIcon size={28} color="#D4C9A8" style={{ marginBottom: 8 }} />
-                  <div style={{ fontSize: 14, fontWeight: 700, color: "#9B8F7A" }}>No artworks yet</div>
-                  <Link href="/dashboard/artworks/new" style={{ fontSize: 12, fontWeight: 700, color: "#FFD400", textDecoration: "none" }}>
-                    + Add your first artwork
-                  </Link>
-                </div>
-              ) : (
-                <div>
-                  {allArtworks.map(aw => {
-                    const isIn = inStore.has(aw.id);
-                    const img = Array.isArray(aw.images) ? aw.images[0] : null;
-                    return (
-                      <div key={aw.id} className="ms-aw-card" style={{ opacity: isIn ? 0.5 : 1 }}>
-                        <div style={{ width: 48, height: 48, borderRadius: 10, overflow: "hidden", border: "2px solid #E8E0D0", flexShrink: 0, background: "#FAF7F3" }}>
-                          {img ? <img src={img} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                            : <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}><ImageIcon size={16} color="#D4C9A8" /></div>}
-                        </div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: 13, fontWeight: 700, color: "#111110", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{aw.title}</div>
-                          <div style={{ fontSize: 11, color: "#9B8F7A", fontWeight: 600 }}>
-                            {aw.medium || "—"} · {aw.price ? `$${Number(aw.price).toLocaleString()}` : "No price"}
-                            {aw.sale_method && ` ${SALE_METHOD_ICON[aw.sale_method] || ""}`}
-                          </div>
-                        </div>
-                        <button onClick={() => toggleArtwork(aw.id)}
-                          style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", borderRadius: 8, border: `2px solid ${isIn ? "#16A34A" : "#111110"}`, background: isIn ? "#DCFCE7" : "#FFD400", fontSize: 11, fontWeight: 800, cursor: "pointer", fontFamily: "inherit", color: "#111110", transition: "all 0.15s", flexShrink: 0 }}>
-                          {isIn ? <><Check size={12} /> Added</> : <><Plus size={12} /> Add</>}
-                        </button>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* ═══ TAB: MOODBOARDS ═══ */}
-        {activeTab === "moodboards" && (
-          <div>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-              <div>
-                <div style={{ fontSize: 14, fontWeight: 800, color: "#111110", marginBottom: 2 }}>Moodboards on your public profile</div>
-                <div style={{ fontSize: 12, color: "#9B8F7A", fontWeight: 600 }}>Toggle which boards visitors can see. Manage boards in <a href="/dashboard/moodboard" style={{ color: "#EC4899", fontWeight: 700, textDecoration: "none" }}>Studio → Moodboard</a>.</div>
-              </div>
-              <a href="/dashboard/moodboard" style={{ textDecoration: "none" }}>
-                <button style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", background: "#FFD400", border: "2px solid #111110", borderRadius: 10, fontSize: 12, fontWeight: 800, cursor: "pointer", fontFamily: "inherit", color: "#111110", boxShadow: "2px 2px 0 #111110" }}>
-                  <Layers size={13} /> Add boards
-                </button>
-              </a>
-            </div>
-
-            {moodboards.length === 0 ? (
-              <div style={{ textAlign: "center", padding: "60px 24px", background: "#fff", borderRadius: 18, border: "2px solid #E8E0D0", boxShadow: "3px 4px 0 #E0D8CA" }}>
-                <div style={{ fontSize: 44, marginBottom: 12 }}>🗂️</div>
-                <div style={{ fontSize: 16, fontWeight: 800, color: "#111110", marginBottom: 6 }}>No moodboards yet</div>
-                <div style={{ fontSize: 13, color: "#9B8F7A", fontWeight: 600, marginBottom: 20 }}>
-                  Add Milanote, Pinterest or Figma boards in the Moodboard section
-                </div>
-                <a href="/dashboard/moodboard" style={{ textDecoration: "none" }}>
-                  <button style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "10px 20px", background: "#FFD400", border: "2px solid #111110", borderRadius: 11, fontSize: 13, fontWeight: 800, cursor: "pointer", fontFamily: "inherit", color: "#111110", boxShadow: "3px 3px 0 #111110" }}>
-                    <Layers size={14} /> Go to Moodboard
-                  </button>
-                </a>
-              </div>
-            ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                {moodboards.map(board => {
-                  const thumb = board.thumbnail_url || board.og_image;
-                  const PROV_EMOJI: Record<string, string> = { milanote:"🟤", pinterest:"📌", figma:"🎨", miro:"🟡", notion:"📓", other:"🔗" };
-                  const emoji = PROV_EMOJI[board.provider] || "🔗";
-                  return (
-                    <div key={board.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", background: "#fff", border: "2px solid #E8E0D0", borderRadius: 14, transition: "border-color .15s" }}
-                      onMouseEnter={e => (e.currentTarget.style.borderColor="#111110")}
-                      onMouseLeave={e => (e.currentTarget.style.borderColor="#E8E0D0")}>
-
-                      {/* Thumbnail or gradient */}
-                      <div style={{ width: 52, height: 52, borderRadius: 11, overflow: "hidden", border: "1.5px solid #E8E0D0", flexShrink: 0, background: thumb ? "#000" : "#F5F0E8", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22 }}>
-                        {thumb
-                          ? <img src={thumb} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                          : emoji}
-                      </div>
-
-                      {/* Info */}
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 13, fontWeight: 800, color: "#111110", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{board.title}</div>
-                        <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 3 }}>
-                          <span style={{ fontSize: 10, fontWeight: 700, color: "#9B8F7A" }}>{emoji} {board.provider}</span>
-                          {board.tags.slice(0, 3).map(t => (
-                            <span key={t} style={{ fontSize: 10, fontWeight: 700, padding: "1px 7px", borderRadius: 99, background: "#F5F0E8", color: "#9B8F7A" }}>{t}</span>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* External link */}
-                      <a href={board.url} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none" }}>
-                        <button style={{ display: "flex", alignItems: "center", gap: 4, padding: "6px 10px", border: "1.5px solid #E8E0D0", borderRadius: 8, background: "#FAF7F3", fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", color: "#9B8F7A", transition: "all .12s" }}
-                          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor="#111110"; (e.currentTarget as HTMLElement).style.color="#111110"; }}
-                          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor="#E8E0D0"; (e.currentTarget as HTMLElement).style.color="#9B8F7A"; }}>
-                          <ExternalLink size={11} /> Open
-                        </button>
-                      </a>
-
-                      {/* Public toggle */}
-                      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, flexShrink: 0 }}>
-                        <div
-                          onClick={async () => {
-                            setMbSaving(board.id);
-                            const sb = (await import("@/lib/supabase/client")).createClient();
-                            await sb.from("moodboards").update({ is_public: !board.is_public }).eq("id", board.id);
-                            setMoodboards(p => p.map(b => b.id === board.id ? { ...b, is_public: !b.is_public } : b));
-                            setMbSaving(null);
-                          }}
-                          style={{ width: 42, height: 24, borderRadius: 12, background: board.is_public ? "#4ECDC4" : "#E8E0D0", position: "relative", cursor: "pointer", transition: "background .2s", border: "1.5px solid #111110", opacity: mbSaving === board.id ? 0.6 : 1 }}>
-                          <div style={{ position: "absolute", top: 2, left: board.is_public ? 20 : 2, width: 16, height: 16, borderRadius: "50%", background: "#fff", border: "1.5px solid #111110", transition: "left .2s", boxShadow: "1px 1px 0 rgba(0,0,0,0.1)" }} />
-                        </div>
-                        <div style={{ fontSize: 9, fontWeight: 800, color: board.is_public ? "#16A34A" : "#9B8F7A", textTransform: "uppercase", letterSpacing: ".08em" }}>
-                          {board.is_public ? "Public" : "Hidden"}
-                        </div>
-                      </div>
+      {/* ── Moodboards ── */}
+      {tab === "moodboards" && (
+        moodboards.length === 0 ? (
+          <EmptyState
+            title="No moodboards yet"
+            description="Link boards from Pinterest, Milanote, Figma and others in Moodboard, then choose which ones to show here."
+            action={<ButtonLink href="/dashboard/moodboard" variant="secondary">Go to Moodboard</ButtonLink>}
+          />
+        ) : (
+          <Card padding="none" className="overflow-hidden">
+            <div className="border-b-hair border-line px-4 py-3 font-ui text-body-sm text-fg-2">Changes here save right away.</div>
+            <ul className="divide-y divide-line">
+              {moodboards.map(b => {
+                const thumb = b.thumbnail_url || b.og_image;
+                return (
+                  <li key={b.id} className="flex items-center gap-3 px-4 py-3">
+                    <div className="h-12 w-16 shrink-0 overflow-hidden rounded-control bg-sunken">
+                      {thumb && (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={thumb} alt="" className="h-full w-full object-cover" />
+                      )}
                     </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* ═══ TAB: CUSTOMIZE ═══ */}
-        {activeTab === "customize" && (
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, alignItems: "start" }}>
-
-            {/* Left: Branding */}
-            <div className="ms-card">
-              <div className="ms-header">
-                <span style={{ fontSize: 14, fontWeight: 900, color: "#111110" }}>Branding</span>
-              </div>
-              <div style={{ padding: 20, display: "flex", flexDirection: "column", gap: 18 }}>
-                <div>
-                  <label className="ms-label">Store Name</label>
-                  <input className="ms-input" value={settings.store_name} onChange={sf("store_name")}
-                    placeholder={profileName ? `${profileName}'s Store` : "My Art Store"} />
-                  <div style={{ fontSize: 10, color: "#C0B8A8", marginTop: 4 }}>Leave empty to use your profile name</div>
-                </div>
-                <div>
-                  <label className="ms-label">Tagline</label>
-                  <input className="ms-input" value={settings.tagline} onChange={sf("tagline")}
-                    placeholder="e.g. Original artworks from Prague" />
-                </div>
-                <div>
-                  <label className="ms-label">Banner Image</label>
-                  {settings.banner_url && (
-                    <div style={{ position: "relative", borderRadius: 12, overflow: "hidden", border: "2px solid #E8E0D0", marginBottom: 10, aspectRatio: "3/1" }}>
-                      <img src={settings.banner_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                      <button onClick={() => setSettings(p => ({ ...p, banner_url: "" }))}
-                        style={{ position: "absolute", top: 8, right: 8, width: 26, height: 26, borderRadius: 8, background: "#111110", border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
-                        <X size={12} color="#FFD400" />
-                      </button>
+                    <div className="flex min-w-0 flex-1 flex-col">
+                      <span className="truncate font-ui text-body font-semibold text-fg">{b.title}</span>
+                      <span className="font-ui text-body-sm text-fg-3">{PROVIDER_LABEL[b.provider] || "Board"}</span>
                     </div>
-                  )}
-                  <div style={{ display: "flex", gap: 8 }}>
-                    <button onClick={() => bannerInputRef.current?.click()}
-                      style={{ display: "flex", alignItems: "center", gap: 5, padding: "8px 14px", border: "2px solid #E8E0D0", borderRadius: 10, background: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
-                      <Upload size={13} /> {bannerUploading ? "Uploading…" : "Upload banner"}
-                    </button>
-                    <input ref={bannerInputRef} type="file" accept="image/*" style={{ display: "none" }}
-                      onChange={e => e.target.files?.[0] && handleBannerUpload(e.target.files[0])} />
-                    <span style={{ fontSize: 11, color: "#C0B8A8", display: "flex", alignItems: "center" }}>or paste URL below</span>
-                  </div>
-                  <input className="ms-input" value={settings.banner_url} onChange={sf("banner_url")}
-                    placeholder="https://..." style={{ marginTop: 8 }} />
-                </div>
-              </div>
-            </div>
+                    <span className="hidden font-ui text-body-sm text-fg-3 sm:inline">{b.is_public ? "Shown" : "Hidden"}</span>
+                    <Switch checked={b.is_public} disabled={mbSaving === b.id} onChange={() => toggleMoodboard(b)} label={`Show ${b.title} on your page`} />
+                  </li>
+                );
+              })}
+            </ul>
+          </Card>
+        )
+      )}
 
-            {/* Right: Colors + Layout */}
-            <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-              <div className="ms-card">
-                <div className="ms-header">
-                  <span style={{ fontSize: 14, fontWeight: 900, color: "#111110" }}>Accent Color</span>
-                </div>
-                <div style={{ padding: 20 }}>
-                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
-                    {COLOR_PRESETS.map(c => (
-                      <div key={c.hex} className={`ms-color-swatch${settings.accent_color === c.hex ? " active" : ""}`}
-                        style={{ background: c.hex }}
-                        onClick={() => setSettings(p => ({ ...p, accent_color: c.hex }))}
-                        title={c.name} />
-                    ))}
-                  </div>
-                  <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                    <label className="ms-label" style={{ marginBottom: 0, whiteSpace: "nowrap" }}>Custom hex</label>
-                    <input className="ms-input" style={{ maxWidth: 120, fontFamily: "monospace" }}
-                      value={customColor || settings.accent_color}
-                      onChange={e => {
-                        setCustomColor(e.target.value);
-                        if (/^#[0-9A-Fa-f]{6}$/.test(e.target.value)) {
-                          setSettings(p => ({ ...p, accent_color: e.target.value }));
-                        }
-                      }}
-                      placeholder="#FFD400" />
-                    <div style={{ width: 32, height: 32, borderRadius: 10, background: settings.accent_color, border: "2.5px solid #111110", flexShrink: 0 }} />
-                  </div>
-                </div>
-              </div>
+      {dirty && (
+        <div className="sticky bottom-4 z-dropdown flex items-center justify-between gap-3 rounded-card border-outline border-ink bg-surface px-4 py-3 shadow-hard-2">
+          <span className="font-ui text-body-sm text-fg">You have unsaved changes.</span>
+          <Button variant="primary" size="sm" onClick={saveAll} disabled={saving}>{saving ? "Saving…" : "Save changes"}</Button>
+        </div>
+      )}
 
-              <div className="ms-card">
-                <div className="ms-header">
-                  <span style={{ fontSize: 14, fontWeight: 900, color: "#111110" }}>Store Layout</span>
-                </div>
-                <div style={{ padding: 20, display: "flex", gap: 10 }}>
-                  {LAYOUT_OPTIONS.map(opt => {
-                    const Icon = opt.icon;
-                    const active = settings.layout === opt.key;
-                    return (
-                      <button key={opt.key} onClick={() => setSettings(p => ({ ...p, layout: opt.key }))}
-                        style={{ flex: 1, padding: "14px 12px", borderRadius: 14, border: `2.5px solid ${active ? "#111110" : "#E8E0D0"}`, background: active ? "#FFD400" : "#fff", cursor: "pointer", textAlign: "center", fontFamily: "inherit", transition: "all 0.15s", boxShadow: active ? "2px 2px 0 #111110" : "none" }}>
-                        <Icon size={20} color="#111110" style={{ marginBottom: 6 }} />
-                        <div style={{ fontSize: 13, fontWeight: 800, color: "#111110" }}>{opt.label}</div>
-                        <div style={{ fontSize: 10, color: "#9B8F7A", fontWeight: 600, marginTop: 2 }}>{opt.desc}</div>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-          </div>
+      <Modal
+        open={showQR}
+        onClose={() => setShowQR(false)}
+        title="QR code for your page"
+        description="Print it on labels, price cards or flyers. It opens your public page."
+        footer={qrUrl ? <a href={qrUrl} download="artomango-qr.png" target="_blank" rel="noopener noreferrer" className="inline-flex h-10 items-center rounded-control px-4 font-ui text-control font-semibold text-fg hover:bg-sunken">Open full size</a> : undefined}
+      >
+        {qrUrl && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={qrUrl} alt={`QR code for ${pageUrl}`} className="mx-auto h-60 w-60 rounded-control border-hair border-line" />
         )}
-
-        {/* ═══ TAB: VISIBILITY SETTINGS ═══ */}
-        {activeTab === "settings" && (
-          <div style={{ maxWidth: 560 }}>
-            <div className="ms-card">
-              <div className="ms-header">
-                <span style={{ fontSize: 14, fontWeight: 900, color: "#111110" }}>What visitors can see</span>
-              </div>
-              <div style={{ padding: "4px 20px 16px" }}>
-                {[
-                  { key: "show_bio",      label: "Artist Bio & Profile", desc: "Your name, photo, bio, and website link", icon: Users },
-                  { key: "show_collabs",   label: "Collaborations",       desc: "Active collabs and partnership requests", icon: Handshake },
-                  { key: "show_events",    label: "Events & Exhibitions", desc: "Upcoming and current shows",             icon: CalendarDays },
-                  { key: "show_location",  label: "Location",             desc: "Your city and map presence",             icon: MapPin },
-                ].map(item => {
-                  const Icon = item.icon;
-                  const on = settings[item.key as keyof StoreSettings] as boolean;
-                  return (
-                    <div key={item.key} className="ms-toggle-row">
-                      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                        <div style={{ width: 36, height: 36, borderRadius: 10, background: on ? "#F0FDF4" : "#F5F0E8", border: `1.5px solid ${on ? "#4ECDC4" : "#E8E0D0"}`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                          <Icon size={16} color={on ? "#16A34A" : "#9B8F7A"} />
-                        </div>
-                        <div>
-                          <div style={{ fontSize: 14, fontWeight: 700, color: "#111110" }}>{item.label}</div>
-                          <div style={{ fontSize: 12, color: "#9B8F7A", fontWeight: 500 }}>{item.desc}</div>
-                        </div>
-                      </div>
-                      <div className="ms-toggle"
-                        style={{ background: on ? "#4ECDC4" : "#E8E0D0" }}
-                        onClick={() => setSettings(p => ({ ...p, [item.key]: !on }))}>
-                        <div className="ms-toggle-knob" style={{ left: on ? 23 : 2, background: on ? "#fff" : "#111110" }} />
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-    </>
+      </Modal>
+    </div>
   );
 }

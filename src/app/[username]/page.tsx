@@ -23,7 +23,7 @@ type Profile = {
 type StoreSettings = {
   store_name?: string; tagline?: string; accent_color?: string;
   banner_url?: string; show_bio?: boolean; show_collabs?: boolean;
-  show_events?: boolean; layout?: string; is_active?: boolean;
+  show_events?: boolean; show_location?: boolean; layout?: string; is_active?: boolean;
 };
 type Artwork = {
   id: string; title: string; medium?: string; year?: number;
@@ -340,7 +340,7 @@ export default function PublicProfilePage() {
                 </div>
                 {showBio && <p className="max-w-[60ch] whitespace-pre-line font-ui text-body text-fg-2">{profile.bio}</p>}
                 <ul className="flex flex-wrap gap-x-5 gap-y-2 font-ui text-body-sm text-fg-3">
-                  {profile.location && <li className="inline-flex items-center gap-1.5"><MapPin size={14} aria-hidden />{profile.location}</li>}
+                  {profile.location && settings?.show_location !== false && <li className="inline-flex items-center gap-1.5"><MapPin size={14} aria-hidden />{profile.location}</li>}
                   {profile.website && (
                     <li>
                       <a href={webHref(profile.website)} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 hover:text-fg">

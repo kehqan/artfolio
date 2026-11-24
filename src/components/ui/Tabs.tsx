@@ -50,7 +50,7 @@ export function Tabs<T extends string>({ items, value, onChange, label, classNam
             onClick={() => onChange(it.value)}
             onKeyDown={(e) => onKey(e, i)}
             className={cn(
-              "inline-flex h-8 items-center gap-1.5 rounded-pill px-3.5 font-ui text-label font-semibold transition-colors duration-fast",
+              "inline-flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-pill px-3.5 font-ui text-label font-semibold transition-colors duration-fast",
               "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink",
               selected ? "bg-inverse text-on-inverse" : "text-fg-2 hover:bg-n-100 hover:text-fg",
             )}

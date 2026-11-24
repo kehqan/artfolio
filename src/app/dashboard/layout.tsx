@@ -27,9 +27,9 @@ type Area = {
 };
 
 const AREAS: Area[] = [
-  { key: "atelier", label: "The Atelier", icon: LayoutDashboard, href: "/dashboard", pages: [] },
+  { key: "atelier", label: "Home", icon: LayoutDashboard, href: "/dashboard", pages: [] },
   {
-    key: "studio", label: "My Studio", icon: ImageIcon, href: "/dashboard/artworks",
+    key: "studio", label: "Studio", icon: ImageIcon, href: "/dashboard/artworks",
     pages: [
       { href: "/dashboard/artworks", label: "Works" },
       { href: "/dashboard/mystore", label: "Public page" },
@@ -37,7 +37,7 @@ const AREAS: Area[] = [
     match: ["/dashboard/moodboard"],
   },
   {
-    key: "scene", label: "The Scene", icon: Handshake, href: "/dashboard/scene",
+    key: "scene", label: "Scene", icon: Handshake, href: "/dashboard/scene",
     pages: [
       { href: "/dashboard/scene", label: "Feed" },
       { href: "/dashboard/discover", label: "People" },
@@ -46,7 +46,7 @@ const AREAS: Area[] = [
     match: ["/dashboard/exhibitions", "/dashboard/pool", "/dashboard/map"],
   },
   {
-    key: "business", label: "Deals & Money", icon: Wallet, href: "/dashboard/sales",
+    key: "business", label: "Money", icon: Wallet, href: "/dashboard/sales",
     pages: [
       { href: "/dashboard/sales", label: "Sales" },
       { href: "/dashboard/clients", label: "Collectors" },
@@ -55,12 +55,14 @@ const AREAS: Area[] = [
     match: ["/dashboard/analytics"],
   },
   {
-    key: "planning", label: "Planning", icon: CalendarDays, href: "/dashboard/tasks",
+    key: "planning", label: "Planner", icon: CalendarDays, href: "/dashboard/tasks",
     pages: [],
     match: ["/dashboard/calendar"],
   },
-  { key: "messages", label: "Messages", icon: MessageSquare, href: "/dashboard/messages", pages: [] },
 ];
+
+// Messages lives in the top bar, not the rail.
+const MESSAGES: Area = { key: "messages", label: "Messages", icon: MessageSquare, href: "/dashboard/messages", pages: [] };
 
 const ACCOUNT: Area = {
   key: "account", label: "Your profile", icon: UserRound, href: "/dashboard/profile",
@@ -74,19 +76,20 @@ const SEARCHABLE: (Page & { area: string })[] = [
       ? a.pages.map(p => ({ ...p, area: a.label }))
       : [{ href: a.href, label: a.label, area: "" }],
   ),
+  { href: "/dashboard/messages", label: "Messages", area: "" },
   { href: "/dashboard/profile", label: "Your profile", area: "" },
-  { href: "/dashboard/mystore?tab=moodboards", label: "Moodboards", area: "My Studio" },
-  { href: "/dashboard/tasks?view=month", label: "Calendar", area: "Planning" },
-  { href: "/dashboard/scene?show=show", label: "Shows and events", area: "The Scene" },
-  { href: "/dashboard/scene?show=opportunity", label: "Open calls and opportunities", area: "The Scene" },
-  { href: "/dashboard/scene?view=map", label: "Scene map", area: "The Scene" },
+  { href: "/dashboard/mystore?tab=moodboards", label: "Moodboards", area: "Studio" },
+  { href: "/dashboard/tasks?view=month", label: "Calendar", area: "Planner" },
+  { href: "/dashboard/scene?show=show", label: "Shows and events", area: "Scene" },
+  { href: "/dashboard/scene?show=opportunity", label: "Open calls and opportunities", area: "Scene" },
+  { href: "/dashboard/scene?view=map", label: "Scene map", area: "Scene" },
 ];
 
 const startsWith = (path: string, href: string) => path === href || path.startsWith(href + "/");
 
 function areaFor(path: string): Area | null {
   if (path === "/dashboard") return AREAS[0];
-  for (const a of [...AREAS, ACCOUNT]) {
+  for (const a of [...AREAS, MESSAGES, ACCOUNT]) {
     if (a.key === "atelier") continue;
     const hrefs = [a.href, ...a.pages.map(p => p.href), ...(a.match ?? [])];
     if (hrefs.some(h => startsWith(path, h))) return a;
@@ -114,17 +117,8 @@ function Wordmark() {
   return <BrandWordmark href="/dashboard" />;
 }
 
-function CountBadge({ n }: { n: number }) {
-  if (n <= 0) return null;
-  return (
-    <span className="ml-auto grid h-5 min-w-5 place-items-center rounded-pill border-outline border-ink bg-mango px-1.5 font-ui text-caption font-bold leading-none text-on-mango">
-      {n > 9 ? "9+" : n}
-    </span>
-  );
-}
-
-function RailNav({ active, unreadMessages, username, onNavigate }: {
-  active: Area | null; unreadMessages: number; username?: string; onNavigate?: () => void;
+function RailNav({ active, username, onNavigate }: {
+  active: Area | null; username?: string; onNavigate?: () => void;
 }) {
   return (
     <div className="flex h-full flex-col">
@@ -149,7 +143,6 @@ function RailNav({ active, unreadMessages, username, onNavigate }: {
                 >
                   <Icon size={18} aria-hidden />
                   {area.label}
-                  {area.key === "messages" && <CountBadge n={unreadMessages} />}
                 </Link>
               </li>
             );
@@ -305,7 +298,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <div className="flex h-header shrink-0 items-center border-b-hair border-line px-6">
           <Wordmark />
         </div>
-        <RailNav active={area} unreadMessages={unreadMessages} username={profile?.username} />
+        <RailNav active={area} username={profile?.username} />
       </aside>
 
       {/* ── DRAWER (mobile) ── */}
@@ -326,7 +319,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </div>
             <RailNav
               active={area}
-              unreadMessages={unreadMessages}
               username={profile?.username}
               onNavigate={() => setOpen(null)}
             />
@@ -345,9 +337,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               onClick={() => setOpen("drawer")}
             >
               <Menu size={18} aria-hidden />
-              {unreadMessages > 0 && (
-                <span aria-hidden className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full border-outline border-ink bg-mango" />
-              )}
             </button>
             <div className="lg:hidden"><Wordmark /></div>
 
@@ -402,6 +391,21 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   </div>
                 )}
               </div>
+
+              {/* Messages */}
+              <Link
+                href="/dashboard/messages"
+                aria-label={unreadMessages > 0 ? `Messages, ${unreadMessages} unread` : "Messages"}
+                aria-current={area?.key === "messages" ? "page" : undefined}
+                className={iconBtn(area?.key === "messages")}
+              >
+                <MessageSquare size={18} aria-hidden />
+                {unreadMessages > 0 && (
+                  <span aria-hidden className="absolute -right-0.5 -top-0.5 grid h-4 min-w-4 place-items-center rounded-pill border-outline border-ink bg-mango px-1 font-ui text-[10px] font-bold leading-none text-on-mango">
+                    {unreadMessages > 9 ? "9+" : unreadMessages}
+                  </span>
+                )}
+              </Link>
 
               {/* Notifications */}
               <div className="relative">

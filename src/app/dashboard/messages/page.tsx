@@ -132,7 +132,7 @@ function ContextPostCard({ convo }: { convo: Conversation }) {
 
   // Where to link
   const href = convo.context_type === "collab"
-    ? "/dashboard/pool"
+    ? "/dashboard/scene"
     : convo.context_type === "artwork_inquiry" && convo.context_id
     ? `/artwork/${convo.context_id}/passport`
     : null;

@@ -26,6 +26,7 @@ export function DealsPanel({ onOpenChat, onCount }: { onOpenChat: (conversationI
   const [role, setRole] = useState<string | null>(null);
   const [deals, setDeals] = useState<DealView[] | null>(null);
   const [signedByMe, setSignedByMe] = useState<Record<string, boolean>>({});
+  const [cancelled, setCancelled] = useState<Record<string, boolean>>({});
   const [filter, setFilter] = useState<Filter>("needs");
   const [showClosed, setShowClosed] = useState(false);
   const [error, setError] = useState("");
@@ -45,10 +46,12 @@ export function DealsPanel({ onOpenChat, onCount }: { onOpenChat: (conversationI
     // Which agreements still need my signature?
     const contracts = list.filter(d => d.status === "agreement_sent" && d.contract_id).map(d => d.contract_id!) as string[];
     if (contracts.length) {
-      const { data } = await sb.from("contracts").select("id, initiator_id, initiator_signed_at, counterparty_signed_at, executed_at").in("id", contracts);
+      const { data } = await sb.from("contracts").select("id, status, initiator_id, initiator_signed_at, counterparty_signed_at, executed_at").in("id", contracts);
       const mine: Record<string, boolean> = {};
+      const off: Record<string, boolean> = {};
       (data || []).forEach((c: any) => {
         mine[c.id] = c.initiator_id === uid ? !!c.initiator_signed_at : !!c.counterparty_signed_at;
+        if (c.status === "cancelled") off[c.id] = true;
         // Signed by both but the deal didn't catch up yet: close the loop.
         const d = list.find(x => x.contract_id === c.id);
         if (c.executed_at && d && d.status === "agreement_sent") {
@@ -56,6 +59,7 @@ export function DealsPanel({ onOpenChat, onCount }: { onOpenChat: (conversationI
         }
       });
       setSignedByMe(mine);
+      setCancelled(off);
     }
   }, []);
 
@@ -82,9 +86,13 @@ export function DealsPanel({ onOpenChat, onCount }: { onOpenChat: (conversationI
 
   const mineToDo = useCallback((d: DealView) => {
     if (!me || isClosed(d)) return false;
-    if (d.status === "agreement_sent") return d.contract_id ? !signedByMe[d.contract_id] : false;
+    if (d.status === "agreement_sent") {
+      // A cancelled agreement: the venue sends a new one.
+      if (d.contract_id && cancelled[d.contract_id]) return d.venue_id === me;
+      return d.contract_id ? !signedByMe[d.contract_id] : false;
+    }
     return needsMe(d, me);
-  }, [me, signedByMe]);
+  }, [me, signedByMe, cancelled]);
 
   const groups = useMemo(() => {
     const list = deals || [];
@@ -171,6 +179,7 @@ export function DealsPanel({ onOpenChat, onCount }: { onOpenChat: (conversationI
             {shown.map(d => (
               <DealCard key={d.id} d={d} me={me!} busy={busy === d.id} focused={focus === d.id} liRef={focus === d.id ? focused : undefined}
                 signed={d.contract_id ? !!signedByMe[d.contract_id] : false}
+                agreementCancelled={!!(d.contract_id && cancelled[d.contract_id])}
                 onMove={s => (s === "interested" ? move(d, s) : setConfirm({ deal: d, kind: s }))}
                 onAgree={() => setAgreeing(d)} filled={!!(d.pool_request_id && filled[d.pool_request_id])} onFill={() => fillPost(d)}
                 onChat={() => d.conversation_id && onOpenChat(d.conversation_id)} />
@@ -213,8 +222,8 @@ export function DealsPanel({ onOpenChat, onCount }: { onOpenChat: (conversationI
   );
 }
 
-function DealCard({ d, me, busy, focused, liRef, signed, onMove, onChat, onAgree, filled, onFill }: {
-  d: DealView; me: string; busy: boolean; focused: boolean; liRef?: React.Ref<HTMLLIElement>; signed: boolean;
+function DealCard({ d, me, busy, focused, liRef, signed, agreementCancelled, onMove, onChat, onAgree, filled, onFill }: {
+  d: DealView; me: string; busy: boolean; focused: boolean; liRef?: React.Ref<HTMLLIElement>; signed: boolean; agreementCancelled?: boolean;
   onMove: (s: "interested" | "declined" | "withdrawn") => void; onChat: () => void;
   onAgree?: () => void; filled?: boolean; onFill?: () => void;
 }) {
@@ -241,7 +250,11 @@ function DealCard({ d, me, busy, focused, liRef, signed, onMove, onChat, onAgree
       {iStarted && <Button variant="ghost" size="sm" disabled={busy} onClick={() => onMove("withdrawn")}>Withdraw</Button>}
     </>;
   }
-  if ((d.status === "agreement_sent" || d.status === "signed") && d.contract_id) {
+  if (d.status === "agreement_sent" && agreementCancelled) {
+    actions = iAmVenue && onAgree
+      ? <Button variant="primary" size="sm" onClick={onAgree}><FileSignature size={14} aria-hidden /> Send a new agreement</Button>
+      : null;
+  } else if ((d.status === "agreement_sent" || d.status === "signed") && d.contract_id) {
     actions = <>
       {d.status === "signed" && iAmVenue && d.post && d.post.status === "open" && !filled && onFill && (
         <Button variant="secondary" size="sm" onClick={onFill}><Check size={14} aria-hidden /> Mark the wall as filled</Button>
@@ -296,7 +309,11 @@ function DealCard({ d, me, busy, focused, liRef, signed, onMove, onChat, onAgree
       ) : null}
 
       <div className="flex flex-col gap-3 border-t-hair border-line pt-3 sm:flex-row sm:items-center">
-        <p className="flex-1 font-ui text-body-sm text-fg-2">{nextLine(d, me)}</p>
+        <p className="flex-1 font-ui text-body-sm text-fg-2">
+          {agreementCancelled && d.status === "agreement_sent"
+            ? (iAmVenue ? "You cancelled the agreement. Send a new one when you're ready." : `${name} cancelled the agreement. They can send a new one.`)
+            : nextLine(d, me)}
+        </p>
         <div className="flex flex-wrap gap-2">
           {actions}
           {d.conversation_id && <Button variant="ghost" size="sm" onClick={onChat}><MessageSquare size={14} aria-hidden /> Message</Button>}

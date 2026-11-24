@@ -56,10 +56,8 @@ const AREAS: Area[] = [
   },
   {
     key: "planning", label: "Planning", icon: CalendarDays, href: "/dashboard/tasks",
-    pages: [
-      { href: "/dashboard/tasks", label: "My To-Dos" },
-      { href: "/dashboard/calendar", label: "My Schedule" },
-    ],
+    pages: [],
+    match: ["/dashboard/calendar"],
   },
   { key: "messages", label: "Messages", icon: MessageSquare, href: "/dashboard/messages", pages: [] },
 ];
@@ -78,6 +76,7 @@ const SEARCHABLE: (Page & { area: string })[] = [
   ),
   { href: "/dashboard/profile", label: "Your profile", area: "" },
   { href: "/dashboard/mystore?tab=moodboards", label: "Moodboards", area: "My Studio" },
+  { href: "/dashboard/tasks?view=month", label: "Calendar", area: "Planning" },
   { href: "/dashboard/scene?show=show", label: "Shows and events", area: "The Scene" },
   { href: "/dashboard/scene?show=opportunity", label: "Open calls and opportunities", area: "The Scene" },
   { href: "/dashboard/scene?view=map", label: "Scene map", area: "The Scene" },

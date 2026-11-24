@@ -85,7 +85,7 @@ export function PlacesStrip() {
           </span>
           <span>
             {next
-              ? <>Next: <Link href={`/dashboard/artworks/${next.id}/edit`} className="font-semibold text-fg underline underline-offset-2">{next.title}</Link> needs {missingForWall(next).join(", ")}.</>
+              ? <>Next: <Link href={`/dashboard/artworks/new?finish=${next.id}`} className="font-semibold text-fg underline underline-offset-2">{next.title}</Link> needs {missingForWall(next).join(", ")}.</>
               : <>No venues are posting{s.city ? ` in ${s.city}` : ""} yet. You&rsquo;ll be first in line when they do.</>}
           </span>
         </span>

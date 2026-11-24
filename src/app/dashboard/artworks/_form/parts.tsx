@@ -37,7 +37,7 @@ const AUTH_TYPES = [
 ];
 
 const FILE_FORMATS = ["PNG", "JPG", "SVG", "GIF", "MP4", "WEBP", "TIFF", "PDF", "PSD", "AI", "GLB", "Other"];
-const CURRENCIES = ["EUR", "USD", "GBP", "CZK", "CHF", "JPY", "CAD"];
+export const CURRENCIES = ["EUR", "USD", "GBP", "CZK", "CHF", "JPY", "CAD"];
 
 export const MAX_IMAGES = 8;
 

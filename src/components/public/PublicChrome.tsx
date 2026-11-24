@@ -17,8 +17,11 @@ const NAV: [string, string][] = [
   ["How it works", "/#how"],
 ];
 
-/** Sticky public header: wordmark, main links, sign in and the one primary action. */
-export function PublicHeader({ action }: { action?: ReactNode }) {
+/**
+ * Sticky public header: wordmark, main links, sign in and the one primary action.
+ * When signedIn, "Sign in" is replaced by a link back to the dashboard.
+ */
+export function PublicHeader({ action, signedIn = false }: { action?: ReactNode; signedIn?: boolean }) {
   const [open, setOpen] = useState(false);
   return (
     <header className="sticky top-0 z-nav border-b-hair border-line bg-surface">
@@ -30,8 +33,14 @@ export function PublicHeader({ action }: { action?: ReactNode }) {
           ))}
         </nav>
         <div className="ml-auto flex items-center gap-2">
-          <ButtonLink href="/login" variant="ghost" className="hidden sm:inline-flex">Sign in</ButtonLink>
-          {action ?? <ButtonLink href="/register" variant="primary">Get started</ButtonLink>}
+          {signedIn ? (
+            action ?? <ButtonLink href="/dashboard" variant="secondary">Open your studio</ButtonLink>
+          ) : (
+            <>
+              <ButtonLink href="/login" variant="ghost" className="hidden sm:inline-flex">Sign in</ButtonLink>
+              {action ?? <ButtonLink href="/register" variant="primary">Get started</ButtonLink>}
+            </>
+          )}
           <button
             type="button"
             aria-label={open ? "Close menu" : "Open menu"}
@@ -45,7 +54,7 @@ export function PublicHeader({ action }: { action?: ReactNode }) {
       </div>
       {open && (
         <nav aria-label="Main" className="border-t-hair border-line px-4 py-3 md:hidden">
-          {[...NAV, ["Sign in", "/login"] as [string, string]].map(([label, href]) => (
+          {[...NAV, (signedIn ? ["Your studio", "/dashboard"] : ["Sign in", "/login"]) as [string, string]].map(([label, href]) => (
             <a key={href} href={href} onClick={() => setOpen(false)} className="block rounded-control px-3 py-2.5 font-ui text-body font-semibold text-fg hover:bg-sunken">{label}</a>
           ))}
         </nav>

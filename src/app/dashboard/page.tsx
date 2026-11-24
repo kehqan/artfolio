@@ -8,6 +8,7 @@ import { Avatar, Badge, ButtonLink, Card, Eyebrow, Heading, StatTile, Tabs, cn }
 import type { BadgeTone } from "@/components/ui";
 import { Mat, formatPrice } from "@/components/public/PublicChrome";
 import { mainCurrency } from "./sales/money";
+import { PlacesStrip } from "@/components/home/PlacesStrip";
 
 /* ── Labels ─────────────────────────────────────────────────────── */
 type ScenePostType = "event" | "exhibition" | "collab" | "opencall" | "commission";
@@ -442,6 +443,9 @@ export default function DashboardPage() {
         </div>
         <ButtonLink href="/dashboard/artworks/new" variant="primary"><Plus size={16} aria-hidden /> Add a work</ButtonLink>
       </header>
+
+      {/* ── Where can my work go? ── */}
+      <PlacesStrip />
 
       {/* ── Numbers ── */}
       <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">

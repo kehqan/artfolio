@@ -6,12 +6,13 @@ import { createClient } from "@/lib/supabase/client";
 import {
   ArrowLeft, Edit2, Copy, Trash2, ChevronLeft, ChevronRight,
   X, ImageIcon, Shield, ExternalLink, Hash, Check, Maximize2, ChevronDown,
-  Link2,
+  Link2, MapPin,
 } from "lucide-react";
 import {
   Badge, Button, ButtonLink, Card, EmptyState, Eyebrow, Heading, Modal, Skeleton, Tag, cn,
 } from "@/components/ui";
 import { STAGES, STAGE_MAP, toStageKey, formatPrice } from "@/lib/artwork-stage";
+import { isSold } from "@/lib/places";
 
 const ART_TYPE_LABEL: Record<string, string> = {
   physical: "Physical",
@@ -229,7 +230,12 @@ export default function ArtworkDetailPage() {
             )}
           </div>
 
-          <ButtonLink href={`/dashboard/artworks/${id}/edit`} variant="primary">
+          {!isSold(artwork) && (
+            <ButtonLink href={`/dashboard/looking?work=${id}`} variant="primary">
+              <MapPin size={15} aria-hidden /> Find a place for it
+            </ButtonLink>
+          )}
+          <ButtonLink href={`/dashboard/artworks/${id}/edit`} variant={isSold(artwork) ? "primary" : "secondary"}>
             <Edit2 size={15} aria-hidden /> Edit
           </ButtonLink>
           <Button variant="secondary" aria-label="Duplicate" title="Duplicate" onClick={handleDuplicate} size="icon">

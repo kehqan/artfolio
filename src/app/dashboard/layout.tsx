@@ -16,7 +16,7 @@ import { cn, Avatar } from "@/components/ui";
 import { Wordmark as BrandWordmark } from "@/components/brand/Wordmark";
 
 // ── Navigation model ───────────────────────────────────────────────
-type Page = { href: string; label: string };
+type Page = { href: string; label: string; venueLabel?: string };
 type Area = {
   key: string;
   label: string;
@@ -37,8 +37,9 @@ const AREAS: Area[] = [
     match: ["/dashboard/moodboard"],
   },
   {
-    key: "scene", label: "Scene", icon: Handshake, href: "/dashboard/scene",
+    key: "scene", label: "Scene", icon: Handshake, href: "/dashboard/looking",
     pages: [
+      { href: "/dashboard/looking", label: "Looking for art", venueLabel: "Find artists" },
       { href: "/dashboard/scene", label: "Feed" },
       { href: "/dashboard/discover", label: "People" },
       { href: "/dashboard/education", label: "Learn" },
@@ -168,7 +169,7 @@ function RailNav({ active, username, onNavigate }: {
   );
 }
 
-function AreaTabs({ area, pathname, className }: { area: Area | null; pathname: string; className?: string }) {
+function AreaTabs({ area, pathname, venue, className }: { area: Area | null; pathname: string; venue?: boolean; className?: string }) {
   if (!area || area.pages.length === 0) {
     return area ? <span className={cn("font-display text-h3 text-fg", className)}>{area.label}</span> : null;
   }
@@ -187,7 +188,7 @@ function AreaTabs({ area, pathname, className }: { area: Area | null; pathname: 
               on ? "border-ink text-fg" : "border-transparent text-fg-3 hover:text-fg",
             )}
           >
-            {p.label}
+            {venue && p.venueLabel ? p.venueLabel : p.label}
           </Link>
         );
       })}
@@ -201,6 +202,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const router = useRouter();
 
   const [profile, setProfile] = useState<Profile | null>(null);
+  const isVenue = profile?.role === "venue" || profile?.role === "gallery";
   const [userId, setUserId] = useState<string | null>(null);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadMessages, setUnreadMessages] = useState(0);
@@ -340,7 +342,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </button>
             <div className="lg:hidden"><Wordmark /></div>
 
-            <AreaTabs area={area} pathname={pathname} className="hidden lg:flex" />
+            <AreaTabs area={area} pathname={pathname} venue={isVenue} className="hidden lg:flex" />
 
             <div ref={toolsRef} className="ml-auto flex items-center gap-1">
               {/* Search */}
@@ -514,7 +516,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           {/* Secondary navigation on small screens: its own scrolling row */}
           {area && area.pages.length > 0 && (
             <div className="h-11 border-t-hair border-line px-2 lg:hidden">
-              <AreaTabs area={area} pathname={pathname} />
+              <AreaTabs area={area} pathname={pathname} venue={isVenue} />
             </div>
           )}
         </header>

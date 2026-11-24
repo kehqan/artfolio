@@ -104,16 +104,24 @@ export default function MessagesPage() {
     try {
       const res = await fetch("/api/conversations");
       const data = await res.json();
-      setConvos(data.conversations || []);
+      const list: Conversation[] = data.conversations || [];
+      setConvos(list);
+      return list;
     } catch { setError("Your messages didn't load. Please refresh the page."); }
-    setLoading(false);
+    finally { setLoading(false); }
+    return null;
   }
 
   useEffect(() => {
     createClient().auth.getUser().then(({ data: { user } }) => {
       if (!user) { setLoading(false); return; }
       setMyId(user.id);
-      loadConvos();
+      loadConvos().then(list => {
+        // ?c=<id> opens that chat, e.g. right after offering a work.
+        const want = new URLSearchParams(window.location.search).get("c");
+        const hit = want && list?.find(c => c.id === want);
+        if (hit) openConvo(hit);
+      });
     });
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
   }, []);

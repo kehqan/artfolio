@@ -4,7 +4,7 @@ import Link from "next/link";
 import { ChevronLeft, ChevronRight, ExternalLink, MessageSquare, Pencil, Trash2 } from "lucide-react";
 import { Avatar, Badge, Button, Modal } from "@/components/ui";
 import { Mat } from "@/components/public/PublicChrome";
-import { type FeedItem, fullDate } from "./feed";
+import { type FeedItem, fullDate, wallDetails } from "./feed";
 import { KIND_TONE } from "./SceneCard";
 
 type Props = {
@@ -12,11 +12,13 @@ type Props = {
   mine: boolean;
   onClose: () => void;
   onMessage: (item: FeedItem) => void;
+  /** Replaces "Message …" on the main button, for example "Offer a work". */
+  actionLabel?: string;
   onEdit: (item: FeedItem) => void;
   onDelete: (item: FeedItem) => Promise<void>;
 };
 
-export function SceneDetail({ item, mine, onClose, onMessage, onEdit, onDelete }: Props) {
+export function SceneDetail({ item, mine, onClose, onMessage, actionLabel, onEdit, onDelete }: Props) {
   const [idx, setIdx] = useState(0);
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -36,6 +38,10 @@ export function SceneDetail({ item, mine, onClose, onMessage, onEdit, onDelete }
   if (item.deadline) rows.push(["Apply by", fullDate(item.deadline)]);
   rows.push(["Where", item.online ? "Online" : item.where || "Not given"]);
   if (item.price) rows.push(["Price from", item.price]);
+  const wd = wallDetails(item);
+  if (wd.wall) rows.push(["Wall", wd.wall]);
+  if (wd.duration) rows.push(["For how long", wd.duration]);
+  if (wd.sells != null) rows.push(["Selling", wd.sells ? `Yes${wd.commission != null ? `, ${wd.commission}% commission` : ""}` : "No, display only"]);
   if (item.raw?.num_artists) rows.push(["Looking for", `${item.raw.num_artists} ${item.raw.num_artists === 1 ? "artist" : "artists"}`]);
   if (item.link) {
     rows.push(["Link", (
@@ -62,7 +68,7 @@ export function SceneDetail({ item, mine, onClose, onMessage, onEdit, onDelete }
     )
   ) : (
     <Button variant="primary" onClick={() => { close(); onMessage(item); }}>
-      <MessageSquare size={15} aria-hidden /> Message {(item.poster?.role === "venue" || item.poster?.role === "gallery" ? item.poster?.full_name : item.poster?.full_name?.split(" ")[0]) || "them"}
+      <MessageSquare size={15} aria-hidden /> {actionLabel || <>Message {(item.poster?.role === "venue" || item.poster?.role === "gallery" ? item.poster?.full_name : item.poster?.full_name?.split(" ")[0]) || "them"}</>}
     </Button>
   );
 

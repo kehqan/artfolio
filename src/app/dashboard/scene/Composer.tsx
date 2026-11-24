@@ -36,12 +36,14 @@ type Form = {
   start: string; end: string; deadline: string;
   eventType: string; collabType: "collab" | "commission"; price: string; numArtists: string;
   requestType: string; isPublic: boolean;
+  wall: string; duration: string; sells: boolean; commission: string;
 };
 
 const EMPTY: Form = {
   title: "", description: "", images: [], where: "", lat: null, lng: null, online: false, link: "",
   start: "", end: "", deadline: "", eventType: "exhibition", collabType: "collab", price: "", numArtists: "",
   requestType: "", isPublic: true,
+  wall: "", duration: "", sells: true, commission: "",
 };
 
 function choiceFor(i: FeedItem): Choice {
@@ -64,6 +66,8 @@ function formFor(i: FeedItem): Form {
     collabType: r.post_type === "commission" ? "commission" : "collab",
     price: r.price_from || "", numArtists: r.num_artists ? String(r.num_artists) : "",
     requestType: r.request_type || "", isPublic: r.is_public !== false,
+    wall: r.details?.wall || "", duration: r.details?.duration || "",
+    sells: r.details?.sells !== false, commission: r.details?.commission != null ? String(r.details.commission) : "",
   };
 }
 
@@ -72,11 +76,13 @@ type Props = {
   editing: FeedItem | null;
   userId: string;
   role?: string | null;
+  /** Open straight on a choice, e.g. a venue's "Art for our walls" post. */
+  start?: { choice: Choice; requestType?: string } | null;
   onClose: () => void;
   onSaved: () => void;
 };
 
-export function Composer({ open, editing, userId, role, onClose, onSaved }: Props) {
+export function Composer({ open, editing, userId, role, start, onClose, onSaved }: Props) {
   const [choice, setChoice] = useState<Choice | null>(null);
   const [form, setForm] = useState<Form>(EMPTY);
   const [saving, setSaving] = useState(false);
@@ -89,8 +95,9 @@ export function Composer({ open, editing, userId, role, onClose, onSaved }: Prop
     if (!open) return;
     setError("");
     if (editing) { setChoice(choiceFor(editing)); setForm(formFor(editing)); }
+    else if (start) { setChoice(start.choice); setForm({ ...EMPTY, requestType: start.requestType || "" }); }
     else { setChoice(null); setForm(EMPTY); }
-  }, [open, editing]);
+  }, [open, editing, start]);
 
   const set = <K extends keyof Form>(k: K, v: Form[K]) => setForm(f => ({ ...f, [k]: v }));
   const maxImages = choice === "show" && (!editing || editing.source === "show") ? 1 : 6;
@@ -151,9 +158,19 @@ export function Composer({ open, editing, userId, role, onClose, onSaved }: Prop
         deadline: form.deadline || null, cover_image: form.images[0] || null, images: form.images,
         status: editing?.raw.status || "open", updated_at: now,
       };
-      res = editing
-        ? await sb.from("pool_requests").update(row).eq("id", editing.id).eq("user_id", userId)
-        : await sb.from("pool_requests").insert({ ...row, user_id: userId });
+      const saved = editing
+        ? await sb.from("pool_requests").update(row).eq("id", editing.id).eq("user_id", userId).select("id").single()
+        : await sb.from("pool_requests").insert({ ...row, user_id: userId }).select("id").single();
+      res = saved;
+      // Wall details go in their own write so the post still saves if the
+      // details column hasn't been added yet.
+      if (!saved.error && saved.data && form.requestType === "walls") {
+        const pct = parseFloat(form.commission);
+        await sb.from("pool_requests").update({ details: {
+          wall: form.wall.trim() || undefined, duration: form.duration.trim() || undefined,
+          sells: form.sells, commission: form.sells && !isNaN(pct) ? pct : null,
+        } }).eq("id", saved.data.id).eq("user_id", userId);
+      }
     } else {
       const postType = sceneShow ? editing!.raw.post_type : choice === "opencall" ? "opencall" : form.collabType;
       const row = {
@@ -220,6 +237,25 @@ export function Composer({ open, editing, userId, role, onClose, onSaved }: Prop
             </Field>
           )}
 
+          {choice === "looking" && form.requestType === "walls" && (
+            <div className="flex flex-col gap-4 rounded-card border-hair border-line bg-sunken p-4">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field label="Wall space" hint="Optional">
+                  {p => <Input {...p} value={form.wall} maxLength={80} placeholder="One wall, about 3 × 2 m" onChange={e => set("wall", e.target.value)} />}
+                </Field>
+                <Field label="For how long" hint="Optional">
+                  {p => <Input {...p} value={form.duration} maxLength={60} placeholder="2 months" onChange={e => set("duration", e.target.value)} />}
+                </Field>
+              </div>
+              <SwitchRow checked={form.sells} onChange={v => set("sells", v)} label="Guests can buy the work" hint="Switch off if it's for display only." />
+              {form.sells && (
+                <Field label="Your commission" hint="Optional. Leave empty if you take none.">
+                  {p => <Input {...p} type="number" min={0} max={100} inputMode="decimal" value={form.commission} placeholder="20" onChange={e => set("commission", e.target.value)} />}
+                </Field>
+              )}
+            </div>
+          )}
+
           {choice === "collab" && !editing && (
             <div className="flex gap-2" role="group" aria-label="Kind">
               <Chip selected={form.collabType === "collab"} onClick={() => set("collabType", "collab")}>A collab</Chip>
@@ -229,7 +265,7 @@ export function Composer({ open, editing, userId, role, onClose, onSaved }: Prop
 
           <Field label="Title">
             {p => <Input {...p} value={form.title} maxLength={120} onChange={e => set("title", e.target.value)}
-              placeholder={choice === "show" ? "Paper and light, a group show" : choice === "opencall" ? "Open call: small works" : choice === "looking" ? "Looking for a wall in Berlin" : "Looking for a printmaker to work with"} />}
+              placeholder={choice === "show" ? "Paper and light, a group show" : choice === "opencall" ? "Open call: small works" : choice === "looking" ? (form.requestType === "walls" ? "Art for our café walls this spring" : "Looking for a wall in Berlin") : "Looking for a printmaker to work with"} />}
           </Field>
 
           {choice === "show" && editing?.source !== "scene" && (

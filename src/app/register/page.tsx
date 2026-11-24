@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Building2, Palette } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -68,6 +68,11 @@ export default function RegisterPage() {
   const router = useRouter();
   const [step, setStep] = useState<Step>("role");
   const [role, setRole] = useState<Role | null>(null);
+  // "Have walls? Tell artists" links here with ?role=venue.
+  useEffect(() => {
+    const r = new URLSearchParams(window.location.search).get("role");
+    if (r === "venue" || r === "artist") setRole(r);
+  }, []);
   // artist
   const [mediums, setMediums] = useState<string[]>([]);
   const [styles, setStyles] = useState<string[]>([]);

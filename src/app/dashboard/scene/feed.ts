@@ -76,6 +76,7 @@ export const POOL_TYPES = {
     { key: "lend", label: "Someone to lend my work to" },
   ],
   venue: [
+    { key: "walls", label: "Art for our walls" },
     { key: "selection", label: "Artists for a show" },
     { key: "gathering", label: "Artists for an event" },
     { key: "residency", label: "Artists for a residency" },
@@ -85,6 +86,7 @@ export const POOL_TYPES = {
 } as const;
 
 const POOL_LABEL: Record<string, string> = {
+  walls: "Art for our walls",
   showcase: "Looking for a venue",
   lend: "Lending work",
   collab: "Looking to collaborate",
@@ -222,3 +224,31 @@ export async function deleteItem(sb: SupabaseClient, i: FeedItem) {
 }
 
 export { isVenueRole };
+
+// ── "Where can my work go?" ─────────────────────────────────────────
+/** Details a venue gives with an "Art for our walls" post (pool_requests.details). */
+export type WallDetails = { wall?: string; duration?: string; sells?: boolean; commission?: number | null };
+
+export const wallDetails = (i: FeedItem): WallDetails => (i.raw?.details || {}) as WallDetails;
+
+/** Venues asking for art: wall posts, show selections, work to buy, open calls. */
+export function wantsArt(i: FeedItem): boolean {
+  if (i.source === "pool") {
+    return isVenueRole(i.raw.poster_role || i.raw.poster_type) && ["walls", "selection", "gathering", "buying"].includes(i.raw.request_type);
+  }
+  return i.source === "scene" && i.raw.post_type === "opencall";
+}
+
+/** Artists asking for a place: "a place to show my work" or "someone to lend my work to". */
+export function wantsPlace(i: FeedItem): boolean {
+  return i.source === "pool" && !isVenueRole(i.raw.poster_role || i.raw.poster_type) && ["showcase", "lend"].includes(i.raw.request_type);
+}
+
+/** "Wall 3 × 2 m · 2 months · Sells work · 20% commission" */
+export function wallTermsLine(d: WallDetails): string {
+  return [
+    d.wall, d.duration,
+    d.sells === true ? "Sells work" : d.sells === false ? "Not selling" : null,
+    d.sells && d.commission != null ? `${d.commission}% commission` : null,
+  ].filter(Boolean).join(" · ");
+}

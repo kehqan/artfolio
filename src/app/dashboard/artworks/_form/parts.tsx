@@ -9,7 +9,7 @@ import {
   Frame, Monitor, Printer, Shapes, type LucideIcon,
 } from "lucide-react";
 import PlacesAutocomplete from "@/components/PlacesAutocomplete";
-import { Card, Chip, Field, Heading, Input, Select, Textarea, cn } from "@/components/ui";
+import { Card, Chip, Field, Heading, Input, Select, Switch, Textarea, cn } from "@/components/ui";
 import { STAGES, formatPrice } from "@/lib/artwork-stage";
 
 // ── Config ─────────────────────────────────────────────────────────
@@ -41,6 +41,12 @@ const CURRENCIES = ["EUR", "USD", "GBP", "CZK", "CHF", "JPY", "CAD"];
 
 export const MAX_IMAGES = 8;
 
+export const WALL_TERMS = [
+  { key: "either", label: "For sale or on loan" },
+  { key: "sale", label: "For sale" },
+  { key: "loan", label: "On loan only" },
+];
+
 export type ArtworkForm = {
   title: string; year: string; medium: string; description: string; notes: string;
   width_cm: string; height_cm: string; depth_cm: string; framed: boolean;
@@ -50,6 +56,8 @@ export type ArtworkForm = {
   price: string; currency: string; status: string; sale_method: string;
   venue_location: string; location_name: string;
   materials_cost: string; time_spent: string;
+  /** "" = not offered; otherwise 'sale' | 'loan' | 'either'. */
+  wall_terms: string;
 };
 
 export type Moodboard = {
@@ -466,6 +474,20 @@ export function ArtworkFields({
           </div>
           <OptionList legend="How it sells" options={SALE_METHODS} value={form.sale_method}
             onSelect={k => patch({ sale_method: form.sale_method === k ? "" : k })} />
+          <div className="flex flex-col gap-3 border-t-hair border-line pt-4">
+            <div className="flex items-start justify-between gap-4">
+              <span className="flex flex-col">
+                <span className="font-ui text-label font-semibold text-fg">Open to a wall</span>
+                <span className="font-ui text-caption text-fg-3">You&apos;d show it in a café or venue. Venues near you can see it.</span>
+              </span>
+              <Switch checked={!!form.wall_terms} onChange={v => patch({ wall_terms: v ? "either" : "" })} label="Open to a wall" />
+            </div>
+            {form.wall_terms && (
+              <div className="flex flex-wrap gap-2" role="group" aria-label="On the wall it can be">
+                {WALL_TERMS.map(t => <Chip key={t.key} selected={form.wall_terms === t.key} onClick={() => patch({ wall_terms: t.key })}>{t.label}</Chip>)}
+              </div>
+            )}
+          </div>
         </FormSection>
 
         <MoodboardPicker moodboards={moodboards} linked={linkedMb} onToggle={toggleMb} />

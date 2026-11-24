@@ -25,7 +25,8 @@ export async function POST(
       return NextResponse.json({ error: "Artwork not found" }, { status: 404 });
     }
 
-    // Check permissions: owner, admin, or gallery role
+    // Check permissions: owner or admin. Galleries are not verified yet, so the
+    // gallery role cannot certify other people's work.
     const { data: profile } = await supabase
       .from("profiles")
       .select("role, full_name")
@@ -34,11 +35,10 @@ export async function POST(
 
     const isOwner = artwork.user_id === user.id;
     const isAdmin = profile?.role === "admin";
-    const isGallery = profile?.role === "gallery";
 
-    if (!isOwner && !isAdmin && !isGallery) {
+    if (!isOwner && !isAdmin) {
       return NextResponse.json(
-        { error: "Only the artwork owner, gallery, or admin can authenticate" },
+        { error: "Only the artwork owner or an admin can authenticate" },
         { status: 403 }
       );
     }
@@ -59,7 +59,7 @@ export async function POST(
     const authenticator = authenticated_by || profile?.full_name || "Unknown";
 
     // Update artwork
-    const { error: updateErr } = await supabase
+    const { data: updated, error: updateErr } = await supabase
       .from("artworks")
       .update({
         authentication_status,
@@ -68,10 +68,14 @@ export async function POST(
         authentication_notes: notes || null,
         updated_at: new Date().toISOString(),
       })
-      .eq("id", artworkId);
+      .eq("id", artworkId)
+      .select("id");
 
     if (updateErr) {
       return NextResponse.json({ error: updateErr.message }, { status: 500 });
+    }
+    if (!updated?.length) {
+      return NextResponse.json({ error: "You don't have permission to change this artwork" }, { status: 403 });
     }
 
     // Write audit log

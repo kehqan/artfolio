@@ -7,7 +7,7 @@ import {
   Building2, Camera, Check, Copy, ExternalLink, Globe, Instagram, Linkedin, Mail, MessageCircle, Palette,
 } from "lucide-react";
 import {
-  Alert, Avatar, Button, ButtonLink, Card, Field, Input, Label, PageHeader, Select, Skeleton, Tabs, Textarea, cn,
+  Alert, Avatar, Button, ButtonLink, Card, Field, Input, Label, PageHeader, Select, Skeleton, Switch, Tabs, Textarea, cn,
 } from "@/components/ui";
 
 type Tab = "profile" | "links" | "invite";
@@ -79,10 +79,21 @@ export default function ProfilePage() {
   const [uploading, setUploading] = useState(false);
   const [referralCount, setReferralCount] = useState(0);
   const [origin, setOrigin] = useState("");
+  const [emails, setEmails] = useState<boolean | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const { copied, copy } = useCopy();
 
   useEffect(() => { setOrigin(window.location.origin); load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    sb.rpc("my_email_updates").then(({ data, error }) => setEmails(error ? null : data !== false));
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function toggleEmails(on: boolean) {
+    setEmails(on);
+    const { error } = await sb.rpc("set_email_updates", { p_on: on });
+    if (error) setEmails(!on);
+  }
 
   async function load() {
     const { data: { user } } = await sb.auth.getUser();
@@ -407,6 +418,19 @@ export default function ProfilePage() {
               <p className="font-ui text-body-sm text-fg-3">Save a username to get your public page link.</p>
             )}
           </Card>
+          {emails !== null && (
+            <Card padding="md" className="flex flex-col gap-2">
+              <div className="flex items-center justify-between gap-3">
+                <span className="font-ui text-label font-semibold text-fg">Email me</span>
+                <Switch checked={emails} onChange={toggleEmails} label="Email me about offers, agreements and messages" />
+              </div>
+              <p className="font-ui text-body-sm text-fg-2">
+                {emails
+                  ? "When someone offers or asks for work, answers you, sends an agreement or writes to you. At most one email every few minutes."
+                  : "No emails. You'll still see everything in Messages."}
+              </p>
+            </Card>
+          )}
           <Card padding="md" className="flex flex-col gap-2">
             <span className="font-ui text-label font-semibold text-fg">Choose what&rsquo;s on show</span>
             <p className="font-ui text-body-sm text-fg-2">Pick the works for sale, banner and sections on your page in Studio, under Public page.</p>

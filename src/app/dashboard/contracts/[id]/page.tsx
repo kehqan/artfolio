@@ -349,7 +349,7 @@ export default function ContractDetailPage() {
             </ul>
             {isExternal && isInitiator && !executed && !isCancelled && !isDraft && (
               <div className="mt-3 flex flex-col gap-2 rounded-control bg-sunken p-3">
-                <p className="font-ui text-body-sm text-fg-2">{c.counterparty_name} isn&apos;t on Artomango. Send them this link to read and sign.</p>
+                <p className="font-ui text-body-sm text-fg-2">{c.counterparty_email ? <>We emailed the signing link to {c.counterparty_email}. You can also send it yourself.</> : <>{c.counterparty_name} isn&apos;t on Artomango. Send them this link to read and sign.</>}</p>
                 <Button variant="secondary" size="sm" onClick={copySigningLink} aria-live="polite">
                   {copied ? <><Check size={14} aria-hidden /> Copied</> : <><Copy size={14} aria-hidden /> Copy signing link</>}
                 </Button>

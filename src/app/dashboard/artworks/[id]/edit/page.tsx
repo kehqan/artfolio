@@ -27,7 +27,7 @@ export default function EditArtworkPage() {
     file_format: "", resolution: "", digital_file_url: "",
     edition_total: "", edition_number: "", edition_code: "",
     authentication_status: "original",
-    price: "", currency: "EUR", status: "concept", sale_method: "",
+    price: "", currency: "EUR", status: "concept", sale_method: "", wall_terms: "",
     venue_location: "", location_name: "",
     materials_cost: "", time_spent: "",
   });
@@ -86,6 +86,7 @@ export default function EditArtworkPage() {
         location_name:         data.location_name        || data.venue_location || "",
         materials_cost:        data.materials_cost       ? String(data.materials_cost)       : "",
         time_spent:            data.time_spent           ? String(data.time_spent)           : "",
+        wall_terms:            data.wall_terms           || "",
       });
 
       if (data.location_lat && data.location_lng) {
@@ -177,6 +178,8 @@ export default function EditArtworkPage() {
       images:                [...existingImages, ...uploadedUrls],
       updated_at:            new Date().toISOString(),
     }).eq("id", id);
+    // Saved on its own so a database without this column still saves the work.
+    try { await sb.from("artworks").update({ wall_terms: form.wall_terms || null }).eq("id", id); } catch { /* ignore */ }
 
     setUploadPct(100);
     setSaving(false);

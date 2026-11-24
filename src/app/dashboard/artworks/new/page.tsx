@@ -38,7 +38,7 @@ export default function NewArtworkPage() {
     // Auth
     authentication_status: "original",
     // Sales
-    price: "", currency: "EUR", status: "concept", sale_method: "",
+    price: "", currency: "EUR", status: "concept", sale_method: "", wall_terms: "",
     // Location
     location: "", venue_location: "", location_name: "",
     // Business
@@ -166,6 +166,10 @@ export default function NewArtworkPage() {
     }).select().single();
 
     if (!error && data) {
+      // Saved on its own so a database without this column still saves the work.
+      if (form.wall_terms) {
+        try { await sb.from("artworks").update({ wall_terms: form.wall_terms }).eq("id", data.id); } catch { /* ignore */ }
+      }
       if (collectionId) {
         try { await sb.from("collection_artworks").insert({ collection_id: collectionId, artwork_id: data.id }); } catch { /* ignore */ }
       }

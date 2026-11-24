@@ -48,11 +48,11 @@ const AREAS: Area[] = [
   {
     key: "business", label: "Deals & Money", icon: Wallet, href: "/dashboard/sales",
     pages: [
-      { href: "/dashboard/sales", label: "My Sales" },
-      { href: "/dashboard/clients", label: "My Collectors" },
-      { href: "/dashboard/contracts", label: "My Papers" },
-      { href: "/dashboard/analytics", label: "My Reach" },
+      { href: "/dashboard/sales", label: "Sales" },
+      { href: "/dashboard/clients", label: "Collectors" },
+      { href: "/dashboard/contracts", label: "Papers" },
     ],
+    match: ["/dashboard/analytics"],
   },
   {
     key: "planning", label: "Planning", icon: CalendarDays, href: "/dashboard/tasks",

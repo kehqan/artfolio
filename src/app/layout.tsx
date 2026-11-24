@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Darker_Grotesque, Instrument_Sans } from "next/font/google";
+import { Darker_Grotesque, Instrument_Sans, Instrument_Serif } from "next/font/google";
 import "../styles/tokens.css";
 import "./globals.css";
 
@@ -15,6 +15,15 @@ const instrumentSans = Instrument_Sans({
   subsets: ["latin"],
   weight: ["400", "500", "600", "700"],
   variable: "--font-instrument-sans",
+  display: "swap",
+});
+
+// Serif headlines for personal sites that choose the "Classic" type mood.
+const instrumentSerif = Instrument_Serif({
+  subsets: ["latin"],
+  weight: ["400"],
+  style: ["normal", "italic"],
+  variable: "--font-site-serif",
   display: "swap",
 });
 
@@ -81,7 +90,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${darkerGrotesque.variable} ${instrumentSans.variable}`}>
+    <html lang="en" className={`${darkerGrotesque.variable} ${instrumentSans.variable} ${instrumentSerif.variable}`}>
       <head>
         {/* PWA install hint for iOS Safari */}
         <meta name="apple-mobile-web-app-capable" content="yes" />

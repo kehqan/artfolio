@@ -116,3 +116,9 @@
 .shadow-yellow-lg {
   box-shadow: 6px 6px 0 #111110;
 }
+
+/* Personal sites: serif headlines for the "Classic" type mood. A class, so the
+   legacy inline font-family override above doesn't catch it. */
+.site-serif {
+  font-family: var(--font-site-serif), Georgia, serif !important;
+}

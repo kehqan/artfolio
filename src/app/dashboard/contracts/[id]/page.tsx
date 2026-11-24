@@ -64,6 +64,33 @@ function CardHead({ title, emoji }: { title: string; emoji?: string }) {
   );
 }
 
+// ── Signing record (audit trail) ───────────────────────────────────
+function SigningRecord({ signatures, termsHash }: { signatures: any[]; termsHash: string }) {
+  if (!termsHash && signatures.length === 0) return null;
+  const mismatch = signatures.some(s => termsHash && s.terms_hash !== termsHash);
+  return (
+    <div style={{ border: "2px solid #E8E0D0", borderRadius: 14, padding: "12px 14px", background: "#fff" }}>
+      <div style={{ fontSize: 10, fontWeight: 800, color: "#9B8F7A", textTransform: "uppercase", letterSpacing: ".12em", marginBottom: 6 }}>Signing record</div>
+      {termsHash && (
+        <div style={{ fontSize: 11, fontWeight: 600, color: "#5C5346", marginBottom: signatures.length ? 8 : 0, wordBreak: "break-all" }}>
+          Terms fingerprint (SHA-256): <code style={{ fontSize: 10 }}>{termsHash}</code>
+        </div>
+      )}
+      {signatures.map(sig => (
+        <div key={sig.party} style={{ fontSize: 11, fontWeight: 600, color: "#5C5346", lineHeight: 1.6 }}>
+          <strong style={{ color: "#111110" }}>{sig.signer_name}</strong>
+          {sig.signer_email ? ` (${sig.signer_email})` : ""} signed {fmtDateTime(sig.signed_at)}
+          {" · "}{sig.signed_via === "account" ? "from their Artomango account" : "via signing link"}
+          {sig.ip_address ? ` · IP ${sig.ip_address}` : ""}
+        </div>
+      ))}
+      {mismatch && (
+        <div style={{ fontSize: 11, fontWeight: 800, color: "#B91C1C", marginTop: 6 }}>Warning: the terms no longer match what was signed.</div>
+      )}
+    </div>
+  );
+}
+
 // ── Signing block ──────────────────────────────────────────────────
 function SignBlock({
   label, role, signed, signedAt, signature, canSign,
@@ -143,6 +170,9 @@ export default function ContractDetailPage() {
   const [signing,   setSigning]   = useState(false);
   const [mySig,     setMySig]     = useState("");
   const [cancelling, setCancelling] = useState(false);
+  const [signError, setSignError] = useState("");
+  const [signatures, setSignatures] = useState<any[]>([]);
+  const [termsHash, setTermsHash] = useState("");
 
   useEffect(() => { load(); }, [id]);
 
@@ -155,6 +185,13 @@ export default function ContractDetailPage() {
     const { data: c } = await sb.from("contracts").select("*").eq("id", id).single();
     setContract(c);
 
+    const [{ data: sigs }, { data: hash }] = await Promise.all([
+      sb.from("contract_signatures").select("party, signer_name, signer_email, signed_via, ip_address, signed_at, terms_hash").eq("contract_id", id).order("signed_at"),
+      sb.rpc("contract_terms_hash", { p_contract_id: id }),
+    ]);
+    setSignatures(sigs || []);
+    setTermsHash(typeof hash === "string" ? hash : "");
+
     if (c) {
       const { data: ca } = await sb.from("contract_artworks")
         .select("artwork_id, notes, artworks(id,title,images,medium,price,status)")
@@ -164,65 +201,26 @@ export default function ContractDetailPage() {
     setLoading(false);
   }
 
+  // The database records the signature (time, IP, terms fingerprint), sets the
+  // status, and on full execution writes provenance and calendar dates for
+  // both parties.
   async function handleSign() {
     if (!mySig.trim()) return;
     setSigning(true);
+    setSignError("");
     const sb = createClient();
     const isInitiator = contract.initiator_id === myId;
     const now = new Date().toISOString();
-
-    const update: Record<string, unknown> = isInitiator
+    const update = isInitiator
       ? { initiator_signed_at: now, initiator_signature: mySig.trim() }
       : { counterparty_signed_at: now, counterparty_signature: mySig.trim() };
 
-    // Check if both will now be signed
-    const bothSigned = isInitiator
-      ? !!contract.counterparty_signed_at
-      : !!contract.initiator_signed_at;
-
-    if (bothSigned) {
-      update.status      = "signed";
-      update.executed_at = now;
-    } else {
-      update.status = "partially_signed";
-    }
-
-    await sb.from("contracts").update(update).eq("id", id);
-
-    // Add provenance note to linked artworks if now fully signed
-    if (bothSigned && artworks.length > 0) {
-      for (const aw of artworks) {
-        await sb.from("provenance_entries").insert({
-          artwork_id:  aw.id,
-          event_type:  contract.contract_type === "exhibition" ? "exhibited" : "transferred",
-          date:        now.split("T")[0],
-          notes:       `Part of signed contract: ${contract.title} (${contract.reference_number || id.slice(0, 8)})`,
-        });
-      }
-    }
-
-    // Create calendar events if fully signed
-    if (bothSigned) {
-      const events: any[] = [];
-      const addEvent = (userId: string, type: string, title: string, date: string) => {
-        if (date) events.push({ contract_id: id, user_id: userId, event_type: type, title, date });
-      };
-      const parties = [contract.initiator_id, contract.counterparty_id].filter(Boolean);
-      parties.forEach((uid: string) => {
-        if (contract.start_date)          addEvent(uid, "start",    `🚀 ${contract.title} — Starts`,         contract.start_date);
-        if (contract.end_date)            addEvent(uid, "end",      `🏁 ${contract.title} — Ends`,           contract.end_date);
-        if (contract.opening_event_date)  addEvent(uid, "opening",  `🎉 Opening: ${contract.title}`,         contract.opening_event_date);
-        if (contract.installation_date)   addEvent(uid, "deadline", `🔧 Installation: ${contract.title}`,    contract.installation_date);
-        if (contract.deinstallation_date) addEvent(uid, "deadline", `📦 Deinstall: ${contract.title}`,       contract.deinstallation_date);
-        if (contract.deposit_due_date)    addEvent(uid, "deposit_due", `💰 Deposit Due: ${contract.title}`,  contract.deposit_due_date);
-        if (contract.final_payment_date)  addEvent(uid, "delivery", `💳 Final Payment: ${contract.title}`,  contract.final_payment_date);
-      });
-      if (events.length > 0) {
-        await sb.from("contract_calendar_events").insert(events);
-      }
-    }
-
+    const { data, error } = await sb.from("contracts").update(update).eq("id", id).select("id");
     setSigning(false);
+    if (error || !data?.length) {
+      setSignError(error?.message || "Your signature couldn't be saved. Please reload and try again.");
+      return;
+    }
     load();
   }
 
@@ -543,6 +541,10 @@ export default function ContractDetailPage() {
                   onSign={handleSign}
                   signing={signing}
                 />
+                {signError && (
+                  <div style={{ fontSize: 12, fontWeight: 700, color: "#B91C1C" }}>{signError}</div>
+                )}
+                <SigningRecord signatures={signatures} termsHash={termsHash} />
               </div>
             </Card>
           )}

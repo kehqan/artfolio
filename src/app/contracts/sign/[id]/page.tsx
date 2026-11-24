@@ -40,6 +40,7 @@ export default function ExternalSignPage() {
   const [agreed,    setAgreed]    = useState(false);
   const [signing,   setSigning]   = useState(false);
   const [done,      setDone]      = useState(false);
+  const [signError, setSignError] = useState("");
 
   // Contracts are no longer readable directly by anonymous visitors. The
   // page goes through two database functions that check the signing token
@@ -61,14 +62,14 @@ export default function ExternalSignPage() {
   async function handleSign() {
     if (!sigName.trim() || !agreed) return;
     setSigning(true);
-    setError("");
+    setSignError("");
     const sb = createClient();
     const { data, error: err } = await sb.rpc("sign_contract_as_counterparty", {
       p_contract_id: id, p_token: token, p_signature: sigName.trim(),
     });
     setSigning(false);
     if (err || !data) {
-      setError(err?.message?.includes("already signed")
+      setSignError(err?.message?.includes("already signed")
         ? "This contract has already been signed."
         : "We couldn't record your signature. Please try again or ask the sender for a new link.");
       return;
@@ -114,6 +115,11 @@ export default function ExternalSignPage() {
         </div>
         <div style={{ padding: "14px 20px", background: "#fff", border: "2px solid #E8E0D0", borderRadius: 14, fontSize: 13, fontWeight: 600, color: "#9B8F7A" }}>
           You can close this page safely.
+          {contract?.terms_hash && (
+            <div style={{ marginTop: 8, fontSize: 10, color: "#C0B8A8", wordBreak: "break-all" }}>
+              Reference {contract.reference_number || ""} · Terms fingerprint {contract.terms_hash}
+            </div>
+          )}
         </div>
         <div style={{ marginTop: 24, fontSize: 12, fontWeight: 600, color: "#C0B8A8" }}>
           Powered by Artomango · <a href="/" style={{ color: "#FFD400", fontWeight: 700, textDecoration: "none" }}>artomango.com</a>
@@ -285,6 +291,7 @@ export default function ExternalSignPage() {
                   </span>
                 </div>
 
+                {signError && <div style={{ fontSize: 13, fontWeight: 700, color: "#B91C1C", marginBottom: 10 }}>{signError}</div>}
                 <button onClick={handleSign} disabled={!sigName.trim() || !agreed || signing}
                   style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, width: "100%", padding: "14px", border: "2.5px solid #111110", borderRadius: 13, background: sigName.trim() && agreed && !signing ? "#FFD400" : "#F5F0E8", fontSize: 15, fontWeight: 800, cursor: sigName.trim() && agreed && !signing ? "pointer" : "not-allowed", fontFamily: "inherit", color: "#111110", boxShadow: sigName.trim() && agreed && !signing ? "4px 4px 0 #111110" : "none", transition: "all .15s" }}>
                   {signing ? <><div style={{ width: 16, height: 16, borderRadius: "50%", border: "2px solid #111110", borderTopColor: "transparent", animation: "spin .6s linear infinite" }} /> Signing…</> : <><Check size={15} /> Sign this contract</>}
@@ -292,8 +299,13 @@ export default function ExternalSignPage() {
 
                 <div style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 6, justifyContent: "center" }}>
                   <Shield size={11} color="#9B8F7A" />
-                  <span style={{ fontSize: 10, fontWeight: 700, color: "#9B8F7A" }}>Secured by Artomango · Timestamp recorded on signing</span>
+                  <span style={{ fontSize: 10, fontWeight: 700, color: "#9B8F7A" }}>Secured by Artomango · Time, IP address and a fingerprint of these terms are recorded when you sign</span>
                 </div>
+                {contract.terms_hash && (
+                  <div style={{ marginTop: 6, fontSize: 9, fontWeight: 600, color: "#C0B8A8", textAlign: "center", wordBreak: "break-all" }}>
+                    Terms fingerprint: {contract.terms_hash}
+                  </div>
+                )}
               </div>
             </div>
           )}

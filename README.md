@@ -27,9 +27,10 @@ No server-side secret is needed. Access control lives in the database
 ## Database
 
 `database/migrations/` holds the SQL changes, named by date and applied in
-order in the Supabase SQL editor. `database/migrations.sql` is an older
-partial schema kept for reference. The live database has more tables than
-the repo describes; exporting the full schema is still on the list.
+order in the Supabase SQL editor. `database/schema.sql` is a snapshot of the
+whole public schema (tables, indexes, triggers, policies) taken on 2026-11-24;
+refresh it after each migration. `database/migrations.sql` is an older partial
+schema kept for reference only.
 
 Admins are set by hand in the SQL editor:
 

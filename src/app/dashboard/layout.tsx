@@ -39,13 +39,11 @@ const AREAS: Area[] = [
   {
     key: "scene", label: "The Scene", icon: Handshake, href: "/dashboard/scene",
     pages: [
-      { href: "/dashboard/scene", label: "Collabs & Events" },
-      { href: "/dashboard/exhibitions", label: "Exhibitions" },
-      { href: "/dashboard/pool", label: "The Pool" },
-      { href: "/dashboard/education", label: "Education Hub" },
-      { href: "/dashboard/map", label: "Art Scene Map" },
+      { href: "/dashboard/scene", label: "Feed" },
+      { href: "/dashboard/discover", label: "People" },
+      { href: "/dashboard/education", label: "Learn" },
     ],
-    match: ["/dashboard/discover"],
+    match: ["/dashboard/exhibitions", "/dashboard/pool", "/dashboard/map"],
   },
   {
     key: "business", label: "Deals & Money", icon: Wallet, href: "/dashboard/sales",
@@ -79,7 +77,9 @@ const SEARCHABLE: (Page & { area: string })[] = [
       : [{ href: a.href, label: a.label, area: "" }],
   ),
   { href: "/dashboard/profile", label: "Your profile", area: "" },
-  { href: "/dashboard/discover", label: "Discover artists and venues", area: "The Scene" },
+  { href: "/dashboard/scene?show=show", label: "Shows and events", area: "The Scene" },
+  { href: "/dashboard/scene?show=opportunity", label: "Open calls and opportunities", area: "The Scene" },
+  { href: "/dashboard/scene?view=map", label: "Scene map", area: "The Scene" },
 ];
 
 const startsWith = (path: string, href: string) => path === href || path.startsWith(href + "/");

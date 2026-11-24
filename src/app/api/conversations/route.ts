@@ -67,7 +67,9 @@ export async function POST(request: NextRequest) {
       initial_message,
       guest_name,
       guest_email,
+      template_key,
     } = body;
+    const tag = typeof template_key === "string" && /^[a-z_]{1,32}$/.test(template_key) ? template_key : null;
 
     if (!recipient_id || !/^[0-9a-f-]{36}$/i.test(String(recipient_id))) {
       return NextResponse.json({ error: "recipient_id required" }, { status: 400 });
@@ -121,6 +123,7 @@ export async function POST(request: NextRequest) {
           conversation_id: existing.id,
           sender_id: senderId,
           body: initial_message.trim(),
+          template_key: tag,
           read_by_a: senderIsA,
           read_by_b: !senderIsA,
         });
@@ -159,6 +162,7 @@ export async function POST(request: NextRequest) {
       guest_name: guest_name || null,
       guest_email: guest_email || null,
       body: initial_message.trim(),
+      template_key: tag,
       read_by_a: true,
       read_by_b: false,
     });

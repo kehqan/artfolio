@@ -83,7 +83,7 @@ function PartyPicker({ value, onChange, myId }: { value: Party | null; onChange:
       <div className="flex flex-col gap-3 rounded-control border-hair border-line bg-sunken p-3">
         <p className="font-ui text-label font-semibold text-fg">Someone not on Artomango</p>
         <Field label="Name">{p => <Input {...p} value={ext.name} onChange={e => setExt(x => ({ ...x, name: e.target.value }))} />}</Field>
-        <Field label="Email" hint="Optional. So you have it with the agreement; you send the signing link yourself.">
+        <Field label="Email" hint="We email them the signing link when you send it. Leave it empty to send the link yourself.">
           {p => <Input {...p} type="email" value={ext.email} onChange={e => setExt(x => ({ ...x, email: e.target.value }))} />}
         </Field>
         <Field label="They are">
@@ -243,9 +243,9 @@ function NewContractInner() {
     const sb = createClient();
     const numOrNull = (v: string) => v.trim() === "" ? null : Number(v);
 
-    // Generate external token if counterparty has no account
+    // Someone not on Artomango signs with a secret link.
     const token = !counterparty!.id
-      ? `${Math.random().toString(36).slice(2)}${Date.now().toString(36)}`
+      ? `${crypto.randomUUID()}${crypto.randomUUID()}`.replace(/-/g, "")
       : null;
 
     const payload: Record<string, unknown> = {
@@ -351,7 +351,7 @@ function NewContractInner() {
   }
 
   const steps = [
-    counterparty?.id ? `${counterparty.name} sees it in their Papers on Artomango.` : "You get a signing link to send them yourself.",
+    counterparty?.id ? `${counterparty.name} sees it in their Papers and gets an email.` : counterparty?.email ? `We email ${counterparty.name} a link to read and sign. No account needed.` : "You get a signing link to send them yourself.",
     "You both read it and sign by typing your full name.",
     "Once you've both signed, it's sealed and kept here.",
     "The key dates go into both of your planners.",

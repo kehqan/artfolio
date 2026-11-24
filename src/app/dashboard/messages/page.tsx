@@ -308,7 +308,7 @@ function ChatsView() {
                       <li key={m.id} className="flex flex-col">
                         {newDay && <span className="my-3 self-center font-ui text-caption font-semibold text-fg-3">{dayLabel(m.created_at)}</span>}
                         <div className={cn("flex max-w-[78%] flex-col", mine ? "items-end self-end" : "items-start self-start")}>
-                          {m.template_key && <span className="mb-0.5 inline-flex items-center gap-1 font-ui text-caption text-fg-3"><Sparkles size={11} aria-hidden /> Quick reply</span>}
+                          {m.template_key && m.template_key !== "deal" && <span className="mb-0.5 inline-flex items-center gap-1 font-ui text-caption text-fg-3"><Sparkles size={11} aria-hidden /> Quick reply</span>}
                           <p className={cn("whitespace-pre-wrap break-words rounded-card border-outline px-3.5 py-2 font-ui text-body",
                             mine ? "border-ink bg-mango text-on-mango" : "border-line bg-surface text-fg")}>
                             {m.body}

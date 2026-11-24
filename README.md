@@ -41,6 +41,16 @@ update public.profiles set role = 'admin' where email = '<email>';
 Supabase Auth must list `<site>/reset-password` under
 Authentication > URL Configuration > Redirect URLs for password reset emails.
 
+## Emails
+
+Emails about deals, agreements and messages are sent by the database, not by
+the app, so the app still needs no server secret. Triggers put each event in
+`email_outbox`; every minute pg_cron runs `email_send_due()`, which groups what
+is waiting per person into one email and sends it through Resend with pg_net.
+The Resend key lives in Supabase Vault. See
+`database/migrations/20261124_emails.sql` for the setup, and check what went
+out with `select * from email_log limit 50;` in the SQL editor.
+
 ## Where things are
 
 - `src/app` – pages and API routes (`/dashboard/*` needs sign-in, `/admin` needs the admin role; see `src/middleware.ts`)

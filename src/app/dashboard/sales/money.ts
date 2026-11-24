@@ -1,10 +1,22 @@
-// Shared helpers for the Money pages.
+// Shared helpers for the Sales pages.
 export type Sale = {
   id: string; user_id?: string; artwork_id?: string | null; buyer_name?: string | null; buyer_email?: string | null;
   sale_price: number | null; currency?: string | null; commission_percentage?: number | null;
   sale_date?: string | null; status: string; payment_method?: string | null; notes?: string | null;
   created_at?: string; artworks?: { id: string; title: string; images?: string[] | null } | null;
+  client_id?: string | null; channel?: Channel | null; deal_id?: string | null;
 };
+
+export type Channel = "studio" | "venue" | "online" | "fair" | "other";
+export const CHANNELS: { key: Channel; label: string; hint: string }[] = [
+  { key: "studio", label: "Studio", hint: "In my studio or at home" },
+  { key: "venue", label: "Venue", hint: "At a venue, cafe or gallery" },
+  { key: "online", label: "Online", hint: "Through my site or social media" },
+  { key: "fair", label: "Fair", hint: "At a fair or market" },
+  { key: "other", label: "Other", hint: "Somewhere else" },
+];
+export const channelLabel = (c?: string | null) => CHANNELS.find(x => x.key === c)?.label || "";
+export const isWaiting = (s: Sale) => statusKey(s.status) === "pending";
 
 export const SALE_STATUSES = ["Completed", "Pending", "Cancelled"] as const;
 export const PAYMENT_METHODS = ["Bank transfer", "Cash", "Card", "PayPal", "Stripe", "Crypto", "Cheque", "Other"];

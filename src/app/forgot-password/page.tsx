@@ -1,8 +1,8 @@
 "use client";
 import { useState } from "react";
-import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import AuthCard, { authInput, authButton, authError, authLink } from "@/components/AuthCard";
+import { Alert, Button, Field, Input } from "@/components/ui";
+import { AuthLink, AuthShell } from "@/components/auth/AuthShell";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
@@ -21,20 +21,30 @@ export default function ForgotPasswordPage() {
     setSent(true);
   }
 
+  const back = <AuthLink href="/login">Back to sign in</AuthLink>;
+
   if (sent) return (
-    <AuthCard title="Check your email" subtitle={`If an account exists for ${email}, we've sent a link to choose a new password.`}>
-      <Link href="/login" style={authLink}>← Back to sign in</Link>
-    </AuthCard>
+    <AuthShell title="Check your email" footer={back}>
+      <Alert tone="ok">
+        If an account exists for <strong className="font-semibold">{email}</strong>, a link to choose a new password is on its way. It can take a minute to arrive.
+      </Alert>
+    </AuthShell>
   );
 
   return (
-    <AuthCard title="Forgot your password?" subtitle="Enter your email and we'll send you a link to choose a new one.">
-      <form onSubmit={submit}>
-        <input type="email" required autoFocus autoComplete="email" placeholder="you@example.com" value={email} onChange={e => setEmail(e.target.value)} style={authInput} />
-        {error && <div style={authError}>{error}</div>}
-        <button type="submit" disabled={sending} style={authButton}>{sending ? "Sending…" : "Send reset link"}</button>
+    <AuthShell title="Reset your password" description="Enter the email you signed up with and we’ll send you a link to choose a new password." footer={back}>
+      <form onSubmit={submit} className="flex flex-col gap-4">
+        {error && <Alert tone="bad">{error}</Alert>}
+        <Field label="Email">
+          {(p) => (
+            <Input {...p} type="email" required autoFocus autoComplete="email" placeholder="you@example.com"
+              value={email} onChange={(e) => setEmail(e.target.value)} />
+          )}
+        </Field>
+        <Button type="submit" variant="primary" disabled={sending} className="mt-2 w-full">
+          {sending ? "Sending…" : "Send reset link"}
+        </Button>
       </form>
-      <Link href="/login" style={authLink}>← Back to sign in</Link>
-    </AuthCard>
+    </AuthShell>
   );
 }

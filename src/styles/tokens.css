@@ -105,6 +105,13 @@
   --duration-fast: 120ms;
   --duration-base: 200ms;
 
+  /* ── App shell ─────────────────────────────────────────────────
+     Main navigation is the left rail; the pages inside the current
+     area are the tabs in the top bar. */
+  --shell-rail: 240px;     /* left rail width (desktop) */
+  --shell-header: 64px;    /* top bar height */
+  --shell-content: 1180px; /* max width of the page column */
+
   /* ── Layers ────────────────────────────────────────────────────── */
   --z-nav: 100;
   --z-dropdown: 200;

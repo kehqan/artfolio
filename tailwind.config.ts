@@ -124,6 +124,13 @@ const config: Config = {
       animation: {
         "drop-in": "drop-in var(--duration-base) var(--ease-standard)",
       },
+      spacing: {
+        rail: v("shell-rail"),
+        header: v("shell-header"),
+      },
+      maxWidth: {
+        content: v("shell-content"),
+      },
       zIndex: {
         nav: v("z-nav"),
         dropdown: v("z-dropdown"),

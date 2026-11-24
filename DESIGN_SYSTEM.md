@@ -66,6 +66,17 @@ Colors are CSS variables, so Tailwind opacity modifiers (`bg-ink/40`) don't work
 - Motion: `duration-fast` 120ms, `duration-base` 200ms, `ease-out`; both drop to 0 with reduced motion
 - Layers: `z-nav`, `z-dropdown`, `z-modal`, `z-toast`
 
+## App shell
+
+The dashboard follows a rail-and-tabs structure:
+
+- **Left rail = main navigation.** One entry per area: The Atelier, My Studio, The Scene, Deals & Money, Planning, Messages. The current area is the one mango item on screen.
+- **Top bar = secondary navigation.** The pages inside the current area sit as tabs on the left of the top bar (active tab: 2px ink underline). Search, notifications and the account menu sit on the right.
+- **Page column** starts at the rail edge, max `max-w-content` (1180px), left-aligned with the tabs.
+- Below 1024px the rail becomes a drawer behind the menu button, and the tabs move to their own scrolling row under the bar.
+
+The model lives in `AREAS` in `src/app/dashboard/layout.tsx`. A new page goes into an area's `pages` list; it should not get its own rail entry.
+
 ## Components
 
 | Component | Use for |
@@ -110,8 +121,8 @@ import { Button, Card, Field, Input, PageHeader } from "@/components/ui";
 Existing pages still use the legacy styles (`globals.css` classes, `bg-paper`, inline styles, Darker Grotesque for body text). They move over page by page:
 
 1. Foundation: tokens, fonts, Tailwind mapping, component kit, reference page
-2. App shell: dashboard nav, dropdowns, page header, new page color
+2. App shell: left rail for areas, top bar tabs for pages, new page color
 3. Artworks: list and detail (done), then forms and passport
 4. Business pages: sales, clients, contracts, exhibitions, calendar, tasks
-5. Public pages: landing, explore, profile, passport, login, register
+5. Public pages: landing, login, register, password reset (done), then explore, profile, passport
 6. Cleanup: remove legacy globals and the font override, add a lint guard

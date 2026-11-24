@@ -1,9 +1,9 @@
 "use client";
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import AuthCard, { authInput, authButton, authError, authLink } from "@/components/AuthCard";
+import { Alert, Button, ButtonLink, Field, PasswordInput } from "@/components/ui";
+import { AuthLink, AuthShell } from "@/components/auth/AuthShell";
 
 // The email link lands here with ?code=…; exchanging it signs the user in so
 // they can set a new password.
@@ -22,10 +22,10 @@ export default function ResetPasswordPage() {
     (async () => {
       if (code) {
         const { error } = await sb.auth.exchangeCodeForSession(code);
-        if (error) { setLinkError("This reset link is invalid or has expired. Please request a new one."); return; }
+        if (error) { setLinkError("This reset link is invalid or has expired. Request a new one below."); return; }
       }
       const { data: { user } } = await sb.auth.getUser();
-      if (!user) { setLinkError("This reset link is invalid or has expired. Please request a new one."); return; }
+      if (!user) { setLinkError("This reset link is invalid or has expired. Request a new one below."); return; }
       setReady(true);
     })();
   }, []);
@@ -34,7 +34,7 @@ export default function ResetPasswordPage() {
     e.preventDefault();
     setError("");
     if (password.length < 8) { setError("Use at least 8 characters."); return; }
-    if (password !== confirm) { setError("The two passwords don't match."); return; }
+    if (password !== confirm) { setError("The two passwords don’t match."); return; }
     setSaving(true);
     const { error } = await createClient().auth.updateUser({ password });
     setSaving(false);
@@ -42,23 +42,33 @@ export default function ResetPasswordPage() {
     router.push("/dashboard");
   }
 
+  const back = <AuthLink href="/login">Back to sign in</AuthLink>;
+
   if (linkError) return (
-    <AuthCard title="Link expired" subtitle={linkError}>
-      <Link href="/forgot-password" style={{ ...authButton, display: "block", textAlign: "center", textDecoration: "none" }}>Send a new link</Link>
-    </AuthCard>
+    <AuthShell title="This link has expired" footer={back}>
+      <div className="flex flex-col gap-4">
+        <Alert tone="warn">{linkError}</Alert>
+        <ButtonLink href="/forgot-password" variant="primary" className="w-full">Send a new link</ButtonLink>
+      </div>
+    </AuthShell>
   );
 
-  if (!ready) return <AuthCard title="Checking your link…"><span /></AuthCard>;
+  if (!ready) return <AuthShell title="Checking your link…"><p className="font-ui text-body text-fg-3">One moment.</p></AuthShell>;
 
   return (
-    <AuthCard title="Choose a new password">
-      <form onSubmit={submit}>
-        <input type="password" required autoFocus autoComplete="new-password" placeholder="New password" value={password} onChange={e => setPassword(e.target.value)} style={authInput} />
-        <input type="password" required autoComplete="new-password" placeholder="Repeat new password" value={confirm} onChange={e => setConfirm(e.target.value)} style={authInput} />
-        {error && <div style={authError}>{error}</div>}
-        <button type="submit" disabled={saving} style={authButton}>{saving ? "Saving…" : "Save new password"}</button>
+    <AuthShell title="Choose a new password" description="Use at least 8 characters." footer={back}>
+      <form onSubmit={submit} className="flex flex-col gap-4">
+        {error && <Alert tone="bad">{error}</Alert>}
+        <Field label="New password">
+          {(p) => <PasswordInput {...p} required autoFocus autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} />}
+        </Field>
+        <Field label="Repeat new password">
+          {(p) => <PasswordInput {...p} required autoComplete="new-password" value={confirm} onChange={(e) => setConfirm(e.target.value)} />}
+        </Field>
+        <Button type="submit" variant="primary" disabled={saving} className="mt-2 w-full">
+          {saving ? "Saving…" : "Save new password"}
+        </Button>
       </form>
-      <Link href="/login" style={authLink}>← Back to sign in</Link>
-    </AuthCard>
+    </AuthShell>
   );
 }

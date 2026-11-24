@@ -10,6 +10,10 @@ import {
   Alert, Avatar, Button, ButtonLink, Card, Field, Input, Label, PageHeader, Select, Skeleton, Tabs, Textarea, cn,
 } from "@/components/ui";
 
+// Names that are pages of the app, so they can't be someone's address.
+const RESERVED = new Set(["admin", "api", "artwork", "artworks", "auth", "available", "contracts", "dashboard", "explore",
+  "forgot-password", "login", "logout", "register", "reset-password", "settings", "about", "help", "terms", "privacy", "artomango"]);
+
 type Tab = "profile" | "links" | "invite";
 
 const VENUE_TYPES = ["Gallery", "Café", "Restaurant", "Hotel", "Office", "Cultural center", "Studio", "Pop-up space", "Museum", "Theater"];
@@ -116,6 +120,11 @@ export default function ProfilePage() {
     const { data: { user } } = await sb.auth.getUser();
     if (!user) { setSaving(false); return; }
     const clean = { ...form, username: form.username.toLowerCase().trim() };
+    if (clean.username && (clean.username.length < 3 || RESERVED.has(clean.username))) {
+      setSaving(false);
+      setNotice({ tone: "bad", text: clean.username.length < 3 ? "Use at least 3 letters or numbers for your username." : "That username is taken. Try another." });
+      return;
+    }
     const { error } = await sb.from("profiles").update({
       full_name: clean.full_name,
       username: clean.username || null,

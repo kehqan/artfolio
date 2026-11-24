@@ -69,6 +69,11 @@ const config: Config = {
           violet: v("color-tag-violet"),
           pink: v("color-tag-pink"),
           sky: v("color-tag-sky"),
+          "coral-well": v("color-tag-coral-well"),
+          "teal-well": v("color-tag-teal-well"),
+          "violet-well": v("color-tag-violet-well"),
+          "pink-well": v("color-tag-pink-well"),
+          "sky-well": v("color-tag-sky-well"),
         },
       },
       fontSize: {
@@ -109,6 +114,15 @@ const config: Config = {
       transitionDuration: {
         fast: v("duration-fast"),
         base: v("duration-base"),
+      },
+      keyframes: {
+        "drop-in": {
+          from: { opacity: "0", transform: "translateY(-6px) scale(0.98)" },
+          to: { opacity: "1", transform: "translateY(0) scale(1)" },
+        },
+      },
+      animation: {
+        "drop-in": "drop-in var(--duration-base) var(--ease-standard)",
       },
       zIndex: {
         nav: v("z-nav"),

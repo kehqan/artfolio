@@ -62,6 +62,12 @@
   --color-tag-violet: #7c3aed;
   --color-tag-pink: #db2777;
   --color-tag-sky: #0ea5e9;
+  /* soft wells for icon tiles / tag backgrounds */
+  --color-tag-coral-well: #ffe4e1;
+  --color-tag-teal-well: #d5f5f2;
+  --color-tag-violet-well: #ede9fe;
+  --color-tag-pink-well: #fce7f3;
+  --color-tag-sky-well: #e0f2fe;
 
   /* ── Type ──────────────────────────────────────────────────────── */
   --font-display: var(--font-darker-grotesque), "Arial Narrow", system-ui, sans-serif;

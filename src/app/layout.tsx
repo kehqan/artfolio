@@ -88,7 +88,7 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="mobile-web-app-capable" content="yes" />
       </head>
-      <body className="font-sans bg-paper text-stone-900 antialiased">
+      <body className="font-sans bg-page text-fg antialiased">
         {children}
       </body>
     </html>

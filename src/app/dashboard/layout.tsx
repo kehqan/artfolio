@@ -11,53 +11,65 @@ import {
   MapPin, CalendarRange, Menu, Globe, ShoppingBag,
   BellOff, MessageSquare, Plus, Layers, FileText, BookOpen,
 } from "lucide-react";
+import { cn, Eyebrow } from "@/components/ui";
+
+// Icon tile colors for nav items: a category tint on a soft well
+const TONE = {
+  violet: "bg-tag-violet-well text-tag-violet",
+  sky: "bg-tag-sky-well text-tag-sky",
+  pink: "bg-tag-pink-well text-tag-pink",
+  mango: "bg-mango-soft text-warn",
+  teal: "bg-tag-teal-well text-tag-teal",
+  coral: "bg-tag-coral-well text-tag-coral",
+} as const;
+type Tone = keyof typeof TONE;
 
 // ── Nav structure ──────────────────────────────────────────────────
 const NAV_SECTIONS = [
   {
     key: "studio",
     label: "My Studio",
-    emoji: "🎨",
+   
     icon: ImageIcon,
     items: [
-      { href: "/dashboard/artworks", label: "My Works",  icon: ImageIcon,   desc: "All your works in one place", emoji: "🖼️", color: "#7C3AED", bg: "#EDE9FE" },
-      { href: "/dashboard/mystore",  label: "My Front Door",   icon: ShoppingBag, desc: "Your public storefront",        emoji: "🛍️", color: "#0EA5E9", bg: "#E0F2FE" },
-      { href: "/dashboard/moodboard",label: "Moodboard", icon: Layers,      desc: "Visual boards & references",   emoji: "🗂️", color: "#EC4899", bg: "#FCE7F3" },
+      { href: "/dashboard/artworks", label: "My Works",  icon: ImageIcon,   desc: "All your works in one place", tone: "violet" },
+      { href: "/dashboard/mystore",  label: "My Front Door",   icon: ShoppingBag, desc: "Your public storefront",        tone: "sky" },
+      { href: "/dashboard/moodboard",label: "Moodboard", icon: Layers,      desc: "Visual boards & references",   tone: "pink" },
     ],
   },
   {
     key: "scene",
     label: "The Scene",
-    emoji: "🌆",
+   
     icon: CalendarRange,
     items: [
-      { href: "/dashboard/scene",     label: "Collabs & Events", icon: Handshake,     desc: "Community feed of events & collabs", emoji: "🌆", color: "#CA8A04", bg: "#FEF9C3" },
-      { href: "/dashboard/exhibitions", label: "Exhibitions",    icon: CalendarRange, desc: "Plan and publish your shows",        emoji: "🖼️", color: "#7C3AED", bg: "#EDE9FE" },
-      { href: "/dashboard/pool",      label: "The Pool",         icon: Globe,         desc: "Open calls from artists & venues",   emoji: "🏊", color: "#16A34A", bg: "#DCFCE7" },
-      { href: "/dashboard/education", label: "Education Hub",    icon: BookOpen,      desc: "Resources, videos & guides",         emoji: "📚", color: "#0EA5E9", bg: "#E0F2FE" },
-      { href: "/dashboard/map",       label: "Art Scene Map",    icon: MapPin,        desc: "Prague art scene map",               emoji: "📍", color: "#EF4444", bg: "#FEE2E2" },
+      { href: "/dashboard/scene",     label: "Collabs & Events", icon: Handshake,     desc: "Community feed of events & collabs", tone: "mango" },
+      { href: "/dashboard/exhibitions", label: "Exhibitions",    icon: CalendarRange, desc: "Plan and publish your shows",        tone: "violet" },
+      { href: "/dashboard/pool",      label: "The Pool",         icon: Globe,         desc: "Open calls from artists & venues",   tone: "teal" },
+      { href: "/dashboard/education", label: "Education Hub",    icon: BookOpen,      desc: "Resources, videos & guides",         tone: "sky" },
+      { href: "/dashboard/map",       label: "Art Scene Map",    icon: MapPin,        desc: "Prague art scene map",               tone: "coral" },
     ],
   },
   {
     key: "business",
     label: "Deals & Money",
-    emoji: "💰",
+   
     icon: BarChart3,
     items: [
-      { href: "/dashboard/sales",     label: "My Sales",     icon: BarChart3,  desc: "Money you've made",  emoji: "💰", color: "#16A34A", bg: "#DCFCE7" },
-      { href: "/dashboard/clients",   label: "My Collectors",   icon: Users,      desc: "People who love your work",   emoji: "👥", color: "#8B5CF6", bg: "#EDE9FE" },
-      { href: "/dashboard/contracts", label: "My Papers", icon: FileText,   desc: "Agreements & Deals",     emoji: "📋", color: "#CA8A04", bg: "#FEF9C3" },
-      { href: "/dashboard/analytics", label: "My Reach", icon: TrendingUp, desc: "See how you're doing",      emoji: "📈", color: "#0EA5E9", bg: "#E0F2FE" },
+      { href: "/dashboard/sales",     label: "My Sales",     icon: BarChart3,  desc: "Money you've made",  tone: "teal" },
+      { href: "/dashboard/clients",   label: "My Collectors",   icon: Users,      desc: "People who love your work",   tone: "violet" },
+      { href: "/dashboard/contracts", label: "My Papers", icon: FileText,   desc: "Agreements & Deals",     tone: "mango" },
+      { href: "/dashboard/analytics", label: "My Reach", icon: TrendingUp, desc: "See how you're doing",      tone: "sky" },
     ],
   },
   {
     key: "planner",
     label: "Planning",
-    emoji: "📅",
+   
     icon: CalendarDays,
     items: [
-      { href: "/dashboard/tasks",    label: "My To-Dos",    icon: CheckSquare,  desc: "Tasks & to-do list", emoji: "✅", color: "#16A34A", bg: "#DCFCE7" },
-      { href: "/dashboard/calendar", label: "My Schedule", icon: CalendarDays, desc: "Schedule & deadlines",    emoji: "📆", color: "#8B5CF6", bg: "#EDE9FE" },
+      { href: "/dashboard/tasks",    label: "My To-Dos",    icon: CheckSquare,  desc: "Tasks & to-do list", tone: "teal" },
+      { href: "/dashboard/calendar", label: "My Schedule", icon: CalendarDays, desc: "Schedule & deadlines",    tone: "violet" },
     ],
   },
 ];
@@ -183,263 +195,93 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     ? profile.full_name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase()
     : "A";
 
+  // Shared class recipes for the nav (all values come from design tokens)
+  const pillBtn = (on: boolean, open = false) =>
+    cn(
+      "relative flex h-9 items-center gap-1.5 whitespace-nowrap rounded-pill px-3.5 font-ui text-label font-semibold",
+      "transition-colors duration-fast ease-out focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink",
+      open ? "bg-inverse text-on-inverse" : on ? "bg-mango text-on-mango" : "text-fg-2 hover:bg-sunken hover:text-fg",
+    );
+  const iconBtn = (on: boolean) =>
+    cn(
+      "relative grid h-9 w-9 place-items-center rounded-pill transition-colors duration-fast ease-out",
+      "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink",
+      on ? "bg-inverse text-on-inverse" : "text-fg-2 hover:bg-sunken hover:text-fg",
+    );
+  const floating = "rounded-card border-outline border-ink bg-surface shadow-hard-3 overflow-hidden animate-drop-in";
+  const divider = <div aria-hidden className="mx-0.5 h-5 w-px shrink-0 bg-line" />;
+
   return (
     <>
-      <style>{`
-        * { box-sizing: border-box; }
-
-        /* ── Pill nav ── */
-        .am-nav-pill {
-          background: rgba(255,255,255,0.92);
-          backdrop-filter: blur(16px);
-          -webkit-backdrop-filter: blur(16px);
-          border: 2.5px solid #111110;
-          border-radius: 9999px;
-          box-shadow: 4px 4px 0 #111110;
-          transition: box-shadow 0.2s, background 0.2s;
-        }
-
-        /* ── Dropdown panel ── */
-        .am-dropdown {
-          position: absolute;
-          top: calc(100% + 12px);
-          left: 50%;
-          transform: translateX(-50%);
-          background: #FFFBEA;
-          border: 2.5px solid #111110;
-          border-radius: 20px;
-          box-shadow: 6px 6px 0 #111110;
-          min-width: 260px;
-          overflow: hidden;
-          z-index: 200;
-          animation: dropIn 0.18s cubic-bezier(0.16,1,0.3,1);
-        }
-        @keyframes dropIn {
-          from { opacity: 0; transform: translateX(-50%) translateY(-10px) scale(0.96); }
-          to   { opacity: 1; transform: translateX(-50%) translateY(0)      scale(1);   }
-        }
-
-        /* Dropdown header */
-        .am-dropdown-header {
-          display: flex; align-items: center; gap: 8px;
-          padding: 10px 14px 9px;
-          border-bottom: 2px solid #E8E0D0;
-          background: #fff;
-        }
-        .am-dropdown-header-emoji { font-size: 16px; line-height: 1; }
-        .am-dropdown-header-label {
-          font-size: 10px; font-weight: 900; color: #9B8F7A;
-          text-transform: uppercase; letter-spacing: 0.14em;
-          font-family: 'Darker Grotesque', sans-serif;
-        }
-
-        /* Dropdown items */
-        .am-dropdown-item {
-          display: flex; align-items: center; gap: 12px;
-          padding: 10px 14px; cursor: pointer;
-          transition: background 0.12s; text-decoration: none;
-          border-bottom: 1px solid #E8E0D0; color: inherit;
-        }
-        .am-dropdown-item:last-child { border-bottom: none; }
-        .am-dropdown-item:hover { background: #fff; }
-        .am-dropdown-item.active { background: #FFD400; border-bottom-color: #D4C9A8; }
-        .am-dropdown-item.active:hover { background: #FFD400; }
-
-        /* Emoji tile */
-        .am-dropdown-tile {
-          width: 40px; height: 40px; border-radius: 12px;
-          border: 2px solid #111110;
-          display: flex; align-items: center; justify-content: center;
-          font-size: 20px; flex-shrink: 0;
-          transition: transform 0.15s;
-          box-shadow: 2px 2px 0 rgba(0,0,0,0.08);
-        }
-        .am-dropdown-item:hover .am-dropdown-tile { transform: scale(1.08) rotate(-3deg); }
-        .am-dropdown-item.active .am-dropdown-tile {
-          background: #111110 !important;
-          filter: grayscale(1) brightness(0) invert(1);
-        }
-
-        /* ── Nav button ── */
-        .am-nav-btn {
-          display: flex; align-items: center; gap: 6px;
-          padding: 8px 13px; border-radius: 9999px; border: none;
-          background: transparent; font-family: 'Darker Grotesque', sans-serif;
-          font-size: 14px; font-weight: 700; color: #111110;
-          cursor: pointer; transition: all 0.15s cubic-bezier(0.16,1,0.3,1);
-          white-space: nowrap; position: relative;
-        }
-        .am-nav-btn:hover { background: rgba(0,0,0,0.05); }
-        .am-nav-btn.active { background: #FFD400; font-weight: 800; box-shadow: 2px 2px 0 #111110; }
-        .am-nav-btn.open { background: #111110; color: #FFD400; }
-
-        /* The Atelier btn */
-        .am-dashboard-btn {
-          display: flex; align-items: center; gap: 6px;
-          padding: 8px 14px; border-radius: 9999px;
-          font-family: 'Darker Grotesque', sans-serif; font-size: 14px;
-          font-weight: 700; text-decoration: none; color: #111110;
-          transition: background 0.15s; white-space: nowrap;
-        }
-        .am-dashboard-btn:hover { background: rgba(0,0,0,0.05); }
-        .am-dashboard-btn.active { background: #FFD400; font-weight: 800; box-shadow: 2px 2px 0 #111110; }
-
-        /* Divider */
-        .am-divider { width: 1px; height: 20px; background: #E0D8CA; margin: 0 2px; flex-shrink: 0; }
-
-        /* Icon buttons */
-        .am-icon-btn {
-          display: flex; align-items: center; justify-content: center;
-          width: 34px; height: 34px; border-radius: 9999px; border: none;
-          background: transparent; cursor: pointer; color: #111110;
-          transition: background 0.15s; position: relative; font-family: inherit;
-        }
-        .am-icon-btn:hover { background: rgba(0,0,0,0.07); }
-        .am-icon-btn.active { background: #111110; color: #FFD400; }
-
-        /* Messages badge */
-        .am-msg-badge {
-          position: absolute; top: 1px; right: 1px;
-          background: #FFD400; color: #111110;
-          font-size: 9px; font-weight: 900;
-          min-width: 16px; height: 16px; border-radius: 99px;
-          display: flex; align-items: center; justify-content: center;
-          border: 2px solid #111110; padding: 0 3px;
-          font-family: 'Darker Grotesque', sans-serif;
-        }
-
-        /* Avatar */
-        .am-avatar {
-          width: 32px; height: 32px; border-radius: 50%;
-          background: #FFD400; border: 2px solid #111110;
-          display: flex; align-items: center; justify-content: center;
-          font-size: 12px; font-weight: 900; color: #111110;
-          cursor: pointer; overflow: hidden; flex-shrink: 0;
-          transition: box-shadow .15s;
-        }
-        .am-avatar:hover { box-shadow: 2px 2px 0 #111110; }
-
-        /* Bell panel */
-        .am-bell-panel {
-          position: absolute; top: calc(100% + 10px); right: 0;
-          background: #fff; border: 2px solid #111110; border-radius: 16px;
-          box-shadow: 6px 6px 0 #111110; width: 320px;
-          overflow: hidden; z-index: 200;
-          animation: dropIn 0.15s cubic-bezier(0.16,1,0.3,1);
-        }
-        .am-bell-hdr { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid #F5F0E8; }
-        .am-bell-title { font-size: 14px; font-weight: 900; color: #111110; }
-        .am-bell-mark { font-size: 11px; font-weight: 700; color: #9B8F7A; cursor: pointer; background: none; border: none; font-family: inherit; }
-        .am-bell-mark:hover { color: #111110; }
-        .am-bell-list { max-height: 340px; overflow-y: auto; }
-        .am-bell-item { display: flex; align-items: flex-start; gap: 10px; padding: 10px 14px; border-bottom: 1px solid #F5F0E8; cursor: pointer; transition: background .1s; }
-        .am-bell-item:last-child { border-bottom: none; }
-        .am-bell-item:hover { background: #FFFBEA; }
-        .am-bell-item.unread { background: #FFFBEA; }
-        .am-bell-dot { width: 7px; height: 7px; border-radius: 50%; background: #FFD400; border: 1.5px solid #111110; flex-shrink: 0; margin-top: 5px; }
-        .am-bell-dot.read { background: #E8E0D0; border-color: #C0B8A8; }
-        .am-bell-body { flex: 1; min-width: 0; }
-        .am-bell-t { font-size: 13px; font-weight: 800; color: #111110; margin-bottom: 1px; }
-        .am-bell-b { font-size: 12px; font-weight: 600; color: #9B8F7A; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .am-bell-time { font-size: 10px; font-weight: 700; color: #C0B8A8; flex-shrink: 0; }
-        .am-bell-empty { padding: 32px 16px; text-align: center; }
-
-        /* Search */
-        .am-search-box {
-          position: absolute; top: calc(100% + 10px); left: 50%;
-          transform: translateX(-50%); background: #fff;
-          border: 2px solid #111110; border-radius: 14px;
-          box-shadow: 6px 6px 0 #111110; width: 320px; overflow: hidden;
-          z-index: 200; animation: dropIn .15s cubic-bezier(.16,1,.3,1);
-        }
-        .am-search-input-wrap { display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-bottom: 1px solid #F5F0E8; }
-        .am-search-field { flex: 1; border: none; outline: none; font-family: inherit; font-size: 14px; font-weight: 600; color: #111110; background: transparent; }
-
-        /* Mobile */
-        .am-mobile-menu { position: fixed; inset: 0; z-index: 300; display: flex; flex-direction: column; }
-        .am-mobile-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.5); }
-        .am-mobile-panel {
-          position: relative; background: #fff;
-          border: 2px solid #111110; border-radius: 0 0 20px 20px;
-          padding: 12px 16px 20px; z-index: 1;
-          max-height: 85vh; overflow-y: auto; border-top: none;
-        }
-        .am-content { max-width: 1280px; margin: 0 auto; padding: 28px 20px; }
-        .dbs-hover:hover { background: #F5F0E8 !important; }
-        .dbn-hover:hover { background: #FFFBEA !important; }
-
-        @media (max-width: 768px) {
-          .am-nav-sections { display: none !important; }
-          .am-mobile-toggle { display: flex !important; }
-        }
-        @media (min-width: 769px) {
-          .am-mobile-toggle { display: none !important; }
-        }
-      `}</style>
-
       {/* ── STICKY NAV ── */}
-      <div style={{ position: "sticky", top: 12, zIndex: 100, padding: "0 16px", pointerEvents: "none" }}>
-        <div ref={navRef} style={{ pointerEvents: "auto", maxWidth: 1000, margin: "0 auto" }}>
-          <div className="am-nav-pill" style={{ display: "flex", alignItems: "center", gap: 4, padding: "5px 6px 5px 10px", position: "relative" }}>
-
+      <div className="pointer-events-none sticky top-3 z-nav px-4">
+        <div ref={navRef} className="pointer-events-auto mx-auto max-w-[1000px]">
+          <nav
+            aria-label="Main"
+            className="relative flex items-center gap-1 rounded-pill border-outline border-ink bg-surface py-1 pl-2.5 pr-1.5 shadow-hard-1"
+          >
             {/* Logo */}
-            <Link href="/dashboard" style={{ display: "flex", alignItems: "center", textDecoration: "none", flexShrink: 0, fontSize: 24, lineHeight: 1, padding: "2px 2px" }}>
+            <Link href="/dashboard" aria-label="Artomango home" className="flex shrink-0 items-center px-0.5 text-h2 leading-none">
               🥭
             </Link>
-            <div className="am-divider" />
+            {divider}
 
             {/* The Atelier */}
-            <Link href="/dashboard" className={`am-dashboard-btn ${isActive("/dashboard") ? "active" : "inactive"}`}>
-              <LayoutDashboard size={15} /> The Atelier
+            <Link href="/dashboard" aria-label="The Atelier" className={pillBtn(isActive("/dashboard"))} aria-current={isActive("/dashboard") ? "page" : undefined}>
+              <LayoutDashboard size={16} aria-hidden /> <span className="hidden min-[420px]:inline">The Atelier</span>
             </Link>
-            <div className="am-divider" />
+            {divider}
 
             {/* Section dropdowns */}
-            <div className="am-nav-sections" style={{ display: "flex", alignItems: "center", gap: 2, flex: 1 }}>
+            <div className="hidden flex-1 items-center gap-0.5 lg:flex">
               {NAV_SECTIONS.map(section => {
                 const active = isSectionActive(section);
                 const isOpen = openMenu === section.key;
+                const SIcon = section.icon;
                 return (
-                  <div key={section.key} style={{ position: "relative" }}>
+                  <div key={section.key} className="relative">
                     <button
-                      className={`am-nav-btn ${active ? "active" : ""} ${isOpen ? "open" : ""}`}
+                      type="button"
+                      aria-expanded={isOpen}
+                      className={pillBtn(active, isOpen)}
                       onClick={() => setOpenMenu(isOpen ? null : section.key)}
                     >
-                      <span style={{ fontSize: 15, lineHeight: 1 }}>{section.emoji}</span>
+                      <SIcon size={16} aria-hidden />
                       {section.label}
-                      <ChevronDown size={12} style={{ transform: isOpen ? "rotate(180deg)" : "none", transition: "transform 0.2s cubic-bezier(0.16,1,0.3,1)" }} />
+                      <ChevronDown size={14} aria-hidden className={cn("transition-transform duration-base ease-out", isOpen && "rotate-180")} />
                     </button>
 
                     {isOpen && (
-                      <div className="am-dropdown">
-                        {/* Header */}
-                        <div className="am-dropdown-header">
-                          <span className="am-dropdown-header-emoji">{section.emoji}</span>
-                          <span className="am-dropdown-header-label">{section.label}</span>
+                      <div className="absolute left-1/2 top-[calc(100%+12px)] z-dropdown -translate-x-1/2">
+                        <div className={cn(floating, "min-w-[280px] p-1.5")}>
+                          <div className="px-3 pb-1.5 pt-2">
+                            <Eyebrow>{section.label}</Eyebrow>
+                          </div>
+                          {section.items.map(item => {
+                            const itemActive = isActive(item.href);
+                            const IIcon = item.icon;
+                            return (
+                              <Link
+                                key={item.href}
+                                href={item.href}
+                                aria-current={itemActive ? "page" : undefined}
+                                className={cn(
+                                  "group flex items-center gap-3 rounded-control px-2.5 py-2 transition-colors duration-fast",
+                                  itemActive ? "bg-mango-soft" : "hover:bg-sunken",
+                                )}
+                              >
+                                <span className={cn("grid h-9 w-9 shrink-0 place-items-center rounded-control", itemActive ? "bg-ink text-mango" : TONE[item.tone as Tone])}>
+                                  <IIcon size={17} aria-hidden />
+                                </span>
+                                <span className="flex min-w-0 flex-1 flex-col">
+                                  <span className="font-ui text-label font-semibold text-fg">{item.label}</span>
+                                  <span className="font-ui text-caption text-fg-3">{item.desc}</span>
+                                </span>
+                                {itemActive && <span aria-hidden className="h-1.5 w-1.5 shrink-0 rounded-full bg-ink" />}
+                              </Link>
+                            );
+                          })}
                         </div>
-
-                        {/* Items */}
-                        {section.items.map(item => {
-                          const itemActive = isActive(item.href);
-                          const it = item as any;
-                          return (
-                            <Link key={item.href} href={item.href} className={`am-dropdown-item ${itemActive ? "active" : ""}`}>
-                              {/* Colored emoji tile */}
-                              <div className="am-dropdown-tile" style={{ background: itemActive ? "#111110" : it.bg }}>
-                                <span style={{ fontSize: 20, lineHeight: 1 }}>{it.emoji}</span>
-                              </div>
-                              {/* Label + desc */}
-                              <div style={{ flex: 1, minWidth: 0 }}>
-                                <div style={{ fontSize: 13, fontWeight: 800, color: "#111110", marginBottom: 1 }}>{item.label}</div>
-                                <div style={{ fontSize: 11, color: itemActive ? "#5C5346" : "#9B8F7A", fontWeight: 600, lineHeight: 1.3 }}>{item.desc}</div>
-                              </div>
-                              {/* Active dot */}
-                              {itemActive && (
-                                <div style={{ width: 7, height: 7, borderRadius: "50%", background: "#111110", flexShrink: 0 }} />
-                              )}
-                            </Link>
-                          );
-                        })}
                       </div>
                     )}
                   </div>
@@ -448,169 +290,221 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </div>
 
             {/* ── Right side ── */}
-            <div style={{ display: "flex", alignItems: "center", gap: 4, marginLeft: "auto" }}>
+            <div className="ml-auto flex items-center gap-0.5">
 
-              {/* Mobile hamburger */}
-              <button className="am-icon-btn am-mobile-toggle" style={{ display: "none" }} onClick={() => setMobileOpen(p => !p)}>
-                <Menu size={15} />
+              {/* Mobile menu */}
+              <button type="button" aria-label="Open menu" className={cn(iconBtn(mobileOpen), "lg:hidden")} onClick={() => setMobileOpen(p => !p)}>
+                <Menu size={17} aria-hidden />
               </button>
 
               {/* Search */}
-              <div style={{ position: "relative" }}>
-                <button className={`am-icon-btn ${searchOpen ? "active" : ""}`} onClick={() => { setSearchOpen(p => !p); setBellOpen(false); }}>
-                  {searchOpen ? <X size={15} /> : <Search size={15} />}
+              <div className="relative">
+                <button
+                  type="button"
+                  aria-label={searchOpen ? "Close search" : "Search"}
+                  className={iconBtn(searchOpen)}
+                  onClick={() => { setSearchOpen(p => !p); setBellOpen(false); setOpenMenu(null); }}
+                >
+                  {searchOpen ? <X size={17} aria-hidden /> : <Search size={17} aria-hidden />}
                 </button>
                 {searchOpen && (
-                  <div className="am-search-box">
-                    <div className="am-search-input-wrap">
-                      <Search size={14} color="#9B8F7A" />
-                      <input
-                        ref={searchRef}
-                        className="am-search-field"
-                        placeholder="Search…"
-                        value={searchQuery}
-                        onChange={e => setSearchQuery(e.target.value)}
-                      />
+                  <div className="absolute right-0 top-[calc(100%+12px)] z-dropdown sm:left-1/2 sm:right-auto sm:-translate-x-1/2">
+                    <div className={cn(floating, "w-[min(320px,calc(100vw-32px))]")}>
+                      <div className="flex items-center gap-2 border-b-hair border-line px-3.5 py-2.5">
+                        <Search size={16} aria-hidden className="text-fg-3" />
+                        <input
+                          ref={searchRef}
+                          aria-label="Search pages"
+                          className="flex-1 bg-transparent font-ui text-control text-fg outline-none placeholder:text-fg-3"
+                          placeholder="Search pages…"
+                          value={searchQuery}
+                          onChange={e => setSearchQuery(e.target.value)}
+                        />
+                      </div>
+                      {searchResults.length > 0 && (
+                        <div className="p-1.5">
+                          {searchResults.map(item => {
+                            const IIcon = item.icon;
+                            return (
+                              <Link
+                                key={item.href}
+                                href={item.href}
+                                className="flex items-center gap-2.5 rounded-control px-2.5 py-2 font-ui text-label font-semibold text-fg hover:bg-sunken"
+                                onClick={() => { setSearchOpen(false); setSearchQuery(""); }}
+                              >
+                                <IIcon size={16} aria-hidden className="text-fg-3" />
+                                {item.label}
+                              </Link>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
-                    {searchResults.map(item => {
-                      const IIcon = item.icon;
-                      return (
-                        <Link key={item.href} href={item.href} className="am-dropdown-item" onClick={() => { setSearchOpen(false); setSearchQuery(""); }}>
-                          <IIcon size={14} color="#9B8F7A" />
-                          <span style={{ fontSize: 13, fontWeight: 700, color: "#111110" }}>{item.label}</span>
-                        </Link>
-                      );
-                    })}
                   </div>
                 )}
               </div>
 
               {/* Messages */}
-              <div style={{ position: "relative" }}>
-                <Link href="/dashboard/messages" style={{ textDecoration: "none" }}>
-                  <button className={`am-icon-btn ${pathname.startsWith("/dashboard/messages") ? "active" : ""}`} title="Messages">
-                    <MessageSquare size={15} />
-                    {unreadMessages > 0 && (
-                      <span className="am-msg-badge">{unreadMessages > 9 ? "9+" : unreadMessages}</span>
-                    )}
-                  </button>
-                </Link>
-              </div>
+              <Link
+                href="/dashboard/messages"
+                title="Messages"
+                aria-label={unreadMessages > 0 ? `Messages, ${unreadMessages} unread` : "Messages"}
+                className={iconBtn(pathname.startsWith("/dashboard/messages"))}
+              >
+                <MessageSquare size={17} aria-hidden />
+                {unreadMessages > 0 && (
+                  <span className="absolute -right-0.5 -top-0.5 grid h-[18px] min-w-[18px] place-items-center rounded-pill border-outline border-ink bg-mango px-1 font-ui text-caption font-bold leading-none text-on-mango">
+                    {unreadMessages > 9 ? "9+" : unreadMessages}
+                  </span>
+                )}
+              </Link>
 
               {/* Bell */}
-              <div style={{ position: "relative" }} ref={bellRef}>
+              <div className="relative" ref={bellRef}>
                 <button
-                  className={`am-icon-btn ${bellOpen ? "active" : ""}`}
-                  onClick={() => { setBellOpen(p => !p); setSearchOpen(false); }}
+                  type="button"
+                  aria-label={unreadNotifs > 0 ? `Notifications, ${unreadNotifs} unread` : "Notifications"}
+                  aria-expanded={bellOpen}
+                  className={iconBtn(bellOpen)}
+                  onClick={() => { setBellOpen(p => !p); setSearchOpen(false); setOpenMenu(null); }}
                 >
-                  {unreadNotifs > 0
-                    ? <Bell size={15} style={{ color: bellOpen ? "#FFD400" : "#111110" }} />
-                    : <BellOff size={15} style={{ opacity: 0.4 }} />
-                  }
+                  {unreadNotifs > 0 ? <Bell size={17} aria-hidden /> : <BellOff size={17} aria-hidden className="opacity-50" />}
                   {unreadNotifs > 0 && !bellOpen && (
-                    <span style={{ position: "absolute", top: 1, right: 1, width: 8, height: 8, borderRadius: "50%", background: "#FFD400", border: "1.5px solid #111110" }} />
+                    <span aria-hidden className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full border-outline border-ink bg-mango" />
                   )}
                 </button>
                 {bellOpen && (
-                  <div className="am-bell-panel">
-                    <div className="am-bell-hdr">
-                      <span className="am-bell-title">Notifications {unreadNotifs > 0 && `(${unreadNotifs})`}</span>
-                      {unreadNotifs > 0 && <button className="am-bell-mark" onClick={markAllNotifRead}>Mark all read</button>}
-                    </div>
-                    <div className="am-bell-list">
-                      {notifications.length === 0 ? (
-                        <div className="am-bell-empty">
-                          <div style={{ fontSize: 28, marginBottom: 8 }}>🔔</div>
-                          <div style={{ fontSize: 13, fontWeight: 700, color: "#9B8F7A" }}>No notifications</div>
-                        </div>
-                      ) : notifications.map(n => (
-                        <div key={n.id} className={`am-bell-item ${!n.read ? "unread" : ""}`} onClick={() => {
-                          markNotifRead(n.id);
-                          if (n.type === "message" && n.data?.conversation_id) {
-                            router.push("/dashboard/messages");
-                            setBellOpen(false);
-                          }
-                        }}>
-                          <div className={`am-bell-dot ${n.read ? "read" : ""}`} />
-                          <div className="am-bell-body">
-                            <div className="am-bell-t">{n.title}</div>
-                            {n.body && <div className="am-bell-b">{n.body}</div>}
+                  <div className="absolute right-0 top-[calc(100%+12px)] z-dropdown">
+                    <div className={cn(floating, "w-[min(340px,calc(100vw-32px))]")}>
+                      <div className="flex items-center justify-between border-b-hair border-line px-4 py-3">
+                        <span className="font-display text-h3">
+                          Notifications{unreadNotifs > 0 && <span className="ml-1.5 font-ui text-label font-semibold text-fg-3">{unreadNotifs} new</span>}
+                        </span>
+                        {unreadNotifs > 0 && (
+                          <button type="button" className="font-ui text-caption font-semibold text-fg-3 hover:text-fg" onClick={markAllNotifRead}>
+                            Mark all read
+                          </button>
+                        )}
+                      </div>
+                      <div className="max-h-[340px] overflow-y-auto">
+                        {notifications.length === 0 ? (
+                          <div className="flex flex-col items-center gap-1 px-4 py-8 text-center">
+                            <BellOff size={22} aria-hidden className="text-fg-3" />
+                            <span className="font-ui text-label font-semibold text-fg-2">You're all caught up</span>
+                            <span className="font-ui text-caption text-fg-3">New messages, sales and invites show up here.</span>
                           </div>
-                          <span className="am-bell-time">
-                            {new Date(n.created_at).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
-                          </span>
-                        </div>
-                      ))}
+                        ) : notifications.map(n => (
+                          <button
+                            type="button"
+                            key={n.id}
+                            className={cn(
+                              "flex w-full items-start gap-2.5 border-b-hair border-line px-4 py-2.5 text-left transition-colors duration-fast last:border-b-0 hover:bg-sunken",
+                              !n.read && "bg-mango-soft",
+                            )}
+                            onClick={() => {
+                              markNotifRead(n.id);
+                              if (n.type === "message" && n.data?.conversation_id) {
+                                router.push("/dashboard/messages");
+                                setBellOpen(false);
+                              }
+                            }}
+                          >
+                            <span aria-hidden className={cn("mt-1.5 h-2 w-2 shrink-0 rounded-full", n.read ? "bg-n-300" : "border-outline border-ink bg-mango")} />
+                            <span className="flex min-w-0 flex-1 flex-col">
+                              <span className="font-ui text-label font-semibold text-fg">{n.title}</span>
+                              {n.body && <span className="truncate font-ui text-caption text-fg-3">{n.body}</span>}
+                            </span>
+                            <span className="shrink-0 font-ui text-caption tabular-nums text-fg-3">
+                              {new Date(n.created_at).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
                     </div>
                   </div>
                 )}
               </div>
 
               {/* Avatar → profile */}
-              <Link href="/dashboard/profile" style={{ textDecoration: "none" }}>
-                <div className="am-avatar">
-                  {profile?.avatar_url
-                    ? <img src={profile.avatar_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                    : initials
-                  }
-                </div>
+              <Link
+                href="/dashboard/profile"
+                aria-label="Your profile"
+                className="ml-0.5 grid h-8 w-8 shrink-0 place-items-center overflow-hidden rounded-full border-outline border-ink bg-mango font-ui text-caption font-bold text-on-mango transition-shadow duration-fast hover:shadow-hard-1"
+              >
+                {profile?.avatar_url
+                  // eslint-disable-next-line @next/next/no-img-element
+                  ? <img src={profile.avatar_url} alt="" className="h-full w-full object-cover" />
+                  : initials
+                }
               </Link>
 
             </div>
-          </div>
+          </nav>
         </div>
       </div>
 
       {/* ── MOBILE MENU ── */}
       {mobileOpen && (
-        <div className="am-mobile-menu">
-          <div className="am-mobile-overlay" onClick={() => setMobileOpen(false)} />
-          <div className="am-mobile-panel">
-            <Link href="/dashboard" style={{ textDecoration: "none" }} onClick={() => setMobileOpen(false)}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", borderRadius: 10, background: isActive("/dashboard") ? "#FFD400" : "transparent", marginBottom: 4 }}>
-                <LayoutDashboard size={16} />
-                <span style={{ fontSize: 15, fontWeight: 800, color: "#111110" }}>The Atelier</span>
-              </div>
-            </Link>
-            <Link href="/dashboard/messages" style={{ textDecoration: "none" }} onClick={() => setMobileOpen(false)}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", borderRadius: 10, background: isActive("/dashboard/messages") ? "#FFD400" : "transparent", marginBottom: 4 }}>
-                <MessageSquare size={16} />
-                <span style={{ fontSize: 15, fontWeight: 800, color: "#111110" }}>Messages</span>
-                {unreadMessages > 0 && (
-                  <span style={{ background: "#FFD400", border: "2px solid #111110", borderRadius: 99, fontSize: 10, fontWeight: 900, padding: "0 6px", marginLeft: "auto" }}>
-                    {unreadMessages}
-                  </span>
+        <div className="fixed inset-0 z-modal flex flex-col">
+          <div aria-hidden className="absolute inset-0 bg-scrim" onClick={() => setMobileOpen(false)} />
+          <div className="relative z-[1] max-h-[85vh] overflow-y-auto rounded-b-card border-x-outline border-b-outline border-ink bg-surface px-4 pb-5 pt-3 shadow-hard-3">
+            {[
+              { href: "/dashboard", label: "The Atelier", Icon: LayoutDashboard, badge: 0 },
+              { href: "/dashboard/messages", label: "Messages", Icon: MessageSquare, badge: unreadMessages },
+            ].map(({ href, label, Icon, badge }) => (
+              <Link
+                key={href}
+                href={href}
+                onClick={() => setMobileOpen(false)}
+                className={cn(
+                  "mb-1 flex items-center gap-2.5 rounded-control px-3 py-2.5 font-ui text-body font-semibold text-fg",
+                  isActive(href) ? "bg-mango" : "hover:bg-sunken",
                 )}
-              </div>
-            </Link>
+              >
+                <Icon size={18} aria-hidden />
+                {label}
+                {badge > 0 && (
+                  <span className="ml-auto rounded-pill border-outline border-ink bg-mango px-2 font-ui text-caption font-bold">{badge}</span>
+                )}
+              </Link>
+            ))}
 
             {NAV_SECTIONS.map(section => (
-              <div key={section.key} style={{ marginBottom: 8 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 10, fontWeight: 800, color: "#9B8F7A", textTransform: "uppercase", letterSpacing: "0.15em", padding: "8px 12px 4px" }}>
-                  <span>{section.emoji}</span>
-                  {section.label}
+              <div key={section.key} className="mb-2">
+                <div className="px-3 pb-1 pt-3">
+                  <Eyebrow>{section.label}</Eyebrow>
                 </div>
                 {section.items.map(item => {
                   const active = isActive(item.href);
-                  const it = item as any;
+                  const IIcon = item.icon;
                   return (
-                    <Link key={item.href} href={item.href} style={{ textDecoration: "none" }} onClick={() => setMobileOpen(false)}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 12px", borderRadius: 10, background: active ? "#FFD400" : "transparent" }}>
-                        <div style={{ width: 28, height: 28, borderRadius: 8, background: active ? "#111110" : it.bg, border: "1.5px solid #111110", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, flexShrink: 0 }}>
-                          {it.emoji}
-                        </div>
-                        <span style={{ fontSize: 14, fontWeight: active ? 800 : 600, color: "#111110" }}>{item.label}</span>
-                      </div>
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      onClick={() => setMobileOpen(false)}
+                      className={cn(
+                        "flex items-center gap-3 rounded-control px-3 py-2 font-ui text-body-sm text-fg",
+                        active ? "bg-mango-soft font-semibold" : "font-medium hover:bg-sunken",
+                      )}
+                    >
+                      <span className={cn("grid h-8 w-8 shrink-0 place-items-center rounded-chip", active ? "bg-ink text-mango" : TONE[item.tone as Tone])}>
+                        <IIcon size={16} aria-hidden />
+                      </span>
+                      {item.label}
                     </Link>
                   );
                 })}
               </div>
             ))}
 
-            <div style={{ marginTop: 8, paddingTop: 12, borderTop: "1px solid #E0D8CA" }}>
-              <button onClick={handleLogout} style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", background: "none", border: "none", cursor: "pointer", borderRadius: 10, fontFamily: "inherit" }}>
-                <LogOut size={15} color="#9B8F7A" />
-                <span style={{ fontSize: 14, fontWeight: 600, color: "#9B8F7A" }}>Sign out</span>
+            <div className="mt-2 border-t-hair border-line pt-3">
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="flex w-full items-center gap-2.5 rounded-control px-3 py-2.5 font-ui text-body-sm font-semibold text-fg-2 hover:bg-sunken hover:text-fg"
+              >
+                <LogOut size={16} aria-hidden />
+                Sign out
               </button>
             </div>
           </div>
@@ -618,8 +512,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       )}
 
       {/* ── PAGE CONTENT ── */}
-      <main style={{ minHeight: "100vh", background: "#FFFBEA" }}>
-        <div className="am-content">
+      <main className="min-h-screen bg-page">
+        <div className="mx-auto max-w-[1280px] px-5 py-7">
           {children}
         </div>
       </main>

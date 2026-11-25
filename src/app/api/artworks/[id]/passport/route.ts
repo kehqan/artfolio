@@ -67,10 +67,9 @@ export async function GET(
       .select("*", { count: "exact", head: true })
       .eq("artwork_id", artworkId);
 
-    // Record view (non-blocking)
-    const forwarded = request.headers.get("x-forwarded-for");
-    const ip = forwarded?.split(",")[0]?.trim() || "unknown";
-    supabase.from("passport_views").insert({ artwork_id: artworkId, viewer_ip: ip }).then(() => {});
+    // Count the view (non-blocking). Nothing about the visitor is kept:
+    // no IP address, device or cookie.
+    supabase.from("passport_views").insert({ artwork_id: artworkId }).then(() => {});
 
     return NextResponse.json({
       artwork: { ...artwork, artist },

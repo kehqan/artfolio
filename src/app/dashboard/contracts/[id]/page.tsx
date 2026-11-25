@@ -193,13 +193,20 @@ export default function ContractDetailPage() {
       .or(`initiator_id.eq.${myId},counterparty_id.eq.${myId}`).not("executed_at", "is", null);
     const other = isInitiator ? contract.counterparty_name : contract.initiator_name;
     if (after?.executed_at || after?.status === "signed") {
+      // Next step after a deal: print the wall labels (lib/labels).
+      const { data: deal } = await sb.from("deals").select("id").eq("contract_id", id).maybeSingle();
+      const labels = deal ? { label: "Print the wall labels", href: `/dashboard/labels/make?deal=${(deal as { id: string }).id}` } : null;
+      const planner = { label: "See your Planner", href: "/dashboard/tasks?view=month" };
       const shown = await celebrate("first_signed", {
         title: "It's a deal",
-        body: "You've both signed. The hanging and taking-down dates are in your Planner, and the works' passports show the show.",
+        body: labels
+          ? "You've both signed. Next, print a label for each work: its QR code opens the piece's page, and you'll see every scan. The dates are in your Planner."
+          : "You've both signed. The hanging and taking-down dates are in your Planner, and the works' passports show the show.",
         image: artworks[0]?.images?.[0] || null,
-        primary: { label: "See your Planner", href: "/dashboard/tasks?view=month" },
+        primary: labels || planner,
+        secondary: labels ? planner : undefined,
       }, (signedBefore ?? 0) <= 1);
-      if (!shown) toast({ title: "Signed by both. It's a deal.", body: "The key dates are in your Planner.", action: { label: "Open Planner", href: "/dashboard/tasks?view=month" } });
+      if (!shown) toast({ title: "Signed by both. It's a deal.", body: labels ? "Next: print the wall labels, so people can scan and find the work." : "The key dates are in your Planner.", action: labels || { label: "Open Planner", href: "/dashboard/tasks?view=month" } });
     } else {
       toast({ title: "Signed", body: `Waiting for ${other || "the other side"} to sign. We'll tell you the moment it's done.` });
     }

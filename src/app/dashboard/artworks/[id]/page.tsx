@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import { ScanStats } from "@/components/labels/ScanStats";
 import { createClient } from "@/lib/supabase/client";
 import { loadPrivate, savePrivate } from "@/lib/artwork-private";
 import {
@@ -388,6 +389,9 @@ export default function ArtworkDetailPage() {
             </span>
             <ChevronRight size={17} aria-hidden className="shrink-0 text-fg-3 transition-transform group-hover:translate-x-0.5" />
           </Link>
+
+          {/* Wall labels: scans and the people who reached out */}
+          <ScanStats artworkId={id} showPeople compact title="Wall labels" makeHref={`/dashboard/labels/make?work=${id}`} />
 
           {/* Details */}
           <Section title="Details">

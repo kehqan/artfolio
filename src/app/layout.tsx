@@ -4,7 +4,7 @@ import "../styles/tokens.css";
 import "./globals.css";
 
 const darkerGrotesque = Darker_Grotesque({
-  subsets: ["latin"],
+  subsets: ["latin", "latin-ext"],
   weight: ["300", "400", "500", "600", "700", "800", "900"],
   variable: "--font-darker-grotesque",
   display: "swap",
@@ -12,7 +12,7 @@ const darkerGrotesque = Darker_Grotesque({
 
 // Body / UI face for the design system (see DESIGN_SYSTEM.md)
 const instrumentSans = Instrument_Sans({
-  subsets: ["latin"],
+  subsets: ["latin", "latin-ext"],
   weight: ["400", "500", "600", "700"],
   variable: "--font-instrument-sans",
   display: "swap",
@@ -20,7 +20,7 @@ const instrumentSans = Instrument_Sans({
 
 // Serif headlines for personal sites that choose the "Classic" type mood.
 const instrumentSerif = Instrument_Serif({
-  subsets: ["latin"],
+  subsets: ["latin", "latin-ext"],
   weight: ["400"],
   style: ["normal", "italic"],
   variable: "--font-site-serif",

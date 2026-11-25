@@ -4,7 +4,7 @@
 // make sense right now.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { Check, FileSignature, ImageOff, MessageSquare } from "lucide-react";
+import { Check, FileSignature, ImageOff, MessageSquare, QrCode } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Alert, Avatar, Badge, Button, ButtonLink, Chip, EmptyState, Skeleton, cn } from "@/components/ui";
 import { useJourney } from "@/components/journey/JourneyProvider";
@@ -281,6 +281,11 @@ function DealCard({ d, me, busy, focused, liRef, signed, agreementCancelled, onM
       )}
       {d.status === "signed" && iAmVenue && d.post && d.post.status === "open" && !filled && onFill && (
         <Button variant="secondary" size="sm" onClick={onFill}><Check size={14} aria-hidden /> Mark the wall as filled</Button>
+      )}
+      {d.status === "signed" && (
+        <ButtonLink variant="primary" size="sm" href={`/dashboard/labels/make?deal=${d.id}&back=${encodeURIComponent(`/dashboard/messages?tab=deals&deal=${d.id}`)}`}>
+          <QrCode size={14} aria-hidden /> Wall labels
+        </ButtonLink>
       )}
       <ButtonLink variant={d.status === "agreement_sent" && !signed ? "primary" : "secondary"} size="sm" href={`/dashboard/contracts/${d.contract_id}`}>
       <FileSignature size={14} aria-hidden /> {d.status === "signed" ? "See the agreement" : signed ? "See the agreement" : "Review and sign"}

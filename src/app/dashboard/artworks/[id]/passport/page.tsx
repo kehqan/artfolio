@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { QrCode as QrSvg } from "@/components/labels/QrCode";
 import {
   ArrowLeft, Shield, CheckCircle2, ExternalLink, Plus, Trash2, MapPin, Calendar,
   Check, Eye, History, QrCode, Copy, Lock, Link2, ScrollText,
@@ -184,8 +185,8 @@ export default function PassportManagePage() {
     setTimeout(() => setCopied(false), 2500);
   }
 
-  const qrUrl = artwork?.certificate_id
-    ? `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(`${typeof window !== "undefined" ? window.location.origin : ""}/artwork/${artworkId}/passport`)}&bgcolor=FFFFFF&color=111110&margin=8`
+  const qrUrl = artwork?.certificate_id && typeof window !== "undefined"
+    ? `${window.location.origin}/artwork/${artworkId}/passport`
     : null;
 
   const isVerified = artwork?.authentication_status && artwork.authentication_status !== "pending";
@@ -358,7 +359,7 @@ export default function PassportManagePage() {
                 { icon: History, label: "Provenance trail" },
                 { icon: Shield, label: "Authentication seal" },
                 { icon: Link2, label: "Shareable link" },
-                { icon: QrCode, label: "QR code for the wall label" },
+                { icon: QrCode, label: "QR code for wall labels" },
               ].map(f => (
                 <li key={f.label} className="flex items-center gap-2.5 font-ui text-body-sm text-fg">
                   <f.icon size={16} aria-hidden className="shrink-0 text-fg-3" /> {f.label}
@@ -519,9 +520,12 @@ export default function PassportManagePage() {
               <div className="flex flex-col gap-3 px-5 py-4">
                 {qrUrl && (
                   <div className="flex items-center gap-4">
-                    <img src={qrUrl} alt="QR code linking to the public passport" width={96} height={96}
-                      className="h-24 w-24 shrink-0 rounded-chip border-hair border-line bg-surface" />
-                    <p className="font-ui text-caption text-fg-2">Print this next to the work. It opens the public passport.</p>
+                    <div className="h-24 w-24 shrink-0 overflow-hidden rounded-chip border-hair border-line bg-surface">
+                      <QrSvg value={qrUrl} title="QR code linking to the public passport" margin={2} className="block h-full w-full" />
+                    </div>
+                    <p className="font-ui text-caption text-fg-2">
+                      It opens the public passport. For the wall, <Link href={`/dashboard/labels/make?work=${artworkId}`} className="font-semibold text-fg underline underline-offset-2">make a wall label</Link>: it shows the passport too, and counts scans.
+                    </p>
                   </div>
                 )}
                 <Button onClick={() => setShowAuthModal(true)} className="w-full">

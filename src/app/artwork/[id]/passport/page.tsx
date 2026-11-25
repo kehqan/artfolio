@@ -10,6 +10,7 @@ import { Avatar, Badge, Button, ButtonLink, EmptyState, Eyebrow, Heading, Skelet
 import type { BadgeTone } from "@/components/ui";
 import { Wordmark } from "@/components/brand/Wordmark";
 import { Mat } from "@/components/public/PublicChrome";
+import { QrCode } from "@/components/labels/QrCode";
 
 type Artist = { id: string; full_name: string; username?: string; location?: string; avatar_url?: string };
 type Artwork = {
@@ -76,7 +77,7 @@ export default function ArtworkPassportPage() {
 
   useEffect(() => {
     if (!artworkId) return;
-    setQrUrl(`https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(window.location.href)}&margin=8`);
+    setQrUrl(window.location.origin + window.location.pathname);
     fetch(`/api/artworks/${artworkId}/passport`)
       .then(r => r.json())
       .then(data => {
@@ -260,8 +261,9 @@ export default function ArtworkPassportPage() {
             </div>
             {qrUrl && (
               <div className="flex flex-col items-start gap-1.5 sm:items-end">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={qrUrl} alt="QR code linking to this passport" className="h-24 w-24 rounded-control border-hair border-line bg-surface" />
+                <div className="h-24 w-24 overflow-hidden rounded-control border-hair border-line bg-surface">
+                  <QrCode value={qrUrl} title="QR code linking to this passport" margin={2} className="block h-full w-full" />
+                </div>
                 <span className="font-ui text-caption text-fg-3">Scan to check this passport</span>
               </div>
             )}

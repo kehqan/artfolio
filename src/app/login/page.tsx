@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { nextPath } from "@/lib/next-path";
 import { createClient } from "@/lib/supabase/client";
 import { Alert, Button, Field, Input, PasswordInput } from "@/components/ui";
 import { AuthLink, AuthShell } from "@/components/auth/AuthShell";
@@ -27,7 +28,7 @@ export default function LoginPage() {
       setLoading(false);
       return;
     }
-    router.push("/dashboard");
+    router.push(nextPath());
   }
 
   return (

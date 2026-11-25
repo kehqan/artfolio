@@ -72,6 +72,14 @@ export function CuratorHome() {
 }
 
 function CuratorNextStep({ live }: { live: ProjectView[] }) {
+  // An artist offered works to an open project: answer first.
+  for (const p of live) {
+    const d = p.deals.find(x => x.status === "sent" && x.started_by === x.artist_id);
+    if (d) return <NextStepCard tone="mango" eyebrow={`Your turn · ${p.title}`} image={d.works[0]?.images?.[0] ?? null}
+      title={`${d.other?.full_name || "An artist"} would like to join`}
+      line="They offered their work to your project. Have a look, then say yes or no thanks."
+      primary={{ label: "Have a look", href: `/dashboard/messages?tab=deals&deal=${d.id}` }} />;
+  }
   // An artist said yes: the agreement is the next move.
   for (const p of live) {
     const d = p.deals.find(x => x.status === "interested");

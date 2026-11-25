@@ -9,7 +9,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { applyPendingProfile } from "@/lib/pending-profile";
 import {
-  LayoutDashboard, ImageIcon, Handshake, Wallet, CalendarDays,
+  LayoutDashboard, ImageIcon, Handshake, FolderOpen, Wallet, CalendarDays,
   MessageSquare, Bell, BellOff, Search, X, Menu, LogOut,
   UserRound, ExternalLink, ChevronDown, type LucideIcon,
 } from "lucide-react";
@@ -29,6 +29,8 @@ type Area = {
   // Venues (cafés, galleries…) see a different set of pages in some areas.
   venueHref?: string;
   venuePages?: Page[];
+  /** Curators (lib/projects) see Projects instead of Studio and Sales. */
+  curator?: "only" | "hide";
 };
 
 const AREAS: Area[] = [
@@ -47,7 +49,9 @@ const AREAS: Area[] = [
       { href: "/dashboard/artworks", label: "Collection" },
     ],
     match: ["/dashboard/moodboard", "/dashboard/walls"],
+    curator: "hide",
   },
+  { key: "projects", label: "Projects", icon: FolderOpen, href: "/dashboard/projects", pages: [], curator: "only" },
   {
     key: "scene", label: "Scene", icon: Handshake, href: "/dashboard/looking",
     pages: [
@@ -66,6 +70,7 @@ const AREAS: Area[] = [
       { href: "/dashboard/contracts", label: "Papers" },
     ],
     match: ["/dashboard/analytics"],
+    curator: "hide",
   },
   {
     key: "planning", label: "Planner", icon: CalendarDays, href: "/dashboard/tasks",
@@ -101,6 +106,7 @@ const SEARCHABLE: (Page & { area: string })[] = [
 const startsWith = (path: string, href: string) => path === href || path.startsWith(href + "/");
 const pagesOf = (a: Area, venue?: boolean) => (venue && a.venuePages) || a.pages;
 const hrefOf = (a: Area, venue?: boolean) => (venue && a.venueHref) || a.href;
+const areasFor = (curator?: boolean) => AREAS.filter(a => curator ? a.curator !== "hide" : a.curator !== "only");
 
 function areaFor(path: string): Area | null {
   if (path === "/dashboard") return AREAS[0];
@@ -132,14 +138,14 @@ function Wordmark() {
   return <BrandWordmark href="/dashboard" />;
 }
 
-function RailNav({ active, username, venue, onNavigate }: {
-  active: Area | null; username?: string; venue?: boolean; onNavigate?: () => void;
+function RailNav({ active, username, venue, curator, onNavigate }: {
+  active: Area | null; username?: string; venue?: boolean; curator?: boolean; onNavigate?: () => void;
 }) {
   return (
     <div className="flex h-full flex-col">
       <nav aria-label="Main" className="flex-1 overflow-y-auto px-3 py-4">
         <ul className="flex flex-col gap-1">
-          {AREAS.map(area => {
+          {areasFor(curator).map(area => {
             const on = active?.key === area.key;
             const Icon = area.icon;
             return (
@@ -218,6 +224,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   const [profile, setProfile] = useState<Profile | null>(null);
   const isVenue = profile?.role === "venue" || profile?.role === "gallery";
+  const isCurator = profile?.role === "curator";
   const [userId, setUserId] = useState<string | null>(null);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadMessages, setUnreadMessages] = useState(0);
@@ -320,7 +327,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <div className="flex h-header shrink-0 items-center border-b-hair border-line px-6">
           <Wordmark />
         </div>
-        <RailNav active={area} username={profile?.username} venue={isVenue} />
+        <RailNav active={area} username={isCurator ? undefined : profile?.username} venue={isVenue} curator={isCurator} />
       </aside>
 
       {/* ── DRAWER (mobile) ── */}
@@ -341,8 +348,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </div>
             <RailNav
               active={area}
-              username={profile?.username}
+              username={isCurator ? undefined : profile?.username}
               venue={isVenue}
+              curator={isCurator}
               onNavigate={() => setOpen(null)}
             />
           </div>
@@ -363,7 +371,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </button>
             <div className="lg:hidden"><Wordmark /></div>
 
-            <AreaTabs area={area} pathname={pathname} venue={isVenue} className="hidden lg:flex" />
+            <AreaTabs area={area} pathname={pathname} venue={isVenue || isCurator} className="hidden lg:flex" />
 
             <div ref={toolsRef} className="ml-auto flex items-center gap-1">
               {/* Search */}
@@ -537,7 +545,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           {/* Secondary navigation on small screens: its own scrolling row */}
           {area && pagesOf(area, isVenue).length > 0 && (
             <div className="h-11 border-t-hair border-line px-2 lg:hidden">
-              <AreaTabs area={area} pathname={pathname} venue={isVenue} />
+              <AreaTabs area={area} pathname={pathname} venue={isVenue || isCurator} />
             </div>
           )}
         </header>

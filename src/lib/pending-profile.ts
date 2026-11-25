@@ -14,7 +14,7 @@ export async function applyPendingProfile(sb: SupabaseClient, user: User): Promi
   // Never let metadata change who someone is or grant a role.
   const { id: _id, role, ...rest } = pending as PendingProfile & { id?: unknown; role?: unknown };
   const fields: PendingProfile = { ...rest, onboarding_done: true };
-  if (role === "artist" || role === "venue" || role === "gallery") fields.role = role;
+  if (role === "artist" || role === "venue" || role === "gallery" || role === "curator") fields.role = role;
   const { error } = await sb.from("profiles").update(fields).eq("id", user.id);
   if (error) return false;
   await sb.auth.updateUser({ data: { profile: null } });

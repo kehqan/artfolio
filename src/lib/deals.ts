@@ -18,7 +18,7 @@ export type DealTerms = { sells?: boolean | null; commission?: number | null; du
 
 export type Deal = {
   id: string; artist_id: string; venue_id: string; started_by: string;
-  pool_request_id: string | null; artwork_ids: string[]; note: string | null; terms: DealTerms | null;
+  pool_request_id: string | null; project_id?: string | null; artwork_ids: string[]; note: string | null; terms: DealTerms | null;
   status: DealStatus; conversation_id: string | null; contract_id: string | null;
   created_at: string; updated_at: string;
 };
@@ -29,6 +29,8 @@ export type DealView = Deal & {
   works: PlaceArtwork[];
   other: Person | null;
   post: { id: string; title: string; details?: DealTerms | null; location?: string | null; status?: string | null } | null;
+  /** The curator's project this deal is part of, if any (lib/projects). */
+  project: { id: string; title: string; kind: string; starts_on: string | null; ends_on: string | null; place: string | null; online: boolean } | null;
 };
 
 /** The 4 steps everyone sees. */
@@ -55,6 +57,7 @@ export function headline(d: DealView, me: string): string {
   const name = d.other?.full_name || (d.venue_id === me ? "An artist" : "A venue");
   const iStarted = d.started_by === me;
   const offer = d.started_by === d.artist_id;
+  if (d.project && !offer) return iStarted ? `You invited ${name} to ${d.project.title}` : `${name} invited you to ${d.project.title}`;
   if (iStarted) return offer ? `You offered ${works} to ${name}` : `You asked ${name} for ${works}`;
   return offer ? `${name} offered you ${works}` : `${name} asked for ${works}`;
 }
@@ -64,7 +67,7 @@ export function nextLine(d: DealView, me: string): string {
   const other = d.other?.full_name || "They";
   const iAmVenue = d.venue_id === me;
   switch (d.status) {
-    case "sent": return d.started_by === me ? `Waiting for ${other} to answer.` : "Are you interested?";
+    case "sent": return d.started_by === me ? `Waiting for ${other} to answer.` : d.project ? "Would you like to join?" : "Are you interested?";
     case "interested": return iAmVenue ? "Send an agreement to make it official." : `${other} is interested. They'll send an agreement.`;
     case "agreement_sent": return "The agreement is waiting for signatures.";
     case "signed": return "Signed by both. It's a deal.";
@@ -82,19 +85,23 @@ export async function loadDeals(sb: SupabaseClient, me: string): Promise<DealVie
   const workIds = Array.from(new Set(deals.flatMap(d => d.artwork_ids)));
   const people = Array.from(new Set(deals.map(d => (d.artist_id === me ? d.venue_id : d.artist_id))));
   const posts = Array.from(new Set(deals.map(d => d.pool_request_id).filter(Boolean))) as string[];
-  const [{ data: ws }, { data: ps }, { data: pr }] = await Promise.all([
+  const projects = Array.from(new Set(deals.map(d => d.project_id).filter(Boolean))) as string[];
+  const [{ data: ws }, { data: ps }, { data: pr }, { data: pj }] = await Promise.all([
     sb.from("artworks").select("id,title,images,medium,width_cm,height_cm,depth_cm,price,currency,status,wall_terms,user_id").in("id", workIds),
     sb.from("profiles").select("id,full_name,avatar_url,role,location,username").in("id", people),
     posts.length ? sb.from("pool_requests").select("id,title,details,location,status").in("id", posts) : Promise.resolve({ data: [] as any[] }),
+    projects.length ? sb.from("projects").select("id,title,kind,starts_on,ends_on,place,online").in("id", projects) : Promise.resolve({ data: [] as any[] }),
   ]);
   const work = new Map(((ws || []) as PlaceArtwork[]).map(w => [w.id, w]));
   const person = new Map(((ps || []) as Person[]).map(p => [p.id, p]));
   const post = new Map(((pr || []) as any[]).map(p => [p.id, p]));
+  const project = new Map(((pj || []) as any[]).map(p => [p.id, p]));
   return deals.map(d => ({
     ...d,
     works: d.artwork_ids.map(id => work.get(id)).filter(Boolean) as PlaceArtwork[],
     other: person.get(d.artist_id === me ? d.venue_id : d.artist_id) || null,
     post: d.pool_request_id ? post.get(d.pool_request_id) || null : null,
+    project: d.project_id ? project.get(d.project_id) || null : null,
   }));
 }
 

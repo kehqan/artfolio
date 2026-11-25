@@ -13,6 +13,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, ArrowRight, Check, Copy, ExternalLink, ImagePlus, X } from "lucide-react";
+import { type Milestone, saveJourney } from "@/lib/journey";
 import { createClient } from "@/lib/supabase/client";
 import { Alert, Button, ButtonLink, Input, Select, cn } from "@/components/ui";
 import { Wordmark } from "@/components/brand/Wordmark";
@@ -106,8 +107,16 @@ export default function WelcomePage() {
   function back() { const i = flow.indexOf(step); if (i > 0) go(flow[i - 1]); }
 
   /** The flow is over for good: finished, skipped or closed. */
-  async function markDone() {
-    await createClient().auth.updateUser({ data: { welcome: "done" } }).catch(() => null);
+  async function markDone(siteSaved = false) {
+    const sb = createClient();
+    await sb.auth.updateUser({ data: { welcome: "done" } }).catch(() => null);
+    // What they celebrated here shouldn't be celebrated again in the app.
+    const won: Milestone[] = [];
+    const saved = works.map(x => x.saved).filter((a): a is PlaceArtwork => !!a);
+    if (saved.length) won.push("first_work");
+    if (saved.some(a => a.wall_terms)) won.push("open_to_wall");
+    if (siteSaved) won.push("site_live");
+    if (uid && won.length) await saveJourney(sb, uid, { won });
   }
   async function leave(href: string) { setBusy(true); await markDone(); router.replace(href); }
 
@@ -211,7 +220,7 @@ export default function WelcomePage() {
     );
     setBusy(false);
     if (e) { setError("That didn't save. Please try again."); return; }
-    await markDone();
+    await markDone(true);
     next();
   }
 

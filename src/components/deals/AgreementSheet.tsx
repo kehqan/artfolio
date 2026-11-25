@@ -42,8 +42,8 @@ export function AgreementSheet({ deal, me, onClose, onSent }: Props) {
     setCommission(deal.terms?.sells && deal.terms?.commission != null ? String(deal.terms.commission) : "");
     const sb = createClient();
     sb.auth.getUser().then(async ({ data: { user } }) => {
-      const { data: p } = await sb.from("profiles").select("full_name,role,location").eq("id", me).single();
-      const v = { name: p?.full_name || "", email: user?.email || "", role: p?.role || "venue", location: p?.location || "" };
+      const { data: p } = await sb.from("profiles").select("full_name,venue_name,role,location").eq("id", me).single();
+      const v = { name: p?.venue_name || p?.full_name || "", email: user?.email || "", role: p?.role || "venue", location: p?.location || "" };
       setVenue(v);
       setAddress(deal.post?.location || v.location);
     });
@@ -98,7 +98,7 @@ export function AgreementSheet({ deal, me, onClose, onSent }: Props) {
           <ButtonLink variant="primary" href={`/dashboard/contracts/${sent}`}><FileSignature size={15} aria-hidden /> Sign it now</ButtonLink>
         </>}>
         <p className="font-ui text-body text-fg-2">
-          {artist} can read and sign it now. Add your signature too, and once you&rsquo;ve both signed it&rsquo;s a deal.
+          {artist} gets an email and can sign it now. Add your signature too: once you&rsquo;ve both signed, it&rsquo;s a deal and the dates go into both your planners.
         </p>
       </Modal>
     );

@@ -21,6 +21,8 @@ import { createClient } from "@/lib/supabase/client";
 import { Alert, Button, ButtonLink, Chip, Input, Select, cn } from "@/components/ui";
 import { CURRENCIES, Dropzone, ImageThumb, MAX_IMAGES, WALL_TERMS, type ArtType } from "../_form/parts";
 import { type PlaceArtwork, missingForWall, wallReady } from "@/lib/places";
+import { useJourney } from "@/components/journey/JourneyProvider";
+import { Burst } from "@/components/journey/Burst";
 
 type Step = "photos" | "title" | "finished" | "medium" | "size" | "year" | "price" | "wall" | "done";
 
@@ -86,6 +88,17 @@ export default function AddWorkPage() {
   }, []);
 
   const step = steps[at];
+  const { win } = useJourney();
+  const [first, setFirst] = useState(false);
+
+  // The very first work in the studio gets a small moment.
+  useEffect(() => {
+    if (step !== "done" || finishId || !userId) return;
+    createClient().from("artworks").select("id", { count: "exact", head: true }).eq("user_id", userId).then(async ({ count }) => {
+      const fresh = await win("first_work");
+      setFirst(fresh && count === 1);
+    });
+  }, [step]); // eslint-disable-line react-hooks/exhaustive-deps
   // Size only makes sense for things you can hang.
   const flow = useMemo(() => steps.filter(s => !(s === "size" && artType === "digital")
     && !((s === "price" || s === "wall") && finished === false)), [steps, artType, finished]);
@@ -307,14 +320,17 @@ export default function AddWorkPage() {
     const ready = wallReady(work);
     body = (
       <div className="flex flex-col items-center gap-6 text-center">
-        <div className="grid h-56 w-56 place-items-center overflow-hidden rounded-card border-outline border-ink bg-sunken shadow-hard-2">
-          {work.images[0]
-            // eslint-disable-next-line @next/next/no-img-element
-            ? <img src={work.images[0]} alt="" className="h-full w-full object-contain p-3" />
-            : <span className="font-display text-h2 text-fg-3">{work.title.slice(0, 1)}</span>}
+        <div className="relative">
+          {first && <Burst spread={2.1} />}
+          <div className="relative grid h-56 w-56 place-items-center overflow-hidden rounded-card border-outline border-ink bg-sunken shadow-hard-2 animate-pop">
+            {work.images[0]
+              // eslint-disable-next-line @next/next/no-img-element
+              ? <img src={work.images[0]} alt="" className="h-full w-full object-contain p-3" />
+              : <span className="font-display text-h2 text-fg-3">{work.title.slice(0, 1)}</span>}
+          </div>
         </div>
         <div className="flex flex-col gap-2">
-          <h1 className="font-display text-h1 leading-tight text-fg">{finishId ? "All set" : `${work.title} is in your studio`}</h1>
+          <h1 className="font-display text-h1 leading-tight text-fg">{finishId ? "All set" : first ? "Your first work is in" : `${work.title} is in your studio`}</h1>
           <p className="mx-auto max-w-sm font-ui text-body text-fg-2">
             {ready
               ? "It's ready to place. Cafés and venues looking for art can say yes to it."

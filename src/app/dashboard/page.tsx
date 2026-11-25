@@ -8,7 +8,7 @@ import { Avatar, Badge, ButtonLink, Card, Eyebrow, Heading, StatTile, Tabs, cn }
 import type { BadgeTone } from "@/components/ui";
 import { Mat, formatPrice } from "@/components/public/PublicChrome";
 import { mainCurrency } from "./sales/money";
-import { PlacesStrip } from "@/components/home/PlacesStrip";
+import { ArtistNextStep } from "@/components/home/ArtistNextStep";
 import { VenueHome } from "./home/VenueHome";
 import { isVenueRole } from "@/lib/site";
 
@@ -458,11 +458,11 @@ function ArtistHome() {
           <Heading level={1} size="h1" suppressHydrationWarning>{timeWord}, {fname}.</Heading>
           <p className="font-ui text-body text-fg-2">{loaded ? greetSub : " "}</p>
         </div>
-        <ButtonLink href="/dashboard/artworks/new" variant="primary"><Plus size={16} aria-hidden /> Add a work</ButtonLink>
+        <ButtonLink href="/dashboard/artworks/new" variant="secondary" className="hidden sm:inline-flex"><Plus size={16} aria-hidden /> Add a work</ButtonLink>
       </header>
 
-      {/* ── Where can my work go? ── */}
-      <PlacesStrip />
+      {/* ── The one next step (also answers "where can my work go?") ── */}
+      <ArtistNextStep />
 
       {/* ── Numbers ── */}
       <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">

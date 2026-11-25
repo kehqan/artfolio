@@ -3,6 +3,7 @@
 // everything by day, a Month view shows the same things on a calendar.
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { CalendarPlus, Check, ChevronDown, ChevronLeft, ChevronRight, MapPin, Plus } from "lucide-react";
+import { Hint } from "@/components/journey/Hint";
 import { createClient } from "@/lib/supabase/client";
 import { Badge, Button, Card, EmptyState, PageHeader, Skeleton, Tabs, cn } from "@/components/ui";
 import {
@@ -188,6 +189,8 @@ export default function PlannerPage() {
         actions={<Button variant="primary" onClick={() => setEditing({ mode: "new", kind: "task", date: view === "month" && picked ? picked : undefined })}><Plus size={16} aria-hidden /> Add</Button>}
       />
 
+      <Hint id="planner" title="Your planner fills itself.">When you sign an agreement, the hanging and taking-down dates land here on their own. Add your own to-dos and events anytime.</Hint>
+
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Tabs<View> label="View" value={view} onChange={setView} items={[{ value: "list", label: "List" }, { value: "month", label: "Month" }]} />
         {view === "month" && (
@@ -208,7 +211,7 @@ export default function PlannerPage() {
             <>{[0, 1, 2].map(i => <Skeleton key={i} className="h-32 w-full rounded-card" />)}</>
           ) : view === "list" ? (
             nothingAhead ? (
-              <EmptyState title="Nothing planned" description="Add a to-do or an event, or pick something from what's happening around you."
+              <EmptyState title="Nothing planned" description="Add a to-do or an event. Shows you agree to in Deals appear here by themselves."
                 action={<Button variant="secondary" onClick={() => setEditing({ mode: "new", kind: "task" })}><Plus size={15} aria-hidden /> Add</Button>} />
             ) : (
               <>

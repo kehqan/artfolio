@@ -6,6 +6,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { ArrowDown, ArrowUp, Check, ExternalLink, ImagePlus, Monitor, Plus, Smartphone, Trash2, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { useJourney } from "@/components/journey/JourneyProvider";
+import { Hint } from "@/components/journey/Hint";
 import { Alert, Button, ButtonLink, Card, EmptyState, Field, Input, PageHeader, Skeleton, Switch, Textarea, cn } from "@/components/ui";
 import {
   ACCENTS, GRIDS, HEADERS, SECTION_HINT, SECTION_LABEL, TYPES,
@@ -55,6 +57,8 @@ function TypeSketch({ k }: { k: TypeKey }) {
 export default function SiteEditorPage() {
   const [uid, setUid] = useState<string | null>(null);
   const [username, setUsername] = useState<string | null>(null);
+  const [hadSite, setHadSite] = useState(true);
+  const { celebrate } = useJourney();
   const [role, setRole] = useState<string | null>(null);
   const [site, setSite] = useState<SiteConfig | null>(null);
   const [extra, setExtra] = useState<Extra>({ store_name: "", tagline: "", banner_url: "" });
@@ -79,6 +83,7 @@ export default function SiteEditorPage() {
         sb.from("store_settings").select("*").eq("user_id", user.id).maybeSingle(),
       ]);
       setUsername(prof?.username || null);
+      setHadSite(!!ss);
       setRole(prof?.role || null);
       const s = siteOf((ss as SiteSettings | null)?.site, prof?.role);
       const e = { store_name: ss?.store_name || "", tagline: ss?.tagline || "", banner_url: ss?.banner_url || "" };
@@ -123,6 +128,16 @@ export default function SiteEditorPage() {
     setSaving(false);
     if (error) { setNotice({ tone: "bad", text: "That didn't save. Please try again." }); return; }
     setSnapshot(JSON.stringify({ s: site, e: extra }));
+    const first = !hadSite;
+    setHadSite(true);
+    const shown = await celebrate("site_live", {
+      title: "Your site is live",
+      body: venue
+        ? "Artists can see your place, your walls and what you're looking for. Share the link anywhere."
+        : "Your works are on your own page. Put the link in your bio, an email or a message.",
+      primary: username ? { label: "Open your site", href: `/${username}` } : undefined,
+    }, first);
+    if (shown) return;
     setNotice({ tone: "ok", text: "Saved. Your site shows it now." });
     setTimeout(() => setNotice(n => (n?.tone === "ok" ? null : n)), 3000);
   }
@@ -190,8 +205,10 @@ export default function SiteEditorPage() {
         description={venue ? "Your venue's own website: what you show, your walls and how to reach you." : "Your own website: your work, what's for sale and your story."}
         actions={<>
           {username && <ButtonLink variant="ghost" href={`/${username}`} target="_blank"><ExternalLink size={15} aria-hidden /> Open your site</ButtonLink>}
-          <Button variant="primary" onClick={save} disabled={saving || !dirty}>{saving ? "Saving…" : dirty ? "Save and publish" : "Saved"}</Button>
+          <Button variant="primary" onClick={save} disabled={saving || (!dirty && hadSite)}>{saving ? "Saving…" : !hadSite ? "Publish your site" : dirty ? "Save and publish" : "Saved"}</Button>
         </>} />
+
+      <Hint id="site" title="This is your own website.">Pick a look on the left and watch it change on the right. Nothing goes live until you press {hadSite ? "Save and publish" : "Publish your site"}.</Hint>
 
       {notice && <Alert tone={notice.tone}>{notice.text}</Alert>}
 

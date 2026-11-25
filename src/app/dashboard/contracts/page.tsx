@@ -148,9 +148,14 @@ export default function PapersPage() {
         <EmptyState
           title={contracts.length === 0 ? "No agreements yet" : "Nothing here"}
           description={contracts.length === 0
-            ? "When you agree on a show, a commission or a collab, put it in writing. The other side signs from a link you send them."
+            ? "When a place says yes to your work in Deals, the agreement is made for you there. For anything else, a commission or a collab, write one here."
             : "Try another filter or search."}
-          action={contracts.length === 0 ? <ButtonLink href="/dashboard/contracts/new" variant="secondary"><Plus size={15} aria-hidden /> New agreement</ButtonLink> : undefined}
+          action={contracts.length === 0 ? (
+            <span className="flex flex-wrap justify-center gap-2">
+              <ButtonLink href="/dashboard/messages?tab=deals" variant="primary">See your deals</ButtonLink>
+              <ButtonLink href="/dashboard/contracts/new" variant="secondary"><Plus size={15} aria-hidden /> New agreement</ButtonLink>
+            </span>
+          ) : undefined}
         />
       ) : (
         <Card padding="none" className="overflow-hidden">

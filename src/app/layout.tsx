@@ -36,11 +36,11 @@ export const viewport: Viewport = {
 
 export const metadata: Metadata = {
   title: {
-    default: "Artomango — Art · Community · Discovery",
+    default: "Artomango — From your studio to a wall",
     template: "%s · Artomango",
   },
   description:
-    "A platform for artists and venues to manage work, find collaborations, and grow in the art scene.",
+    "Artomango gets emerging artists' work onto real walls in cafés and small spaces, and helps them sell it from there. No algorithm, no AI.",
   applicationName: "Artomango",
   appleWebApp: {
     capable: true,
@@ -63,8 +63,8 @@ export const metadata: Metadata = {
   },
   manifest: "/manifest.json",
   openGraph: {
-    title: "Artomango — Art · Community · Discovery",
-    description: "Manage your art, find venues, grow your practice.",
+    title: "Artomango — From your studio to a wall",
+    description: "See where your work can go, agree in one page, and sell it off the wall.",
     type: "website",
     siteName: "Artomango",
     images: [
@@ -72,14 +72,14 @@ export const metadata: Metadata = {
         url: "/og-image.jpg",
         width: 1200,
         height: 630,
-        alt: "Artomango — Art · Community · Discovery",
+        alt: "Artomango — From your studio to a wall",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
     title: "Artomango",
-    description: "Manage your art, find venues, grow your practice.",
+    description: "See where your work can go, agree in one page, and sell it off the wall.",
     images: ["/og-image.jpg"],
   },
 };

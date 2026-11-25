@@ -157,3 +157,38 @@ export function DealMoment() {
     </Frame>
   );
 }
+
+// ── 4. Sell it off the wall ────────────────────────────────────────
+// A wall label with its QR code, scanned on a phone, then the sale.
+const QR = [
+  "1111111001011", "1000001011001", "1011101000101", "1011101110001", "1011101010111", "1000001001001",
+  "1111111010101", "0000000111000", "1101011001101", "0110100110011", "1011011100101", "0100110011010", "1110101101011",
+];
+export function LabelMoment() {
+  const { i } = useCycle(3, 1600);
+  return (
+    <Frame label="A wall label with a QR code, scanned on a phone, then the work sold" className="p-5">
+      <div className="flex items-stretch gap-4">
+        <Painting tone="clay" className="w-24 shrink-0 rounded-control border-hair border-line sm:w-28" />
+        <div className="flex min-w-0 flex-1 flex-col gap-3 rounded-control border-hair border-line bg-page p-3">
+          <div className="min-w-0">
+            <p className="truncate font-ui text-body-sm font-semibold text-fg">Red room, 2026</p>
+            <p className="font-ui text-caption text-fg-3">Oil on canvas · 60 × 80 cm</p>
+            <p className="font-ui text-caption font-semibold text-fg">€640</p>
+          </div>
+          <div className="flex items-end gap-2">
+            <span aria-hidden className={cn("grid shrink-0 grid-cols-[repeat(13,1fr)] gap-0 rounded-[3px] bg-surface p-1 transition-shadow duration-500", i >= 1 && "ring-2 ring-mango")} style={{ width: 52, height: 52 }}>
+              {QR.join("").split("").map((c, k) => <span key={k} className={c === "1" ? "bg-ink" : ""} />)}
+            </span>
+            <span className="font-ui text-caption text-fg-3">Scan to see it, and buy it</span>
+          </div>
+        </div>
+      </div>
+      <div className={cn("mt-4 flex items-center justify-between rounded-control border-hair px-3 py-2.5 transition-all duration-500",
+        i === 2 ? "border-ink bg-mango-soft" : "border-line")}>
+        <span className="font-ui text-body-sm font-semibold text-fg">{i === 0 ? "On the wall at a café" : i === 1 ? "Someone scanned it" : "Sold off the wall"}</span>
+        <span className="inline-flex items-center gap-1 font-ui text-caption font-semibold text-fg">{i === 2 ? <><Check size={13} strokeWidth={3} aria-hidden /> €640</> : i === 1 ? "Just now" : "Label on"}</span>
+      </div>
+    </Frame>
+  );
+}

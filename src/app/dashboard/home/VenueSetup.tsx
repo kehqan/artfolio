@@ -193,7 +193,7 @@ export function VenueSetup({ open, data, start = "name", onClose, onSaved, onPos
   );
 
   return (
-    <Modal open={open} onClose={onClose} size="md" title="Get your place ready" footer={footer}>
+    <Modal open={open} onClose={onClose} size="md" title="Tell local artists about your walls" footer={footer}>
       <form className="flex flex-col gap-5" onSubmit={e => { e.preventDefault(); if (!last) next(); }}>
         <div className="flex flex-col gap-2">
           <span className="font-ui text-caption font-semibold text-fg-3">{last ? "All done" : `Step ${at + 1} of ${STEPS.length - 1}`}</span>

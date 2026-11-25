@@ -1,6 +1,7 @@
 "use client";
-// The landing page. It shows, step by step, how little an artist has to
-// do: add a work, make it your site, offer it to a wall, agree and sell.
+// The landing page. It leads with the problem we solve: getting finished
+// work onto a real wall, and sold from there. Step by step: add a work,
+// find a wall, agree in one page, sell it off the wall.
 // Every number or name on it is real; the small app moments are examples.
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -9,7 +10,7 @@ import CampaignCarousel from "@/components/CampaignCarousel";
 import { ArrowRight, Check } from "lucide-react";
 import { ButtonLink, cn } from "@/components/ui";
 import { Mat, PublicFooter, PublicHeader, formatPrice, publicWrap, textLink } from "@/components/public/PublicChrome";
-import { AddWorkMoment, DealMoment, OfferMoment, SiteMoment } from "@/components/landing/Moments";
+import { AddWorkMoment, DealMoment, LabelMoment, OfferMoment, SiteMoment } from "@/components/landing/Moments";
 
 type Artwork = {
   id: string; title: string; medium?: string | null; price?: number | null; currency?: string | null; images?: string[] | null;
@@ -21,14 +22,14 @@ const wrap = publicWrap;
 const PROMISES = [
   { title: "You choose what's shown", body: "Your works, in the order you pick. Nothing is pushed up or buried." },
   { title: "No algorithm, no AI", body: "No ranking, no feed to keep up with, nothing written or judged by a machine." },
-  { title: "Free to start", body: "Make your page and add your work without paying anything." },
+  { title: "Free to start", body: "Make your page, add your work and find walls without paying anything." },
 ];
 
 const STEPS = [
   { n: "1", title: "Add a work", body: "A photo and a title is enough. Size and price can wait until you know them.", Moment: AddWorkMoment },
-  { n: "2", title: "Make it your site", body: "Pick a colour, a header and a layout. Every choice is designed to look good, so you can't get it wrong.", Moment: () => <SiteMoment /> },
-  { n: "3", title: "Offer it to a wall", body: "See the cafés and venues looking for art right now, and offer a work in one tap.", Moment: OfferMoment },
-  { n: "4", title: "Agree and sell", body: "A one-page agreement, signed in the app. When it sells, record it in a few taps and see what you keep.", Moment: DealMoment },
+  { n: "2", title: "Find a wall", body: "See the cafés and spaces looking for art right now, and offer a work in one tap.", Moment: OfferMoment },
+  { n: "3", title: "Agree in one page", body: "A one-page agreement, signed by both of you in the app. No awkward money talk.", Moment: DealMoment },
+  { n: "4", title: "Sell it off the wall", body: "Hang it with a label. People scan it and see the piece, the price and you. When it sells, see what you keep.", Moment: LabelMoment },
 ];
 
 const VENUE_POINTS = [
@@ -71,18 +72,19 @@ export default function HomePage() {
         <section className={cn(wrap, "grid items-center gap-12 py-14 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)] lg:gap-16 lg:py-24")}>
           <div className="flex flex-col gap-7">
             <span className="inline-flex items-center gap-2 self-start rounded-pill border-hair border-ink bg-surface px-3 py-1 font-ui text-caption font-semibold text-fg">
-              <span aria-hidden className="h-1.5 w-1.5 rounded-pill bg-mango ring-1 ring-ink" /> Made with artists
+              <span aria-hidden className="h-1.5 w-1.5 rounded-pill bg-mango ring-1 ring-ink" /> Starting in Prague
             </span>
             <h1 className="max-w-[12ch] font-display text-[52px] font-extrabold leading-[0.95] tracking-[-0.01em] text-fg sm:text-[76px]">
-              Made for artists, not&nbsp;algorithms.
+              Your work belongs on a&nbsp;wall.
             </h1>
             <p className="max-w-[44ch] font-ui text-lead text-fg-2">
-              Show your work, find it a wall and sell it, in a few simple steps. No algorithm deciding who sees you, no AI, nothing to keep up with.
+              See the cafés and spaces looking for art right now, agree in one page, and sell it off the wall. Free to start.
             </p>
             <div className="flex flex-wrap items-center gap-3">
-              <ButtonLink href="/register" variant="primary">Create your free page <ArrowRight size={16} aria-hidden /></ButtonLink>
-              <ButtonLink href="/register?role=venue" variant="secondary">I run a venue</ButtonLink>
+              <ButtonLink href="/register" variant="primary">Find a wall for my work <ArrowRight size={16} aria-hidden /></ButtonLink>
+              <ButtonLink href="/register?role=venue" variant="secondary">I have a wall</ButtonLink>
             </div>
+            <p className="font-display text-h3 font-extrabold leading-tight text-fg">Made for artists, not algorithms.</p>
           </div>
           <div className="relative mx-auto w-full max-w-[520px]">
             <span aria-hidden className="absolute -right-3 -top-3 hidden h-24 w-24 rounded-pill bg-mango sm:block" />
@@ -116,7 +118,7 @@ export default function HomePage() {
           <div className="mb-14 flex max-w-[640px] flex-col gap-3">
             <span className="font-ui text-caption font-semibold uppercase tracking-[0.12em] text-fg-3">How it works</span>
             <h2 className="font-display text-[40px] font-extrabold leading-[1.02] text-fg sm:text-[56px]">This is how easy it is.</h2>
-            <p className="font-ui text-lead text-fg-2">Four steps, one question at a time. Skip anything you don&rsquo;t know yet.</p>
+            <p className="font-ui text-lead text-fg-2">From your studio to a wall, in four steps. One question at a time, and you can skip anything you don&rsquo;t know yet.</p>
           </div>
           <ol className="flex flex-col gap-16 lg:gap-24">
             {STEPS.map(({ n, title, body, Moment }, k) => (
@@ -137,8 +139,8 @@ export default function HomePage() {
           <div className={cn(wrap, "grid gap-10 md:grid-cols-[1fr_1fr] md:items-center md:gap-16")}>
             <div className="flex flex-col gap-4">
               <span className="font-ui text-caption font-semibold uppercase tracking-[0.12em] text-on-inverse opacity-70">For cafés, bars, shops and galleries</span>
-              <h2 className="font-display text-[40px] font-extrabold leading-[1.02] text-on-inverse sm:text-[56px]">Have walls? Show local artists.</h2>
-              <p className="max-w-[42ch] font-ui text-lead text-on-inverse opacity-80">Fresh art on your walls, changed when you like, at no cost to you.</p>
+              <h2 className="font-display text-[40px] font-extrabold leading-[1.02] text-on-inverse sm:text-[56px]">Have walls? Show local art.</h2>
+              <p className="max-w-[42ch] font-ui text-lead text-on-inverse opacity-80">Local art on your walls, changed when you like, with no paperwork and no cost to you.</p>
               <div className="pt-2"><ButtonLink href="/register?role=venue" variant="primary">Post your wall <ArrowRight size={16} aria-hidden /></ButtonLink></div>
             </div>
             <ol className="flex flex-col gap-3">
@@ -180,9 +182,9 @@ export default function HomePage() {
         <section className="border-t-hair border-line bg-mango py-20 lg:py-24">
           <div className={cn(wrap, "flex flex-col items-start gap-8 md:flex-row md:items-end md:justify-between")}>
             <h2 className="max-w-[18ch] font-display text-[40px] font-extrabold leading-[1.02] text-on-mango sm:text-[56px]">
-              Your art deserves a better home than a spreadsheet and a feed.
+              Most art never leaves the studio. Let&rsquo;s get yours onto a wall.
             </h2>
-            <ButtonLink href="/register" variant="secondary" className="shrink-0">Create your free page <ArrowRight size={16} aria-hidden /></ButtonLink>
+            <ButtonLink href="/register" variant="secondary" className="shrink-0">Find a wall for my work <ArrowRight size={16} aria-hidden /></ButtonLink>
           </div>
         </section>
       </main>

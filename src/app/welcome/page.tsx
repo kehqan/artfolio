@@ -251,11 +251,11 @@ export default function WelcomePage() {
           <h1 className="font-display text-display leading-none text-fg">
             {firstName ? <>Welcome, {firstName}.</> : <>Welcome.</>}
           </h1>
-          <p className="font-ui text-lead text-fg-2">Let&rsquo;s put your work where people can see it. It takes about two minutes.</p>
+          <p className="font-ui text-lead text-fg-2">Let&rsquo;s get your work onto a wall. It takes about two minutes.</p>
         </div>
         <ol className="flex flex-col divide-y divide-line rounded-card border-hair border-line bg-surface">
           {[
-            ["Add up to three works", "A photo, a name, a size and a price."],
+            ["Add up to three works", "Start with pieces you'd like to see hanging somewhere."],
             ["Say if they can hang in a café", "Places looking for art will see them."],
             ["Pick the look of your site", "It goes live at your own address."],
           ].map(([t, d], i) => (
@@ -355,7 +355,7 @@ export default function WelcomePage() {
   if (step === "prices") {
     const any = works.some(x => num(x.price) != null);
     body = (
-      <Screen title="What would you sell them for?" hint="A price helps venues and collectors say yes faster. Leave one empty if it isn't for sale, or you don't know yet."
+      <Screen title="What would you sell them for?" hint="Add a price so people can buy it off the wall. Leave one empty if it isn't for sale, or you don't know yet."
         onSubmit={() => (any ? savePrices() : next())}
         primary={<Button type="submit" variant="primary" size="md" disabled={busy || !any}>{busy ? "Saving…" : "Continue"} <ArrowRight size={16} aria-hidden /></Button>}
         secondary={<Button variant="ghost" onClick={next}>I don&rsquo;t know yet</Button>}>
@@ -459,7 +459,7 @@ export default function WelcomePage() {
       <div className="flex flex-col gap-8">
         <div className="flex flex-col gap-3">
           <span className="grid h-12 w-12 place-items-center rounded-pill border-outline border-ink bg-mango text-on-mango shadow-hard-1"><Check size={22} strokeWidth={3} aria-hidden /></span>
-          <h1 className="font-display text-display leading-none text-fg">You&rsquo;re live.</h1>
+          <h1 className="font-display text-display leading-none text-fg">{ready.length && open ? <>You&rsquo;re ready for a wall.</> : <>You&rsquo;re live.</>}</h1>
           <p className="font-ui text-lead text-fg-2">
             {saved.length === 0
               ? "Your site is up. Add a work and it shows there right away."

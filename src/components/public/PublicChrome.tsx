@@ -69,7 +69,7 @@ export function PublicFooter() {
       <div className={cn(publicWrap, "flex flex-col gap-8 py-10 md:flex-row md:justify-between")}>
         <div className="flex max-w-[320px] flex-col gap-3">
           <Wordmark />
-          <p className="font-ui text-body-sm text-fg-3">A simple home for artists and the places that show them. No algorithm, no AI.</p>
+          <p className="font-ui text-body-sm text-fg-3">From your studio to a wall. Made for artists, not algorithms.</p>
         </div>
         <div className="grid grid-cols-2 gap-x-12 gap-y-2 font-ui text-body-sm">
           <span className="mb-1 font-semibold text-fg">Platform</span>

@@ -25,6 +25,9 @@ type Area = {
   href: string;          // where the rail entry goes
   pages: Page[];         // shown as tabs in the top bar
   match?: string[];      // extra paths that belong to this area
+  // Venues (cafés, galleries…) see a different set of pages in some areas.
+  venueHref?: string;
+  venuePages?: Page[];
 };
 
 const AREAS: Area[] = [
@@ -36,7 +39,13 @@ const AREAS: Area[] = [
       { href: "/dashboard/site", label: "Your site" },
       { href: "/dashboard/mystore", label: "For sale" },
     ],
-    match: ["/dashboard/moodboard"],
+    venueHref: "/dashboard/walls",
+    venuePages: [
+      { href: "/dashboard/walls", label: "Your walls" },
+      { href: "/dashboard/site", label: "Your site" },
+      { href: "/dashboard/artworks", label: "Collection" },
+    ],
+    match: ["/dashboard/moodboard", "/dashboard/walls"],
   },
   {
     key: "scene", label: "Scene", icon: Handshake, href: "/dashboard/looking",
@@ -89,6 +98,8 @@ const SEARCHABLE: (Page & { area: string })[] = [
 ];
 
 const startsWith = (path: string, href: string) => path === href || path.startsWith(href + "/");
+const pagesOf = (a: Area, venue?: boolean) => (venue && a.venuePages) || a.pages;
+const hrefOf = (a: Area, venue?: boolean) => (venue && a.venueHref) || a.href;
 
 function areaFor(path: string): Area | null {
   if (path === "/dashboard") return AREAS[0];
@@ -120,8 +131,8 @@ function Wordmark() {
   return <BrandWordmark href="/dashboard" />;
 }
 
-function RailNav({ active, username, onNavigate }: {
-  active: Area | null; username?: string; onNavigate?: () => void;
+function RailNav({ active, username, venue, onNavigate }: {
+  active: Area | null; username?: string; venue?: boolean; onNavigate?: () => void;
 }) {
   return (
     <div className="flex h-full flex-col">
@@ -133,7 +144,7 @@ function RailNav({ active, username, onNavigate }: {
             return (
               <li key={area.key}>
                 <Link
-                  href={area.href}
+                  href={hrefOf(area, venue)}
                   onClick={onNavigate}
                   aria-current={on ? "page" : undefined}
                   className={cn(
@@ -172,12 +183,13 @@ function RailNav({ active, username, onNavigate }: {
 }
 
 function AreaTabs({ area, pathname, venue, className }: { area: Area | null; pathname: string; venue?: boolean; className?: string }) {
-  if (!area || area.pages.length === 0) {
+  const pages = area ? pagesOf(area, venue) : [];
+  if (!area || pages.length === 0) {
     return area ? <span className={cn("font-display text-h3 text-fg", className)}>{area.label}</span> : null;
   }
   return (
     <nav aria-label={area.label} className={cn("flex h-full items-stretch gap-1 overflow-x-auto", className)}>
-      {area.pages.map(p => {
+      {pages.map(p => {
         const on = startsWith(pathname, p.href);
         return (
           <Link
@@ -292,8 +304,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const toggle = (k: NonNullable<typeof open>) => setOpen(o => (o === k ? null : k));
   const area = areaFor(pathname);
   const unreadNotifs = notifications.filter(n => !n.read).length;
+  const searchable = isVenue
+    ? [{ href: "/dashboard/walls", label: "Your walls", area: "Studio" }, ...SEARCHABLE.filter(i => i.href !== "/dashboard/mystore" && i.href !== "/dashboard/mystore?tab=moodboards")]
+    : SEARCHABLE;
   const searchResults = searchQuery
-    ? SEARCHABLE.filter(i => (i.label + " " + i.area).toLowerCase().includes(searchQuery.toLowerCase()))
+    ? searchable.filter(i => (i.label + " " + i.area).toLowerCase().includes(searchQuery.toLowerCase()))
     : [];
   const name = profile?.full_name || "Your account";
 
@@ -304,7 +319,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <div className="flex h-header shrink-0 items-center border-b-hair border-line px-6">
           <Wordmark />
         </div>
-        <RailNav active={area} username={profile?.username} />
+        <RailNav active={area} username={profile?.username} venue={isVenue} />
       </aside>
 
       {/* ── DRAWER (mobile) ── */}
@@ -326,6 +341,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <RailNav
               active={area}
               username={profile?.username}
+              venue={isVenue}
               onNavigate={() => setOpen(null)}
             />
           </div>
@@ -518,7 +534,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </div>
 
           {/* Secondary navigation on small screens: its own scrolling row */}
-          {area && area.pages.length > 0 && (
+          {area && pagesOf(area, isVenue).length > 0 && (
             <div className="h-11 border-t-hair border-line px-2 lg:hidden">
               <AreaTabs area={area} pathname={pathname} venue={isVenue} />
             </div>

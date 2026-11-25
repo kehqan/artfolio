@@ -9,6 +9,8 @@ import type { BadgeTone } from "@/components/ui";
 import { Mat, formatPrice } from "@/components/public/PublicChrome";
 import { mainCurrency } from "./sales/money";
 import { PlacesStrip } from "@/components/home/PlacesStrip";
+import { VenueHome } from "./home/VenueHome";
+import { isVenueRole } from "@/lib/site";
 
 /* ── Labels ─────────────────────────────────────────────────────── */
 type ScenePostType = "event" | "exhibition" | "collab" | "opencall" | "commission";
@@ -94,7 +96,22 @@ function Quiet({ children }: { children: React.ReactNode }) {
 }
 
 /* ═══════════════════════════════════════════════════════════════════ */
+/** Venues get their own Home (home/VenueHome.tsx); artists get the Atelier. */
 export default function DashboardPage() {
+  const [venue, setVenue] = useState<boolean | null>(null);
+  useEffect(() => {
+    const sb = createClient();
+    sb.auth.getUser().then(async ({ data: { user } }) => {
+      if (!user) { setVenue(false); return; }
+      const { data } = await sb.from("profiles").select("role").eq("id", user.id).single();
+      setVenue(isVenueRole(data?.role));
+    });
+  }, []);
+  if (venue === null) return <div aria-hidden className="h-[60vh]" />;
+  return venue ? <VenueHome /> : <ArtistHome />;
+}
+
+function ArtistHome() {
   /* ── Data state ─────────────────────────────────────── */
   const [profile, setProfile] = useState<{ full_name?: string; username?: string; avatar_url?: string } | null>(null);
   const [artworks, setArtworks] = useState<any[]>([]);

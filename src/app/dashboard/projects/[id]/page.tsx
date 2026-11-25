@@ -25,12 +25,13 @@ import { useJourney } from "@/components/journey/JourneyProvider";
 import { formatPrice } from "@/components/public/PublicChrome";
 import { type DealView, dealLink, nextLine } from "@/lib/deals";
 import { sizeLine } from "@/lib/places";
+import { Share } from "./Share";
 import {
-  type GatheredWork, type ProjectView, type WorkStep,
+  type GatheredWork, type ProjectInvite, type ProjectView, type WorkStep,
   DEAL_LABEL, KIND_LABEL, WORK_STEP_LABEL, dateLine, loadProject, opensIn, placeLine, statusLine,
 } from "@/lib/projects";
 
-const STEP_TONE: Record<WorkStep, BadgeTone> = { invited: "neutral", interested: "mango", agreement: "info", signed: "ok" };
+const STEP_TONE: Record<WorkStep, BadgeTone> = { offered: "mango", invited: "neutral", interested: "mango", agreement: "info", signed: "ok" };
 const edit = (id: string, step: string) => `/dashboard/projects/new?id=${id}&step=${step}`;
 const fmt = (d: string) => new Date(d.length === 10 ? d + "T12:00:00" : d).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
 
@@ -45,6 +46,8 @@ export default function ProjectPage() {
   const [onlySigned, setOnlySigned] = useState(false);
   const [openWork, setOpenWork] = useState<GatheredWork | null>(null);
   const [agreeing, setAgreeing] = useState<DealView | null>(null);
+  const [invites, setInvites] = useState<ProjectInvite[]>([]);
+  const [curator, setCurator] = useState("");
   const { later } = useJourney();
 
   const load = useCallback(async () => {
@@ -55,6 +58,9 @@ export default function ProjectPage() {
     const view = await loadProject(sb, user.id, params.id);
     if (!view || view.owner_id !== user.id) { setMissing(true); return; }
     setP(view);
+    sb.from("project_invites").select("*").eq("project_id", view.id).order("created_at", { ascending: false })
+      .then(({ data }) => setInvites((data || []) as ProjectInvite[]));
+    sb.from("profiles").select("full_name").eq("id", user.id).single().then(({ data }) => setCurator(data?.full_name || ""));
     const ids = view.deals.map(d => d.contract_id).filter(Boolean) as string[];
     if (ids.length) {
       const { data } = await sb.from("contracts").select("id, title, status, executed_at").in("id", ids);
@@ -222,6 +228,11 @@ export default function ProjectPage() {
         <Card padding="none" className="flex flex-col">
           <PanelHead eyebrow="Timeline" title="Dates" action={<Link href={edit(p.id, "when")} className="font-ui text-label font-semibold text-fg-2 hover:text-fg">Edit</Link>} />
           <Timeline p={p} />
+          {(p.starts_on || p.ends_on) && p.status !== "done" && (
+            <Link href="/dashboard/tasks?view=month" className="mx-5 mb-5 inline-flex items-center gap-1.5 self-start font-ui text-label font-semibold text-fg-2 hover:text-fg">
+              <CalendarDays size={13} aria-hidden /> In your Planner
+            </Link>
+          )}
         </Card>
       </div>
 
@@ -253,20 +264,25 @@ export default function ProjectPage() {
           )}
         </Card>
 
+        <div className="flex flex-col gap-6">
         {/* ── About ── */}
-        <Card padding="none" className="flex flex-col">
-          <PanelHead eyebrow="About" title="The project" action={<Link href={edit(p.id, "about")} className="font-ui text-label font-semibold text-fg-2 hover:text-fg">Edit</Link>} />
-          <div className="flex flex-col gap-4 px-5 pb-5">
-            {p.about
-              ? <p className="whitespace-pre-line font-ui text-body-sm text-fg-2">{p.about}</p>
-              : <Link href={edit(p.id, "about")} className="font-ui text-body-sm text-fg-3 underline underline-offset-2 hover:text-fg">Add a few lines about it</Link>}
-            <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 border-t-hair border-line pt-4 font-ui text-body-sm">
-              <dt className="text-fg-3">Kinds</dt><dd className="text-fg">{p.looking_for?.mediums?.length ? p.looking_for.mediums.join(", ") : "Any"}</dd>
-              <dt className="text-fg-3">Works</dt><dd className="text-fg">{p.looking_for?.deal ? DEAL_LABEL[p.looking_for.deal] : "Not decided"}{p.looking_for?.deal === "sale" && p.looking_for.commission != null ? `, ${p.looking_for.commission}%` : ""}</dd>
-            </dl>
-            <Link href={edit(p.id, "looking")} className="inline-flex items-center gap-1.5 self-start font-ui text-label font-semibold text-fg-2 hover:text-fg"><Pencil size={13} aria-hidden /> What you&rsquo;re looking for</Link>
-          </div>
-        </Card>
+          <Card padding="none" className="flex flex-col">
+            <PanelHead eyebrow="About" title="The project" action={<Link href={edit(p.id, "about")} className="font-ui text-label font-semibold text-fg-2 hover:text-fg">Edit</Link>} />
+            <div className="flex flex-col gap-4 px-5 pb-5">
+              {p.about
+                ? <p className="whitespace-pre-line font-ui text-body-sm text-fg-2">{p.about}</p>
+                : <Link href={edit(p.id, "about")} className="font-ui text-body-sm text-fg-3 underline underline-offset-2 hover:text-fg">Add a few lines about it</Link>}
+              <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 border-t-hair border-line pt-4 font-ui text-body-sm">
+                <dt className="text-fg-3">Kinds</dt><dd className="text-fg">{p.looking_for?.mediums?.length ? p.looking_for.mediums.join(", ") : "Any"}</dd>
+                <dt className="text-fg-3">Works</dt><dd className="text-fg">{p.looking_for?.deal ? DEAL_LABEL[p.looking_for.deal] : "Not decided"}{p.looking_for?.deal === "sale" && p.looking_for.commission != null ? `, ${p.looking_for.commission}%` : ""}</dd>
+              </dl>
+              <Link href={edit(p.id, "looking")} className="inline-flex items-center gap-1.5 self-start font-ui text-label font-semibold text-fg-2 hover:text-fg"><Pencil size={13} aria-hidden /> What you&rsquo;re looking for</Link>
+            </div>
+          </Card>
+          <Share p={p} curator={curator} invites={invites}
+            onChange={patch => setP(x => x && { ...x, ...patch })}
+            onInvited={() => createClient().from("project_invites").select("*").eq("project_id", p.id).order("created_at", { ascending: false }).then(({ data }) => setInvites((data || []) as ProjectInvite[]))} />
+        </div>
       </div>
 
       <div className="flex justify-center border-t-hair border-line pt-6">
@@ -283,6 +299,15 @@ export default function ProjectPage() {
 function ProjectNextStep({ p, me, invite, papers, onAgree }: {
   p: ProjectView; me: string; invite: string; papers: Map<string, Paper>; onAgree: (d: DealView) => void;
 }) {
+  const asked = p.deals.find(d => d.status === "sent" && d.started_by === d.artist_id);
+  if (asked) {
+    const who = asked.other?.full_name || "An artist";
+    const n = asked.works.length;
+    return <NextStepCard tone="mango" eyebrow="Your turn" image={asked.works[0]?.images?.[0] ?? null}
+      title={`${who} would like to join with ${n === 1 ? (asked.works[0]?.title ? `“${asked.works[0].title}”` : "a work") : `${n} works`}`}
+      line="Have a look. Saying yes costs nothing: next you send the agreement, already filled in."
+      primary={{ label: "Have a look", href: dealLink(asked.id) }} />;
+  }
   const yes = p.deals.find(d => d.status === "interested");
   if (yes) {
     const who = yes.other?.full_name || "An artist";

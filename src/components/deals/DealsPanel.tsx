@@ -258,7 +258,7 @@ function DealCard({ d, me, busy, focused, liRef, signed, agreementCancelled, onM
   let actions: React.ReactNode = null;
   if (d.status === "sent" && !iStarted) {
     actions = <>
-      <Button variant="primary" size="sm" disabled={busy} onClick={() => onMove("interested")}><Check size={14} aria-hidden /> {d.project ? "I'm in" : "Interested"}</Button>
+      <Button variant="primary" size="sm" disabled={busy} onClick={() => onMove("interested")}><Check size={14} aria-hidden /> {d.project && d.started_by !== d.artist_id ? "I'm in" : "Interested"}</Button>
       <Button variant="secondary" size="sm" disabled={busy} onClick={() => onMove("declined")}>No thanks</Button>
     </>;
   } else if (d.status === "sent" || (d.status === "interested" && iStarted)) {

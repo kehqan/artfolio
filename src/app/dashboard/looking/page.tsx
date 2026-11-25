@@ -21,6 +21,7 @@ import { type FeedItem, deleteItem, isLive, isPast, loadFeed, wallDetails, wallT
 import { SceneDetail } from "../scene/SceneDetail";
 import { SceneMap } from "../scene/SceneMap";
 import { PostFlow } from "../scene/PostFlow";
+import { type Project, PROJECT_COLS, KIND_SHORT, dateLine, placeLine, publicProjectHref } from "@/lib/projects";
 import { type PlaceArtwork, WALL_LABEL, cityOf, isSold, missingForWall, sameCity, wallReady, workLine } from "@/lib/places";
 
 type View = "list" | "map";
@@ -63,6 +64,9 @@ export default function LookingPage() {
   const curator = role === "curator";
   const venue = role === "venue" || role === "gallery" || curator;
   const [projectId, setProjectId] = useState<string | null>(null);
+  // Artists: curators' projects open to them (open, or they were invited).
+  type Joinable = Project & { owner?: Artist; offered: boolean };
+  const [joinable, setJoinable] = useState<Joinable[]>([]);
 
   useEffect(() => {
     setWorkId(new URLSearchParams(window.location.search).get("work"));
@@ -82,6 +86,21 @@ export default function LookingPage() {
       if (!c) setScope("everywhere");
       if (feed) setItems(feed); else setError("This didn't load. Please refresh the page.");
       setMyWorks(((mine || []) as PlaceArtwork[]).filter(a => !isSold(a)));
+
+      if (!["venue", "gallery", "curator"].includes(prof?.role || "")) {
+        const [{ data: pj }, { data: myDeals }] = await Promise.all([
+          sb.from("projects").select(PROJECT_COLS).eq("status", "active").neq("owner_id", user.id).order("created_at", { ascending: false }).limit(12),
+          sb.from("deals").select("project_id, status").eq("artist_id", user.id).not("project_id", "is", null),
+        ]);
+        const list = (pj || []) as Project[];
+        if (list.length) {
+          const ids = Array.from(new Set(list.map(x => x.owner_id)));
+          const { data: owners } = await sb.from("profiles").select("id, full_name, avatar_url, location, username").in("id", ids);
+          const by = new Map(((owners || []) as Artist[]).map(o => [o.id, o]));
+          const done = new Set(((myDeals || []) as { project_id: string; status: string }[]).filter(d => !["declined", "withdrawn"].includes(d.status)).map(d => d.project_id));
+          setJoinable(list.map(x => ({ ...x, owner: by.get(x.owner_id), offered: done.has(x.id) })));
+        }
+      }
 
       if (prof?.role === "venue" || prof?.role === "gallery" || prof?.role === "curator") {
         // Works artists have marked open to a wall, with who made them.
@@ -202,6 +221,38 @@ export default function LookingPage() {
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start">
         <div className="flex flex-col gap-4">
+          {!venue && !loading && view === "list" && joinable.length > 0 && (
+            <section aria-labelledby="projects-open" className="flex flex-col gap-3">
+              <h2 id="projects-open" className="font-display text-h3 text-fg">Shows and collections you can join</h2>
+              <ul className="grid gap-3 sm:grid-cols-2">
+                {joinable.map(pr => (
+                  <li key={pr.id} className="flex flex-col overflow-hidden rounded-card border-hair border-line bg-surface">
+                    <Link href={publicProjectHref(pr.id)} className="relative block aspect-[16/9] border-b-hair border-line bg-sunken">
+                      {pr.cover_url
+                        // eslint-disable-next-line @next/next/no-img-element
+                        ? <img src={pr.cover_url} alt="" className="absolute inset-0 h-full w-full object-cover" />
+                        : <span className="absolute inset-0 grid place-items-center font-display text-h3 text-fg-3">{pr.title}</span>}
+                    </Link>
+                    <div className="flex flex-1 flex-col gap-1 p-4">
+                      <span className="font-ui text-caption font-semibold uppercase tracking-eyebrow text-fg-3">{KIND_SHORT[pr.kind]} · {dateLine(pr)}</span>
+                      <Link href={publicProjectHref(pr.id)} className="font-display text-h3 leading-tight text-fg hover:underline">{pr.title}</Link>
+                      <span className="font-ui text-body-sm text-fg-2">{pr.owner?.full_name || "A curator"} · {placeLine(pr)}</span>
+                      <div className="mt-3 flex items-center gap-2">
+                        {pr.offered ? (
+                          <ButtonLink size="sm" variant="secondary" href="/dashboard/messages?tab=deals"><Check size={14} aria-hidden /> Offered</ButtonLink>
+                        ) : (
+                          <Button size="sm" variant="primary" onClick={() => setOffer({ recipientId: pr.owner_id, name: pr.owner?.full_name || "the curator", avatar: pr.owner?.avatar_url, projectId: pr.id, contextTitle: pr.title })}>
+                            Offer your work
+                          </Button>
+                        )}
+                        <ButtonLink size="sm" variant="ghost" href={publicProjectHref(pr.id)}>About it</ButtonLink>
+                      </div>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
           {loading ? (
             [0, 1, 2].map(i => <Skeleton key={i} className="h-40 w-full rounded-card" />)
           ) : view === "map" ? (
@@ -289,7 +340,13 @@ export default function LookingPage() {
         onDelete={remove}
       />
 
-      <OfferWorkModal open={!!offer} target={offer} onClose={() => setOffer(null)} preselect={offer?.mode === "request" ? requestWork : workId ? [workId] : []} />
+      <OfferWorkModal open={!!offer} target={offer} onClose={() => {
+        // An offer to a project: check whether it went out, so the card says Offered.
+        const pid = offer?.mode !== "request" ? offer?.projectId : null;
+        setOffer(null);
+        if (pid && userId) createClient().from("deals").select("id", { count: "exact", head: true }).eq("project_id", pid).eq("artist_id", userId)
+          .then(({ count }) => { if (count) setJoinable(js => js.map(j => j.id === pid ? { ...j, offered: true } : j)); });
+      }} preselect={offer?.mode === "request" ? requestWork : workId ? [workId] : []} />
 
       {messaging && (
         <MessageModal

@@ -85,6 +85,15 @@ export function OfferWorkModal({ open, onClose, target, preselect = [] }: Props)
         chosenProject = list.find(x => x.id === target.projectId) || list[0] || null;
         setProjectId(chosenProject?.id || "");
       }
+      // An artist offering works to a curator's project (open, or invited).
+      if (!request && target.projectId) {
+        const { data: pj } = await sb.from("projects").select(PROJECT_COLS).eq("id", target.projectId).maybeSingle();
+        if (pj) {
+          setProjects([pj as Project]); setProjectId(pj.id);
+          const first = (target.name || "").trim().split(/\s+/)[0] || "there";
+          setNote(`Hi ${first}, I'd love to be part of ${pj.title}. Here are a few works that could fit. Happy to send more photos.`);
+        }
+      }
       const owner = request ? target.recipientId : user.id;
       const { data } = await sb.from("artworks").select("*").eq("user_id", owner).order("created_at", { ascending: false });
       let list = ((data || []) as PlaceArtwork[]).filter(a => !isSold(a));
@@ -134,7 +143,7 @@ export function OfferWorkModal({ open, onClose, target, preselect = [] }: Props)
     const sb = createClient();
     const origin = window.location.origin;
     const post = posts.find(p => p.id === postId);
-    const project = curator ? projects.find(p => p.id === projectId) || null : null;
+    const project = (curator || !request) && projectId ? projects.find(p => p.id === projectId) || null : null;
     const poolRequestId = request ? postId || null : target.poolRequestId || null;
     const title = project?.title || target.contextTitle || post?.title || `${chosen.length === 1 ? "A work" : `${chosen.length} works`} for your walls`;
     const meta = {
@@ -199,7 +208,7 @@ export function OfferWorkModal({ open, onClose, target, preselect = [] }: Props)
   const name = target.name;
 
   return (
-    <Modal open={open} onClose={onClose} size="lg" title={curator ? `Invite ${name} to your project` : request ? `Ask ${name} for works` : `Offer a work to ${name}`}
+    <Modal open={open} onClose={onClose} size="lg" title={curator ? `Invite ${name} to your project` : !request && projects[0] ? `Offer your work to ${projects[0].title}` : request ? `Ask ${name} for works` : `Offer a work to ${name}`}
       description={target.contextTitle ? <span className="font-ui text-body-sm text-fg-3">For &ldquo;{target.contextTitle}&rdquo;</span> : undefined}
       footer={<>
         <span className="mr-auto font-ui text-body-sm tabular-nums text-fg-3">{picked.length} of {MAX} picked</span>

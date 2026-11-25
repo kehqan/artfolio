@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { applyPendingProfile } from "@/lib/pending-profile";
+import { takeRememberedNext } from "@/lib/next-path";
 import { ButtonLink } from "@/components/ui";
 import { AuthShell } from "@/components/auth/AuthShell";
 
@@ -22,7 +23,7 @@ export default function ConfirmPage() {
       const { data: { user } } = await sb.auth.getUser();
       if (!user) { setFailed(true); return; }
       await applyPendingProfile(sb, user);
-      router.replace("/dashboard");
+      router.replace(takeRememberedNext());
     })();
   }, [router]);
 

@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Building2, FolderOpen, Palette } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { nextPath, rememberNext } from "@/lib/next-path";
 import PlacesAutocomplete from "@/components/PlacesAutocomplete";
 import {
   Alert, Button, Chip, Field, Input, Label, PasswordInput, cn,
@@ -72,7 +73,10 @@ export default function RegisterPage() {
   const [step, setStep] = useState<Step>("role");
   const [role, setRole] = useState<Role | null>(null);
   // "Have walls? Tell artists" links here with ?role=venue.
+  // Came from a link that wants them back afterwards (e.g. a project invitation).
+  const [next, setNext] = useState("");
   useEffect(() => {
+    setNext(nextPath(""));
     const r = new URLSearchParams(window.location.search).get("role");
     if (r === "venue" || r === "artist" || r === "curator") setRole(r);
   }, []);
@@ -120,6 +124,7 @@ export default function RegisterPage() {
       }
       // The details also travel with the account, so nothing is lost if the
       // email has to be confirmed before we can save them.
+      rememberNext();
       const { data, error: e2 } = await sb.auth.signUp({
         email, password: pw,
         // A new artist starts with the welcome flow (see src/app/welcome).
@@ -129,7 +134,7 @@ export default function RegisterPage() {
       if (data.session && data.user) {
         await sb.from("profiles").upsert({ id: data.user.id, ...p });
         await sb.auth.updateUser({ data: { profile: null } });
-        router.push("/dashboard");
+        router.push(nextPath());
         return;
       }
       setSentTo(email);
@@ -144,7 +149,7 @@ export default function RegisterPage() {
     setResent(error ? "failed" : "sent");
   }
 
-  const signIn = <>Already have an account? <AuthLink href="/login">Sign in</AuthLink></>;
+  const signIn = <>Already have an account? <AuthLink href={next ? `/login?next=${encodeURIComponent(next)}` : "/login"}>Sign in</AuthLink></>;
 
   // ── After sign-up: confirm the email ──
   if (sentTo) return (

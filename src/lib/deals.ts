@@ -58,6 +58,7 @@ export function headline(d: DealView, me: string): string {
   const iStarted = d.started_by === me;
   const offer = d.started_by === d.artist_id;
   if (d.project && !offer) return iStarted ? `You invited ${name} to ${d.project.title}` : `${name} invited you to ${d.project.title}`;
+  if (d.project && offer) return iStarted ? `You offered ${works} to ${d.project.title}` : `${name} offered ${works} for ${d.project.title}`;
   if (iStarted) return offer ? `You offered ${works} to ${name}` : `You asked ${name} for ${works}`;
   return offer ? `${name} offered you ${works}` : `${name} asked for ${works}`;
 }
@@ -67,7 +68,7 @@ export function nextLine(d: DealView, me: string): string {
   const other = d.other?.full_name || "They";
   const iAmVenue = d.venue_id === me;
   switch (d.status) {
-    case "sent": return d.started_by === me ? `Waiting for ${other} to answer.` : d.project ? "Would you like to join?" : "Are you interested?";
+    case "sent": return d.started_by === me ? `Waiting for ${other} to answer.` : d.project && d.started_by !== d.artist_id ? "Would you like to join?" : "Are you interested?";
     case "interested": return iAmVenue ? "Send an agreement to make it official." : `${other} is interested. They'll send an agreement.`;
     case "agreement_sent": return "The agreement is waiting for signatures.";
     case "signed": return "Signed by both. It's a deal.";

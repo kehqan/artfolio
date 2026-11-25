@@ -9,7 +9,8 @@
 //   5. What's it about?                  · Skip
 //   6. What are you looking for?         · Skip
 //   7. A cover image                     · I'll add one later
-//   8. Done: invite your first artist
+//   8. Open it to artists?               (one tap: shows in Scene, or invite only)
+//   9. Done: invite your first artist
 //
 // /dashboard/projects/new?id=<id>&step=<step> asks just that one question
 // again for a saved project, then goes back to the project page.
@@ -26,8 +27,8 @@ import {
   DEAL_LABEL, KIND_LABEL, PROJECT_COLS, dateLine, placeLine, projectHref,
 } from "@/lib/projects";
 
-type Step = "kind" | "title" | "when" | "where" | "about" | "looking" | "cover" | "done";
-const STEPS: Step[] = ["kind", "title", "when", "where", "about", "looking", "cover", "done"];
+type Step = "kind" | "title" | "when" | "where" | "about" | "looking" | "cover" | "open" | "done";
+const STEPS: Step[] = ["kind", "title", "when", "where", "about", "looking", "cover", "open", "done"];
 const QUESTIONS = STEPS.length - 1;
 
 const MEDIUMS = ["Painting", "Drawing", "Photography", "Sculpture", "Print", "Digital", "Textile", "Ceramics", "Installation", "Video", "Mixed media"];
@@ -284,6 +285,29 @@ export default function NewProjectPage() {
       );
       break;
 
+    case "open":
+      body = (
+        <Screen title="Let artists find it?" hint="Open projects show up in Scene, where artists look for places to show. They offer their works, and you say yes or no thanks.">
+          <div className="flex flex-col gap-2">
+            {([
+              [true, "Yes, let artists offer work", "It shows in Scene. You can close it any time."],
+              [false, "No, I'll invite artists myself", "Only the artists you invite see it."],
+            ] as [boolean, string, string][]).map(([v, label, line]) => (
+              <button key={String(v)} type="button" disabled={busy} onClick={() => answer({ is_open: v })}
+                className={cn("flex items-center justify-between gap-4 rounded-card border-hair bg-surface px-4 py-3.5 text-left transition hover:border-ink hover:shadow-hard-2 focus-visible:border-ink focus-visible:shadow-hard-2 focus-visible:outline-none",
+                  single && project?.is_open === v ? "border-ink" : "border-line")}>
+                <span className="flex flex-col gap-0.5">
+                  <span className="font-ui text-body font-semibold text-fg">{label}</span>
+                  <span className="font-ui text-body-sm text-fg-3">{line}</span>
+                </span>
+                <ArrowRight size={16} aria-hidden className="shrink-0 text-fg-3" />
+              </button>
+            ))}
+          </div>
+        </Screen>
+      );
+      break;
+
     case "done":
       body = project ? (
         <div className="flex flex-col gap-6">
@@ -296,6 +320,7 @@ export default function NewProjectPage() {
             <dt className="text-fg-3">What</dt><dd className="text-fg">{KIND_LABEL[project.kind]}</dd>
             <dt className="text-fg-3">When</dt><dd className="text-fg">{dateLine(project)}</dd>
             <dt className="text-fg-3">Where</dt><dd className="text-fg">{placeLine(project)}</dd>
+            <dt className="text-fg-3">Artists</dt><dd className="text-fg">{project.is_open ? "Can find it in Scene and offer work" : "Only the ones you invite"}</dd>
             {project.looking_for?.deal && <><dt className="text-fg-3">Works</dt><dd className="text-fg">{DEAL_LABEL[project.looking_for.deal]}</dd></>}
           </dl>
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center">

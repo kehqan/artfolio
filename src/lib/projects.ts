@@ -27,18 +27,19 @@ export type Project = {
   starts_on: string | null; ends_on: string | null;
   place: string | null; lat: number | null; lng: number | null; online: boolean;
   about: string | null; looking_for: LookingFor; cover_url: string | null;
-  is_open: boolean; status: "active" | "done";
+  is_open: boolean; is_public?: boolean; status: "active" | "done";
   created_at: string; updated_at: string;
 };
 
-export const PROJECT_COLS = "id, owner_id, kind, title, starts_on, ends_on, place, lat, lng, online, about, looking_for, cover_url, is_open, status, created_at, updated_at";
+export const PROJECT_COLS = "id, owner_id, kind, title, starts_on, ends_on, place, lat, lng, online, about, looking_for, cover_url, is_open, is_public, status, created_at, updated_at";
 
 /** Where a gathered work stands, in the words the project page uses. */
-export type WorkStep = "invited" | "interested" | "agreement" | "signed";
-export const WORK_STEP_LABEL: Record<WorkStep, string> = { invited: "Invited", interested: "Said yes", agreement: "To sign", signed: "Signed" };
+export type WorkStep = "offered" | "invited" | "interested" | "agreement" | "signed";
+export const WORK_STEP_LABEL: Record<WorkStep, string> = { offered: "Offered to you", invited: "Invited", interested: "Said yes", agreement: "To sign", signed: "Signed" };
 export function workStep(d: DealView): WorkStep {
   const i = stepIndex(d.status);
-  return i <= 0 ? "invited" : i === 1 ? "interested" : i === 2 ? "agreement" : "signed";
+  if (i <= 0) return d.started_by === d.artist_id ? "offered" : "invited";
+  return i === 1 ? "interested" : i === 2 ? "agreement" : "signed";
 }
 
 export type GatheredWork = PlaceArtwork & { deal: DealView; step: WorkStep };
@@ -141,3 +142,23 @@ export function inviteNote(p: Pick<Project, "title" | "starts_on" | "ends_on" | 
 }
 
 export const projectHref = (id: string) => `/dashboard/projects/${id}`;
+/** The page anyone can open: public, open to artists, or with an invitation. */
+export const publicProjectHref = (id: string, token?: string | null) => `/project/${id}${token ? `?invite=${token}` : ""}`;
+
+// ── Invitations by email (part 2) ───────────────────────────────────
+export type ProjectInvite = { id: string; project_id: string; email: string | null; name: string | null; token: string; accepted_by: string | null; accepted_at: string | null; created_at: string };
+
+/** A ready email: subject and body with the link, for the curator's own mail app. */
+export function inviteEmail(p: Pick<Project, "title" | "starts_on" | "ends_on" | "place" | "online" | "kind">, name: string, curator: string, link: string, email?: string | null) {
+  const subject = `Join ${p.title}?`;
+  const body = `${inviteNote(p, name)}\n\nHere's the project, and where you can offer your works:\n${link}\n\nIt's on Artomango, free for artists. If you're new, it takes two minutes to join.\n\n${curator}`;
+  return { subject, body, mailto: `mailto:${email ? encodeURIComponent(email).replace("%40", "@") : ""}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}` };
+}
+
+/** What the public page reads (database function public_project). */
+export type PublicProject = Pick<Project, "id" | "kind" | "title" | "starts_on" | "ends_on" | "place" | "online" | "about" | "looking_for" | "cover_url" | "status"> & {
+  is_open: boolean; is_public: boolean;
+  owner: { id: string; name: string; avatar: string | null; username: string | null; location: string | null } | null;
+  works: { id: string; title: string; image: string | null; medium: string | null; width_cm: number | null; height_cm: number | null; artist: string; artist_username: string | null }[];
+  invite: { name: string | null } | null;
+};

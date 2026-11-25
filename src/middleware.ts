@@ -2,6 +2,13 @@ import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 export async function middleware(request: NextRequest) {
+  // QR codes on wall labels are upper case (lib/labels qrUrl): /S/CODE is served by /s/CODE,
+  // before anything else so a scan opens as fast as possible.
+  if (request.nextUrl.pathname.startsWith("/S/")) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/s/" + request.nextUrl.pathname.slice(3);
+    return NextResponse.rewrite(url);
+  }
   let supabaseResponse = NextResponse.next({ request });
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -21,7 +28,7 @@ export async function middleware(request: NextRequest) {
   );
   const { data: { user } } = await supabase.auth.getUser();
   const path = request.nextUrl.pathname;
-  if (!user && (path.startsWith("/dashboard") || path === "/welcome")) {
+  if (!user && (path.startsWith("/dashboard") || path === "/welcome" || path.startsWith("/print"))) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
   // A new artist's first visit to Home starts the welcome flow (src/app/welcome).

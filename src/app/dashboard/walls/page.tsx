@@ -7,7 +7,7 @@
 // Artists who land here by mistake get pointed to their works.
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, ImageIcon, Plus, Store } from "lucide-react";
+import { ArrowRight, ImageIcon, Plus, QrCode, Store } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Alert, Badge, Button, ButtonLink, Card, EmptyState, PageHeader, Skeleton, cn } from "@/components/ui";
 import { PostFlow } from "../scene/PostFlow";
@@ -56,7 +56,10 @@ export default function WallsPage() {
       <PageHeader
         title="Your walls"
         description="What hangs now, what you're asking for, and every artist who has shown with you."
-        actions={<Button variant="primary" onClick={() => setPosting(true)}><Plus size={16} aria-hidden /> Post your walls</Button>}
+        actions={<>
+          {!!v?.now.length && <ButtonLink href="/dashboard/labels/make?walls=1&back=/dashboard/walls" variant="secondary"><QrCode size={16} aria-hidden /> Print labels for your walls</ButtonLink>}
+          <Button variant="primary" onClick={() => setPosting(true)}><Plus size={16} aria-hidden /> Post your walls</Button>
+        </>}
       />
       {error && <Alert tone="bad">{error}</Alert>}
 
@@ -191,9 +194,14 @@ function ShowCard({ e, live }: { e: WallEntry; live?: boolean }) {
         <Artist e={e} className="font-display text-h2 leading-tight text-fg" />
         <p className="font-ui text-body-sm text-fg-2">{e.works.map(w => w.title).join(", ")}</p>
         <p className="font-ui text-body-sm tabular-nums text-fg-3">{fmtRange(e.start_date, e.end_date)}</p>
-        <Link href={`/dashboard/messages?tab=deals&deal=${e.deal_id}`} className="mt-auto inline-flex items-center gap-1 font-ui text-label font-semibold text-fg-2 hover:text-fg">
-          Deal and agreement <ArrowRight size={14} aria-hidden />
-        </Link>
+        <div className="mt-auto flex flex-wrap gap-x-5 gap-y-2">
+          <Link href={`/dashboard/labels/make?deal=${e.deal_id}&back=/dashboard/walls`} className="inline-flex items-center gap-1 font-ui text-label font-semibold text-fg-2 hover:text-fg">
+            <QrCode size={14} aria-hidden /> Wall labels
+          </Link>
+          <Link href={`/dashboard/messages?tab=deals&deal=${e.deal_id}`} className="inline-flex items-center gap-1 font-ui text-label font-semibold text-fg-2 hover:text-fg">
+            Deal and agreement <ArrowRight size={14} aria-hidden />
+          </Link>
+        </div>
       </div>
     </article>
   );

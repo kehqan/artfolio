@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { QrCode as QrSvg } from "@/components/labels/QrCode";
 import { createClient } from "@/lib/supabase/client";
 import {
   ArrowDown, ArrowUp, Check, Copy, ExternalLink, ImagePlus, Plus, QrCode, Star, Trash2, X,
@@ -258,6 +259,18 @@ export default function MyFrontDoorPage() {
     else setNotice({ tone: "bad", text: "Couldn't delete that board. Please try again." });
   }
 
+  // The QR is drawn here (components/labels/QrCode), never by an outside service.
+  function downloadQr() {
+    const svg = document.querySelector("#page-qr svg");
+    if (!svg) return;
+    const blob = new Blob([svg.outerHTML], { type: "image/svg+xml" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "artomango-qr.svg";
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  }
+
   function copyUrl() {
     if (!pageUrl) return;
     navigator.clipboard?.writeText(pageUrl);
@@ -266,7 +279,6 @@ export default function MyFrontDoorPage() {
   }
 
   const pageUrl = username && origin ? `${origin}/${username}` : "";
-  const qrUrl = pageUrl ? `https://api.qrserver.com/v1/create-qr-code/?size=480x480&data=${encodeURIComponent(pageUrl)}&margin=16` : "";
   const byId = new Map(allArtworks.map(a => [a.id, a]));
   const onPage = storeArtworks.map(x => ({ ...x, aw: byId.get(x.artwork_id) })).filter(x => x.aw) as (StoreArtwork & { aw: Artwork })[];
   const inStore = new Set(storeArtworks.map(x => x.artwork_id));
@@ -520,11 +532,12 @@ export default function MyFrontDoorPage() {
         onClose={() => setShowQR(false)}
         title="QR code for your page"
         description="Print it on labels, price cards or flyers. It opens your public page."
-        footer={qrUrl ? <a href={qrUrl} download="artomango-qr.png" target="_blank" rel="noopener noreferrer" className="inline-flex h-10 items-center rounded-control px-4 font-ui text-control font-semibold text-fg hover:bg-sunken">Open full size</a> : undefined}
+        footer={pageUrl ? <Button variant="secondary" onClick={downloadQr}>Download for print</Button> : undefined}
       >
-        {qrUrl && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={qrUrl} alt={`QR code for ${pageUrl}`} className="mx-auto h-60 w-60 rounded-control border-hair border-line" />
+        {pageUrl && (
+          <div id="page-qr" className="mx-auto h-60 w-60 overflow-hidden rounded-control border-hair border-line">
+            <QrSvg value={pageUrl} title={`QR code for ${pageUrl}`} margin={2} className="block h-full w-full" />
+          </div>
         )}
       </Modal>
     </div>

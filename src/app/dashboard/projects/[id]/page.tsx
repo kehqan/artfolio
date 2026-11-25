@@ -15,7 +15,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { ArrowLeft, ArrowRight, CalendarDays, Check, ExternalLink, FileSignature, ImageOff, MapPin, MessageSquare, Pencil, Plus } from "lucide-react";
+import { ArrowLeft, ArrowRight, CalendarDays, Check, ExternalLink, FileSignature, ImageOff, MapPin, MessageSquare, Pencil, Plus, QrCode } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Avatar, Badge, Button, ButtonLink, Card, EmptyState, Eyebrow, Modal, Skeleton, cn } from "@/components/ui";
 import type { BadgeTone } from "@/components/ui";
@@ -134,7 +134,10 @@ export default function ProjectPage() {
             </div>
             <p className="font-ui text-body font-semibold text-fg">{statusLine(p)}</p>
           </div>
-          {!finished && <ButtonLink variant="primary" href={invite}><Plus size={16} aria-hidden /> Invite artists</ButtonLink>}
+          <div className="flex flex-wrap gap-2">
+            {p.signed > 0 && <ButtonLink variant="secondary" href={`/dashboard/labels/make?project=${p.id}&back=/dashboard/projects/${p.id}`}><QrCode size={16} aria-hidden /> Wall labels</ButtonLink>}
+            {!finished && <ButtonLink variant="primary" href={invite}><Plus size={16} aria-hidden /> Invite artists</ButtonLink>}
+          </div>
         </div>
       </header>
 

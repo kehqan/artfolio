@@ -9,6 +9,8 @@ import { createClient } from "@/lib/supabase/client";
 import { Alert, Avatar, Button, ButtonLink, Input, Modal, Select, cn } from "@/components/ui";
 import { formatPrice } from "@/components/public/PublicChrome";
 import { CHANNELS, type Channel, CURRENCIES } from "./money";
+import { useJourney } from "@/components/journey/JourneyProvider";
+import { Burst } from "@/components/journey/Burst";
 
 export type FlowWork = { id: string; title: string; images?: string[] | null; price?: number | null; currency?: string | null; status?: string | null };
 export type FlowClient = { id: string; name: string; email?: string | null };
@@ -49,6 +51,8 @@ export function SaleFlow({ open, userId, defaultCurrency, works, clients, startW
   const [findBuyer, setFindBuyer] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [first, setFirst] = useState(false);
+  const { win } = useJourney();
 
   // Reset each time it opens, and load signed deals (works on show at a venue).
   useEffect(() => {
@@ -104,9 +108,12 @@ export function SaleFlow({ open, userId, defaultCurrency, works, clients, startW
     return clients.filter(c => !q || c.name.toLowerCase().includes(q) || (c.email || "").toLowerCase().includes(q)).slice(0, 6);
   }, [clients, findBuyer]);
 
+  // Sold through a signed deal: we already know where, so skip that question.
+  const flow = dealId ? STEPS.filter(x => x !== "where") : STEPS;
   function go(s: Step) { setError(""); setStep(s); }
-  function next() { const i = STEPS.indexOf(step); if (i < STEPS.length - 1) go(STEPS[i + 1]); }
-  function back() { const i = STEPS.indexOf(step); if (i > 0) go(STEPS[i - 1]); }
+  const order = () => (flow.includes(step) ? flow : STEPS);
+  function next() { const o = order(), i = o.indexOf(step); if (i < o.length - 1) go(o[i + 1]); }
+  function back() { const o = order(), i = o.indexOf(step); if (i > 0) go(o[i - 1]); }
 
   function pickWork(id: string, quiet = false) {
     const w = works.find(x => x.id === id);
@@ -138,6 +145,10 @@ export function SaleFlow({ open, userId, defaultCurrency, works, clients, startW
     if (res.error && /client_id|channel|deal_id/.test(res.error.message || "")) res = await sb.from("sales").insert(base);
     if (res.error) { setSaving(false); setError("That didn't save. Please try again."); return; }
     if (isPaid && workId) await sb.from("artworks").update({ status: "sold" }).eq("id", workId).eq("user_id", userId);
+    if (isPaid) {
+      const { count } = await sb.from("sales").select("id", { count: "exact", head: true }).eq("user_id", userId).ilike("status", "completed");
+      setFirst((await win("first_sale")) && (count ?? 0) <= 1);
+    } else setFirst(false);
     setSaving(false);
     setStep("done");
     onSaved();
@@ -222,7 +233,9 @@ export function SaleFlow({ open, userId, defaultCurrency, works, clients, startW
         </div>
       );
       footer = <>{backBtn}
-        <Button variant="ghost" onClick={() => { setClientId(null); setNewName(""); setUnknownBuyer(true); go("price"); }}>I don&rsquo;t know yet</Button>
+        <Button variant="ghost" onClick={() => { setClientId(null); setNewName(""); setUnknownBuyer(true); go("price"); }}>
+          {work && dealFor(work.id) ? `A guest at ${dealFor(work.id)!.venue}` : <>I don&rsquo;t know yet</>}
+        </Button>
         <Button variant="primary" disabled={!buyerName} onClick={next}>Continue <ArrowRight size={15} aria-hidden /></Button></>;
       break;
 
@@ -294,6 +307,17 @@ export function SaleFlow({ open, userId, defaultCurrency, works, clients, startW
             <span className="flex-1 whitespace-nowrap font-ui text-body-sm text-fg">Sold on</span>
             <span className="w-44 shrink-0"><Input type="date" value={date} max={today()} onChange={e => setDate(e.target.value)} aria-label="Date sold" /></span>
           </label>
+          {dealId && (() => {
+            const d = deals.find(x => x.id === dealId);
+            const pct = parseFloat(commission) || 0;
+            const keep = parseFloat(price) > 0 ? formatPrice(Math.round(parseFloat(price) * (1 - pct / 100)), currency) : null;
+            return d ? (
+              <p className="font-ui text-body-sm text-fg-2">
+                Sold at {d.venue}{pct ? `, ${pct}% commission from your agreement` : ""}.{keep && pct ? ` You keep ${keep}.` : ""}{" "}
+                <button type="button" onClick={() => go("where")} className="font-semibold text-fg underline underline-offset-2">Change</button>
+              </p>
+            ) : null;
+          })()}
           {saving && <p className="font-ui text-body-sm text-fg-3">Saving…</p>}
         </div>
       );
@@ -301,10 +325,13 @@ export function SaleFlow({ open, userId, defaultCurrency, works, clients, startW
       break;
 
     case "done":
-      title = paid ? "Sold!" : "Saved"; hint = "";
+      title = paid ? (first ? "Your first sale!" : "Sold!") : "Saved"; hint = "";
       body = (
         <div className="flex flex-col items-center gap-4 py-2 text-center">
-          <span className="grid h-16 w-16 place-items-center rounded-pill border-outline border-ink bg-mango text-on-mango shadow-hard-2"><Check size={28} strokeWidth={3} aria-hidden /></span>
+          <span className="relative grid h-24 w-24 place-items-center">
+            {first && <Burst />}
+            <span className="relative grid h-16 w-16 place-items-center rounded-pill border-outline border-ink bg-mango text-on-mango shadow-hard-2 animate-pop"><Check size={28} strokeWidth={3} aria-hidden /></span>
+          </span>
           <p className="max-w-[40ch] font-ui text-body text-fg-2">
             {work ? <><strong className="text-fg">{work.title}</strong> </> : "Your sale "}
             {buyerName ? <>to <strong className="text-fg">{buyerName}</strong> </> : null}
@@ -312,6 +339,7 @@ export function SaleFlow({ open, userId, defaultCurrency, works, clients, startW
             {paid ? (work ? " It's marked as sold." : "") : " It's waiting for payment."}
           </p>
           {unknownBuyer && <p className="font-ui text-caption text-fg-3">Add the buyer anytime by opening the sale.</p>}
+          {first && <p className="max-w-[40ch] font-ui text-body-sm text-fg-2">The first of many. {buyerName ? "It’s in your Sales now, and the buyer is saved as a collector." : "It’s in your Sales now."}</p>}
         </div>
       );
       footer = <>
@@ -322,13 +350,13 @@ export function SaleFlow({ open, userId, defaultCurrency, works, clients, startW
       break;
   }
 
-  const at = STEPS.indexOf(step);
+  const at = order().indexOf(step);
   return (
     <Modal open={open} onClose={onClose} size="md" title={step === "done" ? "" : "Record a sale"} footer={footer}>
       <div className="flex flex-col gap-5">
         {step !== "done" && (
           <div className="flex gap-1" aria-hidden>
-            {STEPS.map((_, i) => <span key={i} className={cn("h-1 flex-1 rounded-pill", i < at ? "bg-ink" : i === at ? "bg-mango" : "bg-line")} />)}
+            {order().map((_, i) => <span key={i} className={cn("h-1 flex-1 rounded-pill", i < at ? "bg-ink" : i === at ? "bg-mango" : "bg-line")} />)}
           </div>
         )}
         {error && <Alert tone="bad">{error}</Alert>}

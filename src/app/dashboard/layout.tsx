@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { cn, Avatar } from "@/components/ui";
 import { Wordmark as BrandWordmark } from "@/components/brand/Wordmark";
+import { JourneyProvider } from "@/components/journey/JourneyProvider";
 
 // ── Navigation model ───────────────────────────────────────────────
 type Page = { href: string; label: string; venueLabel?: string };
@@ -543,7 +544,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
         {/* ── PAGE ── */}
         <main className="mx-auto max-w-content px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
-          {children}
+          <JourneyProvider>{children}</JourneyProvider>
         </main>
       </div>
     </div>

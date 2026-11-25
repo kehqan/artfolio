@@ -6,7 +6,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { Check, FileSignature, ImageOff, MessageSquare } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { Alert, Avatar, Button, ButtonLink, Chip, EmptyState, Modal, Skeleton, cn } from "@/components/ui";
+import { Alert, Avatar, Badge, Button, ButtonLink, Chip, EmptyState, Skeleton, cn } from "@/components/ui";
+import { useJourney } from "@/components/journey/JourneyProvider";
+import { Hint } from "@/components/journey/Hint";
 import { AgreementSheet } from "./AgreementSheet";
 import { type DealView, STEPS, headline, isClosed, loadDeals, needsMe, nextLine, setStatus, stepIndex } from "@/lib/deals";
 import { workLine } from "@/lib/places";
@@ -31,12 +33,12 @@ export function DealsPanel({ onOpenChat, onCount }: { onOpenChat: (conversationI
   const [showClosed, setShowClosed] = useState(false);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
-  const [confirm, setConfirm] = useState<{ deal: DealView; kind: "declined" | "withdrawn" } | null>(null);
   const [focus, setFocus] = useState<string | null>(null);
   const [setupMissing, setSetupMissing] = useState(false);
   const [agreeing, setAgreeing] = useState<DealView | null>(null);
   const [filled, setFilled] = useState<Record<string, boolean>>({});
   const focused = useRef<HTMLLIElement | null>(null);
+  const { toast, later } = useJourney();
 
   const reload = useCallback(async (uid: string) => {
     const sb = createClient();
@@ -120,19 +122,50 @@ export function DealsPanel({ onOpenChat, onCount }: { onOpenChat: (conversationI
     if (deals && !focus && groups.needs.length === 0 && groups.waiting.length > 0) setFilter("waiting");
   }, [deals]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  async function move(d: DealView, status: "interested" | "declined" | "withdrawn") {
-    if (!me) return;
-    setBusy(d.id); setError("");
+  function lineFor(d: DealView, status: "interested" | "declined" | "withdrawn") {
     const iAmVenue = d.venue_id === me;
-    const line = status === "interested"
+    return status === "interested"
       ? (iAmVenue ? "We're interested! Let's make it happen. We'll send you an agreement to sign." : "I'm in! Happy to show these with you. Send the agreement when you're ready.")
       : status === "declined"
         ? (iAmVenue ? "Thank you for the offer. It's not the right fit for us this time." : "Thank you for thinking of me, but I'll pass this time.")
         : "I've withdrawn this. Thanks for your time.";
-    const ok = await setStatus(createClient(), d, me, status, line);
-    setBusy(null); setConfirm(null);
+  }
+
+  const patch = (id: string, status: DealView["status"]) => setDeals(p => p && p.map(x => x.id === id ? { ...x, status } : x));
+
+  // Interested: straight away, then say what happens next.
+  async function interested(d: DealView) {
+    if (!me) return;
+    setBusy(d.id); setError("");
+    const ok = await setStatus(createClient(), d, me, "interested", lineFor(d, "interested"));
+    setBusy(null);
     if (!ok) { setError("That didn't go through. Please try again."); return; }
-    setDeals(p => p && p.map(x => x.id === d.id ? { ...x, status } : x));
+    patch(d.id, "interested");
+    const who = d.other?.full_name || (d.venue_id === me ? "The artist" : "The venue");
+    if (d.venue_id === me) {
+      // The venue's next move is the agreement: offer it right here.
+      toast({ title: `${who} knows you're interested`, body: "Next: send a simple agreement. It's filled in from your post.", action: { label: "Send it now", onClick: () => setAgreeing({ ...d, status: "interested" }) } });
+    } else {
+      toast({ title: `${who} knows you're in`, body: "They'll send an agreement to sign. We'll tell you the moment it arrives." });
+    }
+  }
+
+  // Passing or withdrawing happens now, with a few seconds to undo.
+  function close(d: DealView, status: "declined" | "withdrawn") {
+    if (!me) return;
+    const before = d.status;
+    patch(d.id, status);
+    const who = d.other?.full_name || "They";
+    later({
+      title: status === "declined" ? "You passed" : "Withdrawn",
+      body: status === "declined" ? `We'll let ${who} know kindly. You can still message each other.` : `${who} will see that you withdrew it.`,
+      tone: "plain",
+      commit: async () => {
+        const ok = await setStatus(createClient(), d, me, status, lineFor(d, status));
+        if (!ok) { patch(d.id, before); setError("That didn't go through. Please try again."); }
+      },
+      undo: () => patch(d.id, before),
+    });
   }
 
   if (deals === null) return <div className="flex w-full max-w-3xl flex-col gap-3">{[0, 1].map(i => <Skeleton key={i} className="h-56 rounded-card" />)}</div>;
@@ -161,6 +194,7 @@ export function DealsPanel({ onOpenChat, onCount }: { onOpenChat: (conversationI
 
   return (
     <div className="flex w-full max-w-3xl flex-col gap-4">
+      <Hint id="deals" title="Every deal in one place.">Each card shows the works, where it stands, and the one thing to do next. Your turn is marked in yellow.</Hint>
       <div className="flex gap-2 overflow-x-auto" role="group" aria-label="Show">
         {tabs.map(t => (
           <Chip key={t.key} selected={filter === t.key} onClick={() => setFilter(t.key)} className="shrink-0">
@@ -177,10 +211,10 @@ export function DealsPanel({ onOpenChat, onCount }: { onOpenChat: (conversationI
         ) : (
           <ul className="flex flex-col gap-4">
             {shown.map(d => (
-              <DealCard key={d.id} d={d} me={me!} busy={busy === d.id} focused={focus === d.id} liRef={focus === d.id ? focused : undefined}
+              <DealCard key={d.id} d={d} me={me!} busy={busy === d.id} yourTurn={mineToDo(d)} focused={focus === d.id} liRef={focus === d.id ? focused : undefined}
                 signed={d.contract_id ? !!signedByMe[d.contract_id] : false}
                 agreementCancelled={!!(d.contract_id && cancelled[d.contract_id])}
-                onMove={s => (s === "interested" ? move(d, s) : setConfirm({ deal: d, kind: s }))}
+                onMove={s => (s === "interested" ? interested(d) : close(d, s))}
                 onAgree={() => setAgreeing(d)} filled={!!(d.pool_request_id && filled[d.pool_request_id])} onFill={() => fillPost(d)}
                 onChat={() => d.conversation_id && onOpenChat(d.conversation_id)} />
             ))}
@@ -204,26 +238,12 @@ export function DealsPanel({ onOpenChat, onCount }: { onOpenChat: (conversationI
       </div>
 
       {me && <AgreementSheet deal={agreeing} me={me} onClose={() => setAgreeing(null)} onSent={() => { reload(me); setFilter("waiting"); }} />}
-      <Modal open={!!confirm} onClose={() => setConfirm(null)} size="sm"
-        title={confirm?.kind === "declined" ? "Pass on this?" : "Withdraw this?"}
-        footer={<>
-          <Button variant="ghost" onClick={() => setConfirm(null)}>Keep it</Button>
-          <Button variant="danger" disabled={!!busy} onClick={() => confirm && move(confirm.deal, confirm.kind)}>
-            {confirm?.kind === "declined" ? "Pass" : "Withdraw"}
-          </Button>
-        </>}>
-        <p className="font-ui text-body text-fg-2">
-          {confirm?.kind === "declined"
-            ? `We'll let ${confirm.deal.other?.full_name || "them"} know kindly. You can still message each other.`
-            : `${confirm?.deal.other?.full_name || "They"} will see that you withdrew it.`}
-        </p>
-      </Modal>
     </div>
   );
 }
 
-function DealCard({ d, me, busy, focused, liRef, signed, agreementCancelled, onMove, onChat, onAgree, filled, onFill }: {
-  d: DealView; me: string; busy: boolean; focused: boolean; liRef?: React.Ref<HTMLLIElement>; signed: boolean; agreementCancelled?: boolean;
+function DealCard({ d, me, busy, focused, liRef, signed, agreementCancelled, onMove, onChat, onAgree, filled, onFill, yourTurn }: {
+  d: DealView; me: string; busy: boolean; yourTurn?: boolean; focused: boolean; liRef?: React.Ref<HTMLLIElement>; signed: boolean; agreementCancelled?: boolean;
   onMove: (s: "interested" | "declined" | "withdrawn") => void; onChat: () => void;
   onAgree?: () => void; filled?: boolean; onFill?: () => void;
 }) {
@@ -256,6 +276,9 @@ function DealCard({ d, me, busy, focused, liRef, signed, agreementCancelled, onM
       : null;
   } else if ((d.status === "agreement_sent" || d.status === "signed") && d.contract_id) {
     actions = <>
+      {d.status === "signed" && !iAmVenue && d.works[0] && (
+        <ButtonLink variant="secondary" size="sm" href={`/dashboard/sales?work=${d.works.find(w => (w.status || "").toLowerCase() !== "sold")?.id || d.works[0].id}`}>A work sold? Record it</ButtonLink>
+      )}
       {d.status === "signed" && iAmVenue && d.post && d.post.status === "open" && !filled && onFill && (
         <Button variant="secondary" size="sm" onClick={onFill}><Check size={14} aria-hidden /> Mark the wall as filled</Button>
       )}
@@ -275,6 +298,10 @@ function DealCard({ d, me, busy, focused, liRef, signed, agreementCancelled, onM
             {d.post ? <>For &ldquo;{d.post.title}&rdquo; · </> : null}{ago(d.updated_at)}
           </span>
         </div>
+        {d.status === "signed" ? <Badge tone="ok" className="shrink-0">Done</Badge>
+          : isClosed(d) ? null
+          : yourTurn ? <Badge tone="mango" className="shrink-0">Your turn</Badge>
+          : <Badge className="shrink-0">Their turn</Badge>}
       </div>
 
       <ul className="flex gap-3 overflow-x-auto pb-1">
@@ -312,7 +339,9 @@ function DealCard({ d, me, busy, focused, liRef, signed, agreementCancelled, onM
         <p className="flex-1 font-ui text-body-sm text-fg-2">
           {agreementCancelled && d.status === "agreement_sent"
             ? (iAmVenue ? "You cancelled the agreement. Send a new one when you're ready." : `${name} cancelled the agreement. They can send a new one.`)
-            : nextLine(d, me)}
+            : d.status === "agreement_sent" && d.contract_id
+              ? (signed ? `You've signed. Waiting for ${name} to sign, then it's a deal.` : "Your signature is all that's left.")
+              : nextLine(d, me)}
         </p>
         <div className="flex flex-wrap gap-2">
           {actions}

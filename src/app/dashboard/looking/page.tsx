@@ -10,6 +10,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowRight, Check, Crosshair, ImageOff, MapPin, MessageSquare, Plus, Store } from "lucide-react";
+import { Hint } from "@/components/journey/Hint";
 import { createClient } from "@/lib/supabase/client";
 import MessageModal from "@/components/MessageModal";
 import { OfferWorkModal, type OfferTarget } from "@/components/OfferWorkModal";
@@ -170,6 +171,8 @@ export default function LookingPage() {
           ? <Button variant="primary" onClick={() => setPosting(true)}><Plus size={16} aria-hidden /> Post your walls</Button>
           : undefined}
       />
+
+      {!venue && <Hint id="looking" title="Places that want art right now.">Tap Offer a work on any of them: pick up to three works, and they get your offer by email. You'll see every step in Deals.</Hint>}
 
       {work && !venue && (
         <Alert tone="info">

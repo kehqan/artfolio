@@ -4,6 +4,7 @@
 // a short step-by-step flow; tapping a sale opens the full editor.
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Check, Plus } from "lucide-react";
+import { Hint } from "@/components/journey/Hint";
 import { createClient } from "@/lib/supabase/client";
 import { Button, Card, EmptyState, PageHeader, SearchField, Skeleton, Tabs, cn } from "@/components/ui";
 import { Mat, formatPrice } from "@/components/public/PublicChrome";
@@ -106,6 +107,8 @@ export default function SalesPage() {
         description="What you've sold, and what's still to be paid."
         actions={<Button variant="primary" onClick={record}><Plus size={16} aria-hidden /> Record a sale</Button>}
       />
+
+      {sales.length > 0 && <Hint id="sales" title="Sold something?">Record it in a few taps. We fill in the price from the work, and the venue and its commission if it sold through a deal.</Hint>}
 
       {error && <p role="alert" className="font-ui text-body-sm text-bad">{error}</p>}
 

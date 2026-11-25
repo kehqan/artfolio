@@ -120,9 +120,38 @@ const config: Config = {
           from: { opacity: "0", transform: "translateY(-6px) scale(0.98)" },
           to: { opacity: "1", transform: "translateY(0) scale(1)" },
         },
+        "toast-in": {
+          from: { opacity: "0", transform: "translateY(12px)" },
+          to: { opacity: "1", transform: "translateY(0)" },
+        },
+        "toast-timer": {
+          from: { transform: "scaleX(1)" },
+          to: { transform: "scaleX(0)" },
+        },
+        "fade-in": { from: { opacity: "0" }, to: { opacity: "1" } },
+        "moment-in": {
+          from: { opacity: "0", transform: "translateY(16px) scale(0.96)" },
+          to: { opacity: "1", transform: "translateY(0) scale(1)" },
+        },
+        pop: {
+          "0%": { transform: "scale(0.6)", opacity: "0" },
+          "60%": { transform: "scale(1.08)", opacity: "1" },
+          "100%": { transform: "scale(1)" },
+        },
+        shard: {
+          "0%": { opacity: "0", transform: "translate(-50%, -50%) rotate(0deg) scale(0.4)" },
+          "15%": { opacity: "1" },
+          "100%": { opacity: "0", transform: "translate(calc(-50% + var(--x)), calc(-50% + var(--y))) rotate(var(--r)) scale(1)" },
+        },
       },
       animation: {
         "drop-in": "drop-in var(--duration-base) var(--ease-standard)",
+        "toast-in": "toast-in 220ms var(--ease-standard)",
+        "toast-timer": "toast-timer linear forwards",
+        "fade-in": "fade-in 200ms ease-out",
+        "moment-in": "moment-in 320ms var(--ease-standard)",
+        pop: "pop 420ms var(--ease-standard) both",
+        shard: "shard 900ms cubic-bezier(.2,.7,.3,1) both",
       },
       spacing: {
         rail: v("shell-rail"),

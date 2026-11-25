@@ -16,6 +16,7 @@ import {
   ArrowLeft, ArrowRight, Brush, CalendarDays, Coins, Frame, Handshake, ImagePlus, Megaphone, Store, X,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { useJourney } from "@/components/journey/JourneyProvider";
 import PlacesAutocomplete from "@/components/PlacesAutocomplete";
 import { Alert, Button, Chip, Input, Modal, Switch, Textarea, cn } from "@/components/ui";
 import { type FeedItem, type Kind, SHOW_TYPES, isVenueRole, wallTermsLine } from "./feed";
@@ -104,6 +105,7 @@ type Props = {
 };
 
 export function PostFlow({ open, onClose, onPosted, start }: Props) {
+  const { toast, celebrate } = useJourney();
   const [me, setMe] = useState<Me | null>(null);
   const [works, setWorks] = useState<PlaceArtwork[]>([]);
   const [kind, setKind] = useState<PostKind | null>(null);
@@ -298,6 +300,17 @@ export function PostFlow({ open, onClose, onPosted, start }: Props) {
     if (res.error) { setError("That didn't post. Please try again."); return; }
     onPosted();
     onClose();
+    // Say who sees it, and celebrate a venue's first walls.
+    let shown = false;
+    if (kind === "walls") {
+      const { count } = await sb.from("pool_requests").select("id", { count: "exact", head: true }).eq("user_id", me.id).eq("request_type", "walls");
+      shown = await celebrate("first_post", {
+        title: "Your walls are posted",
+        body: `${whoSees} We'll tell you the moment one does.`,
+        primary: { label: "Browse works now", href: "/dashboard/looking" },
+      }, (count ?? 1) <= 1);
+    }
+    if (!shown) toast({ title: "Posted", body: whoSees });
   }
 
   // ── Screens ──

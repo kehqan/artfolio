@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { Hint } from "@/components/journey/Hint";
 import { createClient } from "@/lib/supabase/client";
 import {
   Plus, LayoutGrid, List, ImageIcon,
@@ -237,6 +238,10 @@ export default function ArtworksPage() {
         }
       />
 
+      {artworks.length > 0 && (
+        <Hint id="studio" title="Your studio.">Every work you add lives here, private or public. Turn on Open to a wall on a work and places looking for art can ask for it.</Hint>
+      )}
+
       {/* ── STATS ── */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatTile label="Total works" value={artworks.length} />
@@ -310,13 +315,13 @@ export default function ArtworksPage() {
       {!loading && filtered.length === 0 && (
         <EmptyState
           icon={<ImageIcon size={22} aria-hidden />}
-          title={filtering ? "No artworks match these filters" : "Your inventory is empty"}
+          title={filtering ? "No artworks match these filters" : "Your studio is empty"}
           description={filtering
             ? "Try another search, or show all stages."
-            : "Add your first artwork with its photos, size and price. You can keep it private until it's ready."}
+            : "Start with one work: a photo, a name and a size. Everything else can wait, and it stays private until you say so."}
           action={filtering
             ? <Button size="sm" onClick={() => { setSearch(""); setStageFilter("All"); }}>Clear filters</Button>
-            : <ButtonLink href="/dashboard/artworks/new" variant="primary" size="sm"><Plus size={15} aria-hidden /> Add first artwork</ButtonLink>}
+            : <ButtonLink href="/dashboard/artworks/new" variant="primary" size="sm"><Plus size={15} aria-hidden /> Add your first work</ButtonLink>}
         />
       )}
 

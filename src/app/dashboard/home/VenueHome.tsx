@@ -19,6 +19,7 @@ import { type DealView, dealLink, headline, isClosed, needsMe } from "@/lib/deal
 import { workLine } from "@/lib/places";
 import { type OpenWork, type SetupStep, type VenueData, loadVenue, openPosts, placeName, setupDone, shortRange } from "@/lib/venue";
 import { VenueSetup } from "./VenueSetup";
+import { NextStepCard } from "@/components/home/NextStepCard";
 
 const SEEN_KEY = "artomango.venue-setup-seen";
 
@@ -88,11 +89,14 @@ export function VenueHome() {
           {v ? <Heading level={1} size="h1" suppressHydrationWarning>{timeWord}, {name}.</Heading> : <Skeleton className="h-10 w-72" />}
           <p className="font-ui text-body text-fg-2">{sub}</p>
         </div>
-        <Button variant="primary" onClick={() => setPosting(true)}><Plus size={16} aria-hidden /> Post your walls</Button>
+        <Button variant={toDo.length || !ready ? "secondary" : "primary"} onClick={() => setPosting(true)}><Plus size={16} aria-hidden /> Post your walls</Button>
       </header>
 
-      {/* ── 1. Ready for artists? ── */}
-      {v && done && !ready && <SetupCard done={done} onStep={s => {
+      {/* ── 1. The one next step: an artist waiting on you comes first ── */}
+      {v && toDo.length > 0 && <VenueNextDeal d={toDo[0]} more={toDo.length - 1} />}
+
+      {/* ── 2. Ready for artists? ── */}
+      {v && done && !ready && toDo.length === 0 && <SetupCard done={done} onStep={s => {
         if (s === "place") setSetup("name");
         else if (s === "photos") setSetup("photos");
         else if (s === "walls") setPosting(true);
@@ -162,6 +166,24 @@ export function VenueHome() {
       <OfferWorkModal open={!!offer} target={offer} onClose={() => { setOffer(null); load(); }} preselect={pick} />
     </div>
   );
+}
+
+// ── Next step ───────────────────────────────────────────────────────
+function VenueNextDeal({ d, more }: { d: DealView; more: number }) {
+  const who = d.other?.full_name || "An artist";
+  const n = d.artwork_ids.length;
+  const works = n === 1 ? (d.works[0]?.title ? `“${d.works[0].title}”` : "a work") : `${n} works`;
+  const title = d.status === "sent"
+    ? `${who} offered you ${works}`
+    : d.status === "interested" ? `Send ${who} the agreement` : `Your agreement with ${who}`;
+  const line = d.status === "sent"
+    ? "Have a look. Saying you're interested costs nothing: next you send a simple agreement."
+    : d.status === "interested"
+      ? `${who} is in. We've filled in the agreement from your post, so it's mostly one tap.`
+      : "Add your signature if you haven't yet. Once you've both signed, the show is on.";
+  const label = d.status === "sent" ? "Have a look" : d.status === "interested" ? "Send agreement" : "Open the agreement";
+  return <NextStepCard tone="mango" eyebrow={more > 0 ? `Your turn · ${more} more after this` : "Your turn"}
+    image={d.works[0]?.images?.[0] ?? null} title={title} line={line} primary={{ label, href: dealLink(d.id) }} />;
 }
 
 // ── Setup ───────────────────────────────────────────────────────────

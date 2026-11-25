@@ -12,6 +12,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Alert, Avatar, Button, ButtonLink, EmptyState, Field, Modal, Select, Skeleton, Textarea, cn } from "@/components/ui";
 import { type PlaceArtwork, WALL_LABEL, isSold, missingForWall, wallReady, workLine } from "@/lib/places";
 import { type DealTerms, chatLine, dealLink, workLines } from "@/lib/deals";
+import { useJourney } from "@/components/journey/JourneyProvider";
 
 const MAX = 3;
 
@@ -47,16 +48,16 @@ export function OfferWorkModal({ open, onClose, target, preselect = [] }: Props)
   const [note, setNote] = useState("");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
-  const [sent, setSent] = useState<string | null>(null);
-  const [dealId, setDealId] = useState<string | null>(null);
   const [me, setMe] = useState<{ id: string; name: string } | null>(null);
   const [posts, setPosts] = useState<WallPost[]>([]);
   const [postId, setPostId] = useState<string>("");
+  const [autoPicked, setAutoPicked] = useState(false);
   const request = target?.mode === "request";
+  const { toast, celebrate } = useJourney();
 
   useEffect(() => {
     if (!open || !target) return;
-    setError(""); setSent(null); setSending(false); setDealId(null);
+    setError(""); setSending(false);
     setPostId(target.poolRequestId || "");
     setNote(request
       ? `Hi ${target.name}, we love these works and would like to show them in our space. Would you be up for it?`
@@ -83,7 +84,14 @@ export function OfferWorkModal({ open, onClose, target, preselect = [] }: Props)
       list.sort((a, b) => rank(a) - rank(b));
       setWorks(list);
       const ids = new Set(list.map(a => a.id));
-      setPicked(preselect.filter(id => ids.has(id)).slice(0, MAX));
+      const chosen = preselect.filter(id => ids.has(id)).slice(0, MAX);
+      // Nothing chosen yet: pick the works that are open to a wall and ready,
+      // so most offers are one tap.
+      const auto = !request && chosen.length === 0
+        ? list.filter(a => a.wall_terms && wallReady(a)).slice(0, MAX).map(a => a.id)
+        : [];
+      setPicked(chosen.length ? chosen : auto);
+      setAutoPicked(auto.length > 0);
       setLoading(false);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -136,30 +144,32 @@ export function OfferWorkModal({ open, onClose, target, preselect = [] }: Props)
     }
     setSending(false);
     if (!deal && convo === null) { setError("That didn't send. Please try again."); return; }
-    setDealId(deal?.id || null);
-    setSent(convo || "");
+    // Say what happens next, and celebrate the very first one.
+    const n = chosen.length;
+    const href = deal ? dealLink(deal.id) : convo ? `/dashboard/messages?c=${convo}` : "/dashboard/messages";
+    const { count: started } = await sb.from("deals").select("id", { count: "exact", head: true }).eq("started_by", me.id);
+    const shown = await celebrate(request ? "first_request" : "first_offer", request ? {
+      title: "Your first request is out",
+      body: `${target.name} gets an email now. If they say yes, you send a simple agreement, already filled in.`,
+      image: chosen[0].images?.[0] || null,
+      primary: { label: "See it in Deals", href },
+    } : {
+      title: "Your first offer is out",
+      body: `${target.name} gets an email now with your ${n === 1 ? "work" : `${n} works`}. If they're interested, they send an agreement and you both sign. We'll tell you the moment they answer.`,
+      image: chosen[0].images?.[0] || null,
+      primary: { label: "See it in Deals", href },
+    }, (started ?? 1) <= 1);
+    if (shown) { onClose(); return; }
+    toast({
+      title: `Sent to ${target.name}`,
+      body: request ? "They get an email now. We'll tell you when they answer." : "They get an email now. We'll tell you the moment they answer.",
+      action: { label: deal ? "See it in Deals" : "Open the chat", href },
+    });
+    onClose();
   }
 
   if (!target) return null;
   const name = target.name;
-
-  if (sent !== null) {
-    return (
-      <Modal open={open} onClose={onClose} size="sm" title="Sent"
-        footer={<>
-          <Button variant="secondary" onClick={onClose}>Done</Button>
-          <ButtonLink variant="primary" href={dealId ? dealLink(dealId) : sent ? `/dashboard/messages?c=${sent}` : "/dashboard/messages"}>
-            {dealId ? "See it in Deals" : "Open the chat"}
-          </ButtonLink>
-        </>}>
-        <p className="font-ui text-body text-fg-2">
-          {request
-            ? `${name} will see your request with the ${picked.length === 1 ? "work" : `${picked.length} works`} you picked. You'll be notified when they answer.`
-            : `${name} has your ${picked.length === 1 ? "work" : `${picked.length} works`}. You'll be notified when they answer.`}
-        </p>
-      </Modal>
-    );
-  }
 
   return (
     <Modal open={open} onClose={onClose} size="lg" title={request ? `Ask ${name} for works` : `Offer a work to ${name}`}
@@ -171,6 +181,9 @@ export function OfferWorkModal({ open, onClose, target, preselect = [] }: Props)
       </>}>
       <div className="flex flex-col gap-5">
         {error && <Alert tone="bad">{error}</Alert>}
+        {autoPicked && !loading && (
+          <p className="font-ui text-body-sm text-fg-2">We picked your works that are open to a wall. Tap to change.</p>
+        )}
 
         {loading ? (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">{[0, 1, 2].map(i => <Skeleton key={i} className="aspect-square rounded-card" />)}</div>

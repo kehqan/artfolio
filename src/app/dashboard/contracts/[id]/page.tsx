@@ -9,6 +9,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Alert, Avatar, Badge, Button, ButtonLink, Card, EmptyState, Input, Modal, Skeleton, cn } from "@/components/ui";
 import type { BadgeTone } from "@/components/ui";
 import { formatPrice } from "@/components/public/PublicChrome";
+import { useJourney } from "@/components/journey/JourneyProvider";
 
 const TYPE_LABEL: Record<string, string> = {
   exhibition: "Exhibition agreement", collaboration: "Collaboration agreement", commission: "Commission agreement", general: "General agreement",
@@ -133,6 +134,7 @@ export default function ContractDetailPage() {
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [sendingDraft, setSendingDraft] = useState(false);
   const [signError, setSignError] = useState("");
+  const { toast, celebrate } = useJourney();
   const [signatures, setSignatures] = useState<any[]>([]);
   const [termsHash, setTermsHash] = useState("");
 
@@ -141,7 +143,7 @@ export default function ContractDetailPage() {
   async function load() {
     const sb = createClient();
     const { data: { user } } = await sb.auth.getUser();
-    if (!user) { setLoading(false); return; }
+    if (!user) { setLoading(false); return null; }
     setMyId(user.id);
 
     const { data: c } = await sb.from("contracts").select("*").eq("id", id).single();
@@ -163,6 +165,7 @@ export default function ContractDetailPage() {
       setArtworks((ca || []).map((r: any) => ({ ...r.artworks, notes: r.notes })));
     }
     setLoading(false);
+    return c;
   }
 
   // The database records the signature (time, IP, terms fingerprint), sets the
@@ -185,7 +188,21 @@ export default function ContractDetailPage() {
       setSignError("Your signature couldn't be saved. Please reload and try again.");
       return;
     }
-    load();
+    const after = await load();
+    const { count: signedBefore } = await sb.from("contracts").select("id", { count: "exact", head: true })
+      .or(`initiator_id.eq.${myId},counterparty_id.eq.${myId}`).not("executed_at", "is", null);
+    const other = isInitiator ? contract.counterparty_name : contract.initiator_name;
+    if (after?.executed_at || after?.status === "signed") {
+      const shown = await celebrate("first_signed", {
+        title: "It's a deal",
+        body: "You've both signed. The hanging and taking-down dates are in your Planner, and the works' passports show the show.",
+        image: artworks[0]?.images?.[0] || null,
+        primary: { label: "See your Planner", href: "/dashboard/tasks?view=month" },
+      }, (signedBefore ?? 0) <= 1);
+      if (!shown) toast({ title: "Signed by both. It's a deal.", body: "The key dates are in your Planner.", action: { label: "Open Planner", href: "/dashboard/tasks?view=month" } });
+    } else {
+      toast({ title: "Signed", body: `Waiting for ${other || "the other side"} to sign. We'll tell you the moment it's done.` });
+    }
   }
 
   async function handleCancel() {

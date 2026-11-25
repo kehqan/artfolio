@@ -6,6 +6,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { DealsPanel } from "@/components/deals/DealsPanel";
 import { createClient } from "@/lib/supabase/client";
 import { ArrowLeft, Check, CheckCheck, ChevronRight, MessageSquare, Send, Sparkles } from "lucide-react";
+import Link from "next/link";
 import { Avatar, Badge, ButtonLink, Chip, EmptyState, SearchField, Skeleton, Tabs, cn } from "@/components/ui";
 import type { BadgeTone } from "@/components/ui";
 
@@ -226,6 +227,7 @@ function ChatsView() {
               <li className="px-4 py-10 text-center">
                 <p className="font-ui text-label font-semibold text-fg">{q ? "No one by that name" : "No messages yet"}</p>
                 <p className="mt-1 font-ui text-body-sm text-fg-3">{q ? "Try another search." : "When collectors, venues or artists write to you, it shows up here."}</p>
+                {!q && <Link href="/dashboard/looking" className="mt-3 inline-block font-ui text-label font-semibold text-fg underline underline-offset-4">Find someone to talk to</Link>}
               </li>
             ) : list.map(c => {
               const on = active?.id === c.id;

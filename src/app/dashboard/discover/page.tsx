@@ -108,7 +108,8 @@ export default function DiscoverPage() {
       ) : filtered.length === 0 ? (
         <EmptyState
           title={q ? "No one matches that" : "No one here yet"}
-          description={q ? "Try a shorter name or a different city." : "As more artists and venues join, they show up here."}
+          description={q ? "Try a shorter name or a different city." : "As more artists and venues join, they show up here. Meanwhile, see who's looking for art."}
+          action={q ? undefined : <ButtonLink href="/dashboard/looking" variant="secondary">Looking for art</ButtonLink>}
         />
       ) : (
         <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">

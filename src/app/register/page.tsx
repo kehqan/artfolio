@@ -25,7 +25,7 @@ const ROLES: { key: Role; title: string; line: string; points: string[]; Icon: t
   },
   {
     key: "venue", title: "I run a venue", line: "Find artists and fill your walls.", Icon: Building2,
-    points: ["Browse artists near you", "Plan and publish exhibitions", "Post open calls and collabs", "Manage events"],
+    points: ["See works ready for your walls", "Artists offer work to you directly", "Agreements signed in the app", "A page with every show you've hosted"],
   },
 ];
 

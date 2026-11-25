@@ -20,10 +20,15 @@ export async function middleware(request: NextRequest) {
     }
   );
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user && request.nextUrl.pathname.startsWith("/dashboard")) {
+  const path = request.nextUrl.pathname;
+  if (!user && (path.startsWith("/dashboard") || path === "/welcome")) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
-  const path = request.nextUrl.pathname;
+  // A new artist's first visit to Home starts the welcome flow (src/app/welcome).
+  // Sign-up sets welcome: "pending"; the flow sets "done" when it ends.
+  if (user && path === "/dashboard" && user.user_metadata?.welcome === "pending" && user.user_metadata?.role === "artist") {
+    return NextResponse.redirect(new URL("/welcome", request.url));
+  }
   if (path.startsWith("/admin") || path.startsWith("/dashboard/admin")) {
     if (!user) return NextResponse.redirect(new URL("/login", request.url));
     const { data: me } = await supabase.from("profiles").select("role").eq("id", user.id).maybeSingle();

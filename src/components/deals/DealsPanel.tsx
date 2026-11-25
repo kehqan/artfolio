@@ -258,7 +258,7 @@ function DealCard({ d, me, busy, focused, liRef, signed, agreementCancelled, onM
   let actions: React.ReactNode = null;
   if (d.status === "sent" && !iStarted) {
     actions = <>
-      <Button variant="primary" size="sm" disabled={busy} onClick={() => onMove("interested")}><Check size={14} aria-hidden /> Interested</Button>
+      <Button variant="primary" size="sm" disabled={busy} onClick={() => onMove("interested")}><Check size={14} aria-hidden /> {d.project ? "I'm in" : "Interested"}</Button>
       <Button variant="secondary" size="sm" disabled={busy} onClick={() => onMove("declined")}>No thanks</Button>
     </>;
   } else if (d.status === "sent" || (d.status === "interested" && iStarted)) {
@@ -295,7 +295,9 @@ function DealCard({ d, me, busy, focused, liRef, signed, agreementCancelled, onM
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
           <span className="font-ui text-body font-semibold text-fg">{headline(d, me)}</span>
           <span className="truncate font-ui text-caption text-fg-3">
-            {d.post ? <>For &ldquo;{d.post.title}&rdquo; · </> : null}{ago(d.updated_at)}
+            {d.project
+              ? <>{iAmVenue ? <Link href={`/dashboard/projects/${d.project.id}`} className="underline underline-offset-2 hover:text-fg">{d.project.title}</Link> : d.project.title} · </>
+              : d.post ? <>For &ldquo;{d.post.title}&rdquo; · </> : null}{ago(d.updated_at)}
           </span>
         </div>
         {d.status === "signed" ? <Badge tone="ok" className="shrink-0">Done</Badge>

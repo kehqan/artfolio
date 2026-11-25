@@ -13,6 +13,7 @@ import { Alert, Avatar, Button, ButtonLink, EmptyState, Field, Modal, Select, Sk
 import { type PlaceArtwork, WALL_LABEL, isSold, missingForWall, wallReady, workLine } from "@/lib/places";
 import { type DealTerms, chatLine, dealLink, workLines } from "@/lib/deals";
 import { useJourney } from "@/components/journey/JourneyProvider";
+import { type Project, PROJECT_COLS, inviteNote, isCuratorRole, termsOf } from "@/lib/projects";
 
 const MAX = 3;
 
@@ -28,6 +29,8 @@ export type OfferTarget = {
   mode?: "offer" | "request";
   /** The venue's wall post this is for, if any. */
   poolRequestId?: string | null;
+  /** A curator's project this invitation is for (lib/projects). */
+  projectId?: string | null;
   terms?: DealTerms | null;
 };
 
@@ -52,12 +55,17 @@ export function OfferWorkModal({ open, onClose, target, preselect = [] }: Props)
   const [posts, setPosts] = useState<WallPost[]>([]);
   const [postId, setPostId] = useState<string>("");
   const [autoPicked, setAutoPicked] = useState(false);
+  // Curators invite artists into one of their projects.
+  const [curator, setCurator] = useState(false);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [projectId, setProjectId] = useState<string>("");
+  const [noteTouched, setNoteTouched] = useState(false);
   const request = target?.mode === "request";
   const { toast, celebrate } = useJourney();
 
   useEffect(() => {
     if (!open || !target) return;
-    setError(""); setSending(false);
+    setError(""); setSending(false); setNoteTouched(false); setCurator(false); setProjects([]);
     setPostId(target.poolRequestId || "");
     setNote(request
       ? `Hi ${target.name}, we love these works and would like to show them in our space. Would you be up for it?`
@@ -66,14 +74,23 @@ export function OfferWorkModal({ open, onClose, target, preselect = [] }: Props)
     const sb = createClient();
     sb.auth.getUser().then(async ({ data: { user } }) => {
       if (!user) { setLoading(false); return; }
-      const { data: prof } = await sb.from("profiles").select("full_name").eq("id", user.id).single();
+      const { data: prof } = await sb.from("profiles").select("full_name, role").eq("id", user.id).single();
       setMe({ id: user.id, name: prof?.full_name || "" });
+      let chosenProject: Project | null = null;
+      if (request && isCuratorRole(prof?.role)) {
+        setCurator(true);
+        const { data: pj } = await sb.from("projects").select(PROJECT_COLS).eq("owner_id", user.id).eq("status", "active").order("created_at", { ascending: false });
+        const list = (pj || []) as Project[];
+        setProjects(list);
+        chosenProject = list.find(x => x.id === target.projectId) || list[0] || null;
+        setProjectId(chosenProject?.id || "");
+      }
       const owner = request ? target.recipientId : user.id;
       const { data } = await sb.from("artworks").select("*").eq("user_id", owner).order("created_at", { ascending: false });
       let list = ((data || []) as PlaceArtwork[]).filter(a => !isSold(a));
       // A venue only sees works with a photo, and ones open to a wall first.
       if (request) list = list.filter(a => a.images?.length);
-      if (request) {
+      if (request && !isCuratorRole(prof?.role)) {
         const { data: mine } = await sb.from("pool_requests").select("id,title,details").eq("user_id", user.id)
           .eq("request_type", "walls").eq("status", "open").order("created_at", { ascending: false });
         setPosts((mine || []) as WallPost[]);
@@ -92,10 +109,18 @@ export function OfferWorkModal({ open, onClose, target, preselect = [] }: Props)
         : [];
       setPicked(chosen.length ? chosen : auto);
       setAutoPicked(auto.length > 0);
+      const firstPick = list.find(a => a.id === (chosen[0] || auto[0]));
+      if (chosenProject) setNote(inviteNote(chosenProject, target.name, firstPick?.title));
       setLoading(false);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, target?.recipientId]);
+
+  function pickProject(id: string) {
+    setProjectId(id);
+    const p = projects.find(x => x.id === id);
+    if (p && !noteTouched && target) setNote(inviteNote(p, target.name, works.find(w => w.id === picked[0])?.title));
+  }
 
   function toggle(id: string) {
     setPicked(p => p.includes(id) ? p.filter(x => x !== id) : p.length >= MAX ? p : [...p, id]);
@@ -109,10 +134,11 @@ export function OfferWorkModal({ open, onClose, target, preselect = [] }: Props)
     const sb = createClient();
     const origin = window.location.origin;
     const post = posts.find(p => p.id === postId);
+    const project = curator ? projects.find(p => p.id === projectId) || null : null;
     const poolRequestId = request ? postId || null : target.poolRequestId || null;
-    const title = target.contextTitle || post?.title || `${chosen.length === 1 ? "A work" : `${chosen.length} works`} for your walls`;
+    const title = project?.title || target.contextTitle || post?.title || `${chosen.length === 1 ? "A work" : `${chosen.length} works`} for your walls`;
     const meta = {
-      title, label: request ? "Requested works" : "Offered works",
+      title, label: project ? "Project invitation" : request ? "Requested works" : "Offered works",
       image: chosen[0].images?.[0] || null,
       subtitle: chosen.map(w => w.title).join(", "),
       works: chosen.map(w => ({ id: w.id, title: w.title, image: w.images?.[0] || null, line: workLine(w) })),
@@ -123,10 +149,11 @@ export function OfferWorkModal({ open, onClose, target, preselect = [] }: Props)
       artist_id: request ? target.recipientId : me.id,
       venue_id: request ? me.id : target.recipientId,
       started_by: me.id,
-      pool_request_id: poolRequestId,
+      pool_request_id: project ? null : poolRequestId,
+      ...(project ? { project_id: project.id } : {}),
       artwork_ids: chosen.map(w => w.id),
       note: note.trim() || null,
-      terms: (request ? post?.details : target.terms) || null,
+      terms: (project ? termsOf(project) : request ? post?.details : target.terms) || null,
     }).select().single();
 
     // 2. The message, with a link to the deal when there is one.
@@ -161,7 +188,7 @@ export function OfferWorkModal({ open, onClose, target, preselect = [] }: Props)
     }, (started ?? 1) <= 1);
     if (shown) { onClose(); return; }
     toast({
-      title: `Sent to ${target.name}`,
+      title: project ? `${target.name} is invited to ${project.title}` : `Sent to ${target.name}`,
       body: request ? "They get an email now. We'll tell you when they answer." : "They get an email now. We'll tell you the moment they answer.",
       action: { label: deal ? "See it in Deals" : "Open the chat", href },
     });
@@ -172,12 +199,12 @@ export function OfferWorkModal({ open, onClose, target, preselect = [] }: Props)
   const name = target.name;
 
   return (
-    <Modal open={open} onClose={onClose} size="lg" title={request ? `Ask ${name} for works` : `Offer a work to ${name}`}
+    <Modal open={open} onClose={onClose} size="lg" title={curator ? `Invite ${name} to your project` : request ? `Ask ${name} for works` : `Offer a work to ${name}`}
       description={target.contextTitle ? <span className="font-ui text-body-sm text-fg-3">For &ldquo;{target.contextTitle}&rdquo;</span> : undefined}
       footer={<>
         <span className="mr-auto font-ui text-body-sm tabular-nums text-fg-3">{picked.length} of {MAX} picked</span>
         <Button variant="secondary" onClick={onClose}>Cancel</Button>
-        <Button variant="primary" onClick={send} disabled={sending || !picked.length}>{sending ? "Sending…" : "Send"}</Button>
+        <Button variant="primary" onClick={send} disabled={sending || !picked.length || (curator && !projectId)}>{sending ? "Sending…" : "Send"}</Button>
       </>}>
       <div className="flex flex-col gap-5">
         {error && <Alert tone="bad">{error}</Alert>}
@@ -237,7 +264,20 @@ export function OfferWorkModal({ open, onClose, target, preselect = [] }: Props)
           </div>
         )}
 
-        {request && posts.length > 0 && (
+        {curator && projects.length === 0 && !loading && (
+          <Alert tone="info">Start a project first, then invite artists into it. <Link href="/dashboard/projects/new" className="font-semibold underline underline-offset-2">Start a project</Link></Alert>
+        )}
+        {curator && projects.length > 0 && (
+          <Field label="For which project?" hint="Its dates, place and terms go with the invitation.">
+            {p => (
+              <Select {...p} value={projectId} onChange={e => pickProject(e.target.value)}>
+                {projects.map(x => <option key={x.id} value={x.id}>{x.title}</option>)}
+              </Select>
+            )}
+          </Field>
+        )}
+
+        {request && !curator && posts.length > 0 && (
           <Field label="For which wall?" hint="Your wall size, timing and commission go with the request.">
             {p => (
               <Select {...p} value={postId} onChange={e => setPostId(e.target.value)}>
@@ -249,7 +289,7 @@ export function OfferWorkModal({ open, onClose, target, preselect = [] }: Props)
         )}
 
         <Field label="Your note">
-          {p => <Textarea {...p} rows={3} value={note} onChange={e => setNote(e.target.value)} />}
+          {p => <Textarea {...p} rows={3} value={note} onChange={e => { setNote(e.target.value); setNoteTouched(true); }} />}
         </Field>
 
         <div className="flex items-center gap-2 font-ui text-caption text-fg-3">

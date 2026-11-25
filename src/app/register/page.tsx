@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Building2, Palette } from "lucide-react";
+import { ArrowLeft, Building2, FolderOpen, Palette } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import PlacesAutocomplete from "@/components/PlacesAutocomplete";
 import {
@@ -9,11 +9,12 @@ import {
 } from "@/components/ui";
 import { AuthLink, AuthShell } from "@/components/auth/AuthShell";
 
-type Role = "artist" | "venue";
+type Role = "artist" | "venue" | "curator";
 type Step = "role" | "art" | "account";
 
 const MEDIUMS = ["Oil painting", "Acrylic", "Watercolor", "Photography", "Sculpture", "Digital art", "Printmaking", "Drawing", "Ceramics", "Installation", "Video", "Mixed media", "Textile", "Performance"];
 const VENUE_TYPES = ["Gallery", "Café", "Restaurant", "Hotel", "Office", "Cultural center", "Studio", "Pop-up space", "Museum", "Theater"];
+const CURATES = ["Exhibitions", "Events or shows", "A collection"];
 const ART_STYLES = ["Abstract", "Realism", "Contemporary", "Minimalist", "Photography", "Illustration", "Sculpture", "Mixed media", "Any style"];
 
 const ROLES: { key: Role; title: string; line: string; points: string[]; Icon: typeof Palette }[] = [
@@ -24,6 +25,10 @@ const ROLES: { key: Role; title: string; line: string; points: string[]; Icon: t
   {
     key: "venue", title: "I run a venue", line: "Find artists and fill your walls.", Icon: Building2,
     points: ["See works ready for your walls", "Artists offer work to you directly", "Agreements signed in the app", "A page with every show you've hosted"],
+  },
+  {
+    key: "curator", title: "I curate or collect", line: "Gather art for a show, an event or a collection.", Icon: FolderOpen,
+    points: ["A project for each show or collection", "Invite artists and ask for works", "Every work, agreement and date in one place", "Agreements signed in the app"],
   },
 ];
 
@@ -69,7 +74,7 @@ export default function RegisterPage() {
   // "Have walls? Tell artists" links here with ?role=venue.
   useEffect(() => {
     const r = new URLSearchParams(window.location.search).get("role");
-    if (r === "venue" || r === "artist") setRole(r);
+    if (r === "venue" || r === "artist" || r === "curator") setRole(r);
   }, []);
   // artist
   const [mediums, setMediums] = useState<string[]>([]);
@@ -82,6 +87,8 @@ export default function RegisterPage() {
   const [vCity, setVCity] = useState("");
   const [vCityCoords, setVCityCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [vIg, setVIg] = useState("");
+  // curator
+  const [curates, setCurates] = useState<string[]>([]);
   // account
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -94,7 +101,7 @@ export default function RegisterPage() {
   function tog(arr: string[], set: (v: string[]) => void, val: string) {
     set(arr.includes(val) ? arr.filter(x => x !== val) : [...arr, val]);
   }
-  function canArt() { return role === "artist" ? mediums.length > 0 : vName.trim() !== "" && vType !== ""; }
+  function canArt() { return role === "artist" ? mediums.length > 0 : role === "curator" ? true : vName.trim() !== "" && vType !== ""; }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault(); if (!role) return;
@@ -103,6 +110,7 @@ export default function RegisterPage() {
       const sb = createClient();
       const p: Record<string, unknown> = { full_name: name, email, role, onboarding_done: true };
       if (role === "artist") { p.mediums = mediums; p.location = city; p.lat = cityCoords?.lat || null; p.lng = cityCoords?.lng || null; }
+      else if (role === "curator") { p.curates = curates; p.location = city; p.lat = cityCoords?.lat || null; p.lng = cityCoords?.lng || null; }
       else { p.venue_name = vName; p.venue_type = vType; p.art_styles_sought = vStyles; p.location = vCity; p.lat = vCityCoords?.lat || null; p.lng = vCityCoords?.lng || null; p.instagram = vIg; }
       // Who invited them (/register?ref=username), if anyone.
       const ref = new URLSearchParams(window.location.search).get("ref");
@@ -156,33 +164,33 @@ export default function RegisterPage() {
   // ── STEP 1: role ──
   if (step === "role") return (
     <AuthShell title="Join Artomango" description="Pick the one that fits. It shapes what you see first." footer={signIn} width="md" before={<StepBar step={step} />}>
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="flex flex-col gap-3">
         {ROLES.map(({ key, title, line, points, Icon }) => (
           <button
             key={key}
             type="button"
             onClick={() => { setRole(key); setStep("art"); }}
             className={cn(
-              "group flex flex-col gap-4 rounded-card border-hair border-line bg-surface p-5 text-left",
+              "group flex items-start gap-4 rounded-card border-hair border-line bg-surface p-4 text-left sm:p-5",
               "transition-[transform,box-shadow,border-color] duration-base ease-out",
               "hover:-translate-x-0.5 hover:-translate-y-0.5 hover:border-ink hover:shadow-hard-2",
               "focus-visible:border-ink focus-visible:outline-none focus-visible:shadow-hard-2",
             )}
           >
-            <span className="grid h-10 w-10 place-items-center rounded-control bg-sunken text-fg transition-colors duration-fast group-hover:bg-mango">
+            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-control bg-sunken text-fg transition-colors duration-fast group-hover:bg-mango">
               <Icon size={20} aria-hidden />
             </span>
-            <span className="flex flex-col gap-1">
+            <span className="flex min-w-0 flex-1 flex-col gap-1">
               <span className="font-display text-h3 text-fg">{title}</span>
               <span className="font-ui text-body-sm text-fg-2">{line}</span>
+              <span className="mt-1.5 hidden flex-wrap gap-x-3 gap-y-1 sm:flex">
+                {points.map(p => (
+                  <span key={p} className="flex items-center gap-1.5 font-ui text-caption text-fg-3">
+                    <span aria-hidden className="h-1 w-1 shrink-0 rounded-full bg-fg-3" />{p}
+                  </span>
+                ))}
+              </span>
             </span>
-            <ul className="flex flex-col gap-1.5 border-t-hair border-line pt-4">
-              {points.map(p => (
-                <li key={p} className="flex items-start gap-2 font-ui text-body-sm text-fg-2">
-                  <span aria-hidden className="mt-2 h-1 w-1 shrink-0 rounded-full bg-fg-3" />{p}
-                </li>
-              ))}
-            </ul>
           </button>
         ))}
       </div>
@@ -192,9 +200,11 @@ export default function RegisterPage() {
   // ── STEP 2: about the art / venue ──
   if (step === "art" && role) return (
     <AuthShell
-      title={role === "artist" ? "Tell us about your work" : "Tell us about your venue"}
+      title={role === "artist" ? "Tell us about your work" : role === "curator" ? "Tell us what you put together" : "Tell us about your venue"}
       description={role === "artist"
         ? "Two quick things, so venues near you can find you. Your bio and links can wait."
+        : role === "curator"
+        ? "Two quick things. Your first project comes right after this."
         : "This helps artists understand what you’re looking for. You can change all of it later."}
       footer={signIn}
       width="md"
@@ -211,6 +221,20 @@ export default function RegisterPage() {
               <PlacesAutocomplete
                 value={city}
                 placeholder="Search your city or studio"
+                onChange={(result, raw) => { setCity(raw); setCityCoords(result ? { lat: result.lat, lng: result.lng } : null); }}
+              />
+            </div>
+          </>
+        ) : role === "curator" ? (
+          <>
+            <ChipGroup label="What do you put together?" hint="Pick any. You can do all three.">
+              {CURATES.map(c => <Chip key={c} selected={curates.includes(c)} onClick={() => tog(curates, setCurates, c)}>{c}</Chip>)}
+            </ChipGroup>
+            <div className="flex flex-col gap-1.5">
+              <Label>Where are you based?</Label>
+              <PlacesAutocomplete
+                value={city}
+                placeholder="Search your city"
                 onChange={(result, raw) => { setCity(raw); setCityCoords(result ? { lat: result.lat, lng: result.lng } : null); }}
               />
             </div>
@@ -251,7 +275,7 @@ export default function RegisterPage() {
   return (
     <AuthShell
       title="Create your account"
-      description={`Last step. You’re joining as ${role === "venue" ? "a venue" : "an artist"}. It’s free.`}
+      description={`Last step. You’re joining as ${role === "venue" ? "a venue" : role === "curator" ? "a curator" : "an artist"}. It’s free.`}
       footer={
         <div className="flex flex-col gap-3">
           <span>{signIn}</span>
@@ -262,7 +286,7 @@ export default function RegisterPage() {
     >
       <form onSubmit={submit} className="flex flex-col gap-4">
         {err && <Alert tone="bad">{err}</Alert>}
-        <Field label={role === "venue" ? "Your name" : "Full name"} hint={role === "venue" ? "The person running the account." : "As you sign your work."}>
+        <Field label={role === "artist" ? "Full name" : "Your name"} hint={role === "venue" ? "The person running the account." : role === "curator" ? "As artists will see it on your invitations." : "As you sign your work."}>
           {(p) => <Input {...p} required autoFocus autoComplete="name" value={name} onChange={e => setName(e.target.value)} />}
         </Field>
         <Field label="Email">
@@ -272,7 +296,7 @@ export default function RegisterPage() {
           {(p) => <PasswordInput {...p} required minLength={8} autoComplete="new-password" value={pw} onChange={e => setPw(e.target.value)} />}
         </Field>
         <Button type="submit" variant="primary" disabled={loading} className="mt-2 w-full">
-          {loading ? "Creating your account…" : role === "venue" ? "Create venue account" : "Create artist account"}
+          {loading ? "Creating your account…" : role === "venue" ? "Create venue account" : role === "curator" ? "Create curator account" : "Create artist account"}
         </Button>
       </form>
     </AuthShell>

@@ -59,10 +59,14 @@ export default function LookingPage() {
   const [workId, setWorkId] = useState<string | null>(null);
   const [requestWork, setRequestWork] = useState<string[]>([]);
 
-  const venue = role === "venue" || role === "gallery";
+  // Curators (lib/projects) see the venue side too, and invite into a project.
+  const curator = role === "curator";
+  const venue = role === "venue" || role === "gallery" || curator;
+  const [projectId, setProjectId] = useState<string | null>(null);
 
   useEffect(() => {
     setWorkId(new URLSearchParams(window.location.search).get("work"));
+    setProjectId(new URLSearchParams(window.location.search).get("project"));
     const sb = createClient();
     sb.auth.getUser().then(async ({ data: { user } }) => {
       if (!user) { setLoading(false); return; }
@@ -79,10 +83,12 @@ export default function LookingPage() {
       if (feed) setItems(feed); else setError("This didn't load. Please refresh the page.");
       setMyWorks(((mine || []) as PlaceArtwork[]).filter(a => !isSold(a)));
 
-      if (prof?.role === "venue" || prof?.role === "gallery") {
+      if (prof?.role === "venue" || prof?.role === "gallery" || prof?.role === "curator") {
         // Works artists have marked open to a wall, with who made them.
-        const { data: works } = await sb.from("artworks").select("*").not("wall_terms", "is", null).neq("user_id", user.id)
-          .order("created_at", { ascending: false }).limit(120);
+        // A curator gathers for shows and collections, so sees every work.
+        let q = sb.from("artworks").select("*").neq("user_id", user.id);
+        if (prof?.role !== "curator") q = q.not("wall_terms", "is", null);
+        const { data: works } = await q.order("created_at", { ascending: false }).limit(120);
         const list = ((works || []) as PlaceArtwork[]).filter(a => !isSold(a) && a.images?.length);
         const ids = Array.from(new Set(list.map(a => a.user_id).filter(Boolean))) as string[];
         const people = new Map<string, Artist>();
@@ -145,7 +151,7 @@ export default function LookingPage() {
   function requestFrom(i: FeedItem) {
     if (!i.poster) return;
     setRequestWork(i.raw?.details?.works || []);
-    setOffer({ mode: "request", recipientId: i.userId, name: i.poster.full_name || "this artist", avatar: i.poster.avatar_url, contextTitle: i.title });
+    setOffer({ mode: "request", recipientId: i.userId, name: i.poster.full_name || "this artist", avatar: i.poster.avatar_url, contextTitle: i.title, projectId });
   }
   function messageAbout(i: FeedItem) {
     if (!i.poster) return;
@@ -164,10 +170,12 @@ export default function LookingPage() {
     <div className="flex flex-col gap-6">
       <PageHeader
         title={venue ? "Find artists" : "Looking for art"}
-        description={venue
+        description={curator
+          ? "Artists looking for a place to show, and works you could add to a project."
+          : venue
           ? "Artists looking for a place to show, and works that are ready for your walls."
           : "Cafés, galleries and venues that want art on their walls right now."}
-        actions={venue
+        actions={venue && !curator
           ? <Button variant="primary" onClick={() => setPosting(true)}><Plus size={16} aria-hidden /> Post your walls</Button>
           : undefined}
       />
@@ -217,7 +225,7 @@ export default function LookingPage() {
               </p>
               <ul className="flex flex-col gap-4">
                 {posts.map(i => (
-                  <WantCard key={i.key} item={i} venueView={venue} onOpen={() => setOpen(i)}
+                  <WantCard key={i.key} item={i} venueView={venue} actLabel={curator ? "Invite to project" : undefined} onOpen={() => setOpen(i)}
                     onAct={() => (venue ? requestFrom(i) : offerTo(i))} />
                 ))}
               </ul>
@@ -227,7 +235,7 @@ export default function LookingPage() {
           {venue && !loading && (
             <section aria-labelledby="open-works" className="mt-4 flex flex-col gap-3">
               <div className="flex items-baseline justify-between gap-3">
-                <h2 id="open-works" className="font-display text-h2 text-fg">Works open to a wall</h2>
+                <h2 id="open-works" className="font-display text-h2 text-fg">{curator ? "Works you could add" : "Works open to a wall"}</h2>
                 <span className="font-ui text-body-sm tabular-nums text-fg-3">{nearWorks.length} {placeName}</span>
               </div>
               {nearWorks.length === 0 ? (
@@ -246,8 +254,8 @@ export default function LookingPage() {
                         <span className="truncate font-ui text-caption text-fg-3">{a.artist?.full_name || "Artist"}{a.artist?.location ? ` · ${cityOf(a.artist.location)}` : ""}</span>
                         {a.artist && (
                           <Button size="sm" variant="secondary" className="mt-2"
-                            onClick={() => { setRequestWork([a.id]); setOffer({ mode: "request", recipientId: a.artist!.id, name: a.artist!.full_name || "this artist", avatar: a.artist!.avatar_url }); }}>
-                            Request this work
+                            onClick={() => { setRequestWork([a.id]); setOffer({ mode: "request", recipientId: a.artist!.id, name: a.artist!.full_name || "this artist", avatar: a.artist!.avatar_url, projectId }); }}>
+                            {curator ? "Add to project" : "Request this work"}
                           </Button>
                         )}
                       </div>
@@ -276,7 +284,7 @@ export default function LookingPage() {
         mine={!!open && open.userId === userId}
         onClose={() => setOpen(null)}
         onMessage={i => (venue ? requestFrom(i) : offerTo(i))}
-        actionLabel={venue ? "Request works" : "Offer a work"}
+        actionLabel={curator ? "Invite to project" : venue ? "Request works" : "Offer a work"}
         onEdit={() => {}}
         onDelete={remove}
       />
@@ -307,7 +315,7 @@ export default function LookingPage() {
 }
 
 // ── One venue (or artist) asking ────────────────────────────────────
-function WantCard({ item, venueView, onOpen, onAct }: { item: FeedItem; venueView: boolean; onOpen: () => void; onAct: () => void }) {
+function WantCard({ item, venueView, actLabel, onOpen, onAct }: { item: FeedItem; venueView: boolean; actLabel?: string; onOpen: () => void; onAct: () => void }) {
   const name = item.poster?.full_name || (venueView ? "An artist" : "A venue");
   const terms = wallTermsLine(wallDetails(item));
   const when = whenLine(item);
@@ -337,7 +345,7 @@ function WantCard({ item, venueView, onOpen, onAct }: { item: FeedItem; venueVie
         {!terms && item.description && <p className="line-clamp-2 font-ui text-body-sm text-fg-3">{item.description}</p>}
         <div className="mt-auto flex flex-wrap gap-2 pt-1">
           <Button variant="primary" size="sm" onClick={onAct}>
-            {venueView ? "Request works" : "Offer a work"}
+            {actLabel || (venueView ? "Request works" : "Offer a work")}
           </Button>
           <Button variant="ghost" size="sm" onClick={onOpen}>Details</Button>
         </div>

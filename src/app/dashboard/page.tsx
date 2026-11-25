@@ -10,6 +10,7 @@ import { Mat, formatPrice } from "@/components/public/PublicChrome";
 import { mainCurrency } from "./sales/money";
 import { ArtistNextStep } from "@/components/home/ArtistNextStep";
 import { VenueHome } from "./home/VenueHome";
+import { CuratorHome } from "./home/CuratorHome";
 import { isVenueRole } from "@/lib/site";
 
 /* ── Labels ─────────────────────────────────────────────────────── */
@@ -96,18 +97,21 @@ function Quiet({ children }: { children: React.ReactNode }) {
 }
 
 /* ═══════════════════════════════════════════════════════════════════ */
-/** Venues get their own Home (home/VenueHome.tsx); artists get the Atelier. */
+/** Venues and curators get their own Home (home/VenueHome.tsx, home/CuratorHome.tsx); artists get the Atelier. */
 export default function DashboardPage() {
   const [venue, setVenue] = useState<boolean | null>(null);
+  const [curator, setCurator] = useState(false);
   useEffect(() => {
     const sb = createClient();
     sb.auth.getUser().then(async ({ data: { user } }) => {
       if (!user) { setVenue(false); return; }
       const { data } = await sb.from("profiles").select("role").eq("id", user.id).single();
+      setCurator(data?.role === "curator");
       setVenue(isVenueRole(data?.role));
     });
   }, []);
   if (venue === null) return <div aria-hidden className="h-[60vh]" />;
+  if (curator) return <CuratorHome />;
   return venue ? <VenueHome /> : <ArtistHome />;
 }
 

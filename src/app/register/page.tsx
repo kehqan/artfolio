@@ -5,7 +5,7 @@ import { ArrowLeft, Building2, Palette } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import PlacesAutocomplete from "@/components/PlacesAutocomplete";
 import {
-  Alert, Button, Chip, Field, Input, Label, PasswordInput, Select, Textarea, cn,
+  Alert, Button, Chip, Field, Input, Label, PasswordInput, cn,
 } from "@/components/ui";
 import { AuthLink, AuthShell } from "@/components/auth/AuthShell";
 
@@ -13,10 +13,8 @@ type Role = "artist" | "venue";
 type Step = "role" | "art" | "account";
 
 const MEDIUMS = ["Oil painting", "Acrylic", "Watercolor", "Photography", "Sculpture", "Digital art", "Printmaking", "Drawing", "Ceramics", "Installation", "Video", "Mixed media", "Textile", "Performance"];
-const STYLES = ["Abstract", "Realism", "Contemporary", "Minimalist", "Expressionism", "Surrealism", "Conceptual", "Street art", "Portrait", "Landscape", "Figurative", "Geometric"];
 const VENUE_TYPES = ["Gallery", "Café", "Restaurant", "Hotel", "Office", "Cultural center", "Studio", "Pop-up space", "Museum", "Theater"];
 const ART_STYLES = ["Abstract", "Realism", "Contemporary", "Minimalist", "Photography", "Illustration", "Sculpture", "Mixed media", "Any style"];
-const YEARS = ["Less than 1 year", "1–3 years", "3–5 years", "5–10 years", "10–20 years", "20+ years"];
 
 const ROLES: { key: Role; title: string; line: string; points: string[]; Icon: typeof Palette }[] = [
   {
@@ -75,12 +73,8 @@ export default function RegisterPage() {
   }, []);
   // artist
   const [mediums, setMediums] = useState<string[]>([]);
-  const [styles, setStyles] = useState<string[]>([]);
-  const [years, setYears] = useState("");
   const [city, setCity] = useState("");
   const [cityCoords, setCityCoords] = useState<{ lat: number; lng: number } | null>(null);
-  const [ig, setIg] = useState("");
-  const [bio, setBio] = useState("");
   // venue
   const [vName, setVName] = useState("");
   const [vType, setVType] = useState("");
@@ -108,7 +102,7 @@ export default function RegisterPage() {
     try {
       const sb = createClient();
       const p: Record<string, unknown> = { full_name: name, email, role, onboarding_done: true };
-      if (role === "artist") { p.mediums = mediums; p.style_tags = styles; p.years_active = years; p.location = city; p.lat = cityCoords?.lat || null; p.lng = cityCoords?.lng || null; p.instagram = ig; p.bio = bio; }
+      if (role === "artist") { p.mediums = mediums; p.location = city; p.lat = cityCoords?.lat || null; p.lng = cityCoords?.lng || null; }
       else { p.venue_name = vName; p.venue_type = vType; p.art_styles_sought = vStyles; p.location = vCity; p.lat = vCityCoords?.lat || null; p.lng = vCityCoords?.lng || null; p.instagram = vIg; }
       // Who invited them (/register?ref=username), if anyone.
       const ref = new URLSearchParams(window.location.search).get("ref");
@@ -120,7 +114,8 @@ export default function RegisterPage() {
       // email has to be confirmed before we can save them.
       const { data, error: e2 } = await sb.auth.signUp({
         email, password: pw,
-        options: { data: { full_name: name, role, profile: p }, emailRedirectTo: `${window.location.origin}/auth/confirm` },
+        // A new artist starts with the welcome flow (see src/app/welcome).
+        options: { data: { full_name: name, role, profile: p, ...(role === "artist" ? { welcome: "pending" } : {}) }, emailRedirectTo: `${window.location.origin}/auth/confirm` },
       });
       if (e2) { setErr(e2.message); setLoading(false); return; }
       if (data.session && data.user) {
@@ -199,7 +194,7 @@ export default function RegisterPage() {
     <AuthShell
       title={role === "artist" ? "Tell us about your work" : "Tell us about your venue"}
       description={role === "artist"
-        ? "This helps venues and collectors find you. You can change all of it later."
+        ? "Two quick things, so venues near you can find you. Your bio and links can wait."
         : "This helps artists understand what you’re looking for. You can change all of it later."}
       footer={signIn}
       width="md"
@@ -211,22 +206,6 @@ export default function RegisterPage() {
             <ChipGroup label="What do you work in?" required hint="Pick all that apply.">
               {MEDIUMS.map(m => <Chip key={m} selected={mediums.includes(m)} onClick={() => tog(mediums, setMediums, m)}>{m}</Chip>)}
             </ChipGroup>
-            <ChipGroup label="How would you describe your style?">
-              {STYLES.map(s => <Chip key={s} selected={styles.includes(s)} onClick={() => tog(styles, setStyles, s)}>{s}</Chip>)}
-            </ChipGroup>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Years making art">
-                {(p) => (
-                  <Select {...p} value={years} onChange={e => setYears(e.target.value)}>
-                    <option value="">Choose one</option>
-                    {YEARS.map(y => <option key={y}>{y}</option>)}
-                  </Select>
-                )}
-              </Field>
-              <Field label="Instagram">
-                {(p) => <Input {...p} placeholder="@yourhandle" value={ig} onChange={e => setIg(e.target.value)} />}
-              </Field>
-            </div>
             <div className="flex flex-col gap-1.5">
               <Label>Where are you based?</Label>
               <PlacesAutocomplete
@@ -235,9 +214,6 @@ export default function RegisterPage() {
                 onChange={(result, raw) => { setCity(raw); setCityCoords(result ? { lat: result.lat, lng: result.lng } : null); }}
               />
             </div>
-            <Field label="Short bio" hint="Shown on your public page.">
-              {(p) => <Textarea {...p} rows={3} placeholder="A few lines about your work and practice" value={bio} onChange={e => setBio(e.target.value)} />}
-            </Field>
           </>
         ) : (
           <>

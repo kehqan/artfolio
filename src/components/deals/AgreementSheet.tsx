@@ -7,6 +7,7 @@ import { FileSignature } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Alert, Button, ButtonLink, Field, Input, Modal, Textarea } from "@/components/ui";
 import { type DealView, chatLine } from "@/lib/deals";
+import { track } from "@/lib/analytics";
 
 const iso = (d: Date) => d.toISOString().slice(0, 10);
 
@@ -94,6 +95,7 @@ export function AgreementSheet({ deal, me, onClose, onSent }: Props) {
     await sb.from("deals").update({ status: "agreement_sent", contract_id: contract.id }).eq("id", deal.id);
     await chatLine(sb, deal, me, `I've sent you an agreement for ${works}. Have a look and sign it here: ${window.location.origin}/dashboard/contracts/${contract.id}`);
     setSending(false);
+    track("agreement_sent");
     setSent(contract.id);
     onSent();
   }

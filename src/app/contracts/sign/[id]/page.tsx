@@ -10,6 +10,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Wordmark } from "@/components/brand/Wordmark";
 import { Alert, Badge, Button, Card, Input, Skeleton } from "@/components/ui";
 import { formatPrice } from "@/components/public/PublicChrome";
+import { track } from "@/lib/analytics";
 
 const TYPE_LABEL: Record<string, string> = {
   exhibition: "Exhibition agreement", collaboration: "Collaboration agreement", commission: "Commission agreement", general: "General agreement",
@@ -134,6 +135,7 @@ export default function ExternalSignPage() {
     }
     setContract(data);
     setDone(true);
+    track("agreement_signed", { via: "link", done: !!(data as { executed_at?: string | null })?.executed_at });
   }
 
   async function resendCode() {

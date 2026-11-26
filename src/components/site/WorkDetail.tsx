@@ -6,6 +6,7 @@ import { Badge, Button, ButtonLink, Modal } from "@/components/ui";
 import type { BadgeTone } from "@/components/ui";
 import { Mat, formatPrice } from "@/components/public/PublicChrome";
 import { type SiteWork, dimsOf } from "@/lib/site";
+import { track } from "@/lib/analytics";
 
 const SALE_LABEL: Record<string, string> = {
   direct: "Buy now", inquiry: "Inquire", price_on_request: "Price on request", auction: "Auction", not_for_sale: "Not for sale",
@@ -46,7 +47,7 @@ export function WorkDetail({ aw, firstName, onClose, onMessage }: {
           <ButtonLink href={`/artwork/${aw.id}/passport`} variant="ghost">
             <FileText size={15} aria-hidden /> Passport
           </ButtonLink>
-          <Button variant={canBuy ? "primary" : "secondary"} onClick={onMessage}>
+          <Button variant={canBuy ? "primary" : "secondary"} onClick={() => { if (canBuy) track("buy_click", { where: "site", method: aw.sale_method || null }); onMessage(); }}>
             <MessageSquare size={15} aria-hidden />
             {canBuy ? (aw.sale_method === "direct" ? "Ask to buy" : "Ask about this work") : `Message ${firstName}`}
           </Button>

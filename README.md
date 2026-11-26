@@ -51,6 +51,22 @@ The Resend key lives in Supabase Vault. See
 `database/migrations/20261124_emails.sql` for the setup, and check what went
 out with `select * from email_log limit 50;` in the SQL editor.
 
+## Crash reports and usage counts
+
+Both are off until their keys are set in Vercel, and both keep personal data out.
+
+- **Crash reports: Sentry** (EU region). Browser setup in `src/lib/crash.ts`
+  (loads after the page), server in `src/sentry.server.config.ts`, what gets
+  stripped in `src/lib/sentry-scrub.ts`. No session replay, no tracing.
+- **Usage counts: PostHog** (EU cloud), no SDK and no cookies.
+  `track("event")` from `src/lib/analytics.ts` posts to `/api/e`, which passes
+  only known events on to PostHog without the visitor's IP. Add a new event
+  name to both `AnalyticsEvent` and the list in `src/app/api/e/route.ts`.
+
+Environment variables (Vercel > Settings > Environment Variables):
+`NEXT_PUBLIC_SENTRY_DSN`, `SENTRY_ORG`, `SENTRY_PROJECT`, `SENTRY_AUTH_TOKEN`
+(for readable stack traces), `NEXT_PUBLIC_POSTHOG_KEY`.
+
 ## Where things are
 
 - `src/app` – pages and API routes (`/dashboard/*` needs sign-in, `/admin` needs the admin role; see `src/middleware.ts`)

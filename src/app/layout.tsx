@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Darker_Grotesque, Instrument_Sans, Instrument_Serif } from "next/font/google";
 import { SpeedInsights } from "@vercel/speed-insights/next";
+import { Analytics } from "@/components/analytics/Analytics";
 import "../styles/tokens.css";
 import "./globals.css";
 
@@ -105,6 +106,8 @@ export default function RootLayout({
         {children}
         {/* Real visitors' load times (Core Web Vitals), in the Vercel dashboard under Speed Insights. Loads after the page. */}
         <SpeedInsights />
+        {/* Cookieless page views and funnel steps (src/lib/analytics.ts). Off until NEXT_PUBLIC_POSTHOG_KEY is set. */}
+        <Analytics />
       </body>
     </html>
   );

@@ -9,6 +9,7 @@ import PlacesAutocomplete from "@/components/PlacesAutocomplete";
 import { Alert, Button, Chip, Field, Input, Modal, Select, Switch, Textarea, cn } from "@/components/ui";
 import { type FeedItem, POOL_TYPES, SHOW_TYPES, isVenueRole } from "./feed";
 import { IMAGE_CACHE_SECONDS, prepareImage } from "@/lib/image";
+import { track } from "@/lib/analytics";
 
 export type Choice = "show" | "opencall" | "collab" | "looking";
 
@@ -189,6 +190,11 @@ export function Composer({ open, editing, userId, role, start, onClose, onSaved 
 
     setSaving(false);
     if (res.error) { setError("That didn't save. Please try again."); return; }
+    if (!editing) {
+      const kind = choice === "looking" ? form.requestType : choice;
+      track("posted", { kind });
+      if (choice === "looking" && form.requestType === "walls" && venue) track("wall_request_posted");
+    }
     onSaved();
     onClose();
   }

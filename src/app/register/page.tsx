@@ -12,6 +12,7 @@ import {
 import { Captcha, captchaOptions, captchaWaiting } from "@/components/auth/Captcha";
 import { AuthLink, AuthShell } from "@/components/auth/AuthShell";
 import { MIN_AGE, TERMS_VERSION } from "@/lib/legal";
+import { track } from "@/lib/analytics";
 
 type Role = "artist" | "venue" | "curator";
 type Step = "role" | "art" | "account";
@@ -140,6 +141,7 @@ export default function RegisterPage() {
       });
       setTries(t => t + 1); // a bot-check token works once
       if (e2) { setErr(e2.message); setLoading(false); return; }
+      track("signed_up", { role, confirm_email: !data.session });
       if (data.session && data.user) {
         await sb.from("profiles").upsert({ id: data.user.id, ...p });
         await sb.auth.updateUser({ data: { profile: null } });

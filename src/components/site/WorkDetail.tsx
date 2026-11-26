@@ -7,6 +7,7 @@ import type { BadgeTone } from "@/components/ui";
 import { Mat, formatPrice } from "@/components/public/PublicChrome";
 import { type SiteWork, dimsOf } from "@/lib/site";
 import { buyHref } from "@/lib/buy";
+import { track } from "@/lib/analytics";
 
 const SALE_LABEL: Record<string, string> = {
   direct: "Buy now", inquiry: "Inquire", price_on_request: "Price on request", auction: "Auction", not_for_sale: "Not for sale",
@@ -54,12 +55,12 @@ export function WorkDetail({ aw, firstName, onClose, onMessage, buyHost }: {
             <>
               <Button variant="secondary" onClick={onMessage}><MessageSquare size={15} aria-hidden /> Ask a question</Button>
               {/* A plain link, not next/link: prefetching would count a tap. */}
-              <a href={buyHref(aw.id, "site")} target="_blank" rel="noopener" className={buttonClasses("primary")}>
+              <a href={buyHref(aw.id, "site")} target="_blank" rel="noopener" className={buttonClasses("primary")} onClick={() => track("buy_click", { where: "site", method: "link" })}>
                 <ShoppingBag size={15} aria-hidden /> Buy
               </a>
             </>
           ) : (
-            <Button variant={canBuy ? "primary" : "secondary"} onClick={onMessage}>
+            <Button variant={canBuy ? "primary" : "secondary"} onClick={() => { if (canBuy) track("buy_click", { where: "site", method: aw.sale_method || null }); onMessage(); }}>
               <MessageSquare size={15} aria-hidden />
               {canBuy ? (aw.sale_method === "direct" ? "Ask to buy" : "Ask about this work") : `Message ${firstName}`}
             </Button>

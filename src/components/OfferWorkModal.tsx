@@ -14,6 +14,7 @@ import { type PlaceArtwork, WALL_LABEL, isSold, missingForWall, wallReady, workL
 import { type DealTerms, chatLine, dealLink, workLines } from "@/lib/deals";
 import { useJourney } from "@/components/journey/JourneyProvider";
 import { type Project, PROJECT_COLS, inviteNote, isCuratorRole, termsOf } from "@/lib/projects";
+import { track } from "@/lib/analytics";
 
 const MAX = 3;
 
@@ -180,6 +181,7 @@ export function OfferWorkModal({ open, onClose, target, preselect = [] }: Props)
     }
     setSending(false);
     if (!deal && convo === null) { setError("That didn't send. Please try again."); return; }
+    track("offer_sent", { kind: project ? "project" : request ? "request" : "offer", works: chosen.length });
     // Say what happens next, and celebrate the very first one.
     const n = chosen.length;
     const href = deal ? dealLink(deal.id) : convo ? `/dashboard/messages?c=${convo}` : "/dashboard/messages";

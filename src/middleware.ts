@@ -10,6 +10,8 @@ export async function middleware(request: NextRequest) {
     return NextResponse.rewrite(url);
   }
   const path = request.nextUrl.pathname;
+  // Usage counts (src/app/api/e) need no session: don't make them wait on auth.
+  if (path === "/api/e") return NextResponse.next();
   // A visitor with no sign-in cookie can't have a session to check or refresh,
   // so skip the round trip to Supabase. Most public traffic (QR scans, profiles,
   // the home page) is like this and now gets its page without waiting on auth.

@@ -1,3 +1,4 @@
+"use client";
 // The landing page. It leads with the problem we solve: getting finished
 // work onto a real wall, and sold from there. Step by step: add a work,
 // find a wall, agree in one page, sell it off the wall.

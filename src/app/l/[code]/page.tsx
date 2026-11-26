@@ -4,7 +4,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight, MapPin } from "lucide-react";
-import { createClient } from "@/lib/supabase/server";
+import { cache } from "react";
+import { publicClient } from "@/lib/supabase/public";
 import { Avatar, Badge, ButtonLink, EmptyState } from "@/components/ui";
 import { Wordmark } from "@/components/brand/Wordmark";
 import { Mat } from "@/components/public/PublicChrome";
@@ -26,12 +27,19 @@ const EVENT: Record<string, string> = {
   created: "Made", sold: "Sold", transferred: "Changed hands", exhibited: "Shown", restored: "Restored", appraised: "Appraised", donated: "Donated", loaned: "Lent",
 };
 
-async function load(code: string): Promise<Page | null> {
+// Built once and kept on the CDN for 30 s: a scan opens from the edge, and a
+// change (sold, new dates) shows within half a minute.
+export const revalidate = 30;
+// No pages are built ahead; each is built on its first visit, then cached.
+export async function generateStaticParams() { return []; }
+
+// generateMetadata and the page share one database call.
+const load = cache(async (code: string): Promise<Page | null> => {
   const clean = (code || "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 12);
   if (!clean) return null;
-  const { data } = await createClient().rpc("label_page", { p_code: clean });
+  const { data } = await publicClient().rpc("label_page", { p_code: clean });
   return (data as Page | null) || null;
-}
+});
 
 export async function generateMetadata({ params }: { params: { code: string } }): Promise<Metadata> {
   const p = await load(params.code);

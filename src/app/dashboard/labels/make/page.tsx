@@ -204,7 +204,7 @@ function Maker() {
                       className={cn("flex w-24 flex-col gap-1 rounded-control border-hair p-1.5 text-left transition", i === active ? "border-ink bg-surface shadow-hard-1" : "border-line hover:border-ink")}>
                       <span className="relative block aspect-square overflow-hidden rounded-[4px] bg-sunken">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                        {it.work.images?.[0] && <img src={it.work.images[0]} alt="" className="absolute inset-0 h-full w-full object-cover" />}
+                        {it.work.images?.[0] && <img loading="lazy" decoding="async" src={it.work.images[0]} alt="" className="absolute inset-0 h-full w-full object-cover" />}
                       </span>
                       <span className="truncate font-ui text-caption font-semibold text-fg">{it.work.title}</span>
                     </button>

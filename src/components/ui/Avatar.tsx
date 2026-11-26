@@ -29,7 +29,7 @@ export function Avatar({ name, src, size = "md", className }: AvatarProps) {
     >
       {src ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={src} alt={name} className="h-full w-full object-cover" />
+        <img loading="lazy" decoding="async" src={src} alt={name} className="h-full w-full object-cover" />
       ) : (
         <span aria-label={name}>{initials(name)}</span>
       )}

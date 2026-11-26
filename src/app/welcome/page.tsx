@@ -22,6 +22,7 @@ import { type PlaceArtwork, type WallTerms, missingForWall, wallReady } from "@/
 import {
   ACCENTS, type AccentKey, type GridKey, type HeaderKey, type PreviewMessage, type SiteConfig, type TypeKey, siteOf,
 } from "@/lib/site";
+import { IMAGE_CACHE_SECONDS, prepareImage } from "@/lib/image";
 
 const MAX_WORKS = 3;
 
@@ -127,10 +128,13 @@ export default function WelcomePage() {
     const picked = Array.from(files).filter(f => f.type.startsWith("image/")).slice(0, MAX_WORKS - works.length);
     const added: Draft[] = picked.map((f, i) => {
       const key = `${Date.now()}-${i}-${f.name}`;
-      const ext = f.name.split(".").pop() || "jpg";
-      const path = `artworks/${uid}/${key.replace(/[^a-zA-Z0-9.-]/g, "")}.${ext}`;
-      uploads.current[key] = sb.storage.from("avatars").upload(path, f, { upsert: true, contentType: f.type })
-        .then(({ error: e }) => (e ? null : sb.storage.from("avatars").getPublicUrl(path).data.publicUrl))
+      // Shrunk and turned into WebP first (lib/image), then uploaded.
+      uploads.current[key] = prepareImage(f).then(img => {
+        const ext = img.name.split(".").pop() || "jpg";
+        const path = `artworks/${uid}/${key.replace(/\.[^.]+$/, "").replace(/[^a-zA-Z0-9.-]/g, "")}.${ext}`;
+        return sb.storage.from("avatars").upload(path, img, { upsert: true, contentType: img.type, cacheControl: IMAGE_CACHE_SECONDS })
+          .then(({ error: e }) => (e ? null : sb.storage.from("avatars").getPublicUrl(path).data.publicUrl));
+      })
         .then(url => { setWorks(ws => ws.map(x => (x.key === key ? { ...x, url, failed: !url } : x))); return url; });
       return { key, preview: URL.createObjectURL(f), url: null, title: "", w: "", h: "", price: "" };
     });
@@ -176,15 +180,11 @@ export default function WelcomePage() {
   async function updateEach(fields: (x: Draft) => Record<string, unknown> | null) {
     setBusy(true); setError("");
     const sb = createClient();
-    const out: Draft[] = [];
-    for (const x of works) {
-      const f = x.id ? fields(x) : null;
-      if (f) {
-        const { error: e } = await sb.from("artworks").update(f).eq("id", x.id!);
-        if (e) { setBusy(false); setError("That didn't save. Please try again."); return false; }
-        out.push({ ...x, saved: { ...x.saved!, ...f } as PlaceArtwork });
-      } else out.push(x);
-    }
+    // All works are saved at the same time, not one after another.
+    const plan = works.map(x => ({ x, f: x.id ? fields(x) : null }));
+    const results = await Promise.all(plan.map(({ x, f }) => (f ? sb.from("artworks").update(f).eq("id", x.id!) : null)));
+    if (results.some(r => r?.error)) { setBusy(false); setError("That didn't save. Please try again."); return false; }
+    const out: Draft[] = plan.map(({ x, f }) => (f ? { ...x, saved: { ...x.saved!, ...f } as PlaceArtwork } : x));
     setWorks(out);
     setBusy(false);
     return true;

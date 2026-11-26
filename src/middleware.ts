@@ -9,6 +9,17 @@ export async function middleware(request: NextRequest) {
     url.pathname = "/s/" + request.nextUrl.pathname.slice(3);
     return NextResponse.rewrite(url);
   }
+  const path = request.nextUrl.pathname;
+  // A visitor with no sign-in cookie can't have a session to check or refresh,
+  // so skip the round trip to Supabase. Most public traffic (QR scans, profiles,
+  // the home page) is like this and now gets its page without waiting on auth.
+  const hasSession = request.cookies.getAll().some(c => c.name.startsWith("sb-") && c.name.includes("-auth-token"));
+  if (!hasSession) {
+    if (path.startsWith("/dashboard") || path === "/welcome" || path.startsWith("/print") || path.startsWith("/admin")) {
+      return NextResponse.redirect(new URL("/login", request.url));
+    }
+    return NextResponse.next();
+  }
   let supabaseResponse = NextResponse.next({ request });
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -27,7 +38,6 @@ export async function middleware(request: NextRequest) {
     }
   );
   const { data: { user } } = await supabase.auth.getUser();
-  const path = request.nextUrl.pathname;
   if (!user && (path.startsWith("/dashboard") || path === "/welcome" || path.startsWith("/print"))) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
@@ -48,5 +58,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|avif|ico|woff2?|txt|xml|json|webmanifest)$).*)"],
 };

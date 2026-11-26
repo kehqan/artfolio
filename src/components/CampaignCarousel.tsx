@@ -75,7 +75,7 @@ export default function CampaignCarousel() {
           min-height:560px;max-height:920px;
           overflow:hidden;border-bottom:3px solid #111110;
           background:#0a0a0a;
-          font-family:'Darker Grotesque',system-ui,sans-serif;
+          font-family:var(--font-darker-grotesque),system-ui,sans-serif;
         }
         .camp-bg {
           position:absolute;inset:0;width:100%;height:100%;
@@ -106,7 +106,7 @@ export default function CampaignCarousel() {
         .camp-ctr{
           position:absolute;bottom:40px;right:48px;z-index:3;
           font-size:12px;font-weight:800;color:rgba(255,255,255,.35);
-          letter-spacing:.12em;font-family:'Darker Grotesque',system-ui,sans-serif;
+          letter-spacing:.12em;font-family:var(--font-darker-grotesque),system-ui,sans-serif;
         }
       `}</style>
 

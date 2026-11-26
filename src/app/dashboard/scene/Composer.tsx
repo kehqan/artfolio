@@ -8,6 +8,7 @@ import { createClient } from "@/lib/supabase/client";
 import PlacesAutocomplete from "@/components/PlacesAutocomplete";
 import { Alert, Button, Chip, Field, Input, Modal, Select, Switch, Textarea, cn } from "@/components/ui";
 import { type FeedItem, POOL_TYPES, SHOW_TYPES, isVenueRole } from "./feed";
+import { IMAGE_CACHE_SECONDS, prepareImage } from "@/lib/image";
 
 export type Choice = "show" | "opencall" | "collab" | "looking";
 
@@ -109,10 +110,10 @@ export function Composer({ open, editing, userId, role, start, onClose, onSaved 
     const added: string[] = [];
     const picked = Array.from(files).slice(0, maxImages - form.images.length);
     for (let i = 0; i < picked.length; i++) {
-      const file = picked[i];
+      const file = await prepareImage(picked[i]);
       const ext = file.name.split(".").pop() || "jpg";
       const path = `${userId}/scene/${Date.now()}-${i}.${ext}`;
-      const { error: err } = await sb.storage.from("artworks").upload(path, file, { upsert: true, contentType: file.type });
+      const { error: err } = await sb.storage.from("artworks").upload(path, file, { upsert: true, contentType: file.type, cacheControl: IMAGE_CACHE_SECONDS });
       if (err) { setError("One of the images didn't upload. Please try again."); continue; }
       added.push(sb.storage.from("artworks").getPublicUrl(path).data.publicUrl);
     }

@@ -187,7 +187,7 @@ function ResourceCard({ r, mine, onRemove }: { r: Resource; mine: boolean; onRem
       <div className="relative aspect-video bg-sunken">
         {thumb ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={thumb} alt="" onError={() => setBroken(true)} className="h-full w-full object-cover" />
+          <img loading="lazy" decoding="async" src={thumb} alt="" onError={() => setBroken(true)} className="h-full w-full object-cover" />
         ) : (
           <div className="grid h-full place-items-center text-fg-3"><Icon size={28} aria-hidden /></div>
         )}

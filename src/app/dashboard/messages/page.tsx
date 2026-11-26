@@ -5,6 +5,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { DealsPanel } from "@/components/deals/DealsPanel";
 import { createClient } from "@/lib/supabase/client";
+import { fetchJson, forget, timeoutSignal } from "@/lib/fetch-json";
 import { ArrowLeft, Check, CheckCheck, ChevronRight, MessageSquare, Send, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { Avatar, Badge, ButtonLink, Chip, EmptyState, SearchField, Skeleton, Tabs, cn } from "@/components/ui";
@@ -70,7 +71,7 @@ function ContextCard({ convo }: { convo: Conversation }) {
     <>
       {meta?.image && (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={meta.image} alt="" className="h-12 w-12 shrink-0 rounded-chip border-hair border-line bg-sunken object-contain" />
+        <img loading="lazy" decoding="async" src={meta.image} alt="" className="h-12 w-12 shrink-0 rounded-chip border-hair border-line bg-sunken object-contain" />
       )}
       <span className="flex min-w-0 flex-1 flex-col gap-1">
         <Badge tone={ctx.tone} className="w-fit">{meta?.label || ctx.label}</Badge>
@@ -134,10 +135,11 @@ function ChatsView() {
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  async function loadConvos() {
+  async function loadConvos(fresh = false) {
     try {
-      const res = await fetch("/api/conversations");
-      const data = await res.json();
+      // Shares the shell's request on first load; `fresh` after reading a chat.
+      if (fresh) forget("/api/conversations");
+      const data = await fetchJson("/api/conversations");
       const list: Conversation[] = data.conversations || [];
       setConvos(list);
       return list;
@@ -160,15 +162,24 @@ function ChatsView() {
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
   }, []);
 
+  const seen = useRef<{ id: string; n: number }>({ id: "", n: -1 });
   const loadMessages = useCallback(async (convoId: string, quiet = false) => {
+    if (quiet && document.hidden) return; // no polling in a background tab
     if (!quiet) setMsgLoading(true);
+    let changed = !quiet;
     try {
-      const res = await fetch(`/api/conversations/${convoId}/messages`);
+      const res = await fetch(`/api/conversations/${convoId}/messages`, { signal: timeoutSignal(10_000) });
       const data = await res.json();
-      setMessages(data.messages || []);
+      const msgs = data.messages || [];
+      // Only re-render and refresh the list when something new arrived.
+      if (seen.current.id !== convoId || seen.current.n !== msgs.length) {
+        changed = true;
+        seen.current = { id: convoId, n: msgs.length };
+        setMessages(prev => (prev.some(m => String(m.id).startsWith("tmp-")) && quiet ? prev : msgs));
+      }
     } catch { /* keep what we have */ }
     setMsgLoading(false);
-    loadConvos();
+    if (changed) loadConvos(true);
   }, []);
 
   useEffect(() => {
@@ -192,17 +203,24 @@ function ChatsView() {
     const text = body ?? input.trim();
     if (!text || !active) return;
     setSending(true); setInput(""); setShowQuick(false);
+    // Show the message straight away; swap in the saved one when the server answers.
+    const tmpId = `tmp-${Date.now()}`;
+    const now = new Date().toISOString();
+    setMessages(p => [...p, { id: tmpId, conversation_id: active.id, sender_id: myId, body: text, created_at: now } as any]);
+    setConvos(p => p.map(c => c.id === active.id
+      ? { ...c, last_message_preview: text.slice(0, 120), last_message_at: now, unread_count: 0 } : c));
+    const undo = () => { setMessages(p => p.filter(m => m.id !== tmpId)); setInput(text); };
     try {
       const res = await fetch(`/api/conversations/${active.id}/messages`, {
         method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ body: text }),
+        signal: timeoutSignal(15_000),
       });
       const data = await res.json();
       if (data.message) {
-        setMessages(p => [...p, data.message]);
-        setConvos(p => p.map(c => c.id === active.id
-          ? { ...c, last_message_preview: text.slice(0, 120), last_message_at: new Date().toISOString(), unread_count: 0 } : c));
-      } else { setInput(text); }
-    } catch { setInput(text); }
+        setMessages(p => p.map(m => (m.id === tmpId ? data.message : m)));
+        seen.current = { id: active.id, n: seen.current.n + 1 };
+      } else undo();
+    } catch { undo(); }
     setSending(false);
     inputRef.current?.focus();
   }

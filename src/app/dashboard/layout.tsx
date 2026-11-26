@@ -16,6 +16,7 @@ import {
 import { cn, Avatar } from "@/components/ui";
 import { Wordmark as BrandWordmark } from "@/components/brand/Wordmark";
 import { JourneyProvider } from "@/components/journey/JourneyProvider";
+import { fetchJson } from "@/lib/fetch-json";
 
 // ── Navigation model ───────────────────────────────────────────────
 type Page = { href: string; label: string; venueLabel?: string };
@@ -256,16 +257,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   async function loadNotifications(uid: string) {
     const supabase = createClient();
     const { data } = await supabase
-      .from("notifications").select("*")
+      .from("notifications").select("id,type,title,body,read,data,created_at")
       .eq("user_id", uid).order("created_at", { ascending: false }).limit(15);
     setNotifications(data || []);
   }
 
   async function loadUnreadMessages() {
     try {
-      const res = await fetch("/api/conversations");
-      if (!res.ok) return;
-      const data = await res.json();
+      if (document.hidden) return; // no polling in a background tab
+      const data = await fetchJson("/api/conversations");
       const total = (data.conversations || []).reduce((sum: number, c: any) => sum + (c.unread_count || 0), 0);
       setUnreadMessages(total);
     } catch {}

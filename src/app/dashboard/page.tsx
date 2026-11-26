@@ -12,6 +12,7 @@ import { ArtistNextStep } from "@/components/home/ArtistNextStep";
 import { VenueHome } from "./home/VenueHome";
 import { CuratorHome } from "./home/CuratorHome";
 import { isVenueRole } from "@/lib/site";
+import { fetchJson } from "@/lib/fetch-json";
 
 /* ── Labels ─────────────────────────────────────────────────────── */
 type ScenePostType = "event" | "exhibition" | "collab" | "opencall" | "commission";
@@ -142,9 +143,8 @@ function ArtistHome() {
   useEffect(() => {
     const loadUnreadMessages = async () => {
       try {
-        const res = await fetch("/api/conversations");
-        if (!res.ok) return;
-        const data = await res.json();
+        if (document.hidden) return; // no polling in a background tab
+        const data = await fetchJson("/api/conversations");
         const total = (data.conversations || []).reduce(
           (sum: number, c: any) => sum + (c.unread_count || 0),
           0

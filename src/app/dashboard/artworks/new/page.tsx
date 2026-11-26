@@ -23,6 +23,7 @@ import { CURRENCIES, Dropzone, ImageThumb, MAX_IMAGES, WALL_TERMS, type ArtType 
 import { type PlaceArtwork, missingForWall, wallReady } from "@/lib/places";
 import { useJourney } from "@/components/journey/JourneyProvider";
 import { Burst } from "@/components/journey/Burst";
+import { IMAGE_CACHE_SECONDS, prepareImage } from "@/lib/image";
 
 type Step = "photos" | "title" | "finished" | "medium" | "size" | "year" | "price" | "wall" | "done";
 
@@ -125,10 +126,13 @@ export default function AddWorkPage() {
     const picked = Array.from(files).filter(f => f.type.startsWith("image/")).slice(0, MAX_IMAGES - photos.length);
     const added = picked.map((f, i) => {
       const key = `${Date.now()}-${i}-${f.name}`;
-      const ext = f.name.split(".").pop() || "jpg";
-      const path = `artworks/${userId}/${key.replace(/[^a-zA-Z0-9.-]/g, "")}.${ext}`;
-      uploads.current[key] = sb.storage.from("avatars").upload(path, f, { upsert: true, contentType: f.type })
-        .then(({ error: e }) => (e ? null : sb.storage.from("avatars").getPublicUrl(path).data.publicUrl))
+      // Shrunk and turned into WebP first (lib/image), then uploaded.
+      uploads.current[key] = prepareImage(f).then(img => {
+        const ext = img.name.split(".").pop() || "jpg";
+        const path = `artworks/${userId}/${key.replace(/\.[^.]+$/, "").replace(/[^a-zA-Z0-9.-]/g, "")}.${ext}`;
+        return sb.storage.from("avatars").upload(path, img, { upsert: true, contentType: img.type, cacheControl: IMAGE_CACHE_SECONDS })
+          .then(({ error: e }) => (e ? null : sb.storage.from("avatars").getPublicUrl(path).data.publicUrl));
+      })
         .then(url => {
           setPhotos(p => p.map(x => (x.key === key ? { ...x, url, failed: !url } : x)));
           return url;
@@ -325,7 +329,7 @@ export default function AddWorkPage() {
           <div className="relative grid h-56 w-56 place-items-center overflow-hidden rounded-card border-outline border-ink bg-sunken shadow-hard-2 animate-pop">
             {work.images[0]
               // eslint-disable-next-line @next/next/no-img-element
-              ? <img src={work.images[0]} alt="" className="h-full w-full object-contain p-3" />
+              ? <img loading="lazy" decoding="async" src={work.images[0]} alt="" className="h-full w-full object-contain p-3" />
               : <span className="font-display text-h2 text-fg-3">{work.title.slice(0, 1)}</span>}
           </div>
         </div>

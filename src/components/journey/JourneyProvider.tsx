@@ -224,7 +224,7 @@ function Moment({ moment, onClose }: { moment: MomentInput | null; onClose: () =
           <Burst />
           {moment.image
             // eslint-disable-next-line @next/next/no-img-element
-            ? <img src={moment.image} alt="" className="relative h-28 w-28 rounded-card border-outline border-ink bg-sunken object-contain p-1.5 shadow-hard-2 animate-pop" />
+            ? <img loading="lazy" decoding="async" src={moment.image} alt="" className="relative h-28 w-28 rounded-card border-outline border-ink bg-sunken object-contain p-1.5 shadow-hard-2 animate-pop" />
             : <span className="relative grid h-20 w-20 place-items-center rounded-pill border-outline border-ink bg-mango text-on-mango shadow-hard-2 animate-pop"><Check size={34} strokeWidth={3} aria-hidden /></span>}
         </div>
         <div className="flex flex-col gap-2">

@@ -42,12 +42,15 @@ function PartyPicker({ value, onChange, myId }: { value: Party | null; onChange:
   const [showExt, setShowExt] = useState(false);
   const [ext, setExt] = useState({ name: "", email: "", role: "artist" });
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const searchSeq = useRef(0);
 
   function handleQuery(q: string) {
     setQuery(q);
     if (debounceRef.current) clearTimeout(debounceRef.current);
     const clean = q.replace(/[,()*%\\]/g, " ").trim();
-    if (!clean) { setResults([]); return; }
+    if (!clean) { searchSeq.current++; setResults([]); return; }
+    // Waits until typing pauses, and drops answers to older searches.
+    const ticket = ++searchSeq.current;
     debounceRef.current = setTimeout(async () => {
       setSearching(true);
       const { data } = await createClient().from("profiles")
@@ -55,6 +58,7 @@ function PartyPicker({ value, onChange, myId }: { value: Party | null; onChange:
         .neq("id", myId)
         .or(`full_name.ilike.%${clean}%,username.ilike.%${clean}%`)
         .limit(6);
+      if (ticket !== searchSeq.current) return;
       setResults(data || []);
       setSearching(false);
     }, 300);
@@ -156,7 +160,7 @@ function ArtworkPicker({ artworks, selected, onChange }: { artworks: Artwork[]; 
                 on ? "border-ink bg-mango-soft" : "border-line hover:border-line-strong")}>
               <span className="grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-chip bg-sunken">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                {img ? <img src={img} alt="" className="h-full w-full object-contain" /> : <ImageIcon size={15} aria-hidden className="text-fg-3" />}
+                {img ? <img loading="lazy" decoding="async" src={img} alt="" className="h-full w-full object-contain" /> : <ImageIcon size={15} aria-hidden className="text-fg-3" />}
               </span>
               <span className="flex min-w-0 flex-1 flex-col">
                 <span className="truncate font-ui text-label font-semibold text-fg">{aw.title}</span>
@@ -214,10 +218,12 @@ function NewContractInner() {
       if (!user) return;
       setMyId(user.id);
       setMyEmail(user.email || "");
-      const { data: prof } = await sb.from("profiles").select("full_name,role").eq("id", user.id).single();
+      const [{ data: prof }, { data: aws }] = await Promise.all([
+        sb.from("profiles").select("full_name,role").eq("id", user.id).single(),
+        sb.from("artworks").select("id,title,images,medium,price,currency,status").eq("user_id", user.id).order("created_at", { ascending: false }),
+      ]);
       setMyName(prof?.full_name || "");
       setMyRole(prof?.role || "artist");
-      const { data: aws } = await sb.from("artworks").select("id,title,images,medium,price,currency,status").eq("user_id", user.id).order("created_at", { ascending: false });
       setArtworks(aws || []);
     });
   }, []);

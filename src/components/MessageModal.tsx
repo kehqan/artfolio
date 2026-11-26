@@ -149,7 +149,7 @@ export default function MessageModal({
         <div style={{
           background: "#FFFBEA", border: "2.5px solid #111110", borderRadius: 22,
           boxShadow: "8px 8px 0 #111110", width: "100%", maxWidth: 500,
-          fontFamily: "'Darker Grotesque', system-ui, sans-serif",
+          fontFamily: "var(--font-darker-grotesque), system-ui, sans-serif",
           pointerEvents: "auto", overflow: "hidden",
         }}>
 
@@ -163,7 +163,7 @@ export default function MessageModal({
               fontSize: 16, fontWeight: 900, color: "#111110",
             }}>
               {recipientAvatar
-                ? <img src={recipientAvatar} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                ? <img loading="lazy" decoding="async" src={recipientAvatar} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                 : initials
               }
             </div>
@@ -192,7 +192,7 @@ export default function MessageModal({
             <div style={{ margin: "14px 16px 0", background: "#fff", border: "2px solid #E8E0D0", borderRadius: 14, overflow: "hidden", display: "flex", alignItems: "stretch" }}>
               {contextMeta?.image && (
                 <div style={{ width: 72, flexShrink: 0, background: "#F5F0E8", overflow: "hidden" }}>
-                  <img src={contextMeta.image} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                  <img loading="lazy" decoding="async" src={contextMeta.image} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                 </div>
               )}
               <div style={{ padding: "10px 14px", flex: 1, minWidth: 0 }}>
@@ -326,7 +326,7 @@ const INPUT_S: React.CSSProperties = {
   width: "100%", padding: "9px 12px",
   border: "2px solid #E8E0D0", borderRadius: 10, outline: "none",
   fontSize: 13, fontWeight: 600, color: "#111110",
-  fontFamily: "'Darker Grotesque', system-ui, sans-serif",
+  fontFamily: "var(--font-darker-grotesque), system-ui, sans-serif",
   background: "#fff", transition: "border-color .15s",
   boxSizing: "border-box",
 };

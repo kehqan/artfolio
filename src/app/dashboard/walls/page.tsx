@@ -169,7 +169,7 @@ function Thumbs({ e, size }: { e: WallEntry; size: string }) {
       {list.slice(0, 3).map(w => (
         <span key={w.id} className={cn("block overflow-hidden rounded-control border-2 border-surface bg-sunken", size)}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          {w.image && <img src={w.image} alt="" className="h-full w-full object-cover" />}
+          {w.image && <img loading="lazy" decoding="async" src={w.image} alt="" className="h-full w-full object-cover" />}
         </span>
       ))}
     </span>

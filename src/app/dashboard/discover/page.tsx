@@ -39,12 +39,21 @@ export default function DiscoverPage() {
     ]);
     if (!rows) { setLoading(false); return; }
     const following = new Set(follows?.map(f => f.following_id) || []);
-    const enriched = await Promise.all(rows.map(async (p: Profile) => {
-      const [{ count: artwork_count }, { count: follower_count }] = await Promise.all([
-        sb.from("artworks").select("*", { count: "exact", head: true }).eq("user_id", p.id),
-        sb.from("followers").select("*", { count: "exact", head: true }).eq("following_id", p.id),
-      ]);
-      return { ...p, artwork_count: artwork_count || 0, follower_count: follower_count || 0, is_following: following.has(p.id) };
+    // Works and followers for all 50 people in two queries (it used to be two per person).
+    const ids = rows.map((p: Profile) => p.id);
+    const [{ data: works }, { data: fans }] = await Promise.all([
+      sb.from("artworks").select("user_id").in("user_id", ids).limit(10000),
+      sb.from("followers").select("following_id").in("following_id", ids).limit(10000),
+    ]);
+    const tally = (list: any[] | null, key: string) => {
+      const m: Record<string, number> = {};
+      for (const r of list || []) m[r[key]] = (m[r[key]] || 0) + 1;
+      return m;
+    };
+    const workCount = tally(works, "user_id");
+    const fanCount = tally(fans, "following_id");
+    const enriched = rows.map((p: Profile) => ({
+      ...p, artwork_count: workCount[p.id] || 0, follower_count: fanCount[p.id] || 0, is_following: following.has(p.id),
     }));
     setProfiles(enriched);
     setLoading(false);
@@ -53,17 +62,19 @@ export default function DiscoverPage() {
   async function toggleFollow(target: Profile) {
     if (!userId) return;
     setFollowLoading(target.id); setError("");
+    // Flip the button straight away; put it back if the server says no.
+    const flip = (on: boolean) => setProfiles(prev => prev.map(p => p.id === target.id ? {
+      ...p, is_following: on,
+      follower_count: Math.max(0, (p.follower_count || 0) + (on ? 1 : -1)),
+    } : p));
+    flip(!target.is_following);
     const sb = createClient();
     const { error: err } = target.is_following
       ? await sb.from("followers").delete().eq("follower_id", userId).eq("following_id", target.id)
       : await sb.from("followers").insert({ follower_id: userId, following_id: target.id });
     if (err) {
+      flip(!!target.is_following);
       setError("That didn't go through. Please try again.");
-    } else {
-      setProfiles(prev => prev.map(p => p.id === target.id ? {
-        ...p, is_following: !p.is_following,
-        follower_count: Math.max(0, (p.follower_count || 0) + (p.is_following ? -1 : 1)),
-      } : p));
     }
     setFollowLoading(null);
   }

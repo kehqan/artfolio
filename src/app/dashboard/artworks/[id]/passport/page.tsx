@@ -376,7 +376,7 @@ export default function PassportManagePage() {
           </div>
           {artwork.images?.[0] ? (
             <div className="relative hidden min-h-[240px] bg-sunken md:block">
-              <img src={artwork.images[0]} alt="" className="absolute inset-0 h-full w-full object-cover" />
+              <img loading="lazy" decoding="async" src={artwork.images[0]} alt="" className="absolute inset-0 h-full w-full object-cover" />
             </div>
           ) : (
             <div className="hidden place-items-center bg-sunken text-fg-3 md:grid">
@@ -490,7 +490,7 @@ export default function PassportManagePage() {
             <Card padding="none">
               {artwork.images?.[0] && (
                 <div className="aspect-[4/3] bg-sunken">
-                  <img src={artwork.images[0]} alt={artwork.title} className="h-full w-full object-cover" />
+                  <img loading="lazy" decoding="async" src={artwork.images[0]} alt={artwork.title} className="h-full w-full object-cover" />
                 </div>
               )}
 

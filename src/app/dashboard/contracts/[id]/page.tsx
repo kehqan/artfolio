@@ -336,7 +336,7 @@ export default function ContractDetailPage() {
                       <Link href={`/dashboard/artworks/${aw.id}`} className="flex items-center gap-3 rounded-control border-hair border-line px-2.5 py-2 hover:border-ink">
                         <span className="grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-chip bg-sunken">
                           {/* eslint-disable-next-line @next/next/no-img-element */}
-                          {img ? <img src={img} alt="" className="h-full w-full object-contain" /> : <ImageIcon size={15} aria-hidden className="text-fg-3" />}
+                          {img ? <img loading="lazy" decoding="async" src={img} alt="" className="h-full w-full object-contain" /> : <ImageIcon size={15} aria-hidden className="text-fg-3" />}
                         </span>
                         <span className="flex min-w-0 flex-1 flex-col">
                           <span className="truncate font-ui text-label font-semibold text-fg">{aw.title}</span>

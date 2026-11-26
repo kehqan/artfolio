@@ -182,7 +182,7 @@ export function SaleFlow({ open, userId, defaultCurrency, works, clients, startW
                       <span className="relative block aspect-square bg-sunken">
                         {w.images?.[0]
                           // eslint-disable-next-line @next/next/no-img-element
-                          ? <img src={w.images[0]} alt="" className="absolute inset-0 h-full w-full object-contain p-2" />
+                          ? <img loading="lazy" decoding="async" src={w.images[0]} alt="" className="absolute inset-0 h-full w-full object-contain p-2" />
                           : <ImageOff size={20} aria-hidden className="absolute inset-0 m-auto text-fg-3" />}
                         {d && <span className="absolute left-1.5 top-1.5 rounded-pill border-hair border-ink bg-mango px-2 py-0.5 font-ui text-[11px] font-semibold text-on-mango">At {d.venue}</span>}
                       </span>

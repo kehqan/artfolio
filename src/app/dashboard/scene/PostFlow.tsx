@@ -22,6 +22,7 @@ import { Alert, Button, Chip, Input, Modal, Switch, Textarea, cn } from "@/compo
 import { type FeedItem, type Kind, SHOW_TYPES, isVenueRole, wallTermsLine } from "./feed";
 import { SceneCard } from "./SceneCard";
 import { type PlaceArtwork, type WallTerms, cityOf, isSold } from "@/lib/places";
+import { IMAGE_CACHE_SECONDS, prepareImage } from "@/lib/image";
 
 export type PostKind = "show" | "place" | "collab" | "commission" | "walls" | "opencall" | "buying";
 
@@ -206,9 +207,9 @@ export function PostFlow({ open, onClose, onPosted, start }: Props) {
     const added: string[] = [];
     const picked = Array.from(files).slice(0, 6 - a.images.length);
     for (let i = 0; i < picked.length; i++) {
-      const f = picked[i];
+      const f = await prepareImage(picked[i]);
       const path = `${me.id}/scene/${Date.now()}-${i}.${f.name.split(".").pop() || "jpg"}`;
-      const { error: e } = await sb.storage.from("artworks").upload(path, f, { upsert: true, contentType: f.type });
+      const { error: e } = await sb.storage.from("artworks").upload(path, f, { upsert: true, contentType: f.type, cacheControl: IMAGE_CACHE_SECONDS });
       if (e) { setError("One of the photos didn't upload. Please try again."); continue; }
       added.push(sb.storage.from("artworks").getPublicUrl(path).data.publicUrl);
     }
@@ -391,7 +392,7 @@ export function PostFlow({ open, onClose, onPosted, start }: Props) {
                   className={cn("relative block w-full overflow-hidden rounded-control border-hair bg-surface text-left transition disabled:opacity-40", on ? "border-ink shadow-hard-1" : "border-line hover:border-ink")}>
                   <span className="relative block aspect-square bg-sunken">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={w.images![0]} alt="" className="absolute inset-0 h-full w-full object-contain p-1.5" />
+                    <img loading="lazy" decoding="async" src={w.images![0]} alt="" className="absolute inset-0 h-full w-full object-contain p-1.5" />
                   </span>
                   <span className="block truncate px-2 py-1.5 font-ui text-caption font-semibold text-fg">{w.title}</span>
                   {on && <span aria-hidden className="absolute right-1.5 top-1.5 h-5 w-5 rounded-pill border-outline border-ink bg-mango" />}

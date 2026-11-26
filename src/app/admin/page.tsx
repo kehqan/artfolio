@@ -70,7 +70,7 @@ function SlideEditor({ slide, onSave, onDelete }: { slide: Slide; onSave: (s: Sl
       <div ref={canvasRef} style={{ position: "relative", width: "100%", aspectRatio: "16/6", overflow: "hidden", cursor: "crosshair", userSelect: "none", background: "#111" }}>
         <img src={p.image_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", opacity: 0.85 }} />
         <div onMouseDown={drag("text")} style={{ position: "absolute", left: `${p.text_x || 10}%`, top: `${p.text_y || 50}%`, cursor: "grab", transform: "translate(0,-50%)", padding: "4px 8px", border: "1.5px dashed rgba(255,212,0,0.7)", borderRadius: 6, background: "rgba(0,0,0,0.3)" }}>
-          <div style={{ fontFamily: "'Darker Grotesque',sans-serif", fontSize: `${(p.text_size || 72) * 0.2}px`, fontWeight: 900, color: p.text_color || "#fff", whiteSpace: "nowrap", pointerEvents: "none" }}>{p.text_content || "Text"}</div>
+          <div style={{ fontFamily: "var(--font-darker-grotesque),sans-serif", fontSize: `${(p.text_size || 72) * 0.2}px`, fontWeight: 900, color: p.text_color || "#fff", whiteSpace: "nowrap", pointerEvents: "none" }}>{p.text_content || "Text"}</div>
         </div>
         <div onMouseDown={drag("open")} style={{ position: "absolute", left: `${p.quote_open_x || 5}%`, top: `${p.quote_open_y || 10}%`, cursor: "grab", padding: "2px", border: "1.5px dashed rgba(255,212,0,0.6)", borderRadius: 4 }}>
           <span style={{ fontSize: `${(p.quote_size || 120) * 0.15}px`, color: p.quote_color || "#FFD400", fontWeight: 900, pointerEvents: "none", lineHeight: 1 }}>"</span>
@@ -251,7 +251,7 @@ export default function AdminPage() {
 
   if (!authed) return (
     <>
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=Darker+Grotesque:wght@700;800;900&display=swap');*{box-sizing:border-box;margin:0;padding:0}body{font-family:'Darker Grotesque',sans-serif;background:#111110}`}</style>
+      <style>{`*{box-sizing:border-box;margin:0;padding:0}body{font-family:var(--font-darker-grotesque),sans-serif;background:#111110}`}</style>
       <div style={{ minHeight:"100vh", background:"#111110", display:"flex", alignItems:"center", justifyContent:"center", padding:20 }}>
         <div style={{ background:"#FFFBEA", border:"2.5px solid #111110", borderRadius:20, padding:"36px 32px", width:"100%", maxWidth:380, boxShadow:"8px 8px 0 #FFD400" }}>
           <div style={{ fontSize:44, textAlign:"center", marginBottom:16 }}>🥭</div>
@@ -285,9 +285,9 @@ export default function AdminPage() {
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Darker+Grotesque:wght@400;500;600;700;800;900&display=swap');
+        
         *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-        body{font-family:'Darker Grotesque',sans-serif;background:#F5F0E8;color:#111110}
+        body{font-family:var(--font-darker-grotesque),sans-serif;background:#F5F0E8;color:#111110}
         input,textarea,select{font-family:inherit}
         input:focus,textarea:focus,select:focus{outline:none;border-color:#FFD400!important;box-shadow:0 0 0 3px rgba(255,212,0,.2)!important}
         .atab{display:flex;align-items:center;gap:7px;padding:14px 18px;border:none;background:transparent;color:#666;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-2px;white-space:nowrap;transition:all .15s}

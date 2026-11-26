@@ -88,7 +88,7 @@ export function SiteMoment({ image, name = "Your name", className }: { image?: s
         <span className="block aspect-[4/5] overflow-hidden rounded-control bg-sunken p-2">
           {image
             // eslint-disable-next-line @next/next/no-img-element
-            ? <img src={image} alt="" className="h-full w-full object-contain" />
+            ? <img loading="lazy" decoding="async" src={image} alt="" className="h-full w-full object-contain" />
             : <Painting tone="dusk" className="h-full w-full rounded-[6px]" />}
         </span>
       </div>

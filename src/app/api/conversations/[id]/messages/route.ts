@@ -23,20 +23,22 @@ export async function GET(
 
     if (!convo) return NextResponse.json({ error: "Conversation not found" }, { status: 404 });
 
-    // Fetch messages
-    const { data: messages } = await supabase
-      .from("messages")
-      .select("*")
-      .eq("conversation_id", conversationId)
-      .order("created_at", { ascending: true });
-
-    // Mark unread messages as read
+    // Fetch messages and mark the unread ones as read, at the same time.
     const isA = convo.participant_a === user.id;
-    await supabase
-      .from("messages")
-      .update({ [isA ? "read_by_a" : "read_by_b"]: true })
-      .eq("conversation_id", conversationId)
-      .neq("sender_id", user.id);
+    const readCol = isA ? "read_by_a" : "read_by_b";
+    const [{ data: messages }] = await Promise.all([
+      supabase
+        .from("messages")
+        .select("*")
+        .eq("conversation_id", conversationId)
+        .order("created_at", { ascending: true }),
+      supabase
+        .from("messages")
+        .update({ [readCol]: true })
+        .eq("conversation_id", conversationId)
+        .eq(readCol, false)
+        .neq("sender_id", user.id),
+    ]);
 
     return NextResponse.json({ messages: messages || [], conversation: convo });
   } catch (e) {

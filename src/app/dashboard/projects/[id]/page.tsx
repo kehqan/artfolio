@@ -422,7 +422,7 @@ function WorkSheet({ w, papers, onClose, onAgree }: { w: GatheredWork; papers: M
         <div className="relative aspect-[4/3] overflow-hidden rounded-card border-hair border-line bg-sunken">
           {w.images?.[0]
             // eslint-disable-next-line @next/next/no-img-element
-            ? <img src={w.images[0]} alt={w.title} className="absolute inset-0 h-full w-full object-contain p-4" />
+            ? <img loading="lazy" decoding="async" src={w.images[0]} alt={w.title} className="absolute inset-0 h-full w-full object-contain p-4" />
             : <ImageOff size={26} aria-hidden className="absolute inset-0 m-auto text-fg-3" />}
         </div>
         <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 font-ui text-body-sm">

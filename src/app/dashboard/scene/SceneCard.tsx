@@ -29,7 +29,7 @@ export function SceneCard({ item, mine, onOpen }: { item: FeedItem; mine: boolea
   const hidden = !isLive(item);
 
   return (
-    <article className="mb-4 break-inside-avoid">
+    <article className="cv-auto mb-4 break-inside-avoid">
       <button
         type="button"
         onClick={onOpen}

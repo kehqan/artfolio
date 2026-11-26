@@ -1,11 +1,14 @@
 import type { Metadata, Viewport } from "next";
 import { Darker_Grotesque, Instrument_Sans, Instrument_Serif } from "next/font/google";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import "../styles/tokens.css";
 import "./globals.css";
 
+// Both UI faces are variable fonts: leaving out `weight` ships one file per
+// face that covers every weight, instead of one file per weight.
+// next/font serves them from our own domain (no Google request at runtime).
 const darkerGrotesque = Darker_Grotesque({
   subsets: ["latin", "latin-ext"],
-  weight: ["300", "400", "500", "600", "700", "800", "900"],
   variable: "--font-darker-grotesque",
   display: "swap",
 });
@@ -13,7 +16,6 @@ const darkerGrotesque = Darker_Grotesque({
 // Body / UI face for the design system (see DESIGN_SYSTEM.md)
 const instrumentSans = Instrument_Sans({
   subsets: ["latin", "latin-ext"],
-  weight: ["400", "500", "600", "700"],
   variable: "--font-instrument-sans",
   display: "swap",
 });
@@ -25,6 +27,8 @@ const instrumentSerif = Instrument_Serif({
   style: ["normal", "italic"],
   variable: "--font-site-serif",
   display: "swap",
+  // Only personal sites with the "Classic" mood use it: don't preload it on every page.
+  preload: false,
 });
 
 export const viewport: Viewport = {
@@ -99,6 +103,8 @@ export default function RootLayout({
       </head>
       <body className="font-sans bg-page text-fg antialiased">
         {children}
+        {/* Real visitors' load times (Core Web Vitals), in the Vercel dashboard under Speed Insights. Loads after the page. */}
+        <SpeedInsights />
       </body>
     </html>
   );

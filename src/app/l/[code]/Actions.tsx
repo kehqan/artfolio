@@ -8,6 +8,7 @@ import Link from "next/link";
 import { ArrowRight, Check, Mail, MessageSquare, Plus, ShoppingBag } from "lucide-react";
 import { Alert, Button, Field, Input, Modal, Textarea } from "@/components/ui";
 import { recordEvent } from "@/lib/labels";
+import { track } from "@/lib/analytics";
 import { MIN_AGE, TERMS_VERSION } from "@/lib/legal";
 import { Captcha, captchaOptions, captchaWaiting } from "@/components/auth/Captcha";
 
@@ -122,6 +123,7 @@ export function SellingActions({ code, artistId, artistFirst, workId, title, pla
   const [error, setError] = useState("");
 
   function start(kind: "buy" | "ask") {
+    if (kind === "buy") track("buy_click", { where: "label" });
     const at = place ? ` at ${place}` : "";
     setBody(kind === "buy"
       ? `Hi ${artistFirst}, I saw “${title}”${at} and I'd like to buy it. How do we go about it?`
@@ -149,6 +151,7 @@ export function SellingActions({ code, artistId, artistFirst, workId, title, pla
       return;
     }
     getSb().then(sb => recordEvent(sb, code, open === "buy" ? "buy" : "ask"));
+    if (open === "buy") track("buy_message_sent", { where: "label" });
     setSent(true);
   }
 

@@ -5,6 +5,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { waitUntil } from "@vercel/functions";
 import { createClient } from "@/lib/supabase/server";
+import { trackServer } from "@/lib/analytics-server";
 
 export async function GET(request: NextRequest, { params }: { params: { code: string } }) {
   const code = (params.code || "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 12);
@@ -13,6 +14,7 @@ export async function GET(request: NextRequest, { params }: { params: { code: st
     // instead of waiting for the database (Vercel keeps the work running).
     try {
       waitUntil(Promise.resolve(createClient().rpc("record_label_event", { p_code: code, p_action: "scan" })).catch(() => {}));
+      waitUntil(trackServer("label_scanned"));
     } catch { /* still open the page */ }
   }
   return NextResponse.redirect(new URL(`/l/${code}`, request.url), 302);

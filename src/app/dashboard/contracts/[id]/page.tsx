@@ -10,6 +10,7 @@ import { Alert, Avatar, Badge, Button, ButtonLink, Card, EmptyState, Input, Moda
 import type { BadgeTone } from "@/components/ui";
 import { formatPrice } from "@/components/public/PublicChrome";
 import { useJourney } from "@/components/journey/JourneyProvider";
+import { track } from "@/lib/analytics";
 
 const TYPE_LABEL: Record<string, string> = {
   exhibition: "Exhibition agreement", collaboration: "Collaboration agreement", commission: "Commission agreement", general: "General agreement",
@@ -189,6 +190,7 @@ export default function ContractDetailPage() {
       return;
     }
     const after = await load();
+    track("agreement_signed", { via: "account", done: !!(after?.executed_at || after?.status === "signed") });
     const { count: signedBefore } = await sb.from("contracts").select("id", { count: "exact", head: true })
       .or(`initiator_id.eq.${myId},counterparty_id.eq.${myId}`).not("executed_at", "is", null);
     const other = isInitiator ? contract.counterparty_name : contract.initiator_name;

@@ -23,6 +23,7 @@ import { type FeedItem, type Kind, SHOW_TYPES, isVenueRole, wallTermsLine } from
 import { SceneCard } from "./SceneCard";
 import { type PlaceArtwork, type WallTerms, cityOf, isSold } from "@/lib/places";
 import { IMAGE_CACHE_SECONDS, prepareImage } from "@/lib/image";
+import { track } from "@/lib/analytics";
 
 export type PostKind = "show" | "place" | "collab" | "commission" | "walls" | "opencall" | "buying";
 
@@ -299,6 +300,8 @@ export function PostFlow({ open, onClose, onPosted, start }: Props) {
 
     setSaving(false);
     if (res.error) { setError("That didn't post. Please try again."); return; }
+    track("posted", { kind });
+    if (kind === "walls") track("wall_request_posted");
     onPosted();
     onClose();
     // Say who sees it, and celebrate a venue's first walls.

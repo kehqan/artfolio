@@ -13,7 +13,7 @@ export default function PrivacyPage() {
     <LegalPage
       eyebrow={`Last updated ${LAST_UPDATED}`}
       title="Privacy"
-      intro="We keep what it takes to run your account and get your work onto walls. No ads, no selling your data, no tracking you around the web."
+      intro="We keep what it takes to run your account and get your work onto walls. No ads, no selling your data, no tracking cookies, no following you around the web."
     >
       <Section title="Who we are">
         <p>
@@ -41,6 +41,8 @@ export default function PrivacyPage() {
           <li><strong>Supabase</strong> (database, sign-in, file storage). Your data is stored in Ireland, in the EU.</li>
           <li><strong>Vercel</strong> (hosting). Pages are served from Dublin and a worldwide network.</li>
           <li><strong>Resend</strong> (sending emails).</li>
+          <li><strong>Sentry</strong> (crash reports), in its EU data region in Germany. When a page breaks, it gets what went wrong in the code, the page address without its query part, your browser type and, if you&rsquo;re signed in, your account number. Not your name, email or what you typed, and no screen recordings. Sentry is set not to store IP addresses.</li>
+          <li><strong>PostHog</strong> (usage counts), in its EU cloud in Germany. See below.</li>
           <li><strong>Google Maps</strong>, only when you type in an address field or open a map. Google then gets your IP address and what you type. Until you use it, nothing is loaded from Google.</li>
           <li><strong>YouTube</strong> thumbnails on a few learning links, loaded from Google when you open those pages.</li>
         </ul>
@@ -60,6 +62,15 @@ export default function PrivacyPage() {
           We measure how fast pages load with Vercel Speed Insights. It uses no cookies and doesn&rsquo;t identify you.
           Fonts are served from our own domain, not from Google.
         </p>
+        <p>
+          To learn what helps artists, we count visits and a few steps, like signing up, adding a work, posting a wall,
+          sending an offer, signing an agreement, scanning a wall label or tapping buy. We use PostHog for this, without
+          cookies and without storing anything in your browser. It goes through our own address, so PostHog never sees
+          your IP address. If you&rsquo;re signed in, the steps are linked to your account number (not your name or email), so we
+          can see where people get stuck. If your browser sends &ldquo;Do Not Track&rdquo; or Global Privacy Control, we count nothing.
+          We do this because we have a legitimate interest in improving Artomango (GDPR art. 6(1)(f)), and you can object any time by
+          writing to us.
+        </p>
       </Section>
 
       <Section title="How long we keep it">
@@ -67,6 +78,7 @@ export default function PrivacyPage() {
           <li>Your account and what you add: until you delete them or ask us to.</li>
           <li>Signed agreements: as long as the law requires us to be able to prove them, usually up to 10 years after they end.</li>
           <li>Email records: up to a year. Reports: up to 3 years after we decide.</li>
+          <li>Crash reports: up to 90 days. Usage counts: up to 2 years.</li>
         </ul>
       </Section>
 

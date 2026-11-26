@@ -23,6 +23,7 @@ import {
   ACCENTS, type AccentKey, type GridKey, type HeaderKey, type PreviewMessage, type SiteConfig, type TypeKey, siteOf,
 } from "@/lib/site";
 import { IMAGE_CACHE_SECONDS, prepareImage } from "@/lib/image";
+import { track } from "@/lib/analytics";
 
 const MAX_WORKS = 3;
 
@@ -168,6 +169,7 @@ export default function WelcomePage() {
         }).select("id, title, images, width_cm, height_cm, price, currency, status, wall_terms").single();
         if (e || !data) { setBusy(false); setError("That didn't save. Please try again."); return; }
         out.push({ ...x, id: data.id, saved: data as PlaceArtwork });
+        track("work_added", { from: "welcome" });
       }
     }
     setWorks(out);

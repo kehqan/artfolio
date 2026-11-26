@@ -1,4 +1,5 @@
 /** @type {import('next').NextConfig} */
+const { withSentryConfig } = require("@sentry/nextjs/config");
 
 // Files in /public keep the same name when they change, so they get a day of
 // browser cache plus a week of "use the old copy while fetching the new one".
@@ -14,15 +15,8 @@ const nextConfig = {
   },
   // Responses are gzip/brotli compressed (Vercel does this at its edge too).
   compress: true,
-  poweredByHeader: false,
-  images: {
-    // When next/image is used, serve AVIF first, then WebP.
-    formats: ["image/avif", "image/webp"],
-    remotePatterns: [
-      { protocol: "https", hostname: "pepvuswdwoxrgmhdipyu.supabase.co", pathname: "/storage/v1/object/public/**" },
-    ],
-    minimumCacheTTL: 60 * 60 * 24 * 30,
-  },
+  // Next 14 only runs src/instrumentation.ts (crash reports) with this on.
+  experimental: { instrumentationHook: true },
   async headers() {
     return [
       // Basic browser protections on every page: no framing by other sites
@@ -40,4 +34,23 @@ const nextConfig = {
   },
 };
 
-module.exports = nextConfig;
+// Crash reports (Sentry). Without SENTRY_AUTH_TOKEN the build still works, it
+// just doesn't upload source maps (then stack traces show minified code).
+module.exports = withSentryConfig(nextConfig, {
+  org: process.env.SENTRY_ORG,
+  project: process.env.SENTRY_PROJECT,
+  url: process.env.SENTRY_URL || undefined,
+  silent: !process.env.CI,
+  telemetry: false,
+  widenClientFileUpload: true,
+  sourcemaps: { disable: !process.env.SENTRY_AUTH_TOKEN, deleteSourcemapsAfterUpload: true },
+  // Errors only: leave the tracing and replay code out of the pages people download.
+  bundleSizeOptimizations: {
+    excludeDebugStatements: true,
+    excludeTracing: true,
+    excludeReplayIframe: true,
+    excludeReplayShadowDom: true,
+    excludeReplayWorker: true,
+  },
+  suppressOnRouterTransitionStartWarning: true,
+});

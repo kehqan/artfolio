@@ -24,6 +24,7 @@ import { type PlaceArtwork, missingForWall, wallReady } from "@/lib/places";
 import { useJourney } from "@/components/journey/JourneyProvider";
 import { Burst } from "@/components/journey/Burst";
 import { IMAGE_CACHE_SECONDS, prepareImage } from "@/lib/image";
+import { track } from "@/lib/analytics";
 
 type Step = "photos" | "title" | "finished" | "medium" | "size" | "year" | "price" | "wall" | "done";
 
@@ -172,6 +173,7 @@ export default function AddWorkPage() {
     }).select().single();
     setBusy(false);
     if (e || !data) { setError("That didn't save. Please try again."); return; }
+    track("work_added", { from: "add" });
     setWork({ ...data, images: data.images || [] } as Work);
     next();
   }

@@ -4,6 +4,7 @@
 // look it is showing, so the owner sees changes before saving.
 import { useEffect, useState } from "react";
 import MessageModal from "@/components/MessageModal";
+import { BlockDialog } from "@/components/BlockDialog";
 import { ButtonLink, EmptyState, Skeleton, cn } from "@/components/ui";
 import { PublicHeader, formatPrice, publicWrap } from "@/components/public/PublicChrome";
 import { Site } from "@/components/site/Site";
@@ -22,6 +23,10 @@ export default function ProfileClient({ username, initial }: { username: string;
   const [selected, setSelected] = useState<SiteWork | null>(null);
   const [message, setMessage] = useState<MessageContext | null>(null);
   const [preview, setPreview] = useState(false);
+  // A signed-in visitor (not the owner) can block this person.
+  const [canBlock, setCanBlock] = useState(false);
+  const [blocked, setBlocked] = useState(false);
+  const [blocking, setBlocking] = useState(false);
 
   useEffect(() => {
     if (!username) return;
@@ -29,6 +34,12 @@ export default function ProfileClient({ username, initial }: { username: string;
     import("@/lib/supabase/client").then(async ({ createClient }) => {
       const sb = createClient();
       const { data: { session } } = await sb.auth.getSession();
+      const ownerId = initial?.profile.id;
+      if (session && ownerId && session.user.id !== ownerId) {
+        setCanBlock(true);
+        sb.from("user_blocks").select("blocked_id").eq("blocked_id", ownerId).maybeSingle()
+          .then(({ data: b }) => setBlocked(!!b));
+      }
       // Signed out, or someone else's page: the server copy is all we need.
       // A new name (renamed or just created) is looked up again as well.
       if (initial && session?.user.id !== initial.profile.id) return;
@@ -90,7 +101,13 @@ export default function ProfileClient({ username, initial }: { username: string;
     <>
       <Site data={data} site={site} preview={preview}
         onOpenWork={w => setSelected(w)}
-        onMessage={() => !preview && setMessage({ kind: "direct" })} />
+        onMessage={() => !preview && setMessage({ kind: "direct" })}
+        onBlock={canBlock && !preview ? () => setBlocking(true) : undefined} blocked={blocked} />
+
+      {canBlock && (
+        <BlockDialog open={blocking} onClose={() => setBlocking(false)} otherId={p.id} name={p.full_name || "this person"}
+          blocked={blocked} onDone={setBlocked} profileUrl={typeof window !== "undefined" ? window.location.href.split("?")[0] : null} />
+      )}
 
       {selected && (
         <WorkDetail aw={selected} firstName={firstName} onClose={() => setSelected(null)}

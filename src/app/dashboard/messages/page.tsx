@@ -6,9 +6,10 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { DealsPanel } from "@/components/deals/DealsPanel";
 import { createClient } from "@/lib/supabase/client";
 import { fetchJson, forget, timeoutSignal } from "@/lib/fetch-json";
-import { ArrowLeft, Check, CheckCheck, ChevronRight, MessageSquare, Send, Sparkles } from "lucide-react";
+import { ArrowLeft, Ban, Check, CheckCheck, ChevronRight, Flag, MessageSquare, Send, Sparkles } from "lucide-react";
+import { BlockDialog, reportPersonHref } from "@/components/BlockDialog";
 import Link from "next/link";
-import { Avatar, Badge, ButtonLink, Chip, EmptyState, SearchField, Skeleton, Tabs, cn } from "@/components/ui";
+import { Avatar, Badge, Button, ButtonLink, Chip, EmptyState, Menu, SearchField, Skeleton, Tabs, cn } from "@/components/ui";
 import type { BadgeTone } from "@/components/ui";
 
 type OtherProfile = { id: string; full_name: string; username?: string; avatar_url?: string; role?: string };
@@ -18,6 +19,7 @@ type Conversation = {
   guest_name: string | null; guest_email: string | null;
   last_message_at: string; last_message_preview: string | null; unread_count: number;
   other_profile: OtherProfile | null;
+  blocked_by_me?: boolean;
 };
 type Message = {
   id: string; conversation_id: string; sender_id: string | null; guest_name: string | null;
@@ -59,6 +61,8 @@ function dayLabel(d: string) {
 }
 
 const nameOf = (c: Conversation) => c.other_profile?.full_name || c.guest_name || "Guest";
+const profileUrlOf = (c: Conversation) =>
+  c.other_profile?.username && typeof window !== "undefined" ? `${window.location.origin}/${c.other_profile.username}` : null;
 const hasContext = (c: Conversation) => !!(c.context_title || c.context_meta);
 
 /** The post or work the conversation started from. */
@@ -130,6 +134,8 @@ function ChatsView() {
   const [search, setSearch] = useState("");
   const [showQuick, setShowQuick] = useState(false);
   const [error, setError] = useState("");
+  const [sendError, setSendError] = useState("");
+  const [blocking, setBlocking] = useState(false);
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -195,14 +201,14 @@ function ChatsView() {
   }, [messages]);
 
   function openConvo(c: Conversation) {
-    setActive(c); setShowQuick(false); setMessages([]);
+    setActive(c); setShowQuick(false); setMessages([]); setSendError("");
     loadMessages(c.id);
   }
 
   async function send(body?: string) {
     const text = body ?? input.trim();
     if (!text || !active) return;
-    setSending(true); setInput(""); setShowQuick(false);
+    setSending(true); setInput(""); setShowQuick(false); setSendError("");
     // Show the message straight away; swap in the saved one when the server answers.
     const tmpId = `tmp-${Date.now()}`;
     const now = new Date().toISOString();
@@ -219,8 +225,8 @@ function ChatsView() {
       if (data.message) {
         setMessages(p => p.map(m => (m.id === tmpId ? data.message : m)));
         seen.current = { id: active.id, n: seen.current.n + 1 };
-      } else undo();
-    } catch { undo(); }
+      } else { undo(); setSendError(data.error || "Your message didn't send. Please try again."); }
+    } catch { undo(); setSendError("Your message didn't send. Check your connection and try again."); }
     setSending(false);
     inputRef.current?.focus();
   }
@@ -309,7 +315,21 @@ function ChatsView() {
                   Profile <ChevronRight size={14} aria-hidden />
                 </ButtonLink>
               )}
+              {active.other_profile && (
+                <Menu label={`More for ${nameOf(active)}`} items={[
+                  { label: "Report", icon: Flag, onSelect: () => { window.location.href = reportPersonHref(profileUrlOf(active)); } },
+                  { label: active.blocked_by_me ? "Unblock" : "Block", icon: Ban, danger: !active.blocked_by_me, onSelect: () => setBlocking(true) },
+                ]} />
+              )}
             </header>
+            {active.other_profile && (
+              <BlockDialog open={blocking} onClose={() => setBlocking(false)} otherId={active.other_profile.id}
+                name={nameOf(active)} blocked={!!active.blocked_by_me} profileUrl={profileUrlOf(active)}
+                onDone={b => {
+                  setActive(a => (a ? { ...a, blocked_by_me: b } : a));
+                  setConvos(p => p.map(c => (c.id === active.id ? { ...c, blocked_by_me: b } : c)));
+                }} />
+            )}
 
             <div className="flex-1 overflow-y-auto px-4 py-4">
               {hasContext(active) && <div className="mx-auto mb-4 max-w-md"><ContextCard convo={active} /></div>}
@@ -348,6 +368,13 @@ function ChatsView() {
               <div ref={bottomRef} />
             </div>
 
+            {active.blocked_by_me ? (
+              <div className="flex flex-wrap items-center justify-between gap-3 border-t-hair border-line bg-surface px-4 py-3">
+                <p className="font-ui text-body-sm text-fg-2">You blocked {nameOf(active).split(" ")[0]}. You can&rsquo;t message each other.</p>
+                <Button size="sm" variant="secondary" onClick={() => setBlocking(true)}>Unblock</Button>
+              </div>
+            ) : <>
+            {sendError && <p role="alert" className="border-t-hair border-line bg-surface px-4 pt-3 font-ui text-body-sm text-bad">{sendError}</p>}
             {showQuick && (
               <div className="flex gap-2 overflow-x-auto border-t-hair border-line bg-surface px-4 py-3" role="group" aria-label="Quick replies">
                 {QUICK_REPLIES.map(t => <Chip key={t.key} onClick={() => send(t.body)} className="shrink-0">{t.label}</Chip>)}
@@ -370,6 +397,7 @@ function ChatsView() {
                 <Send size={17} aria-hidden />
               </button>
             </form>
+            </>}
           </>
         )}
       </section>

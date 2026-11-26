@@ -9,7 +9,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useJourney } from "@/components/journey/JourneyProvider";
 import { Hint } from "@/components/journey/Hint";
 import { Alert, Button, ButtonLink, Card, EmptyState, Field, Input, PageHeader, Skeleton, Switch, Textarea, cn } from "@/components/ui";
-import { IMAGE_CACHE_SECONDS, prepareImage } from "@/lib/image";
+import { IMAGE_CACHE_SECONDS, imageExt, prepareImage } from "@/lib/image";
 import {
   ACCENTS, GRIDS, HEADERS, SECTION_HINT, SECTION_LABEL, TYPES,
   type GridKey, type HeaderKey, type PreviewMessage, type SiteConfig, type SiteSettings, type TypeKey,
@@ -149,7 +149,7 @@ export default function SiteEditorPage() {
     if (!file.type.startsWith("image/")) { setNotice({ tone: "bad", text: "Choose an image file (JPG, PNG or WebP)." }); return null; }
     file = await prepareImage(file);
     if (file.size > 10 * 1024 * 1024) { setNotice({ tone: "bad", text: "That image is over 10 MB. Try a smaller one." }); return null; }
-    const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
+    const ext = imageExt(file);
     const path = `${uid}/${name}-${Date.now()}.${ext}`;
     try {
       const res = await fetch("/api/upload", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ path, contentType: file.type }) });

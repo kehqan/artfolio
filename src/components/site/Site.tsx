@@ -21,6 +21,9 @@ type Props = {
   onMessage: () => void;
   /** In the editor preview: no sticky bar, links stay on the page. */
   preview?: boolean;
+  /** For a signed-in visitor: block or unblock this person (footer link). */
+  onBlock?: () => void;
+  blocked?: boolean;
 };
 
 // ── Look ────────────────────────────────────────────────────────────
@@ -367,7 +370,7 @@ export function Contact({ data, site, onMessage }: { data: SiteData; site: SiteC
 }
 
 // ── The site ────────────────────────────────────────────────────────
-export function Site({ data, site, onOpenWork, onMessage, preview }: Props) {
+export function Site({ data, site, onOpenWork, onMessage, preview, onBlock, blocked }: Props) {
   const p = data.profile;
   const venue = isVenueRole(p.role);
   const featured = useMemo(() => data.works.filter(w => w.featured).slice(0, 3), [data.works]);
@@ -444,6 +447,7 @@ export function Site({ data, site, onOpenWork, onMessage, preview }: Props) {
           <span className="flex flex-wrap items-center gap-x-5 gap-y-2">
             <a href="/register" className="inline-flex items-center gap-1.5 hover:text-fg">Made with <span className="font-semibold text-fg">Artomango</span></a>
             <a href="/report" onClick={e => { e.currentTarget.href = `/report?url=${encodeURIComponent(window.location.href)}`; }} className="hover:text-fg">Report</a>
+            {onBlock && <button type="button" onClick={onBlock} className="hover:text-fg">{blocked ? "Unblock" : "Block"}</button>}
           </span>
         </div>
       </footer>

@@ -1,6 +1,9 @@
 // src/app/api/conversations/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { MESSAGE_MAX, dbRefusal, isEmail, isUuid, oneOf, smallObject, text } from "@/lib/validate";
+
+const CONTEXT_TYPES = ["direct", "collab", "artwork_inquiry"] as const;
 
 export async function GET(request: NextRequest) {
   try {
@@ -22,7 +25,7 @@ export async function GET(request: NextRequest) {
     const otherOf = (c: any) => (c.participant_a === user.id ? c.participant_b : c.participant_a);
     const otherIds = Array.from(new Set(list.map(otherOf).filter(Boolean)));
     const ids = list.map(c => c.id);
-    const [{ data: profs }, { data: unreadRows }] = await Promise.all([
+    const [{ data: profs }, { data: unreadRows }, { data: blockRows }] = await Promise.all([
       otherIds.length
         ? supabase.from("profiles").select("id, full_name, username, avatar_url, role").in("id", otherIds)
         : Promise.resolve({ data: [] as any[] }),
@@ -34,7 +37,12 @@ export async function GET(request: NextRequest) {
             .neq("sender_id", user.id)
             .limit(5000)
         : Promise.resolve({ data: [] as any[] }),
+      // People I blocked (RLS only shows my own blocks).
+      otherIds.length
+        ? supabase.from("user_blocks").select("blocked_id").in("blocked_id", otherIds)
+        : Promise.resolve({ data: [] as any[] }),
     ]);
+    const blocked = new Set((blockRows || []).map((b: any) => b.blocked_id));
     const profById = new Map((profs || []).map((p: any) => [p.id, p]));
     const isAById = new Map(list.map(c => [c.id, c.participant_a === user.id]));
     const unreadById = new Map<string, number>();
@@ -48,6 +56,7 @@ export async function GET(request: NextRequest) {
       ...c,
       other_profile: profById.get(otherOf(c)) || null,
       unread_count: unreadById.get(c.id) || 0,
+      blocked_by_me: blocked.has(otherOf(c)),
     }));
 
     return NextResponse.json({ conversations: enriched });
@@ -63,30 +72,27 @@ export async function POST(request: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser();
     const body = await request.json();
 
-    const {
-      recipient_id,
-      context_type = "direct",
-      context_id,
-      context_title,
-      context_meta,       // ← now included
-      initial_message,
-      guest_name,
-      guest_email,
-      template_key,
-    } = body;
-    const tag = typeof template_key === "string" && /^[a-z_]{1,32}$/.test(template_key) ? template_key : null;
+    const recipient_id = body?.recipient_id;
+    if (!isUuid(recipient_id)) return NextResponse.json({ error: "recipient_id required" }, { status: 400 });
+    // Shape checks only: the text itself is saved exactly as typed (see lib/validate).
+    const context_type = oneOf(body.context_type, CONTEXT_TYPES, "direct");
+    const context_id = text(body.context_id, 100);
+    const context_title = text(body.context_title, 200);
+    const context_meta = smallObject(body.context_meta, 4000);
+    const initial_message = text(body.initial_message, MESSAGE_MAX);
+    const guest_name = text(body.guest_name, 100);
+    const guest_email = text(body.guest_email, 254);
+    const tag = typeof body.template_key === "string" && /^[a-z_]{1,32}$/.test(body.template_key) ? body.template_key : null;
 
-    if (!recipient_id || !/^[0-9a-f-]{36}$/i.test(String(recipient_id))) {
-      return NextResponse.json({ error: "recipient_id required" }, { status: 400 });
-    }
-    if (!initial_message?.trim()) return NextResponse.json({ error: "Message body required" }, { status: 400 });
+    if (!initial_message) return NextResponse.json({ error: "Message body required" }, { status: 400 });
+    if (user && recipient_id === user.id) return NextResponse.json({ error: "You can't message yourself." }, { status: 400 });
 
     const senderId = user?.id || null;
 
     // Visitors without an account go through a database function that checks
     // the input and creates the conversation, message and notification.
     if (!senderId) {
-      if (!guest_name?.trim() || !guest_email?.trim()) {
+      if (!guest_name || !isEmail(guest_email)) {
         return NextResponse.json({ error: "Name and email required" }, { status: 400 });
       }
       const { data: convoId, error: guestErr } = await supabase.rpc("start_guest_conversation", {
@@ -124,17 +130,20 @@ export async function POST(request: NextRequest) {
       if (existing) {
         // The sender has read it; the other person hasn't.
         const senderIsA = existing.participant_a === senderId;
-        await supabase.from("messages").insert({
+        const { error: sendErr } = await supabase.from("messages").insert({
           conversation_id: existing.id,
           sender_id: senderId,
-          body: initial_message.trim(),
+          body: initial_message,
           template_key: tag,
           read_by_a: senderIsA,
           read_by_b: !senderIsA,
         });
+        const refused = dbRefusal(sendErr);
+        if (refused) return NextResponse.json({ error: refused.error }, { status: refused.status });
+        if (sendErr) return NextResponse.json({ error: "Could not send your message." }, { status: 500 });
         await supabase.from("conversations").update({
           last_message_at: new Date().toISOString(),
-          last_message_preview: initial_message.trim().slice(0, 120),
+          last_message_preview: initial_message.slice(0, 120),
         }).eq("id", existing.id);
 
         return NextResponse.json({ conversation_id: existing.id });
@@ -154,19 +163,21 @@ export async function POST(request: NextRequest) {
         guest_name: guest_name || null,
         guest_email: guest_email || null,
         last_message_at: new Date().toISOString(),
-        last_message_preview: initial_message.trim().slice(0, 120),
+        last_message_preview: initial_message.slice(0, 120),
       })
       .select()
       .single();
 
-    if (convoErr || !convo) return NextResponse.json({ error: convoErr?.message || "Failed" }, { status: 500 });
+    const refused = dbRefusal(convoErr);
+    if (refused) return NextResponse.json({ error: refused.error }, { status: refused.status });
+    if (convoErr || !convo) return NextResponse.json({ error: "Could not start the conversation." }, { status: 500 });
 
     await supabase.from("messages").insert({
       conversation_id: convo.id,
       sender_id: senderId,
       guest_name: guest_name || null,
       guest_email: guest_email || null,
-      body: initial_message.trim(),
+      body: initial_message,
       template_key: tag,
       read_by_a: true,
       read_by_b: false,
@@ -177,7 +188,7 @@ export async function POST(request: NextRequest) {
       user_id: recipient_id,
       type: "message",
       title: senderId ? "New message" : `Message from ${guest_name || "a visitor"}`,
-      body: initial_message.trim().slice(0, 80),
+      body: initial_message.slice(0, 80),
       data: { conversation_id: convo.id },
     });
 

@@ -6,14 +6,24 @@
  * Safari), they are usually 200–600 KB and look the same on screen. Every page
  * that shows the work then loads several times faster.
  *
- * GIFs (may move), SVGs and anything that fails to decode go up unchanged, and
- * the original is kept whenever the new file wouldn't be smaller.
+ * Redrawing the photo also drops its hidden details (EXIF): where it was
+ * taken (GPS), the phone, the date. Artists often shoot work at home, so a
+ * photo must never carry its location onto a public page. The original is
+ * only kept when the new file wouldn't be smaller AND the original has no
+ * such details. A JPEG that can't be redrawn has its details cut out instead.
+ * GIFs (may move) go up as they are; they don't carry GPS.
+ *
+ * The storage buckets themselves only take JPEG, PNG, WebP, GIF and AVIF up
+ * to 10 MB (database/migrations/20261124_phase1_contracts_storage.sql), so a
+ * wrong file is refused even if this step is skipped.
  */
 const MAX_SIDE = 2560;
 
 export async function prepareImage(file: File, maxSide = MAX_SIDE): Promise<File> {
   if (typeof window === "undefined" || !file.type.startsWith("image/")) return file;
   if (file.type === "image/gif" || file.type === "image/svg+xml") return file;
+  let meta = true;
+  try { meta = await hasHiddenDetails(file); } catch { /* assume it has some */ }
   try {
     const bitmap = await createImageBitmap(file);
     const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height));
@@ -30,11 +40,45 @@ export async function prepareImage(file: File, maxSide = MAX_SIDE): Promise<File
     let blob = await toBlob(canvas, "image/webp", 0.86);
     // Browsers that can't write WebP hand back a PNG instead.
     if (!blob || blob.type !== "image/webp") blob = await toBlob(canvas, "image/jpeg", 0.88);
-    if (!blob || (blob.size >= file.size && scale === 1)) return file;
+    if (!blob) return meta ? await stripJpeg(file) : file;
+    if (blob.size >= file.size && scale === 1 && !meta) return file;
 
     const ext = blob.type === "image/webp" ? "webp" : "jpg";
     const base = file.name.replace(/\.[^.]+$/, "") || "image";
     return new File([blob], `${base}.${ext}`, { type: blob.type, lastModified: Date.now() });
+  } catch {
+    return meta ? await stripJpeg(file) : file;
+  }
+}
+
+/** True when the file looks like it carries EXIF or XMP details (maybe GPS). */
+async function hasHiddenDetails(file: File): Promise<boolean> {
+  const head = new Uint8Array(await file.slice(0, 256 * 1024).arrayBuffer());
+  let s = "";
+  for (let i = 0; i < head.length; i++) s += String.fromCharCode(head[i]);
+  return /Exif\0|eXIf|EXIF|<x:xmpmeta|XMP |iTXt|tEXt|zTXt/.test(s);
+}
+
+/**
+ * Cut the EXIF/XMP (APP1) and Photoshop/IPTC (APP13) blocks out of a JPEG,
+ * leaving the picture untouched. Anything that isn't a JPEG comes back as is.
+ */
+async function stripJpeg(file: File): Promise<File> {
+  if (file.type !== "image/jpeg") return file;
+  try {
+    const b = new Uint8Array(await file.arrayBuffer());
+    if (b[0] !== 0xff || b[1] !== 0xd8) return file;
+    const parts: Uint8Array[] = [b.subarray(0, 2)];
+    let i = 2;
+    while (i + 4 <= b.length && b[i] === 0xff) {
+      const marker = b[i + 1];
+      if (marker === 0xda) break; // start of the picture data: keep the rest
+      const len = (b[i + 2] << 8) | b[i + 3];
+      if (marker !== 0xe1 && marker !== 0xed) parts.push(b.subarray(i, i + 2 + len));
+      i += 2 + len;
+    }
+    parts.push(b.subarray(i));
+    return new File(parts as BlobPart[], file.name, { type: file.type, lastModified: Date.now() });
   } catch {
     return file;
   }
@@ -46,3 +90,9 @@ function toBlob(canvas: HTMLCanvasElement, type: string, quality: number): Promi
 
 /** Uploaded files get new names every time, so browsers may keep them for a year. */
 export const IMAGE_CACHE_SECONDS = "31536000";
+
+/** The file ending for an upload, from its type (names can be anything). */
+export function imageExt(file: File): string {
+  const byType: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/gif": "gif", "image/avif": "avif" };
+  return byType[file.type] || "jpg";
+}

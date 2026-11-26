@@ -6,6 +6,7 @@ import { nextPath } from "@/lib/next-path";
 import { createClient } from "@/lib/supabase/client";
 import { Alert, Button, Field, Input, PasswordInput } from "@/components/ui";
 import { AuthLink, AuthShell } from "@/components/auth/AuthShell";
+import { Captcha, captchaOptions, captchaWaiting } from "@/components/auth/Captcha";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -13,12 +14,15 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [captcha, setCaptcha] = useState<string | null>(null);
+  const [tries, setTries] = useState(0);
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true); setError("");
     const supabase = createClient();
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { error } = await supabase.auth.signInWithPassword({ email, password, options: captchaOptions(captcha) });
+    setTries(t => t + 1); // a bot-check token works once
     if (error) {
       setError(
         error.message === "Invalid login credentials"
@@ -53,7 +57,8 @@ export default function LoginPage() {
           <PasswordInput id="login-password" required autoComplete="current-password"
             value={password} onChange={(e) => setPassword(e.target.value)} />
         </div>
-        <Button type="submit" variant="primary" disabled={loading} className="mt-2 w-full">
+        <Captcha onToken={setCaptcha} resetKey={tries} />
+        <Button type="submit" variant="primary" disabled={loading || captchaWaiting(captcha)} className="mt-2 w-full">
           {loading ? "Signing in…" : "Sign in"}
         </Button>
       </form>

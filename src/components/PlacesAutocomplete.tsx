@@ -133,15 +133,20 @@ export default function PlacesAutocomplete({
   const [mapCoords,  setMapCoords]  = useState<{lat:number;lng:number}|null>(null);
   const [mapLoading, setMapLoading] = useState(false);
   const [noKey,      setNoKey]      = useState(false);
+  // Google's script loads only once someone uses the field, so just opening
+  // a page doesn't send the visitor's IP address to Google.
+  const [wanted,     setWanted]     = useState(false);
 
   // Sync external value
   useEffect(() => { setInputVal(value || ""); }, [value]);
 
   // ── Load Maps + init Autocomplete widget on the input ─────────────
   useEffect(() => {
-    if (!inputRef.current) return;
+    if (!getApiKey()) setNoKey(true);
+  }, []);
 
-    if (!getApiKey()) { setNoKey(true); return; }
+  useEffect(() => {
+    if (!wanted || !inputRef.current || noKey) return;
 
     loadScript(() => {
       if (!inputRef.current || acRef.current) return;
@@ -192,7 +197,7 @@ export default function PlacesAutocomplete({
         window.google.maps.event.clearInstanceListeners(acRef.current);
       }
     };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [wanted]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Map picker init ───────────────────────────────────────────────
   useEffect(() => {
@@ -293,7 +298,9 @@ export default function PlacesAutocomplete({
             ref={inputRef}
             type="text"
             defaultValue={inputVal}
+            onFocus={() => setWanted(true)}
             onChange={e => {
+              setWanted(true);
               setInputVal(e.target.value);
               if (!e.target.value.trim()) onChange(null, "");
             }}
@@ -311,10 +318,10 @@ export default function PlacesAutocomplete({
             </button>
           )}
 
-          {ready && (
+          {!noKey && (
             <>
               <span aria-hidden className="mx-0.5 h-5 w-px shrink-0 bg-line" />
-              <button type="button" onClick={() => { setMapAddr(inputVal); setShowMap(true); }}
+              <button type="button" onClick={() => { setWanted(true); setMapAddr(inputVal); setShowMap(true); }}
                 title="Pick on map" aria-label="Pick the location on a map"
                 className="grid h-6 w-6 place-items-center rounded-chip text-fg-3 hover:bg-sunken hover:text-fg">
                 <Map size={15} aria-hidden />

@@ -13,7 +13,7 @@ import { IMAGE_CACHE_SECONDS, prepareImage } from "@/lib/image";
 
 // Names that are pages of the app, so they can't be someone's address.
 const RESERVED = new Set(["admin", "api", "artwork", "artworks", "auth", "available", "contracts", "dashboard", "explore",
-  "forgot-password", "login", "logout", "register", "reset-password", "settings", "about", "help", "terms", "privacy", "artomango"]);
+  "forgot-password", "login", "logout", "register", "reset-password", "settings", "about", "help", "terms", "privacy", "report", "artomango"]);
 
 type Tab = "profile" | "links" | "invite";
 
@@ -85,6 +85,7 @@ export default function ProfilePage() {
   const [referralCount, setReferralCount] = useState(0);
   const [origin, setOrigin] = useState("");
   const [emails, setEmails] = useState<boolean | null>(null);
+  const [news, setNews] = useState<boolean | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const { copied, copy } = useCopy();
 
@@ -92,7 +93,14 @@ export default function ProfilePage() {
 
   useEffect(() => {
     sb.rpc("my_email_updates").then(({ data, error }) => setEmails(error ? null : data !== false));
+    sb.rpc("my_email_news").then(({ data, error }) => setNews(error ? null : data !== false));
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function toggleNews(on: boolean) {
+    setNews(on);
+    const { error } = await sb.rpc("set_email_news", { p_on: on });
+    if (error) setNews(!on);
+  }
 
   async function toggleEmails(on: boolean) {
     setEmails(on);
@@ -441,6 +449,12 @@ export default function ProfilePage() {
                   ? "When someone offers or asks for work, answers you, sends an agreement or writes to you. At most one email every few minutes."
                   : "No emails. You'll still see everything in Messages."}
               </p>
+              {emails && news !== null && (
+                <div className="mt-2 flex items-center justify-between gap-3 border-t-hair border-line pt-3">
+                  <span className="font-ui text-body-sm text-fg-2">Places near you looking for art</span>
+                  <Switch checked={news} onChange={toggleNews} label="Email me when a place near me is looking for art" />
+                </div>
+              )}
             </Card>
           )}
           <Card padding="md" className="flex flex-col gap-2">

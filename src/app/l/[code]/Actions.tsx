@@ -8,6 +8,7 @@ import Link from "next/link";
 import { ArrowRight, Check, Mail, MessageSquare, Plus, ShoppingBag } from "lucide-react";
 import { Alert, Button, Field, Input, Modal, Textarea } from "@/components/ui";
 import { recordEvent } from "@/lib/labels";
+import { MIN_AGE, TERMS_VERSION } from "@/lib/legal";
 
 const NEXT_KEY = "artomango.next";
 
@@ -61,7 +62,7 @@ export function FollowButton({ code, artistId, artistFirst }: { code: string; ar
     try { localStorage.setItem(NEXT_KEY, `/l/${code}?do=follow`); } catch { /* the link still signs them in */ }
     const { error: err } = await (await getSb()).auth.signInWithOtp({
       email: email.trim(),
-      options: { emailRedirectTo: `${window.location.origin}/auth/confirm`, data: { role: "curator", full_name: name.trim().slice(0, 100) } },
+      options: { emailRedirectTo: `${window.location.origin}/auth/confirm`, data: { role: "curator", full_name: name.trim().slice(0, 100), adult_confirmed: true, terms_version: TERMS_VERSION, terms_accepted_at: new Date().toISOString() } },
     });
     setBusy(false);
     if (err) { setError(err.message.includes("rate") ? "Too many tries. Please wait a minute and try again." : "We couldn't send the email. Please try again."); return; }
@@ -94,6 +95,7 @@ export function FollowButton({ code, artistId, artistFirst }: { code: string; ar
             <Field label="Your email">{p => <Input {...p} type="email" autoComplete="email" inputMode="email" value={email} onChange={e => setEmail(e.target.value)} onKeyDown={e => e.key === "Enter" && sendLink()} />}</Field>
             <Field label="Your name" hint="Optional. Shown to the artists you follow.">{p => <Input {...p} autoComplete="name" value={name} onChange={e => setName(e.target.value)} onKeyDown={e => e.key === "Enter" && sendLink()} />}</Field>
             <p className="font-ui text-caption text-fg-3">{artistFirst} will see your name when you follow. Nothing else. Already on Artomango? This signs you in.</p>
+            <p className="font-ui text-caption text-fg-3">By sending, you confirm you&rsquo;re {MIN_AGE} or older and agree to the <a href="/terms" target="_blank" className="underline underline-offset-2">terms</a> and <a href="/privacy" target="_blank" className="underline underline-offset-2">privacy policy</a>.</p>
           </div>
         )}
       </Modal>

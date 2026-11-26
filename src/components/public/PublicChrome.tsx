@@ -63,6 +63,12 @@ export function PublicHeader({ action, signedIn = false }: { action?: ReactNode;
   );
 }
 
+const FOOTER: [string, [string, string][]][] = [
+  ["Platform", [["Explore", "/explore"], ["How it works", "/#how"]]],
+  ["Account", [["Create an account", "/register"], ["Sign in", "/login"]]],
+  ["Legal", [["Privacy", "/privacy"], ["Terms", "/terms"], ["Report a problem", "/report"]]],
+];
+
 export function PublicFooter() {
   return (
     <footer className="border-t-hair border-line bg-page">
@@ -71,13 +77,13 @@ export function PublicFooter() {
           <Wordmark />
           <p className="font-ui text-body-sm text-fg-3">From your studio to a wall. Made for artists, not algorithms.</p>
         </div>
-        <div className="grid grid-cols-2 gap-x-12 gap-y-2 font-ui text-body-sm">
-          <span className="mb-1 font-semibold text-fg">Platform</span>
-          <span className="mb-1 font-semibold text-fg">Account</span>
-          <a href="/explore" className="text-fg-2 hover:text-fg">Explore</a>
-          <a href="/register" className="text-fg-2 hover:text-fg">Create an account</a>
-          <a href="/#how" className="text-fg-2 hover:text-fg">How it works</a>
-          <a href="/login" className="text-fg-2 hover:text-fg">Sign in</a>
+        <div className="grid grid-cols-2 gap-x-12 gap-y-2 font-ui text-body-sm sm:grid-cols-3">
+          {FOOTER.map(([title, links]) => (
+            <div key={title} className="flex flex-col gap-2">
+              <span className="mb-1 font-semibold text-fg">{title}</span>
+              {links.map(([label, href]) => <a key={href} href={href} className="text-fg-2 hover:text-fg">{label}</a>)}
+            </div>
+          ))}
         </div>
       </div>
       <div className={cn(publicWrap, "border-t-hair border-line py-5 font-ui text-caption text-fg-3")} suppressHydrationWarning>

@@ -13,7 +13,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { type DealView, isClosed, loadDeals } from "@/lib/deals";
 import { type PlaceArtwork, cityOf, isSold, sameCity } from "@/lib/places";
 import { type SiteConfig, type WallEntry, siteOf, today } from "@/lib/site";
-import { IMAGE_CACHE_SECONDS, prepareImage } from "@/lib/image";
+import { IMAGE_CACHE_SECONDS, imageExt, prepareImage } from "@/lib/image";
 
 export const VENUE_TYPES = ["Café", "Bar", "Restaurant", "Gallery", "Hotel", "Office", "Shop", "Cultural center", "Studio", "Pop-up space"];
 
@@ -134,7 +134,7 @@ export async function uploadImage(sb: SupabaseClient, me: string, file: File, na
   if (!file.type.startsWith("image/")) return null;
   file = await prepareImage(file);
   if (file.size > 10 * 1024 * 1024) return null;
-  const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
+  const ext = imageExt(file);
   const path = `${me}/${name}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}.${ext}`;
   try {
     const res = await fetch("/api/upload", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ path, contentType: file.type }) });

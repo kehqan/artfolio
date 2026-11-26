@@ -12,7 +12,7 @@ import {
 } from "@/components/ui";
 import { BoardModal, PROVIDER_LABEL, type Board } from "./BoardModal";
 import { Mat, formatPrice } from "@/components/public/PublicChrome";
-import { IMAGE_CACHE_SECONDS, prepareImage } from "@/lib/image";
+import { IMAGE_CACHE_SECONDS, imageExt, prepareImage } from "@/lib/image";
 
 /* ── Types ────────────────────────────────────────────────────── */
 type StoreSettings = {
@@ -226,7 +226,7 @@ export default function MyFrontDoorPage() {
     file = await prepareImage(file);
     if (file.size > 10 * 1024 * 1024) { setBannerUploading(false); setNotice({ tone: "bad", text: "That image is over 10 MB. Try a smaller one." }); return; }
     const sb = createClient();
-    const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
+    const ext = imageExt(file);
     const path = `${userId}/store-banner-${Date.now()}.${ext}`;
     try {
       const res = await fetch("/api/upload", {

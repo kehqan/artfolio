@@ -10,11 +10,12 @@ import { Alert, Button, Card, Chip, Field, Input, Textarea } from "@/components/
 import { LegalPage, Section } from "@/components/legal/LegalPage";
 import { OPERATOR } from "@/lib/legal";
 
-type Reason = "copyright" | "illegal" | "personal" | "other";
+type Reason = "copyright" | "illegal" | "personal" | "abuse" | "other";
 const REASONS: { key: Reason; label: string; hint: string }[] = [
   { key: "copyright", label: "It copies my work", hint: "Say which work is yours and where we can see the original (your site, Instagram, a show)." },
   { key: "illegal", label: "It breaks the law", hint: "Say what is illegal about it and, if you can, which law." },
   { key: "personal", label: "It shares private details", hint: "Say whose details and what they are. Don't repeat them in full here." },
+  { key: "abuse", label: "Spam, a scam or harassment", hint: "Say who it is and what they did. If it happened in messages, copy the messages here." },
   { key: "other", label: "Something else", hint: "Tell us what's wrong." },
 ];
 
@@ -31,7 +32,10 @@ export default function ReportPage() {
 
   useEffect(() => {
     // "Report" links on public pages pass the page they came from.
-    const u = new URLSearchParams(window.location.search).get("url");
+    const q = new URLSearchParams(window.location.search);
+    const u = q.get("url");
+    const r = q.get("reason");
+    if (r && REASONS.some(x => x.key === r)) setReason(r as Reason);
     if (u) setUrl(u);
     else if (document.referrer.startsWith(window.location.origin) && !document.referrer.includes("/report")) setUrl(document.referrer);
     createClient().auth.getUser().then(({ data: { user } }) => {
@@ -52,7 +56,7 @@ export default function ReportPage() {
       p_url: url.trim(), p_reason: reason, p_details: details.trim(), p_name: name.trim(), p_email: email.trim(),
       p_rights_holder: mine, p_good_faith: true_,
     });
-    if (error) { setErr(error.message || "That didn't send. Please try again."); setState("edit"); return; }
+    if (error) { setErr(error.hint === "rate_limited" ? error.message : error.message || "That didn't send. Please try again."); setState("edit"); return; }
     setState("done");
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
@@ -63,7 +67,7 @@ export default function ReportPage() {
       title={state === "done" ? "Thanks, we've got it" : "Something wrong on Artomango?"}
       intro={state === "done"
         ? <>We sent a receipt to <strong className="text-fg">{email}</strong>. A person will look at it and write back, usually within 3 working days.</>
-        : "If a page or work copies your art, breaks the law or shares someone's private details, tell us here. A person reads every report."}
+        : "If a page or work copies your art, breaks the law or shares someone's private details, or someone is sending spam or harassing you, tell us here. A person reads every report."}
     >
       {state === "done" ? (
         <div className="flex flex-col gap-3 sm:flex-row">

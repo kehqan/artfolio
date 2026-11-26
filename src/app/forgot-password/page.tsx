@@ -3,19 +3,23 @@ import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Alert, Button, Field, Input } from "@/components/ui";
 import { AuthLink, AuthShell } from "@/components/auth/AuthShell";
+import { Captcha, captchaOptions, captchaWaiting } from "@/components/auth/Captcha";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState("");
+  const [captcha, setCaptcha] = useState<string | null>(null);
+  const [tries, setTries] = useState(0);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setSending(true); setError("");
     const { error } = await createClient().auth.resetPasswordForEmail(email.trim(), {
-      redirectTo: `${window.location.origin}/reset-password`,
+      redirectTo: `${window.location.origin}/reset-password`, ...captchaOptions(captcha),
     });
+    setTries(t => t + 1);
     setSending(false);
     if (error) { setError(error.message); return; }
     setSent(true);
@@ -41,7 +45,8 @@ export default function ForgotPasswordPage() {
               value={email} onChange={(e) => setEmail(e.target.value)} />
           )}
         </Field>
-        <Button type="submit" variant="primary" disabled={sending} className="mt-2 w-full">
+        <Captcha onToken={setCaptcha} resetKey={tries} />
+        <Button type="submit" variant="primary" disabled={sending || captchaWaiting(captcha)} className="mt-2 w-full">
           {sending ? "Sending…" : "Send reset link"}
         </Button>
       </form>

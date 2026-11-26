@@ -1,6 +1,7 @@
 // src/app/api/conversations/[id]/messages/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { MESSAGE_MAX, dbRefusal, isUuid, text } from "@/lib/validate";
 
 export async function GET(
   request: NextRequest,
@@ -12,6 +13,7 @@ export async function GET(
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const conversationId = params.id;
+    if (!isUuid(conversationId)) return NextResponse.json({ error: "Conversation not found" }, { status: 404 });
 
     // Verify access
     const { data: convo } = await supabase
@@ -57,9 +59,12 @@ export async function POST(
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const conversationId = params.id;
-    const { body: msgBody, template_key } = await request.json();
+    if (!isUuid(conversationId)) return NextResponse.json({ error: "Conversation not found" }, { status: 404 });
+    const input = await request.json().catch(() => null);
+    const msgBody = text(input?.body, MESSAGE_MAX);
+    const template_key = typeof input?.template_key === "string" && /^[a-z_]{1,32}$/.test(input.template_key) ? input.template_key : null;
 
-    if (!msgBody?.trim()) return NextResponse.json({ error: "Message body required" }, { status: 400 });
+    if (!msgBody) return NextResponse.json({ error: "Message body required" }, { status: 400 });
 
     // Verify access & get convo
     const { data: convo } = await supabase
@@ -78,20 +83,22 @@ export async function POST(
       .insert({
         conversation_id: conversationId,
         sender_id: user.id,
-        body: msgBody.trim(),
-        template_key: template_key || null,
+        body: msgBody,
+        template_key,
         read_by_a: isA ? true : false,
         read_by_b: isA ? false : true,
       })
       .select()
       .single();
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    const refused = dbRefusal(error);
+    if (refused) return NextResponse.json({ error: refused.error }, { status: refused.status });
+    if (error) return NextResponse.json({ error: "Your message didn't send. Please try again." }, { status: 500 });
 
     // Update conversation preview
     await supabase.from("conversations").update({
       last_message_at: new Date().toISOString(),
-      last_message_preview: msgBody.trim().slice(0, 120),
+      last_message_preview: msgBody.slice(0, 120),
     }).eq("id", conversationId);
 
     // Notify the other participant
@@ -101,7 +108,7 @@ export async function POST(
         user_id: recipientId,
         type: "message",
         title: "New message",
-        body: msgBody.trim().slice(0, 80),
+        body: msgBody.slice(0, 80),
         data: { conversation_id: conversationId },
       });
     }

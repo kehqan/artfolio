@@ -1,5 +1,8 @@
 -- Artomango: legal basics before launch (run after the email, curator and label SQL)
 -- Run once in the Supabase SQL editor. Safe to run again.
+-- If you ever run this file again, run 20261126_security_hardening.sql right
+-- after it: that file adds the signing-code email and the "spam or
+-- harassment" report reason to functions this file also writes.
 --
 -- What changes
 --   1. Emails show who sends them: company name and postal address, from

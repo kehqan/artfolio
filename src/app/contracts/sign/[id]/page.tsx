@@ -72,6 +72,10 @@ export default function ExternalSignPage() {
   const [signing,   setSigning]   = useState(false);
   const [done,      setDone]      = useState(false);
   const [signError, setSignError] = useState("");
+  // People who sign through a link confirm their email with a 6-digit code first.
+  const [codeTo,    setCodeTo]    = useState<string | null>(null);
+  const [code,      setCode]      = useState("");
+  const [resent,    setResent]    = useState(false);
 
   // Contracts are no longer readable directly by anonymous visitors. The
   // page goes through two database functions that check the signing token
@@ -90,15 +94,38 @@ export default function ExternalSignPage() {
     });
   }, [id, token]);
 
+  /** Email a code to the address on the agreement. Returns false when no code is needed. */
+  async function sendCode(): Promise<boolean | null> {
+    const { data, error: err } = await createClient().rpc("send_signing_code", { p_contract_id: id, p_token: token });
+    // Not set up in the database yet: sign the old way.
+    if (err?.code === "PGRST202") return false;
+    if (err) { setSignError(err.hint === "rate_limited" ? err.message : "We couldn't send the code. Please try again in a minute."); return null; }
+    const d = data as { needed: boolean; email?: string };
+    if (!d?.needed) return false;
+    setCodeTo(d.email || "your email");
+    return true;
+  }
+
   async function handleSign() {
     if (!sigName.trim() || !agreed) return;
     setSigning(true);
     setSignError("");
+    if (!codeTo) {
+      const needed = await sendCode();
+      if (needed !== false) { setSigning(false); return; }
+    } else if (!/^\d{6}$/.test(code.trim())) {
+      setSigning(false);
+      setSignError("Enter the 6 numbers from the email.");
+      return;
+    }
     const sb = createClient();
     const { data, error: err } = await sb.rpc("sign_contract_as_counterparty", {
       p_contract_id: id, p_token: token, p_signature: sigName.trim(),
+      ...(codeTo ? { p_code: code.trim() } : {}),
     });
     setSigning(false);
+    if (err?.hint === "code_needed") { setSigning(true); await sendCode(); setSigning(false); return; }
+    if ((data as any)?.error) { setSignError((data as any).error); return; }
     if (err || !data) {
       setSignError(err?.message?.includes("already signed")
         ? "This agreement has already been signed."
@@ -107,6 +134,11 @@ export default function ExternalSignPage() {
     }
     setContract(data);
     setDone(true);
+  }
+
+  async function resendCode() {
+    setSignError(""); setResent(false);
+    if (await sendCode()) setResent(true);
   }
 
   if (loading) return <Shell><Skeleton className="h-10 w-2/3 rounded-control" /><Skeleton className="h-48 rounded-card" /><Skeleton className="h-64 rounded-card" /></Shell>;
@@ -236,9 +268,23 @@ export default function ExternalSignPage() {
                 I&apos;ve read all the terms and agree to them. I understand my typed name is a legally binding digital signature for me or the organisation I represent.
               </span>
             </label>
+            {codeTo && (
+              <div className="flex flex-col gap-2 rounded-control border-hair border-line bg-sunken p-4">
+                <label className="flex flex-col gap-1.5">
+                  <span className="font-ui text-label font-semibold text-fg">Enter the code we emailed you</span>
+                  <span className="font-ui text-body-sm text-fg-2">We sent 6 numbers to <strong className="text-fg">{codeTo}</strong>. It can take a minute. This shows us it&apos;s really you.</span>
+                  <Input value={code} onChange={e => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                    inputMode="numeric" autoComplete="one-time-code" placeholder="123456" aria-label="Code from the email"
+                    className="font-ui text-lead tracking-[0.3em] tabular-nums" />
+                </label>
+                <button type="button" onClick={resendCode} className="self-start font-ui text-caption font-semibold text-fg-2 underline underline-offset-4 hover:text-fg">
+                  {resent ? "Sent again. Check spam too." : "Send a new code"}
+                </button>
+              </div>
+            )}
             {signError && <Alert tone="bad">{signError}</Alert>}
-            <Button variant="primary" onClick={handleSign} disabled={!canSubmit} className="w-full">
-              <Check size={16} aria-hidden /> {signing ? "Signing…" : "Sign this agreement"}
+            <Button variant="primary" onClick={handleSign} disabled={!canSubmit || (!!codeTo && code.length !== 6)} className="w-full">
+              <Check size={16} aria-hidden /> {signing ? "One moment…" : "Sign this agreement"}
             </Button>
             <p className="flex items-start gap-1.5 font-ui text-caption text-fg-3">
               <Shield size={13} aria-hidden className="mt-0.5 shrink-0" />

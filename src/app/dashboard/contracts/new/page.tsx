@@ -1,6 +1,7 @@
 "use client";
 // Write a new agreement: pick the kind, fill in the terms, add the other
 // side, then save a draft or send it for signature.
+import { forFilter } from "@/lib/validate";
 import { useState, useEffect, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, Check, ChevronRight, FileText, Handshake, ImageIcon, Palette, Plus, Search, Send, X } from "lucide-react";
@@ -47,7 +48,7 @@ function PartyPicker({ value, onChange, myId }: { value: Party | null; onChange:
   function handleQuery(q: string) {
     setQuery(q);
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    const clean = q.replace(/[,()*%\\]/g, " ").trim();
+    const clean = forFilter(q);
     if (!clean) { searchSeq.current++; setResults([]); return; }
     // Waits until typing pauses, and drops answers to older searches.
     const ticket = ++searchSeq.current;

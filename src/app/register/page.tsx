@@ -9,6 +9,7 @@ import PlacesAutocomplete from "@/components/PlacesAutocomplete";
 import {
   Alert, Button, Chip, Field, Input, Label, PasswordInput, cn,
 } from "@/components/ui";
+import { Captcha, captchaOptions, captchaWaiting } from "@/components/auth/Captcha";
 import { AuthLink, AuthShell } from "@/components/auth/AuthShell";
 import { MIN_AGE, TERMS_VERSION } from "@/lib/legal";
 
@@ -104,6 +105,8 @@ export default function RegisterPage() {
   const [err, setErr] = useState("");
   const [sentTo, setSentTo] = useState<string | null>(null);
   const [resent, setResent] = useState<"" | "sending" | "sent" | "failed">("");
+  const [captcha, setCaptcha] = useState<string | null>(null);
+  const [tries, setTries] = useState(0);
 
   function tog(arr: string[], set: (v: string[]) => void, val: string) {
     set(arr.includes(val) ? arr.filter(x => x !== val) : [...arr, val]);
@@ -133,8 +136,9 @@ export default function RegisterPage() {
         email, password: pw,
         // A new artist starts with the welcome flow (see src/app/welcome).
         // What they agreed to and when, kept with the account as a record.
-        options: { data: { full_name: name, role, profile: p, adult_confirmed: true, terms_version: TERMS_VERSION, terms_accepted_at: new Date().toISOString(), ...(role === "artist" ? { welcome: "pending" } : {}) }, emailRedirectTo: `${window.location.origin}/auth/confirm` },
+        options: { data: { full_name: name, role, profile: p, adult_confirmed: true, terms_version: TERMS_VERSION, terms_accepted_at: new Date().toISOString(), ...(role === "artist" ? { welcome: "pending" } : {}) }, emailRedirectTo: `${window.location.origin}/auth/confirm`, ...captchaOptions(captcha) },
       });
+      setTries(t => t + 1); // a bot-check token works once
       if (e2) { setErr(e2.message); setLoading(false); return; }
       if (data.session && data.user) {
         await sb.from("profiles").upsert({ id: data.user.id, ...p });
@@ -150,7 +154,8 @@ export default function RegisterPage() {
   async function resend() {
     if (!sentTo) return;
     setResent("sending");
-    const { error } = await createClient().auth.resend({ type: "signup", email: sentTo, options: { emailRedirectTo: `${window.location.origin}/auth/confirm` } });
+    const { error } = await createClient().auth.resend({ type: "signup", email: sentTo, options: { emailRedirectTo: `${window.location.origin}/auth/confirm`, ...captchaOptions(captcha) } });
+    setTries(t => t + 1);
     setResent(error ? "failed" : "sent");
   }
 
@@ -163,7 +168,8 @@ export default function RegisterPage() {
         <p className="font-ui text-body-sm text-fg-2">Everything you told us is saved with your account. If the email isn&rsquo;t there in a minute, check spam or send it again.</p>
         {resent === "sent" && <Alert tone="ok">Sent again.</Alert>}
         {resent === "failed" && <Alert tone="bad">That didn&rsquo;t send. Wait a minute and try again.</Alert>}
-        <Button variant="secondary" onClick={resend} disabled={resent === "sending" || resent === "sent"} className="w-full">
+        <Captcha onToken={setCaptcha} resetKey={tries} />
+        <Button variant="secondary" onClick={resend} disabled={resent === "sending" || resent === "sent" || captchaWaiting(captcha)} className="w-full">
           {resent === "sending" ? "Sending…" : "Send the link again"}
         </Button>
         <Button variant="ghost" onClick={() => { setSentTo(null); setResent(""); setStep("account"); }} className="w-full">Use a different email</Button>
@@ -310,7 +316,8 @@ export default function RegisterPage() {
             I&rsquo;m {MIN_AGE} or older and I agree to the <Link href="/terms" target="_blank" className="font-semibold text-fg underline underline-offset-4">terms</Link> and <Link href="/privacy" target="_blank" className="font-semibold text-fg underline underline-offset-4">privacy policy</Link>.
           </span>
         </label>
-        <Button type="submit" variant="primary" disabled={loading || !adult} className="mt-2 w-full">
+        <Captcha onToken={setCaptcha} resetKey={tries} />
+        <Button type="submit" variant="primary" disabled={loading || !adult || captchaWaiting(captcha)} className="mt-2 w-full">
           {loading ? "Creating your account…" : role === "venue" ? "Create venue account" : role === "curator" ? "Create curator account" : "Create artist account"}
         </Button>
       </form>

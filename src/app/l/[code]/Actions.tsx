@@ -6,7 +6,8 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowRight, Check, Mail, MessageSquare, Plus, ShoppingBag } from "lucide-react";
-import { Alert, Button, Field, Input, Modal, Textarea } from "@/components/ui";
+import { Alert, Button, Field, Input, Modal, Textarea, buttonClasses } from "@/components/ui";
+import { buyHref } from "@/lib/buy";
 import { recordEvent } from "@/lib/labels";
 import { track } from "@/lib/analytics";
 import { MIN_AGE, TERMS_VERSION } from "@/lib/legal";
@@ -110,8 +111,10 @@ export function FollowButton({ code, artistId, artistFirst }: { code: string; ar
 }
 
 // ── Ask / buy ───────────────────────────────────────────────────────
-export function SellingActions({ code, artistId, artistFirst, workId, title, place, withPrice }: {
+export function SellingActions({ code, artistId, artistFirst, workId, title, place, withPrice, buyHost }: {
   code: string; artistId: string; artistFirst: string; workId: string; title: string; place: string; withPrice: boolean;
+  /** The artist's own shop (lib/buy): Buy opens it, with no commission to us. */
+  buyHost?: string;
 }) {
   const me = useMe();
   const [open, setOpen] = useState<null | "buy" | "ask">(null);
@@ -158,9 +161,12 @@ export function SellingActions({ code, artistId, artistFirst, workId, title, pla
   return (
     <>
       <div className="flex flex-wrap gap-2">
-        {withPrice && <Button variant="primary" onClick={() => start("buy")}><ShoppingBag size={15} aria-hidden /> I&rsquo;d like to buy it</Button>}
+        {/* A plain link, not next/link: prefetching would count a tap. */}
+        {withPrice && buyHost && <a href={buyHref(workId, "label", code)} target="_blank" rel="noopener" className={buttonClasses("primary")} onClick={() => track("buy_click", { where: "label", method: "link" })}><ShoppingBag size={15} aria-hidden /> Buy</a>}
+        {withPrice && !buyHost && <Button variant="primary" onClick={() => start("buy")}><ShoppingBag size={15} aria-hidden /> I&rsquo;d like to buy it</Button>}
         <Button variant={withPrice ? "secondary" : "primary"} onClick={() => start("ask")}><MessageSquare size={15} aria-hidden /> {withPrice ? "Ask a question" : "Ask about this piece"}</Button>
       </div>
+      {withPrice && buyHost && <p className="font-ui text-caption text-fg-3">Buy opens {artistFirst}&rsquo;s shop on {buyHost}. You pay {artistFirst} there.</p>}
       <Modal open={!!open} onClose={() => setOpen(null)} size="md"
         title={sent ? "Sent" : open === "buy" ? `Tell ${artistFirst} you'd like it` : `Ask ${artistFirst}`}
         description={sent

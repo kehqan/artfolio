@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { ExternalLink, Pencil, Plus, Printer, QrCode } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Alert, Badge, Button, ButtonLink, EmptyState, PageHeader, Select, Skeleton, cn } from "@/components/ui";
+import { ScanStats } from "@/components/labels/ScanStats";
 import { type LabelBundle, type StatRow, SALES, loadLabels, loadStats, pageUrl, rangeLine, sizeOf } from "@/lib/labels";
 
 export default function LabelsPage() {
@@ -87,12 +88,17 @@ export default function LabelsPage() {
             : mine[0] ? <ButtonLink href={`/dashboard/labels/make?work=${mine[0].id}`} variant="primary"><Plus size={15} aria-hidden /> Make your first label</ButtonLink> : undefined} />
       ) : (
         <div className="flex flex-col gap-8">
+          {/* Everything together: how often people look, where, and when. */}
+          <ScanStats labelIds={labels.map(l => l.id)} title="Out in the world" showPeople={!venue} />
           {groups.map(([place, list]) => (
             <section key={place} className="flex flex-col gap-3">
               <div className="flex flex-wrap items-baseline justify-between gap-2">
                 <h2 className="flex items-baseline gap-2 font-display text-h2 leading-tight text-fg">
                   {place}<span className="font-ui text-body font-semibold tabular-nums text-fg-3">{list.length}</span>
                 </h2>
+                <span className="font-ui text-body-sm tabular-nums text-fg-2">
+                  {(() => { const n = list.reduce((a, l) => a + (scans[l.id]?.all || 0), 0); return `${n} ${n === 1 ? "scan" : "scans"}`; })()}
+                </span>
                 {list.length > 1 && <Button size="sm" variant="ghost" onClick={() => print(list.map(l => l.id))}><Printer size={14} aria-hidden /> Print all {list.length} on one sheet</Button>}
               </div>
               <ul className="flex flex-col divide-y divide-line rounded-card border-hair border-line bg-surface">

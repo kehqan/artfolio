@@ -19,6 +19,7 @@ export function ScanStats({ artworkId, labelIds, showPeople, makeHref, title = "
   const [labels, setLabels] = useState<Pick<WallLabel, "id" | "code" | "place_name">[] | null>(null);
   const [sum, setSum] = useState<Summary | null>(null);
   const [byLabel, setByLabel] = useState<Record<string, number>>({});
+  const [month, setMonth] = useState<Record<string, number>>({});
   const [people, setPeople] = useState<Person[]>([]);
 
   useEffect(() => {
@@ -33,8 +34,15 @@ export function ScanStats({ artworkId, labelIds, showPeople, makeHref, title = "
       const rows = await loadStats(sb, ls.map(l => l.id));
       setSum(summarize(rows));
       const per: Record<string, number> = {};
-      rows.forEach(r => { if (r.action === "scan") per[r.label_id] = (per[r.label_id] || 0) + r.n; });
+      const last30: Record<string, number> = {};
+      const since = Date.now() - 30 * 864e5;
+      rows.forEach(r => {
+        if (r.action !== "scan") return;
+        per[r.label_id] = (per[r.label_id] || 0) + r.n;
+        if (new Date(r.hour).getTime() > since) last30[r.label_id] = (last30[r.label_id] || 0) + r.n;
+      });
       setByLabel(per);
+      setMonth(last30);
 
       if (!showPeople || !ls.length) return;
       // Signed-in people who followed or wrote from a label.
@@ -74,6 +82,20 @@ export function ScanStats({ artworkId, labelIds, showPeople, makeHref, title = "
   }
 
   const maxH = Math.max(1, ...sum.byHour);
+  const maxD = Math.max(1, ...sum.byDay);
+
+  // Places: labels in the same place count together ("By place", and the headline).
+  const places = new Map<string, { all: number; month: number }>();
+  labels.forEach(l => {
+    const k = l.place_name?.trim() || "No place given";
+    const x = places.get(k) || { all: 0, month: 0 };
+    x.all += byLabel[l.id] || 0; x.month += month[l.id] || 0;
+    places.set(k, x);
+  });
+  const placeList = Array.from(places.entries()).sort((a, b) => b[1].all - a[1].all);
+  const top = placeList.filter(([k]) => k !== "No place given").sort((a, b) => b[1].month - a[1].month)[0];
+  const maxP = Math.max(1, ...placeList.map(([, v]) => v.all));
+  const dayStart = new Date(Date.now() - 27 * 864e5).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
   const funnel = [
     { name: "Scanned", n: sum.scans },
     { name: "Opened the passport", n: sum.passport },
@@ -87,11 +109,29 @@ export function ScanStats({ artworkId, labelIds, showPeople, makeHref, title = "
         <h3 className="font-display text-h3 leading-tight text-fg">{title}</h3>
         {makeHref && <ButtonLink href={makeHref} variant="ghost" size="sm"><QrIcon size={14} aria-hidden /> Labels</ButtonLink>}
       </div>
+      {top && top[1].month > 0 && (
+        <p className="text-balance font-ui text-body font-semibold text-fg">
+          Looked at {top[1].month} {top[1].month === 1 ? "time" : "times"} at {top[0]} in the last 30 days.
+        </p>
+      )}
       <div className={cn("flex flex-wrap", compact ? "gap-6" : "gap-8")}>
         <Big n={sum.scans} label="scans so far" small={compact} />
         <Big n={sum.week} label="in the last 7 days" small={compact} />
         <Big n={sum.follow} label="new followers" small={compact} />
       </div>
+
+      {sum.scans > 0 && (
+        <div className="flex flex-col gap-2">
+          <span className="font-ui text-label font-semibold text-fg">Last 4 weeks</span>
+          <div className="flex h-16 items-end gap-[3px]" role="img" aria-label={`Scans per day for the last 4 weeks: ${sum.byDay.reduce((a, b) => a + b, 0)} in all`}>
+            {sum.byDay.map((n, d) => (
+              <span key={d} title={`${new Date(Date.now() - (27 - d) * 864e5).toLocaleDateString("en-GB", { day: "numeric", month: "short" })} · ${n}`}
+                className={d === 27 ? "bg-mango" : "bg-ink"} style={{ flex: 1, height: `${n ? Math.max(6, (n / maxD) * 100) : 2}%`, opacity: n ? 1 : 0.15, borderRadius: "2px 2px 0 0" }} />
+            ))}
+          </div>
+          <div className="flex justify-between font-ui text-caption tabular-nums text-fg-3"><span>{dayStart}</span><span>Today</span></div>
+        </div>
+      )}
 
       {sum.scans > 0 ? (
         <div className={cn("grid gap-6", !compact && "md:grid-cols-2")}>
@@ -121,14 +161,15 @@ export function ScanStats({ artworkId, labelIds, showPeople, makeHref, title = "
         <p className="font-ui text-body-sm text-fg-3">No scans yet. Once the label is on the wall, every scan shows up here within a minute.</p>
       )}
 
-      {labels.length > 1 && (
+      {placeList.length > 1 && (
         <div className="flex flex-col gap-2">
-          <span className="font-ui text-label font-semibold text-fg">By label</span>
-          <ul className="flex flex-col divide-y divide-line rounded-control border-hair border-line">
-            {labels.map(l => (
-              <li key={l.id} className="flex items-center justify-between gap-3 px-3 py-2 font-ui text-body-sm">
-                <span className="truncate text-fg">{l.place_name || "No place given"}</span>
-                <span className="tabular-nums text-fg-2">{byLabel[l.id] || 0} scans</span>
+          <span className="font-ui text-label font-semibold text-fg">By place</span>
+          <ul className="flex flex-col gap-2">
+            {placeList.map(([name, v]) => (
+              <li key={name} className="grid grid-cols-[minmax(0,10rem)_1fr_auto] items-center gap-3 font-ui text-body-sm">
+                <span className="truncate text-fg">{name}</span>
+                <span className="h-2 rounded-pill bg-sunken"><span className="block h-2 rounded-pill bg-ink" style={{ width: `${(v.all / maxP) * 100}%` }} /></span>
+                <span className="text-right tabular-nums text-fg-2">{v.all} <span className="text-fg-3">· {v.month} in 30 days</span></span>
               </li>
             ))}
           </ul>

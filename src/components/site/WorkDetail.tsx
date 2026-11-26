@@ -1,11 +1,12 @@
 "use client";
 // A work opened from a personal site: photos, facts and a way to ask about it.
 import { useState } from "react";
-import { ChevronLeft, ChevronRight, FileText, MessageSquare } from "lucide-react";
-import { Badge, Button, ButtonLink, Modal } from "@/components/ui";
+import { ChevronLeft, ChevronRight, FileText, MessageSquare, ShoppingBag } from "lucide-react";
+import { Badge, Button, ButtonLink, Modal, buttonClasses } from "@/components/ui";
 import type { BadgeTone } from "@/components/ui";
 import { Mat, formatPrice } from "@/components/public/PublicChrome";
 import { type SiteWork, dimsOf } from "@/lib/site";
+import { buyHref } from "@/lib/buy";
 import { track } from "@/lib/analytics";
 
 const SALE_LABEL: Record<string, string> = {
@@ -20,13 +21,16 @@ function statusBadge(status?: string): { tone: BadgeTone; label: string } | null
 const dims = dimsOf;
 
 // ── Artwork detail ─────────────────────────────────────────────────
-export function WorkDetail({ aw, firstName, onClose, onMessage }: {
+export function WorkDetail({ aw, firstName, onClose, onMessage, buyHost }: {
   aw: SiteWork; firstName: string; onClose: () => void; onMessage: () => void;
+  /** The artist's own shop for this work (lib/buy), when they added a link. */
+  buyHost?: string;
 }) {
   const [idx, setIdx] = useState(0);
   const imgs = (aw.images || []).filter(Boolean);
   const badge = statusBadge(aw.status);
   const canBuy = !!aw.sale_method && aw.sale_method !== "not_for_sale" && !badge;
+  const shop = !badge && aw.sale_method !== "not_for_sale" ? buyHost : undefined;
   const price = aw.sale_method === "price_on_request" ? "" : formatPrice(aw.price, aw.currency);
   const facts: [string, string][] = [
     ["Year", aw.year ? String(aw.year) : ""],
@@ -47,10 +51,20 @@ export function WorkDetail({ aw, firstName, onClose, onMessage }: {
           <ButtonLink href={`/artwork/${aw.id}/passport`} variant="ghost">
             <FileText size={15} aria-hidden /> Passport
           </ButtonLink>
-          <Button variant={canBuy ? "primary" : "secondary"} onClick={() => { if (canBuy) track("buy_click", { where: "site", method: aw.sale_method || null }); onMessage(); }}>
-            <MessageSquare size={15} aria-hidden />
-            {canBuy ? (aw.sale_method === "direct" ? "Ask to buy" : "Ask about this work") : `Message ${firstName}`}
-          </Button>
+          {shop ? (
+            <>
+              <Button variant="secondary" onClick={onMessage}><MessageSquare size={15} aria-hidden /> Ask a question</Button>
+              {/* A plain link, not next/link: prefetching would count a tap. */}
+              <a href={buyHref(aw.id, "site")} target="_blank" rel="noopener" className={buttonClasses("primary")} onClick={() => track("buy_click", { where: "site", method: "link" })}>
+                <ShoppingBag size={15} aria-hidden /> Buy
+              </a>
+            </>
+          ) : (
+            <Button variant={canBuy ? "primary" : "secondary"} onClick={() => { if (canBuy) track("buy_click", { where: "site", method: aw.sale_method || null }); onMessage(); }}>
+              <MessageSquare size={15} aria-hidden />
+              {canBuy ? (aw.sale_method === "direct" ? "Ask to buy" : "Ask about this work") : `Message ${firstName}`}
+            </Button>
+          )}
         </>
       }
     >
@@ -92,6 +106,7 @@ export function WorkDetail({ aw, firstName, onClose, onMessage }: {
         </dl>
 
         {aw.description && <p className="whitespace-pre-line font-ui text-body text-fg-2">{aw.description}</p>}
+        {shop && <p className="font-ui text-caption text-fg-3">Buy opens {firstName}&rsquo;s shop on {shop}. You pay {firstName} there.</p>}
       </div>
     </Modal>
   );

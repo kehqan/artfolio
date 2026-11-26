@@ -1,6 +1,7 @@
 // Personal sites: the look an owner picks for their public page, and the
 // data the page shows. Every choice is a preset, so any mix stays polished.
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { loadBuyHosts } from "./buy";
 
 // ── Presets ─────────────────────────────────────────────────────────
 export type AccentKey = "mango" | "ink" | "clay" | "moss" | "ocean" | "plum" | "rose" | "sand";
@@ -136,6 +137,8 @@ export type SiteData = {
   wall: WallEntry[];
   calls: OpenCall[];
   followers: number;
+  /** Works with the artist's own Buy link: work id → the shop's address (lib/buy). */
+  buy?: Record<string, string>;
 };
 
 const WORK_FIELDS = "id, title, medium, year, description, price, currency, status, images, sale_method, width_cm, height_cm, depth_cm, framed";
@@ -168,6 +171,9 @@ export async function loadSiteData(sb: SupabaseClient, by: { username?: string; 
     .map(w => ({ ...w, featured: star.get(w.id) || false, forSale: order.has(w.id) }))
     .sort((a, b) => (order.has(a.id) ? order.get(a.id)! : 1e6) - (order.has(b.id) ? order.get(b.id)! : 1e6));
 
+  // The artist's own Buy links. Missing (feature not set up yet) means none.
+  const buy = venue ? {} : await loadBuyHosts(sb, list.filter(w => !isSoldWork(w)).map(w => w.id));
+
   return {
     profile: profile as SiteProfile,
     settings: (ss || {}) as SiteSettings,
@@ -176,6 +182,7 @@ export async function loadSiteData(sb: SupabaseClient, by: { username?: string; 
     wall: ((wall as WallEntry[] | null) || []),
     calls: ((calls as { data: OpenCall[] | null }).data || []),
     followers: count || 0,
+    buy,
   };
 }
 

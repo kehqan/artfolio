@@ -110,7 +110,7 @@ export default function ProfileClient({ username, initial }: { username: string;
       )}
 
       {selected && (
-        <WorkDetail aw={selected} firstName={firstName} onClose={() => setSelected(null)}
+        <WorkDetail aw={selected} firstName={firstName} buyHost={data.buy?.[selected.id]} onClose={() => setSelected(null)}
           onMessage={() => { if (!preview) setMessage({ kind: "artwork", aw: selected }); setSelected(null); }} />
       )}
 

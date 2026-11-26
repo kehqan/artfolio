@@ -10,6 +10,7 @@ import { Avatar, Badge, ButtonLink, EmptyState } from "@/components/ui";
 import { Wordmark } from "@/components/brand/Wordmark";
 import { Mat } from "@/components/public/PublicChrome";
 import { dims, printedPrice, rangeLine } from "@/lib/labels";
+import { loadBuyHosts } from "@/lib/buy";
 import { FollowButton, PassportLink, SellingActions } from "./Actions";
 
 type Page = {
@@ -21,6 +22,8 @@ type Page = {
   passport_count: number;
   more: { id: string; title: string; image: string | null }[];
   neighbours: { code: string; title: string; image: string | null; artist: string | null }[];
+  /** The artist's own shop for this work, when they added a Buy link (lib/buy). */
+  buyHost?: string | null;
 };
 
 const EVENT: Record<string, string> = {
@@ -38,7 +41,11 @@ const load = cache(async (code: string): Promise<Page | null> => {
   const clean = (code || "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 12);
   if (!clean) return null;
   const { data } = await publicClient().rpc("label_page", { p_code: clean });
-  return (data as Page | null) || null;
+  const page = (data as Page | null) || null;
+  if (page && page.label.sales === "price" && !page.label.sold) {
+    page.buyHost = (await loadBuyHosts(publicClient(), [page.work.id]))[page.work.id] || null;
+  }
+  return page;
 });
 
 export async function generateMetadata({ params }: { params: { code: string } }): Promise<Metadata> {
@@ -120,7 +127,7 @@ export default async function PiecePage({ params }: { params: { code: string } }
           ) : l.sales !== "off" && a ? (
             <div className="flex flex-col gap-3">
               <p className="font-display text-h1 leading-none tabular-nums text-fg">{price || "Price on request"}</p>
-              <SellingActions code={l.code} artistId={a.id} artistFirst={first} workId={w.id} title={w.title} place={where} withPrice={!!price} />
+              <SellingActions code={l.code} artistId={a.id} artistFirst={first} workId={w.id} title={w.title} place={where} withPrice={!!price} buyHost={p.buyHost || undefined} />
             </div>
           ) : null}
 

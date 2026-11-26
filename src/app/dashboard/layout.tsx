@@ -59,6 +59,7 @@ const AREAS: Area[] = [
     key: "scene", label: "Scene", icon: Handshake, href: "/dashboard/looking",
     pages: [
       { href: "/dashboard/looking", label: "Looking for art", venueLabel: "Find artists" },
+      { href: "/dashboard/calls", label: "Open calls" },
       { href: "/dashboard/scene", label: "Feed" },
       { href: "/dashboard/discover", label: "People" },
       { href: "/dashboard/education", label: "Learn" },
@@ -102,7 +103,7 @@ const SEARCHABLE: (Page & { area: string })[] = [
   { href: "/dashboard/mystore?tab=moodboards", label: "Moodboards", area: "Studio" },
   { href: "/dashboard/tasks?view=month", label: "Calendar", area: "Planner" },
   { href: "/dashboard/scene?show=show", label: "Shows and events", area: "Scene" },
-  { href: "/dashboard/scene?show=opportunity", label: "Open calls and opportunities", area: "Scene" },
+  { href: "/dashboard/scene?show=opportunity", label: "Opportunities posted by members", area: "Scene" },
   { href: "/dashboard/scene?view=map", label: "Scene map", area: "Scene" },
 ];
 

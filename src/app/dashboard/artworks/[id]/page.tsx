@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { ScanStats } from "@/components/labels/ScanStats";
+import { BuyLinkCard } from "@/components/buy/BuyLinkCard";
 import { createClient } from "@/lib/supabase/client";
 import { loadPrivate, savePrivate } from "@/lib/artwork-private";
 import {
@@ -372,6 +373,12 @@ export default function ArtworkDetailPage() {
               : <span className="font-ui text-body text-fg-3">No price yet</span>}
             {saleLabel && <span className="pt-1 font-ui text-label text-fg-2">{saleLabel}</span>}
           </Card>
+
+          {/* Buy button: any shop link, no commission, with taps */}
+          {artwork.user_id && (
+            <BuyLinkCard workId={id} userId={artwork.user_id}
+              sellable={!["sold", "reserved", "concept", "in_progress"].includes(toStageKey(artwork.status)) && artwork.sale_method !== "not_for_sale"} />
+          )}
 
           {/* Passport */}
           <Link href={`/dashboard/artworks/${id}/passport`}

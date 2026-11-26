@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import { ArrowRight, Bell, CalendarDays, Circle, Plus } from "lucide-react";
+import { ArrowRight, Bell, CalendarCheck, CalendarDays, Circle, Plus, QrCode, ShoppingBag } from "lucide-react";
 import { Avatar, Badge, ButtonLink, Card, Eyebrow, Heading, StatTile, Tabs, cn } from "@/components/ui";
 import type { BadgeTone } from "@/components/ui";
 import { Mat, formatPrice } from "@/components/public/PublicChrome";
@@ -13,6 +13,8 @@ import { VenueHome } from "./home/VenueHome";
 import { CuratorHome } from "./home/CuratorHome";
 import { isVenueRole } from "@/lib/site";
 import { fetchJson } from "@/lib/fetch-json";
+import { useNextCalls, useReach } from "@/components/home/reach";
+import { closesLine, daysLeft, kindName } from "@/lib/open-calls";
 
 /* ── Labels ─────────────────────────────────────────────────────── */
 type ScenePostType = "event" | "exhibition" | "collab" | "opencall" | "commission";
@@ -135,6 +137,9 @@ function ArtistHome() {
   const [unreadMessages, setUnreadMessages] = useState(0);
   const [contractsOut, setContractsOut] = useState({ out: 0, awaiting: 0 });
   const [loaded, setLoaded] = useState(false);
+  const [me, setMe] = useState<string | null>(null);
+  const reach = useReach(me);
+  const next = useNextCalls(me);
 
   /* ── UI state ───────────────────────────────────── */
   const [calToggle, setCalToggle] = useState<"yours" | "around">("yours");
@@ -165,6 +170,7 @@ function ArtistHome() {
       try {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
+        setMe(user.id);
 
         const now = new Date();
         const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
@@ -601,6 +607,57 @@ function ArtistHome() {
             </ul>
           ) : (
             <Quiet>Nothing new. When a collector, curator or another artist reaches out, it shows up here.</Quiet>
+          )}
+        </Panel>
+
+        {/* ── Out in the world: scans and Buy taps ── */}
+        <Panel title="Out in the world" eyebrow="Last 30 days" className="lg:col-span-2"
+          action={reach && reach.labels > 0 ? <PanelLink href="/dashboard/labels">Labels</PanelLink> : undefined}>
+          {!reach ? <Quiet>Loading…</Quiet> : reach.labels === 0 && reach.links === 0 ? (
+            <div className="flex flex-col gap-3 px-5 py-6">
+              <p className="max-w-prose font-ui text-body-sm text-fg-2">See who stops at your work. Print a wall label with a QR code, or add your shop link behind a work&rsquo;s Buy button. Every scan and tap shows up here.</p>
+              <Link href="/dashboard/labels" className="inline-flex items-center gap-1.5 self-start font-ui text-label font-semibold text-fg hover:underline hover:underline-offset-4"><QrCode size={14} aria-hidden /> Make a wall label</Link>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-5 px-5 py-5">
+              {reach.top ? (
+                <p className="text-balance font-display text-h2 leading-tight text-fg">
+                  People looked at <span className="whitespace-nowrap">&ldquo;{reach.top.title}&rdquo;</span> {reach.top.n} {reach.top.n === 1 ? "time" : "times"} at {reach.top.place}.
+                </p>
+              ) : (
+                <p className="font-ui text-body-sm text-fg-2">No scans in the last 30 days. Labels on a busy wall get the most.</p>
+              )}
+              <div className="flex flex-wrap gap-8">
+                <span className="flex flex-col"><span className="font-display text-h1 leading-none tabular-nums text-fg">{reach.scans30}</span><span className="font-ui text-caption text-fg-3">label scans</span></span>
+                <span className="flex flex-col"><span className="font-display text-h1 leading-none tabular-nums text-fg">{reach.taps30}</span><span className="font-ui text-caption text-fg-3">taps on Buy</span></span>
+              </div>
+              {reach.links === 0 && (
+                <p className="flex items-center gap-2 font-ui text-caption text-fg-3"><ShoppingBag size={13} aria-hidden /> Add your shop link to a work and Buy opens it. No commission.</p>
+              )}
+            </div>
+          )}
+        </Panel>
+
+        {/* ── Open calls: the next deadlines ── */}
+        <Panel title="Open calls" eyebrow="Deadlines" action={<PanelLink href="/dashboard/calls">All</PanelLink>}>
+          {!next.calls ? <Quiet>Loading…</Quiet> : next.calls.length === 0 ? (
+            <Quiet>New open calls, grants and residencies show up here every week.</Quiet>
+          ) : (
+            <ul className="divide-y divide-line">
+              {next.calls.slice(0, 3).map(c => (
+                <li key={c.id}>
+                  <Link href="/dashboard/calls" className="flex flex-col gap-0.5 px-5 py-3 hover:bg-sunken">
+                    <span className="flex items-center gap-2">
+                      <span className="truncate font-ui text-body-sm font-semibold text-fg">{c.title}</span>
+                      {next.saved[c.id] && <CalendarCheck size={14} aria-label="In your Planner" className="shrink-0 text-fg-2" />}
+                    </span>
+                    <span className={cn("font-ui text-caption", daysLeft(c.deadline) <= 7 ? "font-semibold text-bad" : "text-fg-3")}>
+                      {kindName(c.kind)} · {closesLine(c.deadline)}
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
           )}
         </Panel>
 

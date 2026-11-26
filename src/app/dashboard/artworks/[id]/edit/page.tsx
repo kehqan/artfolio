@@ -10,6 +10,7 @@ import {
   ART_TYPES, ArtTypeSwitch, ArtworkFields, Dropzone, FormSection, ImageThumb, MAX_IMAGES, UploadProgress,
   type ArtType,
 } from "../../_form/parts";
+import { IMAGE_CACHE_SECONDS, prepareImage } from "@/lib/image";
 
 function genEditionCode(num: string, total: string) {
   return `AM-${String(num).padStart(3,"0")}/${String(total).padStart(3,"0")}`;
@@ -143,10 +144,10 @@ export default function EditArtworkPage() {
     // Upload new images using the avatars bucket (same as new page)
     const uploadedUrls: string[] = [];
     for (let i = 0; i < newFiles.length; i++) {
-      const file = newFiles[i];
+      const file = await prepareImage(newFiles[i]);
       const ext  = file.name.split(".").pop();
       const path = `artworks/${user.id}/${Date.now()}-${i}.${ext}`;
-      const { data } = await sb.storage.from("avatars").upload(path, file, { upsert: true });
+      const { data } = await sb.storage.from("avatars").upload(path, file, { upsert: true, contentType: file.type, cacheControl: IMAGE_CACHE_SECONDS });
       if (data) {
         const { data: pub } = sb.storage.from("avatars").getPublicUrl(path);
         uploadedUrls.push(pub.publicUrl);

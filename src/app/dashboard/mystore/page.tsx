@@ -12,6 +12,7 @@ import {
 } from "@/components/ui";
 import { BoardModal, PROVIDER_LABEL, type Board } from "./BoardModal";
 import { Mat, formatPrice } from "@/components/public/PublicChrome";
+import { IMAGE_CACHE_SECONDS, prepareImage } from "@/lib/image";
 
 /* ── Types ────────────────────────────────────────────────────── */
 type StoreSettings = {
@@ -221,8 +222,9 @@ export default function MyFrontDoorPage() {
     if (!userId) return;
     setNotice(null);
     if (!file.type.startsWith("image/")) { setNotice({ tone: "bad", text: "Choose an image file (JPG, PNG or WebP)." }); return; }
-    if (file.size > 10 * 1024 * 1024) { setNotice({ tone: "bad", text: "That image is over 10 MB. Try a smaller one." }); return; }
     setBannerUploading(true);
+    file = await prepareImage(file);
+    if (file.size > 10 * 1024 * 1024) { setBannerUploading(false); setNotice({ tone: "bad", text: "That image is over 10 MB. Try a smaller one." }); return; }
     const sb = createClient();
     const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
     const path = `${userId}/store-banner-${Date.now()}.${ext}`;
@@ -234,7 +236,7 @@ export default function MyFrontDoorPage() {
       });
       const { signedUrl } = await res.json();
       if (!signedUrl) throw new Error("no url");
-      const put = await fetch(signedUrl, { method: "PUT", body: file, headers: { "Content-Type": file.type } });
+      const put = await fetch(signedUrl, { method: "PUT", body: file, headers: { "Content-Type": file.type, "cache-control": `max-age=${IMAGE_CACHE_SECONDS}` } });
       if (!put.ok) throw new Error("upload failed");
       const { data: { publicUrl } } = sb.storage.from("artwork-images").getPublicUrl(path);
       setSettings(p => ({ ...p, banner_url: publicUrl }));
@@ -425,7 +427,7 @@ export default function MyFrontDoorPage() {
               <div className="relative h-36 overflow-hidden rounded-control border-hair border-line bg-sunken">
                 {settings.banner_url ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={settings.banner_url} alt="" className="h-full w-full object-cover" />
+                  <img loading="lazy" decoding="async" src={settings.banner_url} alt="" className="h-full w-full object-cover" />
                 ) : (
                   <div className="grid h-full place-items-center font-ui text-body-sm text-fg-3">No banner. Your page starts with your name.</div>
                 )}
@@ -485,7 +487,7 @@ export default function MyFrontDoorPage() {
                     <div className="h-12 w-16 shrink-0 overflow-hidden rounded-control bg-sunken">
                       {thumb && (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img src={thumb} alt="" className="h-full w-full object-cover" />
+                        <img loading="lazy" decoding="async" src={thumb} alt="" className="h-full w-full object-cover" />
                       )}
                     </div>
                     <div className="flex min-w-0 flex-1 flex-col">

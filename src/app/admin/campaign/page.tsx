@@ -103,7 +103,7 @@ function SlideEditor({ slide, onSave }: { slide: Slide; onSave: (s: Slide) => vo
   const scale = canvasW / CANVAS_REF_W;
 
   return (
-    <div style={{ fontFamily: "'Darker Grotesque', system-ui, sans-serif" }}>
+    <div style={{ fontFamily: "var(--font-darker-grotesque), system-ui, sans-serif" }}>
 
       {/* ── Controls panel ── */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 18 }}>
@@ -231,7 +231,7 @@ function SlideEditor({ slide, onSave }: { slide: Slide; onSave: (s: Slide) => vo
             cursor: "grab",
             outline: dragging === "text" ? `2px solid ${p.text_color === "#ffffff" ? "#FFD400" : "#fff"}` : "2px dashed rgba(255,255,255,.45)",
             outlineOffset: 5, borderRadius: 4, padding: "1px 3px",
-            fontFamily: "'Darker Grotesque', system-ui, sans-serif",
+            fontFamily: "var(--font-darker-grotesque), system-ui, sans-serif",
           }}
         >
           {p.text_content}
@@ -250,7 +250,7 @@ function SlideEditor({ slide, onSave }: { slide: Slide; onSave: (s: Slide) => vo
             cursor: "grab",
             outline: dragging === "open" ? "2px solid #fff" : `2px dashed ${p.quote_color}88`,
             outlineOffset: 4, borderRadius: 4, padding: "1px 3px",
-            fontFamily: "'Darker Grotesque', system-ui, sans-serif",
+            fontFamily: "var(--font-darker-grotesque), system-ui, sans-serif",
           }}
         >
           &ldquo;
@@ -269,7 +269,7 @@ function SlideEditor({ slide, onSave }: { slide: Slide; onSave: (s: Slide) => vo
             cursor: "grab",
             outline: dragging === "close" ? "2px solid #fff" : `2px dashed ${p.quote_color}88`,
             outlineOffset: 4, borderRadius: 4, padding: "1px 3px",
-            fontFamily: "'Darker Grotesque', system-ui, sans-serif",
+            fontFamily: "var(--font-darker-grotesque), system-ui, sans-serif",
           }}
         >
           &rdquo;
@@ -393,9 +393,8 @@ export default function CampaignAdminPage() {
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Darker+Grotesque:wght@500;700;800;900&display=swap');
         *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-        body{font-family:'Darker Grotesque',system-ui,sans-serif;background:#F5F0E8;color:#111110}
+        body{font-family:var(--font-darker-grotesque),system-ui,sans-serif;background:#F5F0E8;color:#111110}
 
         .adm-header{background:#111110;height:56px;display:flex;align-items:center;justify-content:space-between;padding:0 32px;position:sticky;top:0;z-index:50}
         .adm-logo{font-size:15px;font-weight:900;color:#FFD400;text-decoration:none}

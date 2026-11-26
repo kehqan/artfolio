@@ -251,7 +251,7 @@ export function OfferWorkModal({ open, onClose, target, preselect = [] }: Props)
                       <span className="relative block aspect-square bg-sunken">
                         {w.images?.[0]
                           // eslint-disable-next-line @next/next/no-img-element
-                          ? <img src={w.images[0]} alt="" className="absolute inset-0 h-full w-full object-contain p-2" />
+                          ? <img loading="lazy" decoding="async" src={w.images[0]} alt="" className="absolute inset-0 h-full w-full object-contain p-2" />
                           : <ImageOff size={22} aria-hidden className="absolute inset-0 m-auto text-fg-3" />}
                       </span>
                       <span className="flex flex-col gap-0.5 p-2.5">

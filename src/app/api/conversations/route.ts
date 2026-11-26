@@ -16,33 +16,38 @@ export async function GET(request: NextRequest) {
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-    // Enrich with other participant profile + unread count
-    const enriched = await Promise.all((convos || []).map(async (c) => {
-      const otherId = c.participant_a === user.id ? c.participant_b : c.participant_a;
-      let otherProfile = null;
-      if (otherId) {
-        const { data: prof } = await supabase
-          .from("profiles")
-          .select("id, full_name, username, avatar_url, role")
-          .eq("id", otherId)
-          .single();
-        otherProfile = prof;
+    // Enrich with the other person's profile and the unread count.
+    // Two queries for the whole list (it used to be two per conversation).
+    const list = convos || [];
+    const otherOf = (c: any) => (c.participant_a === user.id ? c.participant_b : c.participant_a);
+    const otherIds = Array.from(new Set(list.map(otherOf).filter(Boolean)));
+    const ids = list.map(c => c.id);
+    const [{ data: profs }, { data: unreadRows }] = await Promise.all([
+      otherIds.length
+        ? supabase.from("profiles").select("id, full_name, username, avatar_url, role").in("id", otherIds)
+        : Promise.resolve({ data: [] as any[] }),
+      ids.length
+        ? supabase.from("messages")
+            .select("conversation_id, read_by_a, read_by_b, sender_id")
+            .in("conversation_id", ids)
+            .or("read_by_a.eq.false,read_by_b.eq.false")
+            .neq("sender_id", user.id)
+            .limit(5000)
+        : Promise.resolve({ data: [] as any[] }),
+    ]);
+    const profById = new Map((profs || []).map((p: any) => [p.id, p]));
+    const isAById = new Map(list.map(c => [c.id, c.participant_a === user.id]));
+    const unreadById = new Map<string, number>();
+    for (const m of unreadRows || []) {
+      const isA = isAById.get(m.conversation_id);
+      if (isA ? m.read_by_a === false : m.read_by_b === false) {
+        unreadById.set(m.conversation_id, (unreadById.get(m.conversation_id) || 0) + 1);
       }
-
-      // Unread count for this user
-      const isA = c.participant_a === user.id;
-      const { count: unread } = await supabase
-        .from("messages")
-        .select("*", { count: "exact", head: true })
-        .eq("conversation_id", c.id)
-        .eq(isA ? "read_by_a" : "read_by_b", false)
-        .neq("sender_id", user.id);
-
-      return {
-        ...c,
-        other_profile: otherProfile,
-        unread_count: unread || 0,
-      };
+    }
+    const enriched = list.map(c => ({
+      ...c,
+      other_profile: profById.get(otherOf(c)) || null,
+      unread_count: unreadById.get(c.id) || 0,
     }));
 
     return NextResponse.json({ conversations: enriched });

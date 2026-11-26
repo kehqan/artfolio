@@ -13,6 +13,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { type DealView, isClosed, loadDeals } from "@/lib/deals";
 import { type PlaceArtwork, cityOf, isSold, sameCity } from "@/lib/places";
 import { type SiteConfig, type WallEntry, siteOf, today } from "@/lib/site";
+import { IMAGE_CACHE_SECONDS, prepareImage } from "@/lib/image";
 
 export const VENUE_TYPES = ["Café", "Bar", "Restaurant", "Gallery", "Hotel", "Office", "Shop", "Cultural center", "Studio", "Pop-up space"];
 
@@ -130,14 +131,16 @@ export async function saveSite(sb: SupabaseClient, me: string, site: SiteConfig,
 
 /** Upload one image into the person's own folder; returns its public address. */
 export async function uploadImage(sb: SupabaseClient, me: string, file: File, name: string): Promise<string | null> {
-  if (!file.type.startsWith("image/") || file.size > 10 * 1024 * 1024) return null;
+  if (!file.type.startsWith("image/")) return null;
+  file = await prepareImage(file);
+  if (file.size > 10 * 1024 * 1024) return null;
   const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
   const path = `${me}/${name}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}.${ext}`;
   try {
     const res = await fetch("/api/upload", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ path, contentType: file.type }) });
     const { signedUrl } = await res.json();
     if (!signedUrl) return null;
-    const put = await fetch(signedUrl, { method: "PUT", body: file, headers: { "Content-Type": file.type } });
+    const put = await fetch(signedUrl, { method: "PUT", body: file, headers: { "Content-Type": file.type, "cache-control": `max-age=${IMAGE_CACHE_SECONDS}` } });
     if (!put.ok) return null;
     return sb.storage.from("artwork-images").getPublicUrl(path).data.publicUrl;
   } catch {

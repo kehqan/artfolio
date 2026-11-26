@@ -279,7 +279,7 @@ function DealRow({ d, me }: { d: DealView; me: string }) {
         <span className="grid h-14 w-14 shrink-0 place-items-center overflow-hidden rounded-control border-hair border-line bg-sunken">
           {cover
             // eslint-disable-next-line @next/next/no-img-element
-            ? <img src={cover} alt="" className="h-full w-full object-contain p-1" />
+            ? <img loading="lazy" decoding="async" src={cover} alt="" className="h-full w-full object-contain p-1" />
             : <ImageOff size={16} aria-hidden className="text-fg-3" />}
         </span>
         <span className="flex min-w-0 flex-1 flex-col gap-0.5">
@@ -305,7 +305,7 @@ function WallsSummary({ v, onPost }: { v: VenueData; onPost: () => void }) {
             {(show.works.length ? show.works : [{ id: "x", title: "", image: null }]).slice(0, 2).map(w => (
               <span key={w.id} className="block h-12 w-12 overflow-hidden rounded-control border-2 border-surface bg-sunken">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                {w.image && <img src={w.image} alt="" className="h-full w-full object-cover" />}
+                {w.image && <img loading="lazy" decoding="async" src={w.image} alt="" className="h-full w-full object-cover" />}
               </span>
             ))}
           </span>

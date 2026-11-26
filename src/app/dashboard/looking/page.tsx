@@ -230,7 +230,7 @@ export default function LookingPage() {
                     <Link href={publicProjectHref(pr.id)} className="relative block aspect-[16/9] border-b-hair border-line bg-sunken">
                       {pr.cover_url
                         // eslint-disable-next-line @next/next/no-img-element
-                        ? <img src={pr.cover_url} alt="" className="absolute inset-0 h-full w-full object-cover" />
+                        ? <img loading="lazy" decoding="async" src={pr.cover_url} alt="" className="absolute inset-0 h-full w-full object-cover" />
                         : <span className="absolute inset-0 grid place-items-center font-display text-h3 text-fg-3">{pr.title}</span>}
                     </Link>
                     <div className="flex flex-1 flex-col gap-1 p-4">
@@ -469,7 +469,7 @@ function ReadyCard({ works, ready, open, loading }: { works: PlaceArtwork[]; rea
                     <span className="grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-control border-hair border-line bg-sunken">
                       {a.images?.[0]
                         // eslint-disable-next-line @next/next/no-img-element
-                        ? <img src={a.images[0]} alt="" className="h-full w-full object-cover" />
+                        ? <img loading="lazy" decoding="async" src={a.images[0]} alt="" className="h-full w-full object-cover" />
                         : <ImageOff size={14} aria-hidden className="text-fg-3" />}
                     </span>
                     <span className="flex min-w-0 flex-col">

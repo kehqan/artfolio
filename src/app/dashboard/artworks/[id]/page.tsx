@@ -309,7 +309,7 @@ export default function ArtworkDetailPage() {
                   className={cn("h-16 w-20 shrink-0 overflow-hidden rounded-chip border-outline transition-colors",
                     i === activeImg ? "border-ink" : "border-transparent opacity-70 hover:opacity-100")}>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={img} alt="" className="h-full w-full object-cover" />
+                  <img loading="lazy" decoding="async" src={img} alt="" className="h-full w-full object-cover" />
                 </button>
               ))}
             </div>
@@ -336,7 +336,7 @@ export default function ArtworkDetailPage() {
                       className="flex items-center gap-3 rounded-control border-hair border-line p-2.5 transition-colors hover:border-ink">
                       <span className="grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-chip bg-sunken text-fg-3">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                        {thumb ? <img src={thumb} alt="" className="h-full w-full object-cover" /> : <Link2 size={18} aria-hidden />}
+                        {thumb ? <img loading="lazy" decoding="async" src={thumb} alt="" className="h-full w-full object-cover" /> : <Link2 size={18} aria-hidden />}
                       </span>
                       <span className="flex min-w-0 flex-1 flex-col">
                         <span className="truncate font-ui text-body-sm font-semibold text-fg">{mb.title}</span>

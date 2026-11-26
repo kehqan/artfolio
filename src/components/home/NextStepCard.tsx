@@ -23,7 +23,7 @@ export function NextStepCard({ eyebrow = "Next step", title, line, primary, seco
         {image !== undefined ? (
           <span className="hidden h-16 w-16 shrink-0 overflow-hidden rounded-control border-hair border-line bg-sunken sm:block">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            {image && <img src={image} alt="" className="h-full w-full object-contain p-1" />}
+            {image && <img loading="lazy" decoding="async" src={image} alt="" className="h-full w-full object-contain p-1" />}
           </span>
         ) : icon ? (
           <span aria-hidden className="hidden h-12 w-12 shrink-0 place-items-center rounded-pill border-outline border-ink bg-mango text-on-mango sm:grid">{icon}</span>

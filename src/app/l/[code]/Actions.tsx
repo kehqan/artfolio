@@ -6,15 +6,19 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowRight, Check, Mail, MessageSquare, Plus, ShoppingBag } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
 import { Alert, Button, Field, Input, Modal, Textarea } from "@/components/ui";
 import { recordEvent } from "@/lib/labels";
 
 const NEXT_KEY = "artomango.next";
 
+// The database client loads after the page (its own file), so the piece page a
+// QR scan opens has less JavaScript to download before it can be used.
+const getSb = () => import("@/lib/supabase/client").then(m => m.createClient());
+
 function useMe() {
   const [me, setMe] = useState<string | null | undefined>(undefined);
-  useEffect(() => { createClient().auth.getUser().then(({ data }) => setMe(data.user?.id || null)); }, []);
+  // The local session is enough to pick the buttons; it needs no request.
+  useEffect(() => { getSb().then(sb => sb.auth.getSession()).then(({ data }) => setMe(data.session?.user.id || null)); }, []);
   return me;
 }
 
@@ -30,7 +34,7 @@ export function FollowButton({ code, artistId, artistFirst }: { code: string; ar
   const [error, setError] = useState("");
 
   async function follow(uid: string) {
-    const sb = createClient();
+    const sb = await getSb();
     const { error: err } = await sb.from("followers").insert({ follower_id: uid, following_id: artistId });
     if (err && !String(err.code).startsWith("23")) { setError("That didn't work. Please try again."); return false; }
     setFollowing(true);
@@ -40,8 +44,7 @@ export function FollowButton({ code, artistId, artistFirst }: { code: string; ar
 
   useEffect(() => {
     if (!me || me === artistId) return;
-    const sb = createClient();
-    sb.from("followers").select("id").eq("follower_id", me).eq("following_id", artistId).maybeSingle().then(({ data }) => {
+    getSb().then(sb => sb.from("followers").select("id").eq("follower_id", me).eq("following_id", artistId).maybeSingle()).then(({ data }) => {
       if (data) { setFollowing(true); return; }
       // Back from the sign-in email: finish the follow they asked for.
       const q = new URLSearchParams(window.location.search);
@@ -56,7 +59,7 @@ export function FollowButton({ code, artistId, artistFirst }: { code: string; ar
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email.trim())) { setError("Please check the email address."); return; }
     setBusy(true); setError("");
     try { localStorage.setItem(NEXT_KEY, `/l/${code}?do=follow`); } catch { /* the link still signs them in */ }
-    const { error: err } = await createClient().auth.signInWithOtp({
+    const { error: err } = await (await getSb()).auth.signInWithOtp({
       email: email.trim(),
       options: { emailRedirectTo: `${window.location.origin}/auth/confirm`, data: { role: "curator", full_name: name.trim().slice(0, 100) } },
     });
@@ -138,7 +141,7 @@ export function SellingActions({ code, artistId, artistFirst, workId, title, pla
       setError((json as { error?: string }).error?.includes("Too many") ? "Too many messages right now. Please try again in an hour." : "Your message didn't send. Please try again.");
       return;
     }
-    recordEvent(createClient(), code, open === "buy" ? "buy" : "ask");
+    getSb().then(sb => recordEvent(sb, code, open === "buy" ? "buy" : "ask"));
     setSent(true);
   }
 
@@ -180,7 +183,7 @@ export function SellingActions({ code, artistId, artistFirst, workId, title, pla
 // ── Passport ────────────────────────────────────────────────────────
 export function PassportLink({ code, href, count }: { code: string; href: string; count: number }) {
   return (
-    <Link href={href} onClick={() => { recordEvent(createClient(), code, "passport"); }}
+    <Link href={href} onClick={() => { getSb().then(sb => recordEvent(sb, code, "passport")); }}
       className="inline-flex items-center gap-1 self-start font-ui text-label font-semibold text-fg underline-offset-4 hover:underline">
       {count > 3 ? `See the full passport (${count} entries)` : "See the full passport"} <ArrowRight size={14} aria-hidden />
     </Link>

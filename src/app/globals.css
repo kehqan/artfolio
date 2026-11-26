@@ -122,3 +122,14 @@
 .site-serif {
   font-family: var(--font-site-serif), Georgia, serif !important;
 }
+
+/* ── Long lists: let the browser skip drawing what's off screen ───────
+   Cards far below the fold aren't laid out or painted until you scroll
+   near them (the effect of a virtualised list, without the JavaScript).
+   The intrinsic size keeps the scrollbar steady. */
+@layer utilities {
+  .cv-auto {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 360px;
+  }
+}

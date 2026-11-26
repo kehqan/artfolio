@@ -9,6 +9,7 @@ import {
 import {
   Alert, Avatar, Button, ButtonLink, Card, Field, Input, Label, PageHeader, Select, Skeleton, Switch, Tabs, Textarea, cn,
 } from "@/components/ui";
+import { IMAGE_CACHE_SECONDS, prepareImage } from "@/lib/image";
 
 // Names that are pages of the app, so they can't be someone's address.
 const RESERVED = new Set(["admin", "api", "artwork", "artworks", "auth", "available", "contracts", "dashboard", "explore",
@@ -160,17 +161,19 @@ export default function ProfilePage() {
     setSaving(false);
   }
 
-  async function uploadAvatar(file: File) {
+  async function uploadAvatar(picked: File) {
     setNotice(null);
-    if (!file.type.startsWith("image/")) { setNotice({ tone: "bad", text: "Choose an image file (JPG, PNG or WebP)." }); return; }
-    if (file.size > 10 * 1024 * 1024) { setNotice({ tone: "bad", text: "That image is over 10 MB. Try a smaller one." }); return; }
+    if (!picked.type.startsWith("image/")) { setNotice({ tone: "bad", text: "Choose an image file (JPG, PNG or WebP)." }); return; }
     setUploading(true);
+    // A face never needs more than 800 px.
+    const file = await prepareImage(picked, 800);
+    if (file.size > 10 * 1024 * 1024) { setUploading(false); setNotice({ tone: "bad", text: "That image is over 10 MB. Try a smaller one." }); return; }
     const { data: { user } } = await sb.auth.getUser();
     if (!user) { setUploading(false); return; }
     const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
     // Storage rules need the user id as the second path segment; a fresh name per upload avoids stale caches
     const path = `avatars/${user.id}/avatar-${Date.now()}.${ext}`;
-    const { error } = await sb.storage.from("avatars").upload(path, file, { upsert: false, contentType: file.type });
+    const { error } = await sb.storage.from("avatars").upload(path, file, { upsert: false, contentType: file.type, cacheControl: IMAGE_CACHE_SECONDS });
     if (error) {
       setNotice({ tone: "bad", text: "The photo didn't upload. Please try again." });
     } else {
@@ -244,7 +247,7 @@ export default function ProfilePage() {
                   >
                     {avatar ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={avatar} alt="" className="h-full w-full object-cover" />
+                      <img loading="lazy" decoding="async" src={avatar} alt="" className="h-full w-full object-cover" />
                     ) : (
                       <span className="grid h-full w-full place-items-center font-display text-h2 font-bold text-fg">{(form.full_name || "?")[0]}</span>
                     )}

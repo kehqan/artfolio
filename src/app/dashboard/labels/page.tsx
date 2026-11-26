@@ -104,7 +104,7 @@ export default function LabelsPage() {
                       <input type="checkbox" checked={on} onChange={() => toggle(l.id)} aria-label={`Pick ${l.work?.title}`} className="h-4 w-4 accent-[#111110]" />
                       <span className="relative block h-12 w-12 shrink-0 overflow-hidden rounded-control bg-sunken">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                        {l.work?.images?.[0] && <img src={l.work.images[0]} alt="" className="absolute inset-0 h-full w-full object-cover" />}
+                        {l.work?.images?.[0] && <img loading="lazy" decoding="async" src={l.work.images[0]} alt="" className="absolute inset-0 h-full w-full object-cover" />}
                       </span>
                       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                         <span className="truncate font-ui text-body-sm font-semibold text-fg">{l.work?.title || "A work"}</span>

@@ -16,13 +16,13 @@ export function ProjectCard({ p }: { p: ProjectView }) {
       <span className="relative block aspect-[16/9] border-b-hair border-line bg-sunken">
         {p.cover_url ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={p.cover_url} alt="" className="absolute inset-0 h-full w-full object-cover" />
+          <img loading="lazy" decoding="async" src={p.cover_url} alt="" className="absolute inset-0 h-full w-full object-cover" />
         ) : thumbs.length ? (
           <span className="absolute inset-0 grid grid-cols-3 gap-2 p-3">
             {thumbs.map(t => (
               <span key={t} className="relative overflow-hidden rounded-control bg-surface">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={t} alt="" className="absolute inset-0 h-full w-full object-contain p-1" />
+                <img loading="lazy" decoding="async" src={t} alt="" className="absolute inset-0 h-full w-full object-contain p-1" />
               </span>
             ))}
           </span>

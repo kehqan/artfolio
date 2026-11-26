@@ -276,7 +276,7 @@ const OVERLAY: React.CSSProperties = {
 const MODAL: React.CSSProperties = {
   background: "#FFFBEA", border: "2.5px solid #111110", borderRadius: 20,
   boxShadow: "8px 8px 0 #111110", width: "100%", maxWidth: 480,
-  fontFamily: "'Darker Grotesque', system-ui, sans-serif",
+  fontFamily: "var(--font-darker-grotesque), system-ui, sans-serif",
   overflow: "hidden",
 };
 const MODAL_HDR: React.CSSProperties = {

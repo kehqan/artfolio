@@ -9,6 +9,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useJourney } from "@/components/journey/JourneyProvider";
 import { Hint } from "@/components/journey/Hint";
 import { Alert, Button, ButtonLink, Card, EmptyState, Field, Input, PageHeader, Skeleton, Switch, Textarea, cn } from "@/components/ui";
+import { IMAGE_CACHE_SECONDS, prepareImage } from "@/lib/image";
 import {
   ACCENTS, GRIDS, HEADERS, SECTION_HINT, SECTION_LABEL, TYPES,
   type GridKey, type HeaderKey, type PreviewMessage, type SiteConfig, type SiteSettings, type TypeKey,
@@ -146,6 +147,7 @@ export default function SiteEditorPage() {
   async function sendImage(file: File, name: string): Promise<string | null> {
     if (!uid) return null;
     if (!file.type.startsWith("image/")) { setNotice({ tone: "bad", text: "Choose an image file (JPG, PNG or WebP)." }); return null; }
+    file = await prepareImage(file);
     if (file.size > 10 * 1024 * 1024) { setNotice({ tone: "bad", text: "That image is over 10 MB. Try a smaller one." }); return null; }
     const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
     const path = `${uid}/${name}-${Date.now()}.${ext}`;
@@ -153,7 +155,7 @@ export default function SiteEditorPage() {
       const res = await fetch("/api/upload", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ path, contentType: file.type }) });
       const { signedUrl } = await res.json();
       if (!signedUrl) throw new Error("no url");
-      const put = await fetch(signedUrl, { method: "PUT", body: file, headers: { "Content-Type": file.type } });
+      const put = await fetch(signedUrl, { method: "PUT", body: file, headers: { "Content-Type": file.type, "cache-control": `max-age=${IMAGE_CACHE_SECONDS}` } });
       if (!put.ok) throw new Error("upload failed");
       return createClient().storage.from("artwork-images").getPublicUrl(path).data.publicUrl;
     } catch {
@@ -268,7 +270,7 @@ export default function SiteEditorPage() {
               <div className="relative aspect-[16/7] overflow-hidden rounded-control border-hair border-line bg-sunken">
                 {extra.banner_url
                   // eslint-disable-next-line @next/next/no-img-element
-                  ? <img src={extra.banner_url} alt="" className="h-full w-full object-cover" />
+                  ? <img loading="lazy" decoding="async" src={extra.banner_url} alt="" className="h-full w-full object-cover" />
                   : <span className="grid h-full place-items-center px-4 text-center font-ui text-caption text-fg-3">No image yet. We use your first featured work.</span>}
               </div>
               <div className="flex gap-2">

@@ -318,7 +318,7 @@ function DealCard({ d, me, busy, focused, liRef, signed, agreementCancelled, onM
               <span className="relative block aspect-square overflow-hidden rounded-control border-hair border-line bg-sunken group-hover:border-ink">
                 {w.images?.[0]
                   // eslint-disable-next-line @next/next/no-img-element
-                  ? <img src={w.images[0]} alt="" className="absolute inset-0 h-full w-full object-contain p-1.5" />
+                  ? <img loading="lazy" decoding="async" src={w.images[0]} alt="" className="absolute inset-0 h-full w-full object-contain p-1.5" />
                   : <ImageOff size={18} aria-hidden className="absolute inset-0 m-auto text-fg-3" />}
               </span>
               <span className="truncate font-ui text-caption font-semibold text-fg">{w.title}</span>

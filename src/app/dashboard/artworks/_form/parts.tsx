@@ -254,7 +254,7 @@ function MoodboardPicker({ moodboards, linked, onToggle }: { moodboards: Moodboa
                   on ? "border-ink bg-sunken" : "border-line bg-surface hover:border-line-strong",
                 )}>
                 <span className="grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-chip bg-sunken text-fg-3">
-                  {thumb ? <img src={thumb} alt="" className="h-full w-full object-cover" /> : <Layers size={16} aria-hidden />}
+                  {thumb ? <img loading="lazy" decoding="async" src={thumb} alt="" className="h-full w-full object-cover" /> : <Layers size={16} aria-hidden />}
                 </span>
                 <span className="flex min-w-0 flex-1 flex-col">
                   <span className="truncate font-ui text-body-sm font-semibold text-fg">{mb.title}</span>

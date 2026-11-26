@@ -14,6 +14,7 @@ import {
   PageHeader, SearchField, Select, Skeleton, StatTile, Tabs, cn,
 } from "@/components/ui";
 import { STAGES, STAGE_MAP, toStageKey, formatPrice } from "@/lib/artwork-stage";
+import { usePaged } from "@/lib/use-paged";
 
 // ── Types ──────────────────────────────────────────────────────
 type Artwork = {
@@ -58,7 +59,7 @@ function SortTh({ k, label, sortKey, sortDir, onSort }: { k: SortKey; label: str
 function ArtImage({ src, alt, className, iconSize = 28 }: { src: string | null; alt: string; className?: string; iconSize?: number }) {
   if (src) {
     // eslint-disable-next-line @next/next/no-img-element
-    return <img src={src} alt={alt} className={cn("h-full w-full object-cover", className)} />;
+    return <img loading="lazy" decoding="async" src={src} alt={alt} className={cn("h-full w-full object-cover", className)} />;
   }
   return (
     <div className={cn("grid h-full w-full place-items-center bg-sunken text-n-400", className)}>
@@ -194,6 +195,8 @@ export default function ArtworksPage() {
     });
 
   const filtering = Boolean(search) || stageFilter !== "All";
+  // Long collections render a page at a time as you scroll (lib/use-paged).
+  const { visible, hasMore, sentinel } = usePaged(filtered, 24, `${search}|${stageFilter}|${sortKey}|${sortDir}|${view}`);
 
   // ── Inline-edit cell renderer (table view)
   function EditableCell({ aw, field, children }: { aw: Artwork; field: string; children: React.ReactNode }) {
@@ -328,7 +331,7 @@ export default function ArtworksPage() {
       {/* ── GRID VIEW ── */}
       {!loading && filtered.length > 0 && view === "grid" && (
         <div className="grid grid-cols-1 gap-5 min-[480px]:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {filtered.map(aw => (
+          {visible.map(aw => (
             <ArtworkCard
               key={aw.id}
               aw={aw}
@@ -374,7 +377,7 @@ export default function ArtworksPage() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map(aw => {
+                {visible.map(aw => {
                   const img = Array.isArray(aw.images) ? aw.images[0] : null;
                   const st = STAGE_MAP[toStageKey(aw.status)];
                   const price = formatPrice(aw.price, aw.currency);
@@ -426,6 +429,7 @@ export default function ArtworksPage() {
           </div>
         </div>
       )}
+      {!loading && hasMore && <div ref={sentinel} aria-hidden className="h-px" />}
 
       {/* ── DELETE CONFIRMATION ── */}
       <Modal

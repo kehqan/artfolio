@@ -109,7 +109,7 @@ export function BoardModal({ open, board, userId, onClose, onSaved }: Props) {
           <div className="h-16 w-20 shrink-0 overflow-hidden rounded-control border-hair border-line bg-sunken">
             {thumb && (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={thumb} alt="" className="h-full w-full object-cover" />
+              <img loading="lazy" decoding="async" src={thumb} alt="" className="h-full w-full object-cover" />
             )}
           </div>
           <Field label="Title" className="flex-1">

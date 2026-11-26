@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { ArrowLeft, Building2, FolderOpen, Palette } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { nextPath, rememberNext } from "@/lib/next-path";
@@ -9,6 +10,7 @@ import {
   Alert, Button, Chip, Field, Input, Label, PasswordInput, cn,
 } from "@/components/ui";
 import { AuthLink, AuthShell } from "@/components/auth/AuthShell";
+import { MIN_AGE, TERMS_VERSION } from "@/lib/legal";
 
 type Role = "artist" | "venue" | "curator";
 type Step = "role" | "art" | "account";
@@ -97,6 +99,7 @@ export default function RegisterPage() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [pw, setPw] = useState("");
+  const [adult, setAdult] = useState(false);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
   const [sentTo, setSentTo] = useState<string | null>(null);
@@ -109,6 +112,7 @@ export default function RegisterPage() {
 
   async function submit(e: React.FormEvent) {
     e.preventDefault(); if (!role) return;
+    if (!adult) { setErr(`Artomango is for people aged ${MIN_AGE} or older.`); return; }
     setLoading(true); setErr("");
     try {
       const sb = createClient();
@@ -128,7 +132,8 @@ export default function RegisterPage() {
       const { data, error: e2 } = await sb.auth.signUp({
         email, password: pw,
         // A new artist starts with the welcome flow (see src/app/welcome).
-        options: { data: { full_name: name, role, profile: p, ...(role === "artist" ? { welcome: "pending" } : {}) }, emailRedirectTo: `${window.location.origin}/auth/confirm` },
+        // What they agreed to and when, kept with the account as a record.
+        options: { data: { full_name: name, role, profile: p, adult_confirmed: true, terms_version: TERMS_VERSION, terms_accepted_at: new Date().toISOString(), ...(role === "artist" ? { welcome: "pending" } : {}) }, emailRedirectTo: `${window.location.origin}/auth/confirm` },
       });
       if (e2) { setErr(e2.message); setLoading(false); return; }
       if (data.session && data.user) {
@@ -284,7 +289,6 @@ export default function RegisterPage() {
       footer={
         <div className="flex flex-col gap-3">
           <span>{signIn}</span>
-          <span className="font-ui text-caption text-fg-3">By creating an account you agree to the Terms of Service and Privacy Policy.</span>
         </div>
       }
       before={<><BackButton onClick={() => setStep("art")}>Back</BackButton><StepBar step="account" /></>}
@@ -300,7 +304,13 @@ export default function RegisterPage() {
         <Field label="Password" hint="At least 8 characters.">
           {(p) => <PasswordInput {...p} required minLength={8} autoComplete="new-password" value={pw} onChange={e => setPw(e.target.value)} />}
         </Field>
-        <Button type="submit" variant="primary" disabled={loading} className="mt-2 w-full">
+        <label className="flex cursor-pointer items-start gap-2.5">
+          <input type="checkbox" required checked={adult} onChange={e => setAdult(e.target.checked)} className="mt-1 h-4 w-4 shrink-0 accent-ink" />
+          <span className="font-ui text-body-sm text-fg-2">
+            I&rsquo;m {MIN_AGE} or older and I agree to the <Link href="/terms" target="_blank" className="font-semibold text-fg underline underline-offset-4">terms</Link> and <Link href="/privacy" target="_blank" className="font-semibold text-fg underline underline-offset-4">privacy policy</Link>.
+          </span>
+        </label>
+        <Button type="submit" variant="primary" disabled={loading || !adult} className="mt-2 w-full">
           {loading ? "Creating your account…" : role === "venue" ? "Create venue account" : role === "curator" ? "Create curator account" : "Create artist account"}
         </Button>
       </form>

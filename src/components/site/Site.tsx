@@ -441,7 +441,10 @@ export function Site({ data, site, onOpenWork, onMessage, preview }: Props) {
       <footer className="border-t-hair border-line">
         <div className={cn(wrap, "flex flex-col gap-3 py-8 font-ui text-body-sm text-fg-3 sm:flex-row sm:items-center sm:justify-between")}>
           <span suppressHydrationWarning>© {new Date().getFullYear()} {name}</span>
-          <a href="/register" className="inline-flex items-center gap-1.5 hover:text-fg">Made with <span className="font-semibold text-fg">Artomango</span></a>
+          <span className="flex flex-wrap items-center gap-x-5 gap-y-2">
+            <a href="/register" className="inline-flex items-center gap-1.5 hover:text-fg">Made with <span className="font-semibold text-fg">Artomango</span></a>
+            <a href="/report" onClick={e => { e.currentTarget.href = `/report?url=${encodeURIComponent(window.location.href)}`; }} className="hover:text-fg">Report</a>
+          </span>
         </div>
       </footer>
     </div>

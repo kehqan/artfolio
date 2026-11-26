@@ -183,6 +183,7 @@ export default async function PiecePage({ params }: { params: { code: string } }
           <div className="flex flex-wrap gap-x-5 gap-y-2 font-ui text-body-sm font-semibold">
             <Link href="/register?role=artist" className="text-mango hover:underline">Artists: find walls like this one</Link>
             <Link href="/register?role=venue" className="text-mango hover:underline">Places: find art for yours</Link>
+            <Link href={`/report?url=${encodeURIComponent(`https://artomango.com/l/${l.code}`)}`} className="text-on-inverse/80 hover:underline">Report</Link>
           </div>
         </div>
       </footer>

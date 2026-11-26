@@ -20,15 +20,17 @@ type Slide = {
   quote_size: number;
 };
 
+// Fallback slides use our own images: a link to another site would send each
+// visitor's IP address there.
 const FALLBACK: Omit<Slide, "id" | "order" | "active">[] = [
   {
-    image_url: "https://images.unsplash.com/photo-1541961017774-22349e4a1262?w=1600&q=80",
+    image_url: "/demo/vltava-at-dusk.jpg",
     text_x: 5, text_y: 52, text_content: "Art while you", text_color: "#ffffff", text_size: 72,
     quote_open_x: 50, quote_open_y: 22, quote_close_x: 70, quote_close_y: 22,
     quote_color: "#FFD400", quote_size: 120,
   },
   {
-    image_url: "https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=1600&q=80",
+    image_url: "/demo/night-market.jpg",
     text_x: 5, text_y: 52, text_content: "Art while you", text_color: "#ffffff", text_size: 72,
     quote_open_x: 46, quote_open_y: 24, quote_close_x: 68, quote_close_y: 24,
     quote_color: "#FFD400", quote_size: 120,

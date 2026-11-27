@@ -37,6 +37,10 @@ const FALLBACK: Omit<Slide, "id" | "order" | "active">[] = [
   },
 ];
 
+// Sizes are saved as pixels on a 1280px-wide stage (see /admin/campaign).
+// Turn them into a share of the stage's real width.
+const cqw = (px: number) => `${(px / 12.8).toFixed(3)}cqw`;
+
 export default function CampaignCarousel() {
   const [slides, setSlides] = useState<Slide[]>([]);
   const [active, setActive] = useState(0);
@@ -72,9 +76,12 @@ export default function CampaignCarousel() {
   return (
     <>
       <style>{`
+        /* The stage has the same 16:9 shape as the editor in /admin/campaign, and
+           every size is a share of its width. So the words and the quote marks land
+           on the same spot of the photo on every screen, exactly as placed there. */
         .camp-section {
-          position:relative;width:100%;height:100vh;
-          min-height:560px;max-height:920px;
+          position:relative;width:100%;aspect-ratio:16/9;
+          container-type:inline-size;
           overflow:hidden;border-bottom:3px solid #111110;
           background:#0a0a0a;
           font-family:var(--font-darker-grotesque),system-ui,sans-serif;
@@ -92,13 +99,13 @@ export default function CampaignCarousel() {
         .camp-el{
           position:absolute;z-index:2;user-select:none;
           transition:opacity .3s ease,transform .4s cubic-bezier(.16,1,.3,1);
-          white-space:nowrap;font-weight:900;line-height:1;
+          white-space:nowrap;font-weight:900;line-height:1;padding:1px 3px;
         }
         .camp-el.off{opacity:0;transform:translateY(10px)}
         .camp-el.on {opacity:1;transform:translateY(0)}
         .camp-progress{
           position:absolute;bottom:0;left:0;right:0;z-index:3;
-          display:flex;gap:3px;padding:0 48px 28px;
+          display:flex;gap:3px;padding:0 clamp(16px,3.75cqw,48px) clamp(10px,2.2cqw,28px);
         }
         .camp-bar{flex:1;height:2px;background:rgba(255,255,255,.2);border-radius:2px;cursor:pointer;overflow:hidden}
         .camp-fill{height:100%;background:#FFD400;transform:scaleX(0);transform-origin:left;border-radius:2px}
@@ -106,7 +113,7 @@ export default function CampaignCarousel() {
         .camp-bar.ba .camp-fill{animation:cFill 6s linear forwards}
         .camp-bar.bd .camp-fill{transform:scaleX(1)}
         .camp-ctr{
-          position:absolute;bottom:40px;right:48px;z-index:3;
+          position:absolute;bottom:clamp(18px,3.1cqw,40px);right:clamp(16px,3.75cqw,48px);z-index:3;
           font-size:12px;font-weight:800;color:rgba(255,255,255,.35);
           letter-spacing:.12em;font-family:var(--font-darker-grotesque),system-ui,sans-serif;
         }
@@ -126,9 +133,9 @@ export default function CampaignCarousel() {
           style={{
             left: `${s.text_x}%`, top: `${s.text_y}%`,
             transform: "translateY(-50%)",
-            fontSize: `${s.text_size}px`,
+            fontSize: cqw(s.text_size),
             color: s.text_color,
-            letterSpacing: "-2px",
+            letterSpacing: cqw(-1.5),
             textShadow: "0 2px 28px rgba(0,0,0,.5)",
           }}
         >
@@ -140,7 +147,7 @@ export default function CampaignCarousel() {
           className={`camp-el ${visible ? "on" : "off"}`}
           style={{
             left: `${s.quote_open_x}%`, top: `${s.quote_open_y}%`,
-            fontSize: `${s.quote_size}px`, color: s.quote_color,
+            fontSize: cqw(s.quote_size), color: s.quote_color,
             lineHeight: 0.75, transitionDelay: ".05s",
             textShadow: "0 2px 16px rgba(0,0,0,.35)",
           }}
@@ -153,7 +160,7 @@ export default function CampaignCarousel() {
           className={`camp-el ${visible ? "on" : "off"}`}
           style={{
             left: `${s.quote_close_x}%`, top: `${s.quote_close_y}%`,
-            fontSize: `${s.quote_size}px`, color: s.quote_color,
+            fontSize: cqw(s.quote_size), color: s.quote_color,
             lineHeight: 0.75, transitionDelay: ".1s",
             textShadow: "0 2px 16px rgba(0,0,0,.35)",
           }}

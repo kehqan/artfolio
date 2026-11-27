@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Please pick a JPG, PNG, WebP, GIF or AVIF picture." }, { status: 400 });
     }
     const { data, error } = await supabase.storage.from("artwork-images").createSignedUploadUrl(path);
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) { console.error("Upload URL error:", error.message); return NextResponse.json({ error: "Could not start the upload. Please try again." }, { status: 500 }); }
     return NextResponse.json({ signedUrl: data.signedUrl });
   } catch (e) {
     return NextResponse.json({ error: "Server error" }, { status: 500 });

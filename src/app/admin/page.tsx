@@ -168,7 +168,7 @@ export default function AdminPage() {
   async function loadAll() {
     setLoading(true);
     const [{ data: u }, { data: aw }, { data: ev }, { data: sl }, { data: hc }, { data: st }] = await Promise.all([
-      sb.from("profiles").select("*").order("created_at", { ascending: false }),
+      sb.from("profiles").select("id, full_name, username, role, avatar_url, location, bio, created_at").order("created_at", { ascending: false }),
       sb.from("artworks").select("id,title,medium,price,status,images,created_at,user_id").order("created_at", { ascending: false }).limit(200),
       sb.from("exhibitions").select("id,title,event_type,start_date,is_online,is_public,user_id,venue").order("created_at", { ascending: false }).limit(200),
       sb.from("campaign_slides").select("*").order("order"),

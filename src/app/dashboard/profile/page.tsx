@@ -113,7 +113,8 @@ export default function ProfilePage() {
     const { data: { user } } = await sb.auth.getUser();
     if (!user) { setLoading(false); return; }
     const [{ data }, { count }] = await Promise.all([
-      sb.from("profiles").select("*").eq("id", user.id).single(),
+      // Not "*": nobody (not even the owner) reads profiles.email through the API.
+      sb.from("profiles").select("id, full_name, username, bio, location, website, role, instagram, behance, linkedin, venue_name, venue_type, avatar_url, location_name, lat, lng, mediums, style_tags, years_active, art_styles_sought, curates, onboarding_done, referred_by, focus_mode_default, created_at, updated_at").eq("id", user.id).single(),
       sb.from("profiles").select("id", { count: "exact", head: true }).eq("referred_by", user.id),
     ]);
     if (data) {

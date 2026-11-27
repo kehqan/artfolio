@@ -111,6 +111,7 @@
   --shell-rail: 240px;     /* left rail width (desktop) */
   --shell-header: 64px;    /* top bar height */
   --shell-content: 1180px; /* max width of the page column */
+  --shell-tabbar: 60px;    /* bottom tab bar height (phones), before the home-indicator inset */
 
   /* ── Layers ────────────────────────────────────────────────────── */
   --z-nav: 100;
@@ -125,3 +126,11 @@
     --duration-base: 0ms;
   }
 }
+
+/* ── Bottom tab bar space (phones) ─────────────────────────────────
+   Anything pinned to the bottom of a dashboard page (toasts, sticky
+   action bars, full-height panes) adds var(--tabbar-space) so the tab
+   bar never covers it. It is 0 on desktop and while the keyboard is up. */
+.am-shell { --tabbar-space: calc(var(--shell-tabbar) + env(safe-area-inset-bottom, 0px)); }
+.am-shell[data-typing="true"] { --tabbar-space: 0px; }
+@media (min-width: 1024px) { .am-shell { --tabbar-space: 0px; } }

@@ -514,7 +514,7 @@ export default function MyFrontDoorPage() {
       )}
 
       {dirty && (
-        <div className="sticky bottom-4 z-dropdown flex items-center justify-between gap-3 rounded-card border-outline border-ink bg-surface px-4 py-3 shadow-hard-2">
+        <div className="sticky bottom-[calc(1rem+var(--tabbar-space,0px))] z-dropdown flex items-center justify-between gap-3 rounded-card border-outline border-ink bg-surface px-4 py-3 shadow-hard-2">
           <span className="font-ui text-body-sm text-fg">You have unsaved changes.</span>
           <Button variant="primary" size="sm" onClick={saveAll} disabled={saving}>{saving ? "Saving…" : "Save changes"}</Button>
         </div>

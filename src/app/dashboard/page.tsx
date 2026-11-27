@@ -15,6 +15,7 @@ import { isVenueRole } from "@/lib/site";
 import { fetchJson } from "@/lib/fetch-json";
 import { useNextCalls, useReach } from "@/components/home/reach";
 import { closesLine, daysLeft, kindName } from "@/lib/open-calls";
+import { asDate } from "@/lib/dates";
 
 /* ── Labels ─────────────────────────────────────────────────────── */
 type ScenePostType = "event" | "exhibition" | "collab" | "opencall" | "commission";
@@ -433,14 +434,14 @@ function ArtistHome() {
     if (p.is_online) parts.push("Online");
     else if (p.location) parts.push(p.location);
     if (p.start_date) {
-      const dt = new Date(p.start_date).toLocaleDateString("en-US", {
+      const dt = asDate(p.start_date).toLocaleDateString("en-US", {
         month: "short",
         day: "numeric",
       });
       const d = daysUntil(p.start_date);
       parts.push(d === "today" || d === "tomorrow" ? `opens ${d}` : `${dt}`);
     } else if (p.deadline) {
-      const dt = new Date(p.deadline).toLocaleDateString("en-US", {
+      const dt = asDate(p.deadline).toLocaleDateString("en-US", {
         month: "short",
         day: "numeric",
       });
@@ -519,7 +520,7 @@ function ArtistHome() {
                         <span className="truncate font-ui text-body-sm font-semibold text-fg">{t.title}</span>
                         <span className="flex items-center gap-2 font-ui text-caption text-fg-3">
                           <Badge tone={pr.tone}>{pr.label}</Badge>
-                          {t.due_date && <span>Due {new Date(t.due_date).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}</span>}
+                          {t.due_date && <span>Due {asDate(t.due_date).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}</span>}
                         </span>
                       </span>
                     </Link>

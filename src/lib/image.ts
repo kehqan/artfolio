@@ -19,8 +19,40 @@
  */
 const MAX_SIDE = 2560;
 
-export async function prepareImage(file: File, maxSide = MAX_SIDE): Promise<File> {
-  if (typeof window === "undefined" || !file.type.startsWith("image/")) return file;
+/** iPhone "High Efficiency" photos. Windows and some browsers give them no type at all. */
+export function isHeic(file: File): boolean {
+  return /^image\/hei[cf]/i.test(file.type) || /\.(heic|heif)$/i.test(file.name);
+}
+
+/** Is this a picture we can try? Files with no type (HEIC on Windows) are judged by their name. */
+export function isPicture(file: File): boolean {
+  return file.type.startsWith("image/") || isHeic(file) || (!file.type && /\.(jpe?g|png|webp|gif|avif)$/i.test(file.name));
+}
+
+/** What to tell someone when a photo couldn't be used. */
+export function photoProblem(file: File): string {
+  if (isHeic(file)) return "This browser can't open iPhone HEIC photos. Pick the photo on your iPhone (it converts by itself), open this page in Safari, or save the photo as JPEG first.";
+  if (file.size > 40 * 1024 * 1024) return "That photo is very large. Try one under 40 MB.";
+  return "That photo didn't upload. Try a JPG or PNG.";
+}
+
+// Big phone photos are decoded one at a time. Several 48-megapixel photos
+// decoded at once is enough to make an older iPhone reload the page.
+let queue: Promise<unknown> = Promise.resolve();
+
+export function prepareImage(file: File, maxSide = MAX_SIDE): Promise<File> {
+  const run = queue.then(() => prepareOne(file, maxSide), () => prepareOne(file, maxSide));
+  queue = run.catch(() => null);
+  return run;
+}
+
+/** The file after prepareImage: can the storage take it? (JPEG, PNG, WebP, GIF, AVIF.) */
+export function uploadable(file: File): boolean {
+  return /^image\/(jpeg|png|webp|gif|avif)$/.test(file.type);
+}
+
+async function prepareOne(file: File, maxSide: number): Promise<File> {
+  if (typeof window === "undefined" || !isPicture(file)) return file;
   if (file.type === "image/gif" || file.type === "image/svg+xml") return file;
   let meta = true;
   try { meta = await hasHiddenDetails(file); } catch { /* assume it has some */ }
@@ -41,7 +73,7 @@ export async function prepareImage(file: File, maxSide = MAX_SIDE): Promise<File
     // Browsers that can't write WebP hand back a PNG instead.
     if (!blob || blob.type !== "image/webp") blob = await toBlob(canvas, "image/jpeg", 0.88);
     if (!blob) return meta ? await stripJpeg(file) : file;
-    if (blob.size >= file.size && scale === 1 && !meta) return file;
+    if (blob.size >= file.size && scale === 1 && !meta && uploadable(file)) return file;
 
     const ext = blob.type === "image/webp" ? "webp" : "jpg";
     const base = file.name.replace(/\.[^.]+$/, "") || "image";

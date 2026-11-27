@@ -1,5 +1,6 @@
 "use client";
 // Learn: videos, articles and tips that artists share with each other.
+import { safeHref } from "@/lib/safe-url";
 import { useEffect, useState } from "react";
 import { ExternalLink, FileText, MessageSquare, Play, Plus, Trash2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -210,7 +211,7 @@ function ResourceCard({ r, mine, onRemove }: { r: Resource; mine: boolean; onRem
         </div>
         <h3 className="font-ui text-body font-semibold leading-snug text-fg">
           {r.url ? (
-            <a href={r.url} target="_blank" rel="noopener noreferrer" className="after:absolute after:inset-0 focus-visible:outline-none">
+            <a href={safeHref(r.url)} target="_blank" rel="noopener noreferrer" className="after:absolute after:inset-0 focus-visible:outline-none">
               {r.title}
             </a>
           ) : r.title}

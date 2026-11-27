@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Alert, Button, Field, Input, PasswordInput } from "@/components/ui";
 import { AuthLink, AuthShell } from "@/components/auth/AuthShell";
 import { Captcha, captchaOptions, captchaWaiting } from "@/components/auth/Captcha";
+import { normEmail } from "@/lib/email-address";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -19,15 +20,22 @@ export default function LoginPage() {
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
+    if (loading) return;
     setLoading(true); setError("");
     const supabase = createClient();
-    const { error } = await supabase.auth.signInWithPassword({ email, password, options: captchaOptions(captcha) });
+    const { error } = await supabase.auth.signInWithPassword({ email: normEmail(email), password, options: captchaOptions(captcha) });
     setTries(t => t + 1); // a bot-check token works once
     if (error) {
       setError(
         error.message === "Invalid login credentials"
           ? "That email and password don’t match an account. Check both, or reset your password."
-          : error.message,
+          : /not confirmed/i.test(error.message)
+            ? "Please confirm your email first. Open the link we sent you, or create the account again to get a new link."
+            : /rate limit|too many/i.test(error.message)
+              ? "Too many tries for now. Wait a few minutes, then try again."
+              : /fetch|network/i.test(error.message)
+                ? "No connection. Check your signal and try again."
+                : error.message,
       );
       setLoading(false);
       return;
@@ -45,7 +53,7 @@ export default function LoginPage() {
         {error && <Alert tone="bad">{error}</Alert>}
         <Field label="Email">
           {(p) => (
-            <Input {...p} type="email" required autoFocus autoComplete="email" placeholder="you@example.com"
+            <Input {...p} type="email" required autoFocus autoComplete="email" autoCapitalize="none" autoCorrect="off" spellCheck={false} placeholder="you@example.com"
               value={email} onChange={(e) => setEmail(e.target.value)} />
           )}
         </Field>

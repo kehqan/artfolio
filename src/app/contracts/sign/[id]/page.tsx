@@ -108,7 +108,7 @@ export default function ExternalSignPage() {
   }
 
   async function handleSign() {
-    if (!sigName.trim() || !agreed) return;
+    if (!sigName.trim() || !agreed || signing) return;
     setSigning(true);
     setSignError("");
     if (!codeTo) {
@@ -128,8 +128,13 @@ export default function ExternalSignPage() {
     if (err?.hint === "code_needed") { setSigning(true); await sendCode(); setSigning(false); return; }
     if ((data as any)?.error) { setSignError((data as any).error); return; }
     if (err || !data) {
-      setSignError(err?.message?.includes("already signed")
-        ? "This agreement has already been signed."
+      // Signed on an earlier tap whose answer got lost (bad signal)? Then it's done.
+      if (err?.message?.includes("already signed") || err?.code === "23505") {
+        const { data: now } = await sb.rpc("get_contract_for_signing", { p_contract_id: id, p_token: token });
+        if (now) { setContract(now); setDone(true); return; }
+      }
+      setSignError(/fetch|network/i.test(err?.message || "")
+        ? "No connection. Check your signal and tap Sign again. You won't sign twice."
         : "We couldn't record your signature. Please try again or ask the sender for a new link.");
       return;
     }

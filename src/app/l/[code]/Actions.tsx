@@ -66,7 +66,7 @@ export function FollowButton({ code, artistId, artistFirst }: { code: string; ar
     setBusy(true); setError("");
     try { localStorage.setItem(NEXT_KEY, `/l/${code}?do=follow`); } catch { /* the link still signs them in */ }
     const { error: err } = await (await getSb()).auth.signInWithOtp({
-      email: email.trim(),
+      email: email.trim().toLowerCase(),
       options: { emailRedirectTo: `${window.location.origin}/auth/confirm`, data: { role: "curator", full_name: name.trim().slice(0, 100), adult_confirmed: true, terms_version: TERMS_VERSION, terms_accepted_at: new Date().toISOString() }, ...captchaOptions(captcha) },
     });
     setTries(t => t + 1);
@@ -98,7 +98,7 @@ export function FollowButton({ code, artistId, artistFirst }: { code: string; ar
         {!sent && (
           <div className="flex flex-col gap-3">
             {error && <Alert tone="bad">{error}</Alert>}
-            <Field label="Your email">{p => <Input {...p} type="email" autoComplete="email" inputMode="email" value={email} onChange={e => setEmail(e.target.value)} onKeyDown={e => e.key === "Enter" && sendLink()} />}</Field>
+            <Field label="Your email">{p => <Input {...p} type="email" autoComplete="email" inputMode="email" autoCapitalize="none" autoCorrect="off" spellCheck={false} value={email} onChange={e => setEmail(e.target.value)} onKeyDown={e => e.key === "Enter" && sendLink()} />}</Field>
             <Field label="Your name" hint="Optional. Shown to the artists you follow.">{p => <Input {...p} autoComplete="name" value={name} onChange={e => setName(e.target.value)} onKeyDown={e => e.key === "Enter" && sendLink()} />}</Field>
             <p className="font-ui text-caption text-fg-3">{artistFirst} will see your name when you follow. Nothing else. Already on Artomango? This signs you in.</p>
             <p className="font-ui text-caption text-fg-3">By sending, you confirm you&rsquo;re {MIN_AGE} or older and agree to the <a href="/terms" target="_blank" className="underline underline-offset-2">terms</a> and <a href="/privacy" target="_blank" className="underline underline-offset-2">privacy policy</a>.</p>
@@ -185,7 +185,7 @@ export function SellingActions({ code, artistId, artistFirst, workId, title, pla
             {me === null && (
               <div className="grid gap-3 sm:grid-cols-2">
                 <Field label="Your name">{p => <Input {...p} autoComplete="name" value={name} onChange={e => setName(e.target.value)} />}</Field>
-                <Field label="Your email">{p => <Input {...p} type="email" autoComplete="email" inputMode="email" value={email} onChange={e => setEmail(e.target.value)} />}</Field>
+                <Field label="Your email">{p => <Input {...p} type="email" autoComplete="email" inputMode="email" autoCapitalize="none" autoCorrect="off" spellCheck={false} value={email} onChange={e => setEmail(e.target.value)} />}</Field>
               </div>
             )}
             <p className="font-ui text-caption text-fg-3">{artistFirst} will see your name, email and message. Nothing else.</p>

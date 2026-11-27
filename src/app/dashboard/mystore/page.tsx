@@ -1,4 +1,5 @@
 "use client";
+import { safeHref } from "@/lib/safe-url";
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { QrCode as QrSvg } from "@/components/labels/QrCode";
@@ -12,7 +13,7 @@ import {
 } from "@/components/ui";
 import { BoardModal, PROVIDER_LABEL, type Board } from "./BoardModal";
 import { Mat, formatPrice } from "@/components/public/PublicChrome";
-import { IMAGE_CACHE_SECONDS, imageExt, prepareImage } from "@/lib/image";
+import { IMAGE_CACHE_SECONDS, imageExt, prepareImage, isPicture } from "@/lib/image";
 
 /* ── Types ────────────────────────────────────────────────────── */
 type StoreSettings = {
@@ -221,7 +222,7 @@ export default function MyFrontDoorPage() {
   async function uploadBanner(file: File) {
     if (!userId) return;
     setNotice(null);
-    if (!file.type.startsWith("image/")) { setNotice({ tone: "bad", text: "Choose an image file (JPG, PNG or WebP)." }); return; }
+    if (!isPicture(file)) { setNotice({ tone: "bad", text: "Choose an image file (JPG, PNG or WebP)." }); return; }
     setBannerUploading(true);
     file = await prepareImage(file);
     if (file.size > 10 * 1024 * 1024) { setBannerUploading(false); setNotice({ tone: "bad", text: "That image is over 10 MB. Try a smaller one." }); return; }
@@ -491,7 +492,7 @@ export default function MyFrontDoorPage() {
                       )}
                     </div>
                     <div className="flex min-w-0 flex-1 flex-col">
-                      <a href={b.url} target="_blank" rel="noopener noreferrer" className="truncate font-ui text-body font-semibold text-fg underline-offset-4 hover:underline">{b.title}</a>
+                      <a href={safeHref(b.url)} target="_blank" rel="noopener noreferrer" className="truncate font-ui text-body font-semibold text-fg underline-offset-4 hover:underline">{b.title}</a>
                       <span className="font-ui text-body-sm text-fg-3">{PROVIDER_LABEL[b.provider] || "Board"}</span>
                     </div>
                     <span className="hidden font-ui text-body-sm text-fg-3 sm:inline">{b.is_public ? "Shown" : "Hidden"}</span>

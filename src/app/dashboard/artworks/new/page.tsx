@@ -23,8 +23,9 @@ import { CURRENCIES, Dropzone, ImageThumb, MAX_IMAGES, WALL_TERMS, type ArtType 
 import { type PlaceArtwork, missingForWall, wallReady } from "@/lib/places";
 import { useJourney } from "@/components/journey/JourneyProvider";
 import { Burst } from "@/components/journey/Burst";
-import { IMAGE_CACHE_SECONDS, prepareImage } from "@/lib/image";
+import { IMAGE_CACHE_SECONDS, isPicture, photoProblem, prepareImage, uploadable } from "@/lib/image";
 import { track } from "@/lib/analytics";
+import { insertOnce, newId } from "@/lib/once";
 
 type Step = "photos" | "title" | "finished" | "medium" | "size" | "year" | "price" | "wall" | "done";
 
@@ -60,6 +61,8 @@ export default function AddWorkPage() {
   const [price, setPrice] = useState(""); const [currency, setCurrency] = useState("EUR");
 
   const uploads = useRef<Record<string, Promise<string | null>>>({});
+  // Picked once: a second tap or a retry on a bad connection can't save the work twice.
+  const workId = useRef(newId());
 
   // Who, which currency they use, and whether we're finishing a saved work.
   useEffect(() => {
@@ -124,16 +127,19 @@ export default function AddWorkPage() {
   function addPhotos(files: FileList | null) {
     if (!files || !userId) return;
     const sb = createClient();
-    const picked = Array.from(files).filter(f => f.type.startsWith("image/")).slice(0, MAX_IMAGES - photos.length);
+    const picked = Array.from(files).filter(isPicture).slice(0, MAX_IMAGES - photos.length);
+    if (!picked.length && files.length) { setError("Pick a photo: JPG, PNG, WebP or an iPhone photo."); return; }
     const added = picked.map((f, i) => {
       const key = `${Date.now()}-${i}-${f.name}`;
       // Shrunk and turned into WebP first (lib/image), then uploaded.
       uploads.current[key] = prepareImage(f).then(img => {
+        if (!uploadable(img)) { setError(photoProblem(f)); return null; }
         const ext = img.name.split(".").pop() || "jpg";
         const path = `artworks/${userId}/${key.replace(/\.[^.]+$/, "").replace(/[^a-zA-Z0-9.-]/g, "")}.${ext}`;
         return sb.storage.from("avatars").upload(path, img, { upsert: true, contentType: img.type, cacheControl: IMAGE_CACHE_SECONDS })
           .then(({ error: e }) => (e ? null : sb.storage.from("avatars").getPublicUrl(path).data.publicUrl));
       })
+        .catch(() => null)
         .then(url => {
           setPhotos(p => p.map(x => (x.key === key ? { ...x, url, failed: !url } : x)));
           return url;
@@ -164,15 +170,16 @@ export default function AddWorkPage() {
 
   async function saveTitle(t: string) {
     if (!userId) return;
+    if (busy) return;
     if (work) { if (await update({ title: t })) next(); return; }
     setBusy(true); setError("");
     const images = await photoUrls();
-    const { data, error: e } = await createClient().from("artworks").insert({
-      user_id: userId, title: t, images, art_type: "physical", status: "complete", currency,
+    const { data, error: e } = await insertOnce(createClient(), "artworks", {
+      id: workId.current, user_id: userId, title: t, images, art_type: "physical", status: "complete", currency,
       authentication_status: "original",
-    }).select().single();
+    });
     setBusy(false);
-    if (e || !data) { setError("That didn't save. Please try again."); return; }
+    if (e || !data) { setError(e?.hint === "rate_limited" ? e.message : "That didn't save. Check your connection and try again."); return; }
     track("work_added", { from: "add" });
     setWork({ ...data, images: data.images || [] } as Work);
     next();

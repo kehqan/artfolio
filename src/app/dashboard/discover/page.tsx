@@ -60,7 +60,7 @@ export default function DiscoverPage() {
   }
 
   async function toggleFollow(target: Profile) {
-    if (!userId) return;
+    if (!userId || followLoading === target.id) return;
     setFollowLoading(target.id); setError("");
     // Flip the button straight away; put it back if the server says no.
     const flip = (on: boolean) => setProfiles(prev => prev.map(p => p.id === target.id ? {
@@ -72,7 +72,8 @@ export default function DiscoverPage() {
     const { error: err } = target.is_following
       ? await sb.from("followers").delete().eq("follower_id", userId).eq("following_id", target.id)
       : await sb.from("followers").insert({ follower_id: userId, following_id: target.id });
-    if (err) {
+    // Already following (a double tap, or a retry that had gone through) is fine.
+    if (err && err.code !== "23505") {
       flip(!!target.is_following);
       setError("That didn't go through. Please try again.");
     }

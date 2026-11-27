@@ -1,4 +1,5 @@
 "use client";
+import { safeHref } from "@/lib/safe-url";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowRight, CalendarDays, Globe, MapPin, PlayCircle } from "lucide-react";
@@ -8,6 +9,7 @@ import {
 import { Mat, PublicFooter, PublicHeader, formatPrice, publicWrap, textLink } from "@/components/public/PublicChrome";
 
 import type { Artwork, Event, ExploreData, Person, Resource } from "./data";
+import { asDate } from "@/lib/dates";
 
 type Section = "all" | "works" | "artists" | "venues" | "events" | "learn";
 
@@ -27,7 +29,7 @@ const SECTIONS: { value: Section; label: string }[] = [
 
 function fmtDate(d?: string | null) {
   if (!d) return "";
-  return new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+  return asDate(d).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
 }
 function isUpcoming(ev: Event) {
   const ref = ev.end_date || ev.start_date;
@@ -59,9 +61,9 @@ function EventRow({ ev }: { ev: Event }) {
     <li className="flex gap-4 px-5 py-4">
       <div className="flex w-14 shrink-0 flex-col items-center justify-center rounded-control border-hair border-line bg-page py-2">
         <span className="font-ui text-caption font-semibold uppercase tracking-eyebrow text-fg-3">
-          {ev.start_date ? new Date(ev.start_date).toLocaleDateString("en-GB", { month: "short" }) : "TBA"}
+          {ev.start_date ? asDate(ev.start_date).toLocaleDateString("en-GB", { month: "short" }) : "TBA"}
         </span>
-        <span className="font-display text-h3 font-bold tabular-nums leading-none text-fg">{ev.start_date ? new Date(ev.start_date).getDate() : "–"}</span>
+        <span className="font-display text-h3 font-bold tabular-nums leading-none text-fg">{ev.start_date ? asDate(ev.start_date).getDate() : "–"}</span>
       </div>
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         <div className="flex flex-wrap items-center gap-2">
@@ -254,7 +256,7 @@ export default function ExploreClient({ initial }: { initial: ExploreData }) {
                   {fResources.slice(0, limit(4)).map(r => {
                     const yt = r.type === "video" ? youtubeId(r.url) : null;
                     return (
-                      <a key={r.id} href={r.url || "#"} target="_blank" rel="noopener noreferrer"
+                      <a key={r.id} href={safeHref(r.url) || "#"} target="_blank" rel="noopener noreferrer"
                         className="flex flex-col overflow-hidden rounded-card border-hair border-line bg-surface transition-colors duration-fast hover:border-ink">
                         {yt && (
                           <div className="relative aspect-video bg-sunken">

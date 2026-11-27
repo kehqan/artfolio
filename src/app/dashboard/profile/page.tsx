@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { DeleteAccount } from "@/components/DeleteAccount";
 import PlacesAutocomplete from "@/components/PlacesAutocomplete";
 import {
   Building2, Camera, Check, Copy, ExternalLink, Globe, Instagram, Linkedin, Mail, MessageCircle, Palette,
@@ -9,7 +10,7 @@ import {
 import {
   Alert, Avatar, Button, ButtonLink, Card, Field, Input, Label, PageHeader, Select, Skeleton, Switch, Tabs, Textarea, cn,
 } from "@/components/ui";
-import { IMAGE_CACHE_SECONDS, prepareImage } from "@/lib/image";
+import { IMAGE_CACHE_SECONDS, isPicture, photoProblem, prepareImage, uploadable } from "@/lib/image";
 
 // Names that are pages of the app, so they can't be someone's address.
 const RESERVED = new Set(["admin", "api", "artwork", "artworks", "auth", "available", "contracts", "dashboard", "explore",
@@ -171,10 +172,11 @@ export default function ProfilePage() {
 
   async function uploadAvatar(picked: File) {
     setNotice(null);
-    if (!picked.type.startsWith("image/")) { setNotice({ tone: "bad", text: "Choose an image file (JPG, PNG or WebP)." }); return; }
+    if (!isPicture(picked)) { setNotice({ tone: "bad", text: "Choose an image file (JPG, PNG or WebP)." }); return; }
     setUploading(true);
     // A face never needs more than 800 px.
     const file = await prepareImage(picked, 800);
+    if (!uploadable(file)) { setUploading(false); setNotice({ tone: "bad", text: photoProblem(picked) }); return; }
     if (file.size > 10 * 1024 * 1024) { setUploading(false); setNotice({ tone: "bad", text: "That image is over 10 MB. Try a smaller one." }); return; }
     const { data: { user } } = await sb.auth.getUser();
     if (!user) { setUploading(false); return; }
@@ -463,6 +465,11 @@ export default function ProfilePage() {
             <Link href="/dashboard/mystore" className="mt-1 self-start font-ui text-label font-semibold text-fg underline decoration-line-strong underline-offset-4 hover:decoration-ink">
               Edit your public page
             </Link>
+          </Card>
+          <Card padding="md" className="flex flex-col gap-2">
+            <span className="font-ui text-label font-semibold text-fg">Your account</span>
+            <p className="font-ui text-body-sm text-fg-2">You can leave any time. Deleting removes your works, page and messages.</p>
+            <DeleteAccount />
           </Card>
         </aside>
       </div>

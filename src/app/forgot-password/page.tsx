@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Alert, Button, Field, Input } from "@/components/ui";
 import { AuthLink, AuthShell } from "@/components/auth/AuthShell";
 import { Captcha, captchaOptions, captchaWaiting } from "@/components/auth/Captcha";
+import { normEmail } from "@/lib/email-address";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
@@ -15,12 +16,17 @@ export default function ForgotPasswordPage() {
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    if (sending) return;
     setSending(true); setError("");
-    const { error } = await createClient().auth.resetPasswordForEmail(email.trim(), {
+    const { error } = await createClient().auth.resetPasswordForEmail(normEmail(email), {
       redirectTo: `${window.location.origin}/reset-password`, ...captchaOptions(captcha),
     });
     setTries(t => t + 1);
     setSending(false);
+    // Too many tries is the only error worth showing: saying "no such account"
+    // would tell anyone which emails are signed up.
+    if (error && /rate limit|too many|seconds/i.test(error.message)) { setError("A link was sent a moment ago. Wait a minute before asking for another."); return; }
+    if (error && /fetch|network/i.test(error.message)) { setError("No connection. Check your signal and try again."); return; }
     if (error) { setError(error.message); return; }
     setSent(true);
   }
@@ -41,7 +47,7 @@ export default function ForgotPasswordPage() {
         {error && <Alert tone="bad">{error}</Alert>}
         <Field label="Email">
           {(p) => (
-            <Input {...p} type="email" required autoFocus autoComplete="email" placeholder="you@example.com"
+            <Input {...p} type="email" required autoFocus autoComplete="email" autoCapitalize="none" autoCorrect="off" spellCheck={false} placeholder="you@example.com"
               value={email} onChange={(e) => setEmail(e.target.value)} />
           )}
         </Field>

@@ -206,8 +206,12 @@ export default function AdminPage() {
     setUsers(p => p.map(x => x.id === u.id ? u : x)); setEditUser(null);
   }
   async function deleteUser(id: string) {
-    if (!confirm("Delete this user permanently?")) return;
-    await sb.from("profiles").delete().eq("id", id);
+    if (!confirm("Delete this user permanently? Their account, works and messages are removed.")) return;
+    // The whole account (database/migrations/20261127_edge_cases.sql). Deleting
+    // only the profile left a login with nothing behind it.
+    const { error } = await sb.rpc("admin_delete_user", { p_id: id });
+    if (error && error.code !== "PGRST202") { alert(`Could not delete this user: ${error.message}`); return; }
+    if (error) await sb.from("profiles").delete().eq("id", id);
     setUsers(p => p.filter(x => x.id !== id));
   }
   async function setArtworkStatus(id: string, status: string) {

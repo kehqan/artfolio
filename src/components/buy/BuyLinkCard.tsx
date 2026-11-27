@@ -1,6 +1,7 @@
 "use client";
 // "Buy button" on a work's page in Studio: where Buy goes (any shop link,
 // no commission) and how many people tapped it, from where.
+import { safeHref } from "@/lib/safe-url";
 import { useEffect, useMemo, useState } from "react";
 import { ExternalLink, ShoppingBag } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -65,7 +66,7 @@ export function BuyLinkCard({ workId, userId, sellable }: { workId: string; user
       </div>
 
       {url && !editing ? (
-        <a href={url} target="_blank" rel="noopener noreferrer" className="inline-flex min-w-0 items-center gap-2 font-ui text-body font-semibold text-fg hover:underline">
+        <a href={safeHref(url)} target="_blank" rel="noopener noreferrer" className="inline-flex min-w-0 items-center gap-2 font-ui text-body font-semibold text-fg hover:underline">
           <ShoppingBag size={16} aria-hidden className="shrink-0" /> <span className="truncate">Opens {hostOf(url)}</span> <ExternalLink size={13} aria-hidden className="shrink-0 text-fg-3" />
         </a>
       ) : (

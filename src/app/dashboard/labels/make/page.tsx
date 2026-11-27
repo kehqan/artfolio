@@ -8,6 +8,7 @@
 //
 // One set of choices for all the works; each work can have its own note.
 // The preview is the real print, in millimetres.
+import { localDay } from "@/lib/dates";
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, Check, Lock, Printer } from "lucide-react";
@@ -94,7 +95,7 @@ function Maker() {
       if (!list.length) { setItems([]); return; }
     }
     if (!list.length && q.get("walls")) {
-      const today = new Date().toISOString().slice(0, 10);
+      const today = localDay();
       const { data: ds } = await sb.from("deals").select("id, contract_id").eq("venue_id", user.id).eq("status", "signed");
       for (const row of (ds || []) as { id: string }[]) {
         const d = await placeFromDeal(sb, row.id);

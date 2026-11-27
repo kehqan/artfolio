@@ -6,6 +6,7 @@
 // artist sees one stream with one set of filters. The tables stay as they
 // are; merging them into one table is a later, separate step.
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { localDay } from "@/lib/dates";
 
 export type Source = "scene" | "show" | "pool";
 export type Kind = "show" | "opportunity" | "collab";
@@ -159,7 +160,7 @@ export function isLive(i: FeedItem): boolean {
 }
 
 // ── Time ────────────────────────────────────────────────────────────
-export const todayIso = () => new Date().toISOString().slice(0, 10);
+export const todayIso = () => localDay();
 
 /** Over and done: a show that has ended, or a call whose deadline passed. */
 export function isPast(i: FeedItem, today = todayIso()): boolean {

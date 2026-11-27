@@ -2,11 +2,13 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { signInFromEmailLink } from "@/lib/supabase/email-link";
 import { Alert, Button, ButtonLink, Field, PasswordInput } from "@/components/ui";
 import { AuthLink, AuthShell } from "@/components/auth/AuthShell";
 
-// The email link lands here with ?code=…; exchanging it signs the user in so
-// they can set a new password.
+// The email link lands here (?token_hash=… or ?code=…); it signs the person in
+// so they can set a new password. The link works once (Supabase), and signing
+// in with the new password ends the other sessions' refresh.
 export default function ResetPasswordPage() {
   const router = useRouter();
   const [ready, setReady] = useState(false);
@@ -17,15 +19,9 @@ export default function ResetPasswordPage() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    const sb = createClient();
-    const code = new URLSearchParams(window.location.search).get("code");
     (async () => {
-      if (code) {
-        const { error } = await sb.auth.exchangeCodeForSession(code);
-        if (error) { setLinkError("This reset link is invalid or has expired. Request a new one below."); return; }
-      }
-      const { data: { user } } = await sb.auth.getUser();
-      if (!user) { setLinkError("This reset link is invalid or has expired. Request a new one below."); return; }
+      const ok = await signInFromEmailLink(createClient(), "recovery");
+      if (!ok) { setLinkError("This reset link is invalid or has expired. Request a new one below."); return; }
       setReady(true);
     })();
   }, []);
@@ -35,10 +31,17 @@ export default function ResetPasswordPage() {
     setError("");
     if (password.length < 8) { setError("Use at least 8 characters."); return; }
     if (password !== confirm) { setError("The two passwords don’t match."); return; }
+    if (saving) return;
     setSaving(true);
     const { error } = await createClient().auth.updateUser({ password });
     setSaving(false);
-    if (error) { setError(error.message); return; }
+    if (error) {
+      setError(/same/i.test(error.message) ? "That's your current password. Choose a new one."
+        : /fetch|network/i.test(error.message) ? "No connection. Check your signal and try again."
+        : /session|jwt|expired/i.test(error.message) ? "This page waited too long. Ask for a new reset link."
+        : error.message);
+      return;
+    }
     router.push("/dashboard");
   }
 

@@ -38,6 +38,9 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
+  // Lets pages reach under the iPhone home indicator; the phone tab bar
+  // pads itself with env(safe-area-inset-bottom).
+  viewportFit: "cover",
 };
 
 // Full address for share images (og/twitter), so link previews point at the

@@ -2,6 +2,8 @@
 // App shell: the left rail is the main navigation (one entry per area),
 // the top bar holds the secondary navigation (the pages inside the
 // current area) plus search, notifications and the account menu.
+// On phones the rail becomes a bottom tab bar (same areas, same order);
+// Messages and the account menu stay top right.
 "use client";
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
@@ -10,7 +12,7 @@ import { createClient } from "@/lib/supabase/client";
 import { applyPendingProfile } from "@/lib/pending-profile";
 import {
   LayoutDashboard, ImageIcon, Handshake, FolderOpen, Wallet, CalendarDays,
-  MessageSquare, Bell, BellOff, Search, X, Menu, LogOut,
+  MessageSquare, Bell, BellOff, Search, X, LogOut,
   UserRound, ExternalLink, ChevronDown, type LucideIcon,
 } from "lucide-react";
 import { cn, Avatar } from "@/components/ui";
@@ -142,8 +144,8 @@ function Wordmark() {
   return <BrandWordmark href="/dashboard" />;
 }
 
-function RailNav({ active, username, venue, curator, onNavigate }: {
-  active: Area | null; username?: string; venue?: boolean; curator?: boolean; onNavigate?: () => void;
+function RailNav({ active, username, venue, curator }: {
+  active: Area | null; username?: string; venue?: boolean; curator?: boolean;
 }) {
   return (
     <div className="flex h-full flex-col">
@@ -156,7 +158,6 @@ function RailNav({ active, username, venue, curator, onNavigate }: {
               <li key={area.key}>
                 <Link
                   href={hrefOf(area, venue)}
-                  onClick={onNavigate}
                   aria-current={on ? "page" : undefined}
                   className={cn(
                     "flex h-10 items-center gap-3 rounded-control border-outline px-3 font-ui text-label font-semibold",
@@ -181,7 +182,6 @@ function RailNav({ active, username, venue, curator, onNavigate }: {
             href={`/${username}`}
             target="_blank"
             rel="noreferrer"
-            onClick={onNavigate}
             className={cn("flex h-10 items-center gap-3 rounded-control px-3 font-ui text-label font-semibold text-fg-2 hover:bg-sunken hover:text-fg", focusRing)}
           >
             <ExternalLink size={16} aria-hidden />
@@ -221,6 +221,62 @@ function AreaTabs({ area, pathname, venue, className }: { area: Area | null; pat
   );
 }
 
+// Phone navigation: the rail's areas as a bottom tab bar. Tapping the tab
+// you are already on takes you back to the top of that area's first page.
+function TabBar({ active, venue, curator, pathname, hidden }: {
+  active: Area | null; venue?: boolean; curator?: boolean; pathname: string; hidden: boolean;
+}) {
+  const areas = areasFor(curator);
+  return (
+    <nav
+      aria-label="Main"
+      aria-hidden={hidden || undefined}
+      className={cn(
+        "fixed inset-x-0 bottom-0 z-nav border-t-hair border-line bg-surface lg:hidden",
+        "pb-[env(safe-area-inset-bottom)] transition-transform duration-base ease-out",
+        hidden && "pointer-events-none translate-y-full",
+      )}
+    >
+      <ul className="mx-auto grid h-[var(--shell-tabbar)] max-w-[560px] px-1" style={{ gridTemplateColumns: `repeat(${areas.length}, minmax(0, 1fr))` }}>
+        {areas.map(area => {
+          const on = active?.key === area.key;
+          const Icon = area.icon;
+          const href = hrefOf(area, venue);
+          return (
+            <li key={area.key} className="flex">
+              <Link
+                href={href}
+                tabIndex={hidden ? -1 : undefined}
+                aria-current={on ? "page" : undefined}
+                onClick={e => {
+                  if (pathname === href) { e.preventDefault(); window.scrollTo({ top: 0, behavior: "smooth" }); }
+                }}
+                className={cn(
+                  "group flex flex-1 select-none flex-col items-center justify-center gap-1 rounded-control",
+                  "[-webkit-tap-highlight-color:transparent]", focusRing,
+                )}
+              >
+                <span
+                  aria-hidden
+                  className={cn(
+                    "grid h-7 w-12 place-items-center rounded-pill border-outline transition-[background-color,border-color,transform] duration-fast ease-out group-active:scale-90",
+                    on ? "border-ink bg-mango text-on-mango" : "border-transparent text-fg-3",
+                  )}
+                >
+                  <Icon size={20} strokeWidth={on ? 2.4 : 2} />
+                </span>
+                <span className={cn("font-ui text-caption leading-none", on ? "font-bold text-fg" : "font-semibold text-fg-3")}>
+                  {area.label}
+                </span>
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
+    </nav>
+  );
+}
+
 // ── Layout ─────────────────────────────────────────────────────────
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -232,7 +288,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [userId, setUserId] = useState<string | null>(null);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadMessages, setUnreadMessages] = useState(0);
-  const [open, setOpen] = useState<null | "search" | "bell" | "account" | "drawer">(null);
+  const [open, setOpen] = useState<null | "search" | "bell" | "account">(null);
+  // The phone keyboard is up: hide the tab bar so it doesn't ride on top of it.
+  const [typing, setTyping] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
   const toolsRef = useRef<HTMLDivElement>(null);
@@ -275,7 +333,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   // Close floating layers on outside click and Escape
   useEffect(() => {
     function onDown(e: MouseEvent) {
-      if (open && open !== "drawer" && toolsRef.current && !toolsRef.current.contains(e.target as Node)) {
+      if (open && toolsRef.current && !toolsRef.current.contains(e.target as Node)) {
         setOpen(null); setSearchQuery("");
       }
     }
@@ -291,6 +349,23 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }, [open]);
 
   useEffect(() => { setOpen(null); setSearchQuery(""); }, [pathname]);
+
+  useEffect(() => {
+    const NOT_TYPED = ["checkbox", "radio", "button", "submit", "reset", "range", "file", "color", "image"];
+    const isField = (el: Element | null) =>
+      el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement ||
+      (el instanceof HTMLInputElement && !NOT_TYPED.includes(el.type)) ||
+      (el instanceof HTMLElement && el.isContentEditable);
+    function onIn(e: FocusEvent) { if (isField(e.target as Element)) setTyping(true); }
+    // Wait a beat: moving from one field to the next shouldn't flash the bar.
+    function onOut() { setTimeout(() => setTyping(isField(document.activeElement)), 80); }
+    document.addEventListener("focusin", onIn);
+    document.addEventListener("focusout", onOut);
+    return () => {
+      document.removeEventListener("focusin", onIn);
+      document.removeEventListener("focusout", onOut);
+    };
+  }, []);
   useEffect(() => { if (open === "search") setTimeout(() => searchRef.current?.focus(), 50); }, [open]);
 
   async function handleLogout() {
@@ -324,7 +399,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const name = profile?.full_name || "Your account";
 
   return (
-    <div className="min-h-screen bg-page">
+    <div className="am-shell min-h-screen bg-page" data-typing={typing || undefined}>
       {/* ── RAIL (desktop) ── */}
       <aside className="fixed inset-y-0 left-0 z-nav hidden w-rail flex-col border-r-hair border-line bg-surface lg:flex">
         <div className="flex h-header shrink-0 items-center border-b-hair border-line px-6">
@@ -333,45 +408,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <RailNav active={area} username={isCurator ? undefined : profile?.username} venue={isVenue} curator={isCurator} />
       </aside>
 
-      {/* ── DRAWER (mobile) ── */}
-      {open === "drawer" && (
-        <div className="fixed inset-0 z-modal lg:hidden">
-          <div aria-hidden className="absolute inset-0 bg-scrim" onClick={() => setOpen(null)} />
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-label="Menu"
-            className="absolute inset-y-0 left-0 flex w-[min(300px,85vw)] flex-col border-r-outline border-ink bg-surface shadow-hard-3"
-          >
-            <div className="flex h-header shrink-0 items-center justify-between border-b-hair border-line px-4">
-              <Wordmark />
-              <button type="button" aria-label="Close menu" className={iconBtn(false)} onClick={() => setOpen(null)}>
-                <X size={18} aria-hidden />
-              </button>
-            </div>
-            <RailNav
-              active={area}
-              username={isCurator ? undefined : profile?.username}
-              venue={isVenue}
-              curator={isCurator}
-              onNavigate={() => setOpen(null)}
-            />
-          </div>
-        </div>
-      )}
-
       <div className="lg:pl-rail">
         {/* ── TOP BAR: secondary navigation + tools ── */}
         <header className="sticky top-0 z-nav border-b-hair border-line bg-surface">
           <div className="flex h-header items-center gap-3 px-4 lg:px-8">
-            <button
-              type="button"
-              aria-label="Open menu"
-              className={cn(iconBtn(false), "lg:hidden")}
-              onClick={() => setOpen("drawer")}
-            >
-              <Menu size={18} aria-hidden />
-            </button>
             <div className="lg:hidden"><Wordmark /></div>
 
             <AreaTabs area={area} pathname={pathname} venue={isVenue || isCurator} className="hidden lg:flex" />
@@ -554,10 +594,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </header>
 
         {/* ── PAGE ── */}
-        <main className="mx-auto max-w-content px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+        <main className="mx-auto max-w-content px-4 pt-6 pb-[calc(1.5rem+var(--tabbar-space))] sm:px-6 lg:px-8 lg:py-8">
           <JourneyProvider>{children}</JourneyProvider>
         </main>
       </div>
+
+      {/* ── TAB BAR (phones) ── */}
+      <TabBar active={area} venue={isVenue} curator={isCurator} pathname={pathname} hidden={typing} />
     </div>
   );
 }

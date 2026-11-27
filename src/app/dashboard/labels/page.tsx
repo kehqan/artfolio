@@ -138,7 +138,7 @@ export default function LabelsPage() {
       )}
 
       {picked.length > 0 && (
-        <div className="sticky bottom-4 z-10 flex flex-wrap items-center justify-between gap-3 self-center rounded-card border-hair border-ink bg-surface px-4 py-3 shadow-hard-2">
+        <div className="sticky bottom-[calc(1rem+var(--tabbar-space,0px))] z-10 flex flex-wrap items-center justify-between gap-3 self-center rounded-card border-hair border-ink bg-surface px-4 py-3 shadow-hard-2">
           <span className="font-ui text-body-sm font-semibold text-fg">{picked.length} picked</span>
           <div className="flex gap-2">
             <Button variant="ghost" size="sm" onClick={() => setPicked([])}>Clear</Button>

@@ -336,7 +336,7 @@ export default function NewProjectPage() {
   const idx = at;
 
   return (
-    <div className="mx-auto flex min-h-[calc(100dvh-var(--shell-header)-4rem)] w-full max-w-[560px] flex-col gap-8">
+    <div className="mx-auto flex min-h-[calc(100dvh-var(--shell-header)-4rem-var(--tabbar-space,0px))] w-full max-w-[560px] flex-col gap-8">
       <div className="flex items-center gap-3">
         <button type="button" onClick={back} disabled={idx <= 0 || step === "done" || !!single}
           aria-label="Back" className="grid h-9 w-9 shrink-0 place-items-center rounded-control border-hair border-line bg-surface text-fg-2 transition-colors hover:border-ink hover:text-fg disabled:invisible">

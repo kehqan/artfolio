@@ -161,7 +161,7 @@ export function JourneyProvider({ children }: { children: ReactNode }) {
 // ── Toasts ──────────────────────────────────────────────────────────
 function Toasts({ list, onClose }: { list: Toast[]; onClose: (id: number) => void }) {
   return (
-    <div aria-live="polite" className="pointer-events-none fixed inset-x-0 bottom-0 z-toast flex flex-col items-center gap-2 p-4 sm:items-end sm:p-6">
+    <div aria-live="polite" className="pointer-events-none fixed inset-x-0 bottom-[var(--tabbar-space,0px)] z-toast flex flex-col items-center gap-2 p-4 sm:items-end sm:p-6">
       {list.map(t => (
         <div key={t.id} role="status"
           className="pointer-events-auto relative flex w-full max-w-[420px] items-start gap-3 overflow-hidden rounded-card border-outline border-ink bg-surface p-4 pr-3 shadow-hard-2 animate-toast-in">

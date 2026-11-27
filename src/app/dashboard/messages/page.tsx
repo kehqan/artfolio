@@ -236,7 +236,7 @@ function ChatsView() {
   const totalUnread = convos.reduce((n, c) => n + (c.unread_count || 0), 0);
 
   return (
-    <div className="flex h-[calc(100dvh-var(--shell-header)-6rem)] min-h-[420px] overflow-hidden rounded-card border-outline border-ink bg-surface shadow-hard-2 lg:h-[calc(100dvh-var(--shell-header)-7rem)]">
+    <div className="flex h-[calc(100dvh-var(--shell-header)-6rem-var(--tabbar-space,0px))] min-h-[420px] overflow-hidden rounded-card border-outline border-ink bg-surface shadow-hard-2 lg:h-[calc(100dvh-var(--shell-header)-7rem)]">
       {/* ── List ── */}
       <section aria-label="Conversations" className={cn("flex w-full flex-col border-r-hair border-line md:w-80 md:shrink-0", active && "hidden md:flex")}>
         <div className="flex flex-col gap-3 border-b-hair border-line p-4">

@@ -615,26 +615,10 @@ export default function AdminPage() {
 
         {/* ─── CAMPAIGNS ─── */}
         {tab === "campaigns" && (
-          <div className="fu">
-            <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:20, flexWrap:"wrap", gap:12 }}>
-              <h2 style={{ fontSize:22, fontWeight:900, letterSpacing:"-0.6px" }}>Campaign Carousel <span style={{ fontSize:15, color:"#9B8F7A", fontWeight:700 }}>({slides.length} slides)</span></h2>
-              <a href="/" target="_blank" style={{ display:"flex", alignItems:"center", gap:5, padding:"8px 16px", border:"2px solid #E8E0D0", borderRadius:10, background:"#fff", fontSize:12, fontWeight:700, textDecoration:"none", color:"#111110" }}>
-                <Eye size={13}/> Preview on site
-              </a>
-            </div>
-            <div style={{ background:"#fff", border:"2px solid #E8E0D0", borderRadius:14, padding:"16px 18px", marginBottom:20 }}>
-              <label style={{ ...lbl, marginBottom:10 }}>Add new slide — paste an image URL</label>
-              <div style={{ display:"flex", gap:10 }}>
-                <input style={{ ...inp, flex:1 }} value={newSlideUrl} onChange={e => setNewSlideUrl(e.target.value)} onKeyDown={e => e.key === "Enter" && addSlide()} placeholder="https://images.unsplash.com/photo-…"/>
-                <button onClick={addSlide} disabled={addingSlide || !newSlideUrl.trim()} style={{ padding:"9px 18px", border:"2.5px solid #111110", borderRadius:10, background:"#FFD400", fontSize:13, fontWeight:800, cursor:"pointer", fontFamily:"inherit", whiteSpace:"nowrap", boxShadow:"2px 2px 0 #111110" }}>
-                  <Plus size={14} style={{ display:"inline", marginRight:4, verticalAlign:"middle" }}/> Add
-                </button>
-              </div>
-            </div>
-            {slides.length === 0
-              ? <div style={{ padding:"48px 24px", textAlign:"center", background:"#fff", border:"2px dashed #E0D8CA", borderRadius:16, color:"#9B8F7A" }}><Megaphone size={32} color="#C0B8A8" style={{ marginBottom:12 }}/><div style={{ fontSize:14, fontWeight:700 }}>No slides yet. Add one above.</div></div>
-              : slides.map(s => <SlideEditor key={s.id} slide={s} onSave={u => setSlides(p => p.map(x => x.id === u.id ? u : x))} onDelete={() => deleteSlide(s.id)}/>)
-            }
+          <div className="fu" style={{ background:"#fff", border:"2px solid #E8E0D0", borderRadius:14, padding:"24px" }}>
+            <h2 style={{ fontSize:22, fontWeight:900, marginBottom:8 }}>The home page photos moved</h2>
+            <p style={{ fontSize:14, marginBottom:16 }}>Photos, words and cards of the &ldquo;Meanwhile&rdquo; section are now edited in one place, with a live preview.</p>
+            <a href="/admin/home" style={{ display:"inline-block", padding:"10px 20px", border:"2.5px solid #111110", borderRadius:12, background:"#FFD400", fontSize:13, fontWeight:800, textDecoration:"none", color:"#111110" }}>Open Home page editor</a>
           </div>
         )}
 

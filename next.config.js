@@ -15,6 +15,9 @@ const nextConfig = {
   },
   // Responses are gzip/brotli compressed (Vercel does this at its edge too).
   compress: true,
+  // The site never uses next/image, so switch the image resizer off entirely:
+  // nothing for anyone to call (several Next.js advisories are about it).
+  images: { unoptimized: true },
   // Next 14 only runs src/instrumentation.ts (crash reports) with this on.
   experimental: { instrumentationHook: true },
   async headers() {
@@ -27,6 +30,14 @@ const nextConfig = {
         { key: "X-Content-Type-Options", value: "nosniff" },
         { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
         { key: "Permissions-Policy", value: "camera=(), microphone=(), payment=(), geolocation=(self)" },
+        // Always HTTPS (Vercel sends this too; stating it keeps it if hosting changes).
+        { key: "Strict-Transport-Security", value: "max-age=63072000" },
+        // The parts of a Content Security Policy that can't break the site:
+        // no plugins, no <base> hijack, forms only post here, only we may
+        // frame our pages, and any http:// asset is fetched as https://.
+        // (Limiting scripts too needs per-request nonces, which would turn off
+        // the CDN caching of public pages; not worth it at this size.)
+        { key: "Content-Security-Policy", value: "object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'; upgrade-insecure-requests" },
       ] },
       { source: "/demo/:path*", headers: [{ key: "Cache-Control", value: PUBLIC_CACHE }] },
       { source: "/:file(favicon\\.ico|favicon\\.svg|favicon-16\\.png|favicon-32\\.png|apple-touch-icon\\.png|icon-192\\.png|icon-512\\.png|logo\\.png|og-image\\.jpg|manifest\\.json)", headers: [{ key: "Cache-Control", value: PUBLIC_CACHE }] },

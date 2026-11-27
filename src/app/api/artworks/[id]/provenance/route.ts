@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { isUuid, text } from "@/lib/validate";
 
 export async function POST(
   request: NextRequest,
@@ -13,6 +14,7 @@ export async function POST(
     }
 
     const artworkId = params.id;
+    if (!isUuid(artworkId)) return NextResponse.json({ error: "Artwork not found" }, { status: 404 });
 
     // Verify ownership or admin role
     const { data: artwork } = await supabase
@@ -42,8 +44,13 @@ export async function POST(
       );
     }
 
-    const body = await request.json();
-    const { event_type, owner_name, is_anonymous, date, location, notes } = body;
+    const body = await request.json().catch(() => null);
+    const event_type = body?.event_type;
+    const owner_name = text(body?.owner_name, 200);
+    const is_anonymous = body?.is_anonymous === true;
+    const location = text(body?.location, 200);
+    const notes = text(body?.notes, 2000);
+    const date = typeof body?.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(body.date) ? body.date : null;
 
     // Validate event_type
     const validTypes = ["created", "sold", "transferred", "exhibited", "restored", "appraised", "donated", "loaned"];
@@ -59,18 +66,19 @@ export async function POST(
       .insert({
         artwork_id: artworkId,
         event_type,
-        owner_name: owner_name || null,
-        is_anonymous: is_anonymous || false,
-        date: date || null,
-        location: location || null,
-        notes: notes || null,
+        owner_name,
+        is_anonymous,
+        date,
+        location,
+        notes,
         added_by: user.id,
       })
       .select()
       .single();
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      console.error("Provenance insert error:", error.message);
+      return NextResponse.json({ error: "Could not save this entry. Please try again." }, { status: 500 });
     }
 
     return NextResponse.json({ entry });

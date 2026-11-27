@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { isUuid, text } from "@/lib/validate";
 
 export async function POST(
   request: NextRequest,
@@ -13,6 +14,7 @@ export async function POST(
     }
 
     const artworkId = params.id;
+    if (!isUuid(artworkId)) return NextResponse.json({ error: "Artwork not found" }, { status: 404 });
 
     // Fetch artwork
     const { data: artwork } = await supabase
@@ -43,8 +45,10 @@ export async function POST(
       );
     }
 
-    const body = await request.json();
-    const { authentication_status, authenticated_by, notes } = body;
+    const body = await request.json().catch(() => null);
+    const authentication_status = body?.authentication_status;
+    const authenticated_by = text(body?.authenticated_by, 200);
+    const notes = text(body?.notes, 2000);
 
     // Validate status
     const validStatuses = ["original", "limited_edition", "reproduction"];
@@ -72,7 +76,8 @@ export async function POST(
       .select("id");
 
     if (updateErr) {
-      return NextResponse.json({ error: updateErr.message }, { status: 500 });
+      console.error("Authenticate update error:", updateErr.message);
+      return NextResponse.json({ error: "Could not save. Please try again." }, { status: 500 });
     }
     if (!updated?.length) {
       return NextResponse.json({ error: "You don't have permission to change this artwork" }, { status: 403 });

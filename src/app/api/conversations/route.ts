@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
       .or(`participant_a.eq.${user.id},participant_b.eq.${user.id}`)
       .order("last_message_at", { ascending: false });
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) { console.error("Conversations GET error:", error.message); return NextResponse.json({ error: "Could not load your conversations." }, { status: 500 }); }
 
     // Enrich with the other person's profile and the unread count.
     // Two queries for the whole list (it used to be two per conversation).

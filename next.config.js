@@ -40,7 +40,8 @@ const nextConfig = {
         { key: "Content-Security-Policy", value: "object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'; upgrade-insecure-requests" },
       ] },
       { source: "/demo/:path*", headers: [{ key: "Cache-Control", value: PUBLIC_CACHE }] },
-      { source: "/:file(favicon\\.ico|favicon\\.svg|favicon-16\\.png|favicon-32\\.png|apple-touch-icon\\.png|icon-192\\.png|icon-512\\.png|logo\\.png|og-image\\.jpg|manifest\\.json)", headers: [{ key: "Cache-Control", value: PUBLIC_CACHE }] },
+      { source: "/brand/:path*", headers: [{ key: "Cache-Control", value: PUBLIC_CACHE }] },
+      { source: "/:file(favicon\\.ico|favicon\\.svg|favicon-16\\.png|favicon-32\\.png|apple-touch-icon\\.png|icon-192\\.png|icon-512\\.png|icon-maskable-192\\.png|icon-maskable-512\\.png|logo\\.png|manifest\\.json)", headers: [{ key: "Cache-Control", value: PUBLIC_CACHE }] },
     ];
   },
 };

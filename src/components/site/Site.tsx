@@ -7,6 +7,7 @@ import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import Link from "next/link";
 import { ArrowRight, Behance, Globe, ImageIcon, Instagram, Linkedin, MapPin, MessageSquare } from "./icons";
 import { cn } from "@/components/ui";
+import { MangoMark } from "@/components/brand/MangoMark";
 import { formatPrice } from "@/components/public/PublicChrome";
 import {
   type SectionKey, type SiteConfig, type SiteData, type SiteWork, type WallEntry,
@@ -445,7 +446,7 @@ export function Site({ data, site, onOpenWork, onMessage, preview, onBlock, bloc
         <div className={cn(wrap, "flex flex-col gap-3 py-8 font-ui text-body-sm text-fg-3 sm:flex-row sm:items-center sm:justify-between")}>
           <span suppressHydrationWarning>© {new Date().getFullYear()} {name}</span>
           <span className="flex flex-wrap items-center gap-x-5 gap-y-2">
-            <a href="/register" className="inline-flex items-center gap-1.5 hover:text-fg">Made with <span className="font-semibold text-fg">Artomango</span></a>
+            <a href="/register" className="inline-flex items-center gap-1.5 hover:text-fg">Made with <MangoMark size={16} /><span className="font-semibold text-fg">Artomango</span></a>
             <a href="/report" onClick={e => { e.currentTarget.href = `/report?url=${encodeURIComponent(window.location.href)}`; }} className="hover:text-fg">Report</a>
             {onBlock && <button type="button" onClick={onBlock} className="hover:text-fg">{blocked ? "Unblock" : "Block"}</button>}
           </span>

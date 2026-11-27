@@ -33,13 +33,21 @@ const instrumentSerif = Instrument_Serif({
 });
 
 export const viewport: Viewport = {
-  themeColor: "#FFD400",
+  // Browser bar on phones matches the page paper (see src/components/brand).
+  themeColor: "#FBF8F0",
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
 };
 
+// Full address for share images (og/twitter), so link previews point at the
+// real site and not a single deployment's address.
+const siteUrl =
+  process.env.NEXT_PUBLIC_SITE_URL ||
+  (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : "http://localhost:3000");
+
 export const metadata: Metadata = {
+  metadataBase: new URL(siteUrl),
   title: {
     default: "Artomango — From your studio to a wall",
     template: "%s · Artomango",
@@ -50,7 +58,7 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     title: "Artomango",
-    statusBarStyle: "black-translucent",
+    statusBarStyle: "default",
   },
   icons: {
     icon: [
@@ -62,9 +70,6 @@ export const metadata: Metadata = {
     apple: [
       { url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" },
     ],
-    other: [
-      { rel: "mask-icon", url: "/favicon.svg" },
-    ],
   },
   manifest: "/manifest.json",
   openGraph: {
@@ -74,7 +79,7 @@ export const metadata: Metadata = {
     siteName: "Artomango",
     images: [
       {
-        url: "/og-image.jpg",
+        url: "/brand/og-image.jpg",
         width: 1200,
         height: 630,
         alt: "Artomango — From your studio to a wall",
@@ -85,7 +90,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Artomango",
     description: "See where your work can go, agree in one page, and sell it off the wall.",
-    images: ["/og-image.jpg"],
+    images: ["/brand/og-image.jpg"],
   },
 };
 
@@ -99,7 +104,7 @@ export default function RootLayout({
       <head>
         {/* PWA install hint for iOS Safari */}
         <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         <meta name="mobile-web-app-capable" content="yes" />
       </head>
       <body className="font-sans bg-page text-fg antialiased">

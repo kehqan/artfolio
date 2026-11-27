@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
+import { MangoMark } from "@/components/brand/MangoMark";
 import { createClient } from "@/lib/supabase/client";
 
 type Slide = {
@@ -439,7 +440,7 @@ export default function CampaignAdminPage() {
       `}</style>
 
       <header className="adm-header">
-        <a href="/admin" className="adm-logo">🥭 artomango</a>
+        <a href="/admin" className="adm-logo" style={{ display: "inline-flex", alignItems: "center", gap: 8 }}><MangoMark size={22} /> Artomango</a>
         <span className="adm-badge">Campaign Admin</span>
         <a href="/" style={{ fontSize: 12, fontWeight: 700, color: "#555", textDecoration: "none" }}>← Back to site</a>
       </header>

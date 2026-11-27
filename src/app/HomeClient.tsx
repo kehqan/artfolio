@@ -4,7 +4,7 @@
 // find a wall, agree in one page, sell it off the wall.
 // Every number or name on it is real; the small app moments are examples.
 import Link from "next/link";
-import CampaignCarousel from "@/components/LazyCampaignCarousel";
+import Meanwhile from "@/components/landing/Meanwhile";
 import { ArrowRight, Check } from "lucide-react";
 import { ButtonLink, cn } from "@/components/ui";
 import { Mat, PublicFooter, PublicHeader, formatPrice, publicWrap, textLink } from "@/components/public/PublicChrome";
@@ -157,7 +157,7 @@ export default function HomeClient({ works }: { works: Artwork[] }) {
           </section>
         )}
 
-        <CampaignCarousel />
+        <Meanwhile />
 
         {/* ── Close ── */}
         <section className="border-t-hair border-line bg-mango py-20 lg:py-24">

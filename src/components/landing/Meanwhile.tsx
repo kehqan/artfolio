@@ -1,5 +1,5 @@
 "use client";
-// "You live. Your art keeps working." A moment from an artist's life on the
+// "Meanwhile, your art is out there." A moment from an artist's life on the
 // left (the photos from /admin/campaign), and on the right what Artomango did
 // for their art at the same time. Every card is something the app really does:
 // works on walls, scans of the QR wall label, and the artist's own Buy link.
@@ -58,9 +58,8 @@ export default function Meanwhile() {
 
           {/* Meanwhile */}
           <div className="flex flex-col gap-5 p-6 sm:p-8 lg:p-10">
-            <span className="font-ui text-caption font-semibold uppercase tracking-[0.12em] text-fg-3">Meanwhile, your art</span>
             <h2 className="font-display text-[36px] font-extrabold leading-[1] text-fg sm:text-[44px]">
-              You live. Your art keeps working.
+              Meanwhile, your art is out there.
             </h2>
             <ul className="flex flex-col gap-3" aria-label="What your art did meanwhile, for example">
               <Row thumb="/demo/window-seat.jpg"><b className="font-semibold">Window Seat</b> is on the wall at a café in Žižkov</Row>

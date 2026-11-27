@@ -2,20 +2,23 @@
 // Send an agreement from a deal in one sheet. Everything is filled in
 // from the deal and the wall post; the venue checks the dates and sends.
 // It becomes a normal exhibition agreement that both sides sign.
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { FileSignature } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Alert, Button, ButtonLink, Field, Input, Modal, Textarea } from "@/components/ui";
 import { type DealView, chatLine } from "@/lib/deals";
 import { track } from "@/lib/analytics";
+import { asDate, localDay } from "@/lib/dates";
+import { insertOnce, newId } from "@/lib/once";
 
-const iso = (d: Date) => d.toISOString().slice(0, 10);
+// Days in the person's own time zone (lib/dates).
+const iso = localDay;
 
 /** "3 months" → the end date that many months after the start. */
 function endFrom(start: string, duration?: string | null) {
   const m = /^(\d+)\s*month/.exec(duration || "");
   const months = m ? Number(m[1]) : 1;
-  const d = new Date(start);
+  const d = asDate(start);
   d.setMonth(d.getMonth() + months);
   return iso(d);
 }
@@ -32,10 +35,14 @@ export function AgreementSheet({ deal, me, onClose, onSent }: Props) {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
   const [sent, setSent] = useState<string | null>(null);
+  // One agreement per sheet: tapping Send again after a dropped connection
+  // finds the agreement that already went through instead of making a second.
+  const contractId = useRef(newId());
 
   useEffect(() => {
     if (!deal) return;
     setError(""); setSent(null); setSending(false); setExtra("");
+    contractId.current = newId();
     const s = new Date(); s.setDate(s.getDate() + 7);
     // A project's own dates come first (lib/projects).
     const st = deal.project?.starts_on || iso(s);
@@ -57,7 +64,7 @@ export function AgreementSheet({ deal, me, onClose, onSent }: Props) {
   const works = deal.works.map(w => w.title).join(", ");
 
   async function send() {
-    if (!deal) return;
+    if (!deal || sending) return;
     if (!start || !end) { setError("Add when it starts and ends."); return; }
     if (end < start) { setError("The end date is before the start."); return; }
     setSending(true); setError("");
@@ -70,7 +77,8 @@ export function AgreementSheet({ deal, me, onClose, onSent }: Props) {
     const shows = project
       ? `${artist} shows ${works} in ${project.title}${address.trim() ? `, at ${address.trim()}` : ""}, curated by ${venue.name || "the curator"}.`
       : `${artist} shows ${works} at ${where}${deal.terms?.wall ? ` (${deal.terms.wall})` : ""}.`;
-    const { data: contract, error: err } = await sb.from("contracts").insert({
+    const { data: contract, error: err } = await insertOnce<{ id: string }>(sb, "contracts", {
+      id: contractId.current,
       contract_type: "exhibition",
       status: "sent",
       title,
@@ -86,11 +94,11 @@ export function AgreementSheet({ deal, me, onClose, onSent }: Props) {
       commission_pct: sells && commission.trim() ? Number(commission) : null,
       transport_by: "artist",
       special_conditions: extra.trim() || null,
-    }).select("id").single();
+    }, "id");
     if (err || !contract) { setSending(false); setError("That didn't send. Please try again."); return; }
 
     if (deal.artwork_ids.length) {
-      await sb.from("contract_artworks").insert(deal.artwork_ids.map(id => ({ contract_id: contract.id, artwork_id: id })));
+      await sb.from("contract_artworks").upsert(deal.artwork_ids.map(id => ({ contract_id: contract.id, artwork_id: id })), { onConflict: "contract_id,artwork_id", ignoreDuplicates: true });
     }
     await sb.from("deals").update({ status: "agreement_sent", contract_id: contract.id }).eq("id", deal.id);
     await chatLine(sb, deal, me, `I've sent you an agreement for ${works}. Have a look and sign it here: ${window.location.origin}/dashboard/contracts/${contract.id}`);

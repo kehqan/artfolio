@@ -173,7 +173,7 @@ export default function ContractDetailPage() {
   // status, and on full execution writes provenance and calendar dates for
   // both parties.
   async function handleSign() {
-    if (!mySig.trim()) return;
+    if (!mySig.trim() || signing) return;
     setSigning(true);
     setSignError("");
     const sb = createClient();
@@ -184,12 +184,21 @@ export default function ContractDetailPage() {
       : { counterparty_signed_at: now, counterparty_signature: mySig.trim() };
 
     const { data, error } = await sb.from("contracts").update(update).eq("id", id).select("id");
-    setSigning(false);
+    let after: Awaited<ReturnType<typeof load>> | undefined;
     if (error || !data?.length) {
-      setSignError("Your signature couldn't be saved. Please reload and try again.");
-      return;
+      // An earlier tap may have gone through while its answer got lost.
+      after = await load().catch(() => undefined);
+      const signedNow = after && (isInitiator ? after.initiator_signed_at : after.counterparty_signed_at);
+      if (!signedNow) {
+        setSigning(false);
+        setSignError(/fetch|network/i.test(error?.message || "")
+          ? "No connection. Check your signal and tap Sign again. You won't sign twice."
+          : "Your signature couldn't be saved. Please reload and try again.");
+        return;
+      }
     }
-    const after = await load();
+    setSigning(false);
+    after = after ?? await load();
     track("agreement_signed", { via: "account", done: !!(after?.executed_at || after?.status === "signed") });
     const { count: signedBefore } = await sb.from("contracts").select("id", { count: "exact", head: true })
       .or(`initiator_id.eq.${myId},counterparty_id.eq.${myId}`).not("executed_at", "is", null);

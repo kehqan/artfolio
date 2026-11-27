@@ -2,6 +2,7 @@
 // Open calls: open calls, grants, residencies and prizes, checked by the
 // Artomango team. Soonest deadline first. One tap puts the deadline (and a
 // to-do a week before) in the Planner. Admins add and change calls here.
+import { safeHref } from "@/lib/safe-url";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { CalendarCheck, CalendarPlus, ExternalLink, Megaphone, Pencil, Plus } from "lucide-react";
@@ -163,7 +164,7 @@ function CallCard({ c, today, saved, busy, canSave, onToggle, onEdit }: {
             {saved ? <><CalendarCheck size={14} aria-hidden /> In your Planner</> : <><CalendarPlus size={14} aria-hidden /> Add to Planner</>}
           </Button>
         )}
-        <a href={c.url} target="_blank" rel="noopener noreferrer" className={buttonClasses("ghost", "sm")}>
+        <a href={safeHref(c.url)} target="_blank" rel="noopener noreferrer" className={buttonClasses("ghost", "sm")}>
           Read and apply <ExternalLink size={13} aria-hidden />
         </a>
         {onEdit && <Button size="sm" variant="ghost" className="ml-auto" onClick={onEdit} aria-label={`Change ${c.title}`}><Pencil size={14} aria-hidden /></Button>}

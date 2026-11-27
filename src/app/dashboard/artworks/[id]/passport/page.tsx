@@ -1,4 +1,5 @@
 "use client";
+import { asDate, localDay } from "@/lib/dates";
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
@@ -48,7 +49,7 @@ const AUTH_STATUSES: Array<{ key: string; label: string; desc: string; tone: "ok
 
 function fmtDate(d?: string) {
   if (!d) return "—";
-  return new Date(d).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+  return asDate(d).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
 }
 
 export default function PassportManagePage() {
@@ -122,7 +123,7 @@ export default function PassportManagePage() {
       const { data: entry } = await sb.from("provenance_entries").insert({
         artwork_id: artwork.id,
         event_type: "created",
-        date: artwork.year ? `${artwork.year}-01-01` : new Date().toISOString().split("T")[0],
+        date: artwork.year ? `${artwork.year}-01-01` : localDay(),
         notes: `Artwork created by the artist${artwork.medium ? ` in ${artwork.medium}` : ""}.`,
       }).select().single();
       if (entry) setProvenance([entry]);

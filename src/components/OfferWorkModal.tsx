@@ -5,16 +5,17 @@
 // Either way it starts a deal (see lib/deals.ts) and adds the works to the
 // two people's chat as cards and as plain lines with links. If deals
 // aren't set up in the database yet, it still sends the message.
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Check, ImageOff } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Alert, Avatar, Button, ButtonLink, EmptyState, Field, Modal, Select, Skeleton, Textarea, cn } from "@/components/ui";
 import { type PlaceArtwork, WALL_LABEL, isSold, missingForWall, wallReady, workLine } from "@/lib/places";
-import { type DealTerms, chatLine, dealLink, workLines } from "@/lib/deals";
+import { type Deal, type DealTerms, chatLine, dealLink, workLines } from "@/lib/deals";
 import { useJourney } from "@/components/journey/JourneyProvider";
 import { type Project, PROJECT_COLS, inviteNote, isCuratorRole, termsOf } from "@/lib/projects";
 import { track } from "@/lib/analytics";
+import { insertOnce, newId } from "@/lib/once";
 
 const MAX = 3;
 
@@ -51,6 +52,8 @@ export function OfferWorkModal({ open, onClose, target, preselect = [] }: Props)
   const [picked, setPicked] = useState<string[]>([]);
   const [note, setNote] = useState("");
   const [sending, setSending] = useState(false);
+  // One id for this offer: a retry after a dropped connection can't make two deals.
+  const dealId = useRef(newId());
   const [error, setError] = useState("");
   const [me, setMe] = useState<{ id: string; name: string } | null>(null);
   const [posts, setPosts] = useState<WallPost[]>([]);
@@ -63,6 +66,8 @@ export function OfferWorkModal({ open, onClose, target, preselect = [] }: Props)
   const [noteTouched, setNoteTouched] = useState(false);
   const request = target?.mode === "request";
   const { toast, celebrate } = useJourney();
+
+  useEffect(() => { if (open) dealId.current = newId(); }, [open, target?.recipientId]);
 
   useEffect(() => {
     if (!open || !target) return;
@@ -137,7 +142,7 @@ export function OfferWorkModal({ open, onClose, target, preselect = [] }: Props)
   }
 
   async function send() {
-    if (!target || !me) return;
+    if (!target || !me || sending) return;
     const chosen = picked.map(id => works.find(w => w.id === id)).filter(Boolean) as PlaceArtwork[];
     if (!chosen.length) { setError("Pick at least one work."); return; }
     setSending(true); setError("");
@@ -155,7 +160,8 @@ export function OfferWorkModal({ open, onClose, target, preselect = [] }: Props)
     };
 
     // 1. The deal.
-    const { data: deal } = await sb.from("deals").insert({
+    const { data: deal, error: dealErr } = await insertOnce<Deal>(sb, "deals", {
+      id: dealId.current,
       artist_id: request ? target.recipientId : me.id,
       venue_id: request ? me.id : target.recipientId,
       started_by: me.id,
@@ -164,7 +170,18 @@ export function OfferWorkModal({ open, onClose, target, preselect = [] }: Props)
       artwork_ids: chosen.map(w => w.id),
       note: note.trim() || null,
       terms: (project ? termsOf(project) : request ? post?.details : target.terms) || null,
-    }).select().single();
+    });
+    // Only fall back to a plain message when deals don't exist in the
+    // database at all. A dropped connection or a refusal is shown, so the
+    // person can try again with the same offer.
+    const noDeals = dealErr && (dealErr.code === "42P01" || dealErr.code === "PGRST205");
+    if (!deal && !noDeals) {
+      setSending(false);
+      setError(dealErr?.hint === "rate_limited" ? dealErr.message
+        : dealErr?.hint === "blocked" ? "You can't send this to them."
+        : "That didn't send. Check your connection and try again.");
+      return;
+    }
 
     // 2. The message, with a link to the deal when there is one.
     const body = `${note.trim()}\n\n${workLines(chosen, origin)}${deal ? `\n\n${request ? "Answer here" : "See the offer"}: ${origin}${dealLink(deal.id)}` : ""}`;

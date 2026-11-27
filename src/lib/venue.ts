@@ -13,7 +13,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { type DealView, isClosed, loadDeals } from "@/lib/deals";
 import { type PlaceArtwork, cityOf, isSold, sameCity } from "@/lib/places";
 import { type SiteConfig, type WallEntry, siteOf, today } from "@/lib/site";
-import { IMAGE_CACHE_SECONDS, imageExt, prepareImage } from "@/lib/image";
+import { IMAGE_CACHE_SECONDS, imageExt, prepareImage, isPicture } from "@/lib/image";
+import { asDate } from "@/lib/dates";
 
 export const VENUE_TYPES = ["Café", "Bar", "Restaurant", "Gallery", "Hotel", "Office", "Shop", "Cultural center", "Studio", "Pop-up space"];
 
@@ -131,7 +132,7 @@ export async function saveSite(sb: SupabaseClient, me: string, site: SiteConfig,
 
 /** Upload one image into the person's own folder; returns its public address. */
 export async function uploadImage(sb: SupabaseClient, me: string, file: File, name: string): Promise<string | null> {
-  if (!file.type.startsWith("image/")) return null;
+  if (!isPicture(file)) return null;
   file = await prepareImage(file);
   if (file.size > 10 * 1024 * 1024) return null;
   const ext = imageExt(file);
@@ -150,7 +151,7 @@ export async function uploadImage(sb: SupabaseClient, me: string, file: File, na
 
 /** "Until 14 Feb", "From 3 Mar". */
 export function shortRange(e: { start_date: string | null; end_date: string | null }): string {
-  const f = (d: string) => new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+  const f = (d: string) => asDate(d).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
   const t = today();
   if (e.start_date && e.start_date > t) return `From ${f(e.start_date)}`;
   if (e.end_date) return `Until ${f(e.end_date)}`;

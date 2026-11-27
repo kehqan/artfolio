@@ -1,6 +1,7 @@
 "use client";
 // The Scene feed on a map. Only posts with a real address get a pin;
 // nothing is placed at made-up positions.
+import { safeHref } from "@/lib/safe-url";
 import { useEffect, useRef, useState } from "react";
 import { ExternalLink, MapPin, X } from "lucide-react";
 import { getApiKey, loadScript, MAP_STYLE } from "@/components/PlacesAutocomplete";
@@ -83,7 +84,7 @@ export function SceneMap({ items, venues, onOpen }: { items: FeedItem[]; venues:
               <span className="font-ui text-body font-semibold text-fg">{venue.name}</span>
               <span className="font-ui text-body-sm text-fg-3">{[venue.address, venue.city].filter(Boolean).join(", ")}</span>
               {venue.website && (
-                <a href={venue.website} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-ui text-body-sm font-semibold text-fg underline-offset-4 hover:underline">
+                <a href={safeHref(venue.website)} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-ui text-body-sm font-semibold text-fg underline-offset-4 hover:underline">
                   Website <ExternalLink size={12} aria-hidden />
                 </a>
               )}

@@ -13,6 +13,7 @@ import { Captcha, captchaOptions, captchaWaiting } from "@/components/auth/Captc
 import { AuthLink, AuthShell } from "@/components/auth/AuthShell";
 import { MIN_AGE, TERMS_VERSION } from "@/lib/legal";
 import { track } from "@/lib/analytics";
+import { normEmail } from "@/lib/email-address";
 
 type Role = "artist" | "venue" | "curator";
 type Step = "role" | "art" | "account";
@@ -98,8 +99,8 @@ export default function RegisterPage() {
   // curator
   const [curates, setCurates] = useState<string[]>([]);
   // account
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
+  const [rawName, setName] = useState("");
+  const [rawEmail, setEmail] = useState("");
   const [pw, setPw] = useState("");
   const [adult, setAdult] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -115,11 +116,13 @@ export default function RegisterPage() {
   function canArt() { return role === "artist" ? mediums.length > 0 : role === "curator" ? true : vName.trim() !== "" && vType !== ""; }
 
   async function submit(e: React.FormEvent) {
-    e.preventDefault(); if (!role) return;
+    e.preventDefault(); if (!role || loading) return;
     if (!adult) { setErr(`Artomango is for people aged ${MIN_AGE} or older.`); return; }
     setLoading(true); setErr("");
     try {
       const sb = createClient();
+      const email = normEmail(rawEmail);
+      const name = rawName.trim().replace(/\s+/g, " ");
       const p: Record<string, unknown> = { full_name: name, email, role, onboarding_done: true };
       if (role === "artist") { p.mediums = mediums; p.location = city; p.lat = cityCoords?.lat || null; p.lng = cityCoords?.lng || null; }
       else if (role === "curator") { p.curates = curates; p.location = city; p.lat = cityCoords?.lat || null; p.lng = cityCoords?.lng || null; }
@@ -140,7 +143,13 @@ export default function RegisterPage() {
         options: { data: { full_name: name, role, profile: p, adult_confirmed: true, terms_version: TERMS_VERSION, terms_accepted_at: new Date().toISOString(), ...(role === "artist" ? { welcome: "pending" } : {}) }, emailRedirectTo: `${window.location.origin}/auth/confirm`, ...captchaOptions(captcha) },
       });
       setTries(t => t + 1); // a bot-check token works once
-      if (e2) { setErr(e2.message); setLoading(false); return; }
+      if (e2) {
+        setErr(/already registered|already exists/i.test(e2.message) ? "There's already an account with this email. Sign in, or reset your password."
+          : /rate limit|too many/i.test(e2.message) ? "Lots of people are signing up right now. Wait a minute and try again."
+          : /fetch|network/i.test(e2.message) ? "No connection. Check your signal and try again."
+          : e2.message);
+        setLoading(false); return;
+      }
       track("signed_up", { role, confirm_email: !data.session });
       if (data.session && data.user) {
         await sb.from("profiles").upsert({ id: data.user.id, ...p });
@@ -304,10 +313,10 @@ export default function RegisterPage() {
       <form onSubmit={submit} className="flex flex-col gap-4">
         {err && <Alert tone="bad">{err}</Alert>}
         <Field label={role === "artist" ? "Full name" : "Your name"} hint={role === "venue" ? "The person running the account." : role === "curator" ? "As artists will see it on your invitations." : "As you sign your work."}>
-          {(p) => <Input {...p} required autoFocus autoComplete="name" value={name} onChange={e => setName(e.target.value)} />}
+          {(p) => <Input {...p} required autoFocus autoComplete="name" maxLength={100} value={rawName} onChange={e => setName(e.target.value)} />}
         </Field>
         <Field label="Email">
-          {(p) => <Input {...p} type="email" required autoComplete="email" placeholder="you@example.com" value={email} onChange={e => setEmail(e.target.value)} />}
+          {(p) => <Input {...p} type="email" required autoComplete="email" autoCapitalize="none" autoCorrect="off" spellCheck={false} placeholder="you@example.com" value={rawEmail} onChange={e => setEmail(e.target.value)} />}
         </Field>
         <Field label="Password" hint="At least 8 characters.">
           {(p) => <PasswordInput {...p} required minLength={8} autoComplete="new-password" value={pw} onChange={e => setPw(e.target.value)} />}

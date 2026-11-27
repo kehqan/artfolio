@@ -1,4 +1,5 @@
 "use client";
+import { asDate } from "@/lib/dates";
 import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -172,7 +173,7 @@ export default function ProvenanceManager({ artworkId }: { artworkId: string }) 
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 2 }}>
                     <span style={{ fontSize: 13, fontWeight: 800, color: "#111110" }}>{et.label}</span>
-                    {entry.date && <span style={{ fontSize: 11, fontWeight: 600, color: "#9B8F7A" }}>{new Date(entry.date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>}
+                    {entry.date && <span style={{ fontSize: 11, fontWeight: 600, color: "#9B8F7A" }}>{asDate(entry.date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>}
                   </div>
                   {entry.owner_name && !entry.is_anonymous && <div style={{ fontSize: 12, fontWeight: 700, color: "#5C5346" }}>{entry.owner_name}</div>}
                   {entry.is_anonymous && <div style={{ fontSize: 12, fontWeight: 600, color: "#9B8F7A", fontStyle: "italic" }}>Private collection</div>}

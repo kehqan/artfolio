@@ -1,4 +1,5 @@
 "use client";
+import { safeHref } from "@/lib/safe-url";
 import { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
@@ -16,6 +17,7 @@ import {
 } from "@/components/ui";
 import { STAGES, STAGE_MAP, toStageKey, formatPrice } from "@/lib/artwork-stage";
 import { isSold, missingForWall } from "@/lib/places";
+import { asDate, localDay } from "@/lib/dates";
 
 const ART_TYPE_LABEL: Record<string, string> = {
   physical: "Physical",
@@ -86,7 +88,7 @@ export default function ArtworkDetailPage() {
         const cid = data?.[0]?.contract_id;
         if (!cid) return;
         const { data: c } = await sb.from("contracts").select("venue_name,end_date").eq("id", cid).single();
-        if (!c || (c.end_date && c.end_date < new Date().toISOString().slice(0, 10))) return;
+        if (!c || (c.end_date && c.end_date < localDay())) return;
         setOnShow({ venue: c.venue_name || "a venue", until: c.end_date, contract: cid });
       });
   }, [id]);
@@ -234,7 +236,7 @@ export default function ArtworkDetailPage() {
             {onShow && (
               <Link href={`/dashboard/contracts/${onShow.contract}`} className="inline-flex items-center gap-1.5 self-start rounded-pill border-outline border-ink bg-mango px-3 py-1 font-ui text-label font-semibold text-on-mango">
                 <MapPin size={13} aria-hidden /> On show at {onShow.venue}
-                {onShow.until && <span className="font-normal">until {new Date(onShow.until).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}</span>}
+                {onShow.until && <span className="font-normal">until {asDate(onShow.until).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}</span>}
               </Link>
             )}
           </div>
@@ -333,7 +335,7 @@ export default function ArtworkDetailPage() {
                 {moodboards.map(mb => {
                   const thumb = mb.thumbnail_url || mb.og_image;
                   return (
-                    <a key={mb.id} href={mb.url} target="_blank" rel="noopener noreferrer"
+                    <a key={mb.id} href={safeHref(mb.url)} target="_blank" rel="noopener noreferrer"
                       className="flex items-center gap-3 rounded-control border-hair border-line p-2.5 transition-colors hover:border-ink">
                       <span className="grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-chip bg-sunken text-fg-3">
                         {/* eslint-disable-next-line @next/next/no-img-element */}

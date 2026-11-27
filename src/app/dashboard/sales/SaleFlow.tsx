@@ -3,9 +3,10 @@
 // much, where it sold, and whether it's paid. Everything we already know
 // (the work's price and currency, a venue's commission from a signed deal)
 // is filled in, and anything else can wait with "I don't know yet".
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, ArrowRight, Check, ImageOff, Search } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { insertOnce, newId } from "@/lib/once";
 import { Alert, Avatar, Button, ButtonLink, Input, Modal, Select, cn } from "@/components/ui";
 import { formatPrice } from "@/components/public/PublicChrome";
 import { CHANNELS, type Channel, CURRENCIES } from "./money";
@@ -50,6 +51,9 @@ export function SaleFlow({ open, userId, defaultCurrency, works, clients, startW
   const [find, setFind] = useState("");
   const [findBuyer, setFindBuyer] = useState("");
   const [saving, setSaving] = useState(false);
+  // Ids picked once per sale, so tapping again on a bad connection
+  // doesn't record the sale (or the new collector) twice.
+  const ids = useRef({ sale: newId(), client: newId() });
   const [error, setError] = useState("");
   const [first, setFirst] = useState(false);
   const { win } = useJourney();
@@ -57,6 +61,7 @@ export function SaleFlow({ open, userId, defaultCurrency, works, clients, startW
   // Reset each time it opens, and load signed deals (works on show at a venue).
   useEffect(() => {
     if (!open) return;
+    ids.current = { sale: newId(), client: newId() };
     setError(""); setSaving(false); setFind(""); setFindBuyer("");
     setWorkId(null); setClientId(startClient || null); setNewName(""); setNewEmail(""); setUnknownBuyer(false);
     setPrice(""); setCurrency(defaultCurrency); setChannel(null); setDealId(null); setCommission(""); setPaid(null); setDate(today());
@@ -126,12 +131,13 @@ export function SaleFlow({ open, userId, defaultCurrency, works, clients, startW
   }
 
   async function save(isPaid: boolean) {
+    if (saving) return;
     setPaid(isPaid); setSaving(true); setError("");
     const sb = createClient();
     let cid = clientId;
     if (!cid && newName.trim()) {
-      const { data: c, error: e } = await sb.from("clients").insert({ user_id: userId, name: newName.trim(), email: newEmail.trim() || null, status: "active" }).select("id").single();
-      if (e || !c) { setSaving(false); setError("We couldn't save the collector. Please try again."); return; }
+      const { data: c, error: e } = await insertOnce<{ id: string }>(sb, "clients", { id: ids.current.client, user_id: userId, name: newName.trim(), email: newEmail.trim() || null, status: "active" }, "id");
+      if (e || !c) { setSaving(false); setError("We couldn't save the collector. Check your connection and try again."); return; }
       cid = c.id;
     }
     const base = {
@@ -140,10 +146,10 @@ export function SaleFlow({ open, userId, defaultCurrency, works, clients, startW
       sale_price: parseFloat(price) || 0, currency, commission_percentage: parseFloat(commission) || 0,
       sale_date: date || today(), status: isPaid ? "Completed" : "Pending",
     };
-    let res = await sb.from("sales").insert({ ...base, client_id: cid, channel, deal_id: dealId });
+    let res = await insertOnce(sb, "sales", { ...base, id: ids.current.sale, client_id: cid, channel, deal_id: dealId }, "id");
     // Before the new fields exist, save the sale without them.
-    if (res.error && /client_id|channel|deal_id/.test(res.error.message || "")) res = await sb.from("sales").insert(base);
-    if (res.error) { setSaving(false); setError("That didn't save. Please try again."); return; }
+    if (res.error && /client_id|channel|deal_id/.test(res.error.message || "")) res = await insertOnce(sb, "sales", { ...base, id: ids.current.sale }, "id");
+    if (res.error) { setSaving(false); setError("That didn't save. Check your connection and try again."); return; }
     if (isPaid && workId) await sb.from("artworks").update({ status: "sold" }).eq("id", workId).eq("user_id", userId);
     if (isPaid) {
       const { count } = await sb.from("sales").select("id", { count: "exact", head: true }).eq("user_id", userId).ilike("status", "completed");

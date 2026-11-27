@@ -15,6 +15,7 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft, ArrowRight, Check, Copy, ExternalLink, ImagePlus, X } from "lucide-react";
 import { type Milestone, saveJourney } from "@/lib/journey";
 import { createClient } from "@/lib/supabase/client";
+import { insertOnce, newId } from "@/lib/once";
 import { Alert, Button, ButtonLink, Input, Select, cn } from "@/components/ui";
 import { Wordmark } from "@/components/brand/Wordmark";
 import { CURRENCIES } from "@/app/dashboard/artworks/_form/parts";
@@ -22,7 +23,7 @@ import { type PlaceArtwork, type WallTerms, missingForWall, wallReady } from "@/
 import {
   ACCENTS, type AccentKey, type GridKey, type HeaderKey, type PreviewMessage, type SiteConfig, type TypeKey, siteOf,
 } from "@/lib/site";
-import { IMAGE_CACHE_SECONDS, prepareImage } from "@/lib/image";
+import { IMAGE_CACHE_SECONDS, isPicture, photoProblem, prepareImage, uploadable } from "@/lib/image";
 import { track } from "@/lib/analytics";
 
 const MAX_WORKS = 3;
@@ -33,6 +34,8 @@ const ALL_STEPS: Step[] = ["hello", "photos", "titles", "sizes", "prices", "wall
 /** One work in the flow. `id` is set once it's saved. */
 type Draft = {
   key: string; id?: string; preview: string; url: string | null; failed?: boolean;
+  /** The id this work will be saved under, picked once so a retry can't save it twice. */
+  newId?: string;
   title: string; w: string; h: string; price: string;
   saved?: PlaceArtwork;
 };
@@ -126,16 +129,19 @@ export default function WelcomePage() {
   function addPhotos(files: FileList | null) {
     if (!files || !uid) return;
     const sb = createClient();
-    const picked = Array.from(files).filter(f => f.type.startsWith("image/")).slice(0, MAX_WORKS - works.length);
+    const picked = Array.from(files).filter(isPicture).slice(0, MAX_WORKS - works.length);
+    if (!picked.length && files.length) { setError("Pick a photo: JPG, PNG, WebP or an iPhone photo."); return; }
     const added: Draft[] = picked.map((f, i) => {
       const key = `${Date.now()}-${i}-${f.name}`;
       // Shrunk and turned into WebP first (lib/image), then uploaded.
       uploads.current[key] = prepareImage(f).then(img => {
+        if (!uploadable(img)) { setError(photoProblem(f)); return null; }
         const ext = img.name.split(".").pop() || "jpg";
         const path = `artworks/${uid}/${key.replace(/\.[^.]+$/, "").replace(/[^a-zA-Z0-9.-]/g, "")}.${ext}`;
         return sb.storage.from("avatars").upload(path, img, { upsert: true, contentType: img.type, cacheControl: IMAGE_CACHE_SECONDS })
           .then(({ error: e }) => (e ? null : sb.storage.from("avatars").getPublicUrl(path).data.publicUrl));
       })
+        .catch(() => null)
         .then(url => { setWorks(ws => ws.map(x => (x.key === key ? { ...x, url, failed: !url } : x))); return url; });
       return { key, preview: URL.createObjectURL(f), url: null, title: "", w: "", h: "", price: "" };
     });
@@ -163,11 +169,13 @@ export default function WelcomePage() {
         }
         out.push({ ...x, saved: { ...x.saved!, title } });
       } else {
-        const { data, error: e } = await sb.from("artworks").insert({
-          user_id: uid, title, images: [x.url], art_type: "physical", status: "complete", currency,
+        x.newId ||= newId();
+        const { data, error: e } = await insertOnce<PlaceArtwork>(sb, "artworks", {
+          id: x.newId, user_id: uid, title, images: [x.url], art_type: "physical", status: "complete", currency,
           authentication_status: "original",
-        }).select("id, title, images, width_cm, height_cm, price, currency, status, wall_terms").single();
-        if (e || !data) { setBusy(false); setError("That didn't save. Please try again."); return; }
+        }, "id, title, images, width_cm, height_cm, price, currency, status, wall_terms");
+        // Keep the ones that did save, so trying again only saves the rest.
+        if (e || !data) { setWorks([...out, ...keep.slice(out.length)]); setBusy(false); setError("That didn't save. Check your connection and try again."); return; }
         out.push({ ...x, id: data.id, saved: data as PlaceArtwork });
         track("work_added", { from: "welcome" });
       }

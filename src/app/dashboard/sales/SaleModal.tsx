@@ -1,8 +1,9 @@
 "use client";
 // Record a sale, or open one to change or delete it.
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Trash2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { insertOnce, newId } from "@/lib/once";
 import { Alert, Button, Chip, Field, Input, Modal, Select, Textarea } from "@/components/ui";
 import { formatPrice } from "@/components/public/PublicChrome";
 import { type Sale, CURRENCIES, PAYMENT_METHODS, SALE_STATUSES } from "./money";
@@ -27,11 +28,13 @@ export function SaleModal({ open, sale, userId, defaultCurrency, artworks, clien
     date: today(), payment: "Bank transfer", status: "Completed", notes: "",
   });
   const [saving, setSaving] = useState(false);
+  const newSaleId = useRef(newId());
   const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
     if (!open) return;
+    newSaleId.current = newId();
     setError(""); setConfirming(false);
     setF(sale ? {
       artwork_id: sale.artwork_id || "", buyer_name: sale.buyer_name || "", buyer_email: sale.buyer_email || "",
@@ -64,6 +67,7 @@ export function SaleModal({ open, sale, userId, defaultCurrency, artworks, clien
   }
 
   async function save() {
+    if (saving) return;
     if (!(parseFloat(f.price) >= 0) || f.price === "") { setError("Add the price it sold for."); return; }
     setSaving(true); setError("");
     const sb = createClient();
@@ -74,7 +78,7 @@ export function SaleModal({ open, sale, userId, defaultCurrency, artworks, clien
     };
     const res = sale
       ? await sb.from("sales").update(row).eq("id", sale.id).eq("user_id", userId)
-      : await sb.from("sales").insert({ ...row, user_id: userId });
+      : await insertOnce(sb, "sales", { ...row, id: newSaleId.current, user_id: userId }, "id");
     if (res.error) { setSaving(false); setError("That didn't save. Please try again."); return; }
     // A completed sale marks the work as sold.
     if (f.status === "Completed" && f.artwork_id) {

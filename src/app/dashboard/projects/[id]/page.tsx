@@ -12,6 +12,7 @@
 //
 // The works, artists and papers all come from the deals that belong to the
 // project (lib/projects), so nothing here has to be kept in sync by hand.
+import { localDay } from "@/lib/dates";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
@@ -367,7 +368,7 @@ function Quiet({ children }: { children: React.ReactNode }) {
 }
 
 function Timeline({ p }: { p: ProjectView }) {
-  const t = new Date().toISOString().slice(0, 10);
+  const t = localDay();
   const firstInvite = [...p.deals, ...p.closed].map(d => d.created_at).sort()[0];
   const firstSigned = p.deals.filter(d => d.status === "signed").map(d => d.updated_at).sort()[0];
   const rows: { label: string; date: string | null; done: boolean }[] = [

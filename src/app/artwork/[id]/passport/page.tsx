@@ -11,6 +11,7 @@ import type { BadgeTone } from "@/components/ui";
 import { Wordmark } from "@/components/brand/Wordmark";
 import { Mat } from "@/components/public/PublicChrome";
 import { QrCode } from "@/components/labels/QrCode";
+import { asDate } from "@/lib/dates";
 
 type Artist = { id: string; full_name: string; username?: string; location?: string; avatar_url?: string };
 type Artwork = {
@@ -50,7 +51,7 @@ const AUTH: Record<string, { label: string; tone: BadgeTone }> = {
 
 function fmt(d?: string | null) {
   if (!d) return "";
-  try { return new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" }); }
+  try { return asDate(d).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" }); }
   catch { return d; }
 }
 

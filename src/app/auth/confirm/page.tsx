@@ -1,10 +1,11 @@
 "use client";
-// The "confirm your email" link lands here with ?code=…. Exchanging it
+// The "confirm your email" link lands here with ?token_hash=… or ?code=…. Using it
 // signs the person in; then we save what they told us at sign-up and
 // take them to Home.
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { signInFromEmailLink } from "@/lib/supabase/email-link";
 import { applyPendingProfile } from "@/lib/pending-profile";
 import { takeRememberedNext } from "@/lib/next-path";
 import { ButtonLink } from "@/components/ui";
@@ -16,10 +17,8 @@ export default function ConfirmPage() {
 
   useEffect(() => {
     const sb = createClient();
-    const q = new URLSearchParams(window.location.search);
-    const code = q.get("code");
     (async () => {
-      if (code) await sb.auth.exchangeCodeForSession(code).catch(() => null);
+      await signInFromEmailLink(sb, "email");
       const { data: { user } } = await sb.auth.getUser();
       if (!user) { setFailed(true); return; }
       await applyPendingProfile(sb, user);

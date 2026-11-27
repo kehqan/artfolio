@@ -2,6 +2,7 @@
 // data the page shows. Every choice is a preset, so any mix stays polished.
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { loadBuyHosts } from "./buy";
+import { asDate, localDay } from "@/lib/dates";
 
 // ── Presets ─────────────────────────────────────────────────────────
 export type AccentKey = "mango" | "ink" | "clay" | "moss" | "ocean" | "plum" | "rose" | "sand";
@@ -196,11 +197,11 @@ export const dimsOf = (w: SiteWork) => {
   return d.length ? `${d.join(" × ")} cm` : "";
 };
 export const webHref = (url: string) => (url.startsWith("http") ? url : `https://${url}`);
-export const today = () => new Date().toISOString().slice(0, 10);
+export const today = () => localDay();
 export const isCurrent = (e: { start_date: string | null; end_date: string | null }) =>
   (!e.end_date || e.end_date >= today()) && (!e.start_date || e.start_date <= today());
 export const fmtRange = (a?: string | null, b?: string | null) => {
-  const f = (d: string) => new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+  const f = (d: string) => asDate(d).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
   if (!a) return b ? `Until ${f(b)}` : "";
   return b && b !== a ? `${f(a)} – ${f(b)}` : f(a);
 };

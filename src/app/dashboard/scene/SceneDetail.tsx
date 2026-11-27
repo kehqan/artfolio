@@ -1,4 +1,5 @@
 "use client";
+import { safeHref } from "@/lib/safe-url";
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import Link from "next/link";
@@ -59,7 +60,7 @@ export function SceneDetail({ item, mine, onClose, onMessage, actionLabel, onEdi
   if (item.raw?.num_artists) rows.push(["Looking for", `${item.raw.num_artists} ${item.raw.num_artists === 1 ? "artist" : "artists"}`]);
   if (item.link) {
     rows.push(["Link", (
-      <a href={item.link} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-semibold text-fg underline underline-offset-4">
+      <a href={safeHref(item.link)} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-semibold text-fg underline underline-offset-4">
         Open link <ExternalLink size={13} aria-hidden />
       </a>
     )]);

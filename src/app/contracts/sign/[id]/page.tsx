@@ -5,6 +5,7 @@
 // functions.
 import { useState, useEffect } from "react";
 import { useParams, useSearchParams } from "next/navigation";
+import { MangoMark } from "@/components/brand/MangoMark";
 import { AlertCircle, Check, CheckCircle2, Clock, Shield } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Wordmark } from "@/components/brand/Wordmark";
@@ -178,7 +179,7 @@ export default function ExternalSignPage() {
             </p>
           )}
         </Card>
-        <p className="text-center font-ui text-caption text-fg-3">Made with <a href="/" className="font-semibold text-fg-2 hover:text-fg">Artomango</a>, where artists keep their work, shows and papers.</p>
+        <p className="text-center font-ui text-caption text-fg-3">Made with <a href="/" className="inline-flex items-center gap-1 align-middle font-semibold text-fg-2 hover:text-fg"><MangoMark size={14} />Artomango</a>, where artists keep their work, shows and papers.</p>
       </Shell>
     );
   }
@@ -302,7 +303,7 @@ export default function ExternalSignPage() {
         </Card>
       )}
 
-      <p className="text-center font-ui text-caption text-fg-3">Made with <a href="/" className="font-semibold text-fg-2 hover:text-fg">Artomango</a>, where artists keep their work, shows and papers.</p>
+      <p className="text-center font-ui text-caption text-fg-3">Made with <a href="/" className="inline-flex items-center gap-1 align-middle font-semibold text-fg-2 hover:text-fg"><MangoMark size={14} />Artomango</a>, where artists keep their work, shows and papers.</p>
     </Shell>
   );
 }

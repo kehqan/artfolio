@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { MangoMark } from "@/components/brand/MangoMark";
 import {
   Users, ImageIcon, Calendar, Settings, LayoutDashboard,
   Palette, Building2, Megaphone, Globe, Edit2, Trash2,
@@ -251,14 +252,14 @@ export default function AdminPage() {
 
   const stats = { users: users.length, artists: users.filter(u => u.role === "artist").length, galleries: users.filter(u => u.role === "gallery").length, artworks: artworks.length, available: artworks.filter(a => a.status?.toLowerCase() === "available").length, events: events.length, slides: slides.filter(s => s.active).length };
 
-  if (authLoading) return <div style={{ minHeight:"100vh", background:"#111110", display:"flex", alignItems:"center", justifyContent:"center", fontSize:40 }}>🥭</div>;
+  if (authLoading) return <div style={{ minHeight:"100vh", background:"#111110", display:"flex", alignItems:"center", justifyContent:"center" }}><MangoMark size={44} label="Artomango" /></div>;
 
   if (!authed) return (
     <>
       <style>{`*{box-sizing:border-box;margin:0;padding:0}body{font-family:var(--font-darker-grotesque),sans-serif;background:#111110}`}</style>
       <div style={{ minHeight:"100vh", background:"#111110", display:"flex", alignItems:"center", justifyContent:"center", padding:20 }}>
         <div style={{ background:"#FFFBEA", border:"2.5px solid #111110", borderRadius:20, padding:"36px 32px", width:"100%", maxWidth:380, boxShadow:"8px 8px 0 #FFD400" }}>
-          <div style={{ fontSize:44, textAlign:"center", marginBottom:16 }}>🥭</div>
+          <div style={{ textAlign:"center", marginBottom:16 }}><MangoMark size={48} /></div>
           <h1 style={{ fontSize:24, fontWeight:900, color:"#111110", letterSpacing:"-0.8px", marginBottom:4, textAlign:"center" }}>Admin Panel</h1>
           <p style={{ fontSize:13, color:"#9B8F7A", fontWeight:600, textAlign:"center", marginBottom:24 }}>{authError || "Checking access…"}</p>
           <a href="/login" style={{ display:"block", width:"100%", padding:13, border:"2.5px solid #111110", borderRadius:12, background:"#FFD400", fontSize:14, fontWeight:800, cursor:"pointer", fontFamily:"inherit", boxShadow:"3px 3px 0 #111110", textAlign:"center", color:"#111110", textDecoration:"none" }}>
@@ -318,8 +319,8 @@ export default function AdminPage() {
       {/* Top bar */}
       <div style={{ background:"#111110", padding:"12px 24px", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
         <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-          <span style={{ fontSize:22 }}>🥭</span>
-          <span style={{ fontSize:15, fontWeight:900, color:"#FFD400", letterSpacing:"-0.3px" }}>artomango</span>
+          <MangoMark size={24} />
+          <span style={{ fontSize:15, fontWeight:900, color:"#FFD400", letterSpacing:"-0.3px" }}>Artomango</span>
           <span style={{ fontSize:11, fontWeight:700, color:"#555", background:"#1a1a1a", padding:"2px 8px", borderRadius:6 }}>ADMIN</span>
         </div>
         <div style={{ display:"flex", gap:8 }}>

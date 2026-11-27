@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { cn } from "@/components/ui";
+import { MangoMark } from "./MangoMark";
 
 /** The Artomango mark + name. Links home; pass href to change where. */
 export function Wordmark({ href = "/", size = "md", className }: { href?: string; size?: "md" | "lg"; className?: string }) {
@@ -12,8 +13,7 @@ export function Wordmark({ href = "/", size = "md", className }: { href?: string
         className,
       )}
     >
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src="/logo.png" alt="" className={size === "lg" ? "h-8 w-8" : "h-6 w-6"} />
+      <MangoMark size={size === "lg" ? 32 : 24} />
       <span className={cn("font-display text-fg", size === "lg" ? "text-h2" : "text-h3")}>Artomango</span>
     </Link>
   );

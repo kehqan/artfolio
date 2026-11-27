@@ -77,7 +77,12 @@ export function WallLabelArt(p: LabelArtProps) {
       <p style={{ fontFamily: UI, fontWeight: 600, fontSize: pt(7), letterSpacing: "0.05em", textTransform: "uppercase", lineHeight: 1.25, margin: 0 }}>
         {say("scan", p.language)}
       </p>
-      <p style={{ fontFamily: DISPLAY, fontWeight: 800, fontSize: pt(8), lineHeight: 1, margin: 0, opacity: 0.55 }}>artomango</p>
+      <p style={{ display: "flex", alignItems: "center", gap: `${0.8 * k}mm`, fontFamily: DISPLAY, fontWeight: 800, fontSize: pt(8), lineHeight: 1, margin: 0 }}>
+        {/* The brand mark (src/components/brand/MangoMark.tsx), sized in mm for print. */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/brand/mango.svg" alt="" style={{ width: `${3.2 * k}mm`, height: `${3.2 * k}mm`, flex: "none" }} />
+        <span style={{ opacity: 0.6 }}>Artomango</span>
+      </p>
     </div>
   );
 

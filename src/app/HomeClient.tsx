@@ -4,7 +4,8 @@
 // find a wall, agree in one page, sell it off the wall.
 // Every number or name on it is real; the small app moments are examples.
 import Link from "next/link";
-import Meanwhile from "@/components/landing/Meanwhile";
+import Meanwhile, { type MeanwhilePhoto } from "@/components/landing/Meanwhile";
+import type { MeanwhileContent } from "@/lib/siteContent";
 import { ArrowRight, Check } from "lucide-react";
 import { ButtonLink, cn } from "@/components/ui";
 import { Mat, PublicFooter, PublicHeader, formatPrice, publicWrap, textLink } from "@/components/public/PublicChrome";
@@ -38,7 +39,10 @@ const VENUE_POINTS = [
 
 // The works arrive from the server (page.tsx), so the first picture is in the
 // page itself instead of waiting for two requests after the JavaScript loads.
-export default function HomeClient({ works }: { works: Artwork[] }) {
+export default function HomeClient({ works, meanwhile }: {
+  works: Artwork[];
+  meanwhile: { content: MeanwhileContent; photos: MeanwhilePhoto[] };
+}) {
   const loaded = true;
 
   const hero = works[0];
@@ -157,7 +161,7 @@ export default function HomeClient({ works }: { works: Artwork[] }) {
           </section>
         )}
 
-        <Meanwhile />
+        <Meanwhile content={meanwhile.content} photos={meanwhile.photos} />
 
         {/* ── Close ── */}
         <section className="border-t-hair border-line bg-mango py-20 lg:py-24">

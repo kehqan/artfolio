@@ -2,6 +2,8 @@
 // minutes: the newest available works are already in the HTML.
 import { publicClient } from "@/lib/supabase/public";
 import HomeClient, { type Artwork } from "./HomeClient";
+import { MEANWHILE_KEY, readMeanwhile, type MeanwhileContent } from "@/lib/siteContent";
+import type { MeanwhilePhoto } from "@/components/landing/Meanwhile";
 
 export const revalidate = 300;
 
@@ -23,6 +25,24 @@ async function newestWorks(): Promise<Artwork[]> {
   }
 }
 
+// The "Meanwhile" section: its words and photos, as edited in /admin/home.
+// Saving there asks for this page to be rebuilt, so edits show within seconds.
+async function meanwhile(): Promise<{ content: MeanwhileContent; photos: MeanwhilePhoto[] }> {
+  const sb = publicClient();
+  const [c, p] = await Promise.all([
+    sb.from("site_content").select("value").eq("key", MEANWHILE_KEY).maybeSingle().then(r => r, () => null),
+    sb.from("campaign_slides").select("image_url,caption").eq("active", true).order("order", { ascending: true }).then(r => r, () => null),
+  ]);
+  let photos = (p?.data || []) as MeanwhilePhoto[];
+  if (p?.error) {
+    // Before admin/site_content.sql is run there is no caption column yet.
+    const { data } = await sb.from("campaign_slides").select("image_url").eq("active", true).order("order", { ascending: true }).then(r => r, () => ({ data: null }));
+    photos = (data || []) as MeanwhilePhoto[];
+  }
+  return { content: readMeanwhile(c?.data?.value), photos };
+}
+
 export default async function HomePage() {
-  return <HomeClient works={await newestWorks()} />;
+  const [works, m] = await Promise.all([newestWorks(), meanwhile()]);
+  return <HomeClient works={works} meanwhile={m} />;
 }
